@@ -16,6 +16,11 @@ export interface AddMovementInput {
   cashRegisterId?: string;
 }
 
+/** Movimiento de caja enriquecido con el estado de la venta relacionada (si aplica). */
+export type CashMovementWithStatus = CashMovement & {
+  relatedSaleStatus?: 'completed' | 'voided' | 'pending';
+};
+
 export interface CashReport {
   register: CashRegister;
   openingAmount: string;
@@ -31,7 +36,7 @@ export interface CashReport {
   closingAmount: string | null;
   /** declarado − esperado (null si la caja sigue abierta) */
   difference: string | null;
-  movements: CashMovement[];
+  movements: CashMovementWithStatus[];
 }
 
 export class CashService {
@@ -101,7 +106,13 @@ export class CashService {
 
   private async buildReport(register: CashRegister): Promise<CashReport> {
     const { repos } = this.ctx;
-    const movements = await repos.cashMovements.findByRegister(register.id);
+    const rawMovements = await repos.cashMovements.findByRegister(register.id);
+    const saleIds = [...new Set(rawMovements.filter((m) => m.relatedSaleId).map((m) => m.relatedSaleId as string))];
+    const saleStatuses = await repos.sales.findStatusesByIds(saleIds);
+    const movements: CashMovementWithStatus[] = rawMovements.map((m) => {
+      const status = m.relatedSaleId ? saleStatuses.get(m.relatedSaleId) : undefined;
+      return status ? { ...m, relatedSaleStatus: status } : m;
+    });
     const incomes = movements.filter((m) => m.type === 'income');
     const expenses = movements.filter((m) => m.type === 'expense');
     const incomeTotal = sumDecimals(incomes.map((m) => m.amount));

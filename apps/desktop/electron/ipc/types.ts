@@ -188,6 +188,8 @@ export interface CashMovementDTO {
   relatedSaleId: string | null;
   relatedPurchaseId: string | null;
   createdAt: number;
+  /** Estado de la venta relacionada (sólo presente cuando hay `relatedSaleId`). */
+  relatedSaleStatus?: SaleStatus;
 }
 
 export interface SaleDTO {
@@ -537,6 +539,13 @@ export interface ApiSurface {
     get(payload: IdPayload): Res<FamilyDTO | null>;
     create(payload: EntityPayload): Res<FamilyDTO>;
     update(payload: UpdatePayload): Res<FamilyDTO>;
+    delete(payload: IdPayload): Res<{ deleted: true }>;
+  };
+  cards: {
+    list(): Res<CardDTO[]>;
+    get(payload: IdPayload): Res<CardDTO | null>;
+    create(payload: EntityPayload): Res<CardDTO>;
+    update(payload: UpdatePayload): Res<CardDTO>;
     delete(payload: IdPayload): Res<{ deleted: true }>;
   };
   users: {

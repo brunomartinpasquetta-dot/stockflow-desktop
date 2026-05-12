@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, max, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, max, sql } from 'drizzle-orm';
 import {
   CreateSaleWithLinesSchema,
   type CreateSaleWithLinesInput,
@@ -161,13 +161,20 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           if (inserted) insertedLines.push(inserted);
         }
 
-        // Movimiento de caja (ingreso). En ventas a cuenta corriente no entra dinero.
-        if (data.paymentType !== 'account') {
+        // Movimiento de caja: sólo la parte que entra en efectivo al cajón.
+        // cash -> total ; mixed -> total - cardAmount ; card/account -> nada al cajón.
+        const cashIn =
+          data.paymentType === 'cash'
+            ? total
+            : data.paymentType === 'mixed'
+              ? subDecimal(total, data.cardAmount ?? '0', 4)
+              : '0';
+        if (Number(cashIn) > 0) {
           tx.insert(cashMovements).values({
             cashRegisterId: data.cashRegisterId,
             type: 'income',
             description: `Venta ${data.type} #${number}`,
-            amount: total,
+            amount: cashIn,
             date: now,
             userId: data.sellerId,
             relatedSaleId: insertedSale.id,
@@ -213,12 +220,18 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .all()[0];
         if (!updated) throw new NotFoundError(this.entityName, id);
 
-        if (sale.paymentType !== 'account') {
+        const cashBack =
+          sale.paymentType === 'cash'
+            ? sale.total
+            : sale.paymentType === 'mixed'
+              ? subDecimal(sale.total, sale.cardAmount ?? '0', 4)
+              : '0';
+        if (sale.paymentType !== 'account' && Number(cashBack) > 0) {
           tx.insert(cashMovements).values({
             cashRegisterId: sale.cashRegisterId,
             type: 'expense',
             description: `Anulación venta ${sale.type} #${sale.number}`,
-            amount: sale.total,
+            amount: cashBack,
             date: Date.now(),
             userId: sale.sellerId,
             relatedSaleId: sale.id,
@@ -247,6 +260,21 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
   async findByCustomer(customerId: string): Promise<Sale[]> {
     try {
       return this.db.select().from(sales).where(eq(sales.customerId, customerId)).all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /** Mapa id → status de las ventas pedidas (para enriquecer reportes). */
+  async findStatusesByIds(ids: string[]): Promise<Map<string, Sale['status']>> {
+    if (ids.length === 0) return new Map();
+    try {
+      const rows = this.db
+        .select({ id: sales.id, status: sales.status })
+        .from(sales)
+        .where(inArray(sales.id, ids))
+        .all();
+      return new Map(rows.map((r) => [r.id, r.status]));
     } catch (err) {
       return rethrowDbError(err);
     }

@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { PrintProvider } from '@/contexts/PrintContext'
 import { queryClient } from '@/lib/queryClient'
 import { router } from '@/router'
 import './index.css'
@@ -16,8 +17,10 @@ createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
-        <RouterProvider router={router} />
-        <Toaster position="top-right" richColors closeButton />
+        <PrintProvider>
+          <RouterProvider router={router} />
+          <Toaster position="top-right" richColors closeButton />
+        </PrintProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </StrictMode>,

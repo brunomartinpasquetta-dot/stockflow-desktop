@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Loader2, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
-import { api } from '@/lib/api'
-import { useArticles, useCreateSale, useCurrentCash, useCustomerBalances, useCustomers } from '@/lib/hooks'
+import { api, ApiError } from '@/lib/api'
+import { useArticles, useCards, useCreateSale, useCurrentCash, useCustomerBalances, useCustomers } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePrintSaleTicket } from '@/lib/usePrint'
 import { calculateSaleTotals, lineTotal, resolvePrice } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import type { SaleTicketData, SaleTicketLine } from '@/print/SaleTicket'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,7 +19,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQuery } from '@tanstack/react-query'
-import type { ArticleDTO, CustomerDTO, VoucherType } from '@/types/api'
+import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, VoucherType } from '@/types/api'
 
 interface CartLine {
   article: ArticleDTO
@@ -33,6 +35,16 @@ const VOUCHER_OPTIONS: { value: VoucherType; label: string }[] = [
   { value: 'C', label: 'Factura C' },
   { value: 'X', label: 'Comprobante X' },
 ]
+
+const PAYMENT_LABELS: Record<'cash' | 'card' | 'mixed' | 'account', string> = {
+  cash: 'Efectivo',
+  card: 'Tarjeta',
+  mixed: 'Mixto',
+  account: 'Cuenta corriente',
+}
+
+/** Imprimir el ticket automáticamente al confirmar la venta (sin pasar por el toast). */
+const AUTO_PRINT_TICKET = false
 
 function CustomerPicker({
   open,
@@ -112,10 +124,14 @@ function PDV() {
   const articlesQuery = useArticles()
   const customersQuery = useCustomers()
   const balancesQuery = useCustomerBalances()
+  const cardsQuery = useCards()
+  const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
   const createSale = useCreateSale()
+  const printSaleTicket = usePrintSaleTicket()
 
   const allArticles = useMemo(() => (articlesQuery.data ?? []).filter((a) => a.active), [articlesQuery.data])
   const customers = useMemo(() => customersQuery.data ?? [], [customersQuery.data])
+  const activeCards = useMemo(() => (cardsQuery.data ?? []).filter((c) => c.active), [cardsQuery.data])
   const cfCustomer = useMemo(() => customers.find((c) => c.lastName.toUpperCase() === 'CONSUMIDOR FINAL'), [customers])
   const [today] = useState(() => formatDate(Date.now()))
 
@@ -135,7 +151,8 @@ function PDV() {
   const [globalDiscount, setGlobalDiscount] = useState('0')
   const [paymentType, setPaymentType] = useState<'cash' | 'card' | 'mixed' | 'account'>('cash')
   const [received, setReceived] = useState('')
-  const [mixedCash, setMixedCash] = useState('')
+  const [mixedCard, setMixedCard] = useState('')
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
@@ -237,10 +254,17 @@ function PDV() {
   }
 
   // --- pago ---
+  const cardRequired = paymentType === 'card' || paymentType === 'mixed'
+  const noCards = cardRequired && activeCards.length === 0
+  const effectiveCardId =
+    selectedCardId != null && activeCards.some((c) => c.id === selectedCardId)
+      ? selectedCardId
+      : activeCards[0]?.id ?? null
   const receivedNum = received ? Number(parseCurrencyInput(received)) : 0
   const change = paymentType === 'cash' ? Math.max(0, receivedNum - totalNum) : 0
-  const mixedCashNum = mixedCash ? Number(parseCurrencyInput(mixedCash)) : 0
-  const mixedCard = paymentType === 'mixed' ? Math.max(0, totalNum - mixedCashNum) : 0
+  const mixedCardNum = mixedCard ? Number(parseCurrencyInput(mixedCard)) : 0
+  const mixedCashNum = paymentType === 'mixed' ? Math.max(0, totalNum - mixedCardNum) : 0
+  const mixedValid = mixedCardNum > 0 && mixedCardNum < totalNum
   const accountEligible =
     selectedCustomer != null &&
     selectedCustomer.docType != null &&
@@ -256,7 +280,43 @@ function PDV() {
     effectiveCustomerId != null &&
     !createSale.isPending &&
     !(paymentType === 'cash' && receivedNum < totalNum) &&
-    !(paymentType === 'account' && (!accountEligible || overCredit))
+    !(paymentType === 'account' && (!accountEligible || overCredit)) &&
+    !(cardRequired && effectiveCardId == null) &&
+    !(paymentType === 'mixed' && !mixedValid)
+
+  const FALLBACK_COMPANY: CompanyDTO = {
+    id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, createdAt: 0, updatedAt: 0,
+  }
+
+  function buildTicket(result: CreateSaleResultDTO): SaleTicketData {
+    const isCF =
+      selectedCustomer == null ||
+      selectedCustomer.lastName.toUpperCase() === 'CONSUMIDOR FINAL' ||
+      selectedCustomer.docType === 'CF'
+    const descById = new Map(cart.map((l) => [l.article.id, l.article.description]))
+    const lines: SaleTicketLine[] = result.lines.map((l) => ({
+      description: descById.get(l.articleId) ?? '—',
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      lineTotal: l.lineTotal,
+    }))
+    const pt = result.sale.paymentType
+    return {
+      company: companyQuery.data ?? FALLBACK_COMPANY,
+      sale: result.sale,
+      lines,
+      customerName:
+        isCF || !selectedCustomer
+          ? null
+          : `${selectedCustomer.lastName}${selectedCustomer.firstName ? `, ${selectedCustomer.firstName}` : ''}`,
+      customerDoc:
+        !isCF && selectedCustomer?.docNumber ? `${selectedCustomer.docType ?? ''} ${selectedCustomer.docNumber}`.trim() : null,
+      paymentLabel: PAYMENT_LABELS[pt],
+      cardName: pt === 'card' || pt === 'mixed' ? activeCards.find((c) => c.id === result.sale.cardId)?.name ?? null : null,
+      received: pt === 'cash' ? receivedNum : null,
+      change: pt === 'cash' ? Math.max(0, receivedNum - Number(result.sale.total)) : null,
+    }
+  }
 
   async function confirmar(): Promise<void> {
     if (!effectiveCustomerId) return
@@ -265,9 +325,9 @@ function PDV() {
         type: voucherType,
         customerId: effectiveCustomerId,
         paymentType,
-        cardId: null,
+        cardId: cardRequired ? effectiveCardId : null,
         cardAmount:
-          paymentType === 'card' ? totals.total : paymentType === 'mixed' ? mixedCard.toFixed(4) : '0.0000',
+          paymentType === 'card' ? totals.total : paymentType === 'mixed' ? mixedCardNum.toFixed(4) : '0.0000',
         discount: parseCurrencyInput(globalDiscount),
         notes: null,
         lines: cart.map((l) => ({
@@ -279,18 +339,25 @@ function PDV() {
         })),
       })
       const vuelto = paymentType === 'cash' ? Math.max(0, receivedNum - Number(result.sale.total)) : 0
+      // Armamos los datos del ticket ahora (antes de limpiar el estado del PDV).
+      const ticketData = buildTicket(result)
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} registrada — Total ${formatCurrency(result.sale.total)}${vuelto > 0 ? ` — Vuelto ${formatCurrency(vuelto)}` : ''}`,
-        { action: { label: 'Imprimir', onClick: () => window.print() } },
+        { action: { label: 'Imprimir', onClick: () => printSaleTicket(ticketData) } },
       )
+      if (AUTO_PRINT_TICKET) printSaleTicket(ticketData)
       setCart([])
       setGlobalDiscount('0')
       setReceived('')
-      setMixedCash('')
+      setMixedCard('')
       setPaymentType('cash')
       void numberQuery.refetch()
       barcodeRef.current?.focus()
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'VALIDATION' && err.field === 'cardId') {
+        toast.error('Debe seleccionar una tarjeta para este tipo de pago')
+        return
+      }
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
     }
   }
@@ -520,25 +587,53 @@ function PDV() {
               </div>
             </div>
           )}
-          {paymentType === 'card' && (
+          {cardRequired && (
+            noCards ? (
+              <p className="text-xs text-destructive">
+                No hay tarjetas configuradas.{' '}
+                <Link to="/tarjetas" className="font-medium underline">
+                  Crear tarjetas
+                </Link>
+              </p>
+            ) : (
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-muted-foreground">Tarjeta</span>
+                <Select
+                  className="h-8 w-44"
+                  value={effectiveCardId ?? ''}
+                  onChange={(e) => setSelectedCardId(e.target.value || null)}
+                >
+                  {activeCards.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )
+          )}
+          {paymentType === 'card' && !noCards && (
             <p className="text-xs text-muted-foreground">Se cobra {formatCurrency(totals.total)} con tarjeta.</p>
           )}
-          {paymentType === 'mixed' && (
+          {paymentType === 'mixed' && !noCards && (
             <div className="flex flex-col gap-1 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">En efectivo</span>
+                <span className="text-muted-foreground">En tarjeta</span>
                 <Input
                   className="h-8 w-32 text-right tabular-nums"
                   inputMode="decimal"
-                  value={mixedCash}
-                  onChange={(e) => setMixedCash(e.target.value)}
-                  onBlur={() => mixedCash && setMixedCash(parseCurrencyInput(mixedCash))}
+                  value={mixedCard}
+                  onChange={(e) => setMixedCard(e.target.value)}
+                  onBlur={() => mixedCard && setMixedCard(parseCurrencyInput(mixedCard))}
                 />
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">En tarjeta</span>
-                <span className="tabular-nums font-medium">{formatCurrency(mixedCard)}</span>
+                <span className="text-muted-foreground">En efectivo</span>
+                <span className="tabular-nums font-medium">{formatCurrency(mixedCashNum)}</span>
               </div>
+              {mixedCard.trim() !== '' && !mixedValid && (
+                <p className="text-xs text-destructive">El monto en tarjeta debe ser mayor a 0 y menor al total.</p>
+              )}
             </div>
           )}
           {paymentType === 'account' && (

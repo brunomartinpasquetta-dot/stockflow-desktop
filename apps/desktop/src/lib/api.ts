@@ -4,6 +4,7 @@
  */
 import type {
   ArticleDTO,
+  CardDTO,
   CashMovementDTO,
   CashRegisterDTO,
   CashReportDTO,
@@ -110,6 +111,13 @@ export const api = {
     create: (data: EntityPayload): Promise<FamilyDTO> => unwrap(sf().families.create(data)),
     update: (id: string, data: EntityPayload): Promise<FamilyDTO> => unwrap(sf().families.update({ id, data })),
     delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().families.delete({ id })),
+  },
+  cards: {
+    list: (): Promise<CardDTO[]> => unwrap(sf().cards.list()),
+    get: (id: string): Promise<CardDTO | null> => unwrap(sf().cards.get({ id })),
+    create: (data: EntityPayload): Promise<CardDTO> => unwrap(sf().cards.create(data)),
+    update: (id: string, data: EntityPayload): Promise<CardDTO> => unwrap(sf().cards.update({ id, data })),
+    delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().cards.delete({ id })),
   },
   users: {
     list: (): Promise<UserDTO[]> => unwrap(sf().users.list()),

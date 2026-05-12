@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Plus, Wallet } from 'lucide-react'
 
+import { api } from '@/lib/api'
 import { useCashMutations, useCashReport, useCurrentCash } from '@/lib/hooks'
-import { usePermission } from '@/contexts/AuthContext'
+import { useAuth, usePermission } from '@/contexts/AuthContext'
+import { usePrintCashClose } from '@/lib/usePrint'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -99,6 +102,9 @@ function CajaAbierta({ registerId }: { registerId: string }) {
   const report = useCashReport(registerId)
   const { close, addMovement } = useCashMutations()
   const canMove = usePermission('add_cash_movement')
+  const { currentUser } = useAuth()
+  const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
+  const printCashClose = usePrintCashClose()
 
   const [movOpen, setMovOpen] = useState(false)
   const [movType, setMovType] = useState<'income' | 'expense'>('income')
@@ -144,9 +150,16 @@ function CajaAbierta({ registerId }: { registerId: string }) {
       })
       setCloseOpen(false)
       const diff = result.report.difference ?? '0'
+      const reportData = {
+        company: companyQuery.data ?? {
+          id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, createdAt: 0, updatedAt: 0,
+        },
+        report: result.report,
+        closedBy: currentUser?.fullName ?? '—',
+      }
       toast.success(
         `Caja cerrada — esperado ${formatCurrency(result.report.expectedCash)}, contado ${formatCurrency(amt)}, diferencia ${formatCurrency(diff)}`,
-        { action: { label: 'Imprimir', onClick: () => window.print() } },
+        { action: { label: 'Imprimir reporte', onClick: () => printCashClose(reportData) } },
       )
       setCloseAmount('')
       setCloseNotes('')
@@ -225,21 +238,27 @@ function CajaAbierta({ registerId }: { registerId: string }) {
               ) : (
                 [...r.movements]
                   .sort((a, b) => b.date - a.date)
-                  .map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{movementKind(m)}</Badge>
-                      </TableCell>
-                      <TableCell>{m.description}</TableCell>
-                      <TableCell className="text-right tabular-nums text-success">
-                        {m.type === 'income' ? formatCurrency(m.amount) : ''}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">
-                        {m.type === 'expense' ? formatCurrency(m.amount) : ''}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  .map((m) => {
+                    const anulada = m.relatedSaleStatus === 'voided' && m.type === 'income'
+                    return (
+                      <TableRow key={m.id} className={cn(anulada && 'line-through opacity-60')}>
+                        <TableCell className="text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
+                        <TableCell>
+                          <span className="flex items-center gap-1.5">
+                            <Badge variant="outline">{movementKind(m)}</Badge>
+                            {anulada && <Badge variant="destructive">ANULADA</Badge>}
+                          </span>
+                        </TableCell>
+                        <TableCell>{m.description}</TableCell>
+                        <TableCell className="text-right tabular-nums text-success">
+                          {m.type === 'income' ? formatCurrency(m.amount) : ''}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-destructive">
+                          {m.type === 'expense' ? formatCurrency(m.amount) : ''}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
               )}
             </TableBody>
           </Table>

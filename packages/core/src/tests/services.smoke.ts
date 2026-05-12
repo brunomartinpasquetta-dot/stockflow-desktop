@@ -171,6 +171,39 @@ async function main(): Promise<void> {
     JSON.stringify(gomezBalance),
   );
 
+  // --- pagos con tarjeta / mixto ---
+  console.log('\n[tarjetas / pago mixto]');
+  const visa = await repos.cards.create({ name: 'Visa', commissionPct: '3.00' });
+  check('cards.create', !!visa.id && visa.name === 'Visa' && visa.active === true);
+  const cardSale = await seller.sales.createSale({
+    type: 'B',
+    customerId: cf.id,
+    paymentType: 'card',
+    cardId: visa.id,
+    cardAmount: '1000.0000',
+    lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }],
+  });
+  check(
+    'venta con tarjeta se registra (cardId + cardAmount)',
+    cardSale.sale.paymentType === 'card' && cardSale.sale.cardId === visa.id && cardSale.sale.cardAmount === '1000.0000',
+    JSON.stringify({ pt: cardSale.sale.paymentType, cardId: cardSale.sale.cardId, ca: cardSale.sale.cardAmount }),
+  );
+  const mixedSale = await seller.sales.createSale({
+    type: 'B',
+    customerId: cf.id,
+    paymentType: 'mixed',
+    cardId: visa.id,
+    cardAmount: '600.0000',
+    lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }],
+  });
+  check('venta mixta se registra', mixedSale.sale.paymentType === 'mixed' && mixedSale.sale.cardAmount === '600.0000');
+  const reportAfterCardSales = await seller.cash.getCashReport(reg.id);
+  check(
+    'caja: la venta con tarjeta no aporta efectivo; la mixta sólo la parte en efectivo (1700 + 0 + 400 = 2100)',
+    reportAfterCardSales.incomeTotal === '2100.0000',
+    `incomeTotal=${reportAfterCardSales.incomeTotal}`,
+  );
+
   await expectThrows(
     'voidSale como seller → PermissionDeniedError',
     () => seller.sales.voidSale(cashSale.sale.id),
@@ -231,13 +264,16 @@ async function main(): Promise<void> {
     (e) => e instanceof PermissionDeniedError,
   );
 
-  // ingresos esperados en la caja: venta contado 1700 + cobranzas 400 + 600 + aporte 500 = 3200
-  const { register: closedReg, report } = await admin.cash.closeCashRegister(reg.id, '4200.0000');
+  // ingresos en efectivo: venta contado 1700 + venta tarjeta 0 + venta mixta 400 + cobranzas 400 + 600 + aporte 500 = 3600
+  const { register: closedReg, report } = await admin.cash.closeCashRegister(reg.id, '4600.0000', 'cierre de prueba');
   check('closeCashRegister', closedReg.status === 'closed');
-  check('reporte: ingresos = 3200', report.incomeTotal === '3200.0000', `incomeTotal=${report.incomeTotal}`);
-  check('reporte: efectivo esperado = 4200', report.expectedCash === '4200.0000', `expected=${report.expectedCash}`);
+  check('reporte: ingresos en efectivo = 3600', report.incomeTotal === '3600.0000', `incomeTotal=${report.incomeTotal}`);
+  check('reporte: efectivo esperado = 4600', report.expectedCash === '4600.0000', `expected=${report.expectedCash}`);
   check('reporte: diferencia = 0', report.difference === '0.0000', `diff=${report.difference}`);
-  check('reporte: notes con diferencia', typeof closedReg.notes === 'string' && closedReg.notes!.includes('Diferencia'));
+  check(
+    'reporte: notes con observaciones del cierre + arqueo',
+    typeof closedReg.notes === 'string' && closedReg.notes!.includes('cierre de prueba') && closedReg.notes!.includes('Diferencia'),
+  );
   await expectThrows(
     'closeCashRegister sobre caja ya cerrada → BusinessRuleError',
     () => admin.cash.closeCashRegister(reg.id, '0.0000'),

@@ -9,6 +9,7 @@ import { Articulos } from '@/pages/Articulos'
 import { Proveedores } from '@/pages/Proveedores'
 import { Clientes } from '@/pages/Clientes'
 import { Familias } from '@/pages/Familias'
+import { Tarjetas } from '@/pages/Tarjetas'
 import { Usuarios } from '@/pages/Usuarios'
 import { Caja } from '@/pages/Caja'
 import { Ventas } from '@/pages/Ventas'
@@ -28,6 +29,10 @@ export const router = createHashRouter([
           { path: '/proveedores', element: <Proveedores /> },
           { path: '/clientes', element: <Clientes /> },
           { path: '/familias', element: <Familias /> },
+          {
+            element: <RoleGuard roles={['admin', 'manager']} />,
+            children: [{ path: '/tarjetas', element: <Tarjetas /> }],
+          },
           {
             element: <RoleGuard roles={['admin']} />,
             children: [{ path: '/usuarios', element: <Usuarios /> }],

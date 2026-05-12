@@ -50,6 +50,13 @@ const api: ApiSurface = {
     update: (p) => call('families:update', p),
     delete: (p) => call('families:delete', p),
   },
+  cards: {
+    list: () => call('cards:list'),
+    get: (p) => call('cards:get', p),
+    create: (p) => call('cards:create', p),
+    update: (p) => call('cards:update', p),
+    delete: (p) => call('cards:delete', p),
+  },
   users: {
     list: () => call('users:list'),
     get: (p) => call('users:get', p),

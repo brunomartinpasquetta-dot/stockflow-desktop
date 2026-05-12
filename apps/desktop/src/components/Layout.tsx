@@ -7,6 +7,7 @@ import {
   BarChart3,
   Boxes,
   Calculator,
+  CreditCard,
   LogOut,
   Package,
   Receipt,
@@ -19,7 +20,7 @@ import {
 
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
-import { ROLE_LABELS } from '@/lib/permissions'
+import { ROLE_LABELS, hasPermission, type PermissionAction } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -27,11 +28,12 @@ import { Separator } from '@/components/ui/separator'
 type IconType = ComponentType<{ className?: string }>
 
 interface NavItem {
-  fkey: string
+  fkey?: string
   label: string
   icon: IconType
   path?: string
   adminOnly?: boolean
+  requires?: PermissionAction
   exit?: boolean
 }
 
@@ -39,6 +41,7 @@ const NAV: NavItem[] = [
   { fkey: 'F1', label: 'Artículos', icon: Package, path: '/articulos' },
   { fkey: 'F2', label: 'Proveedores', icon: Truck, path: '/proveedores' },
   { fkey: 'F3', label: 'Clientes', icon: Users, path: '/clientes' },
+  { label: 'Tarjetas', icon: CreditCard, path: '/tarjetas', requires: 'manage_cards' },
   { fkey: 'F4', label: 'Usuarios', icon: ShieldCheck, path: '/usuarios', adminOnly: true },
   { fkey: 'F5', label: 'Compras', icon: ShoppingCart },
   { fkey: 'F6', label: 'Ventas', icon: Receipt, path: '/ventas' },
@@ -64,7 +67,11 @@ export function Layout() {
   const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
   const companyName = companyQuery.data?.name ?? 'StockFlow'
 
-  const items = NAV.filter((it) => !it.adminOnly || currentUser?.role === 'admin')
+  const items = NAV.filter((it) => {
+    if (it.adminOnly) return currentUser?.role === 'admin'
+    if (it.requires) return hasPermission(currentUser?.role, it.requires)
+    return true
+  })
 
   function activate(item: NavItem): void {
     if (item.exit) {
@@ -120,7 +127,7 @@ export function Layout() {
             const active = item.path != null && location.pathname.startsWith(item.path)
             return (
               <button
-                key={item.fkey}
+                key={item.label}
                 type="button"
                 onClick={() => activate(item)}
                 className={cn(
@@ -134,7 +141,9 @@ export function Layout() {
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate">{item.label}</span>
-                <span className="rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground">{item.fkey}</span>
+                {item.fkey && (
+                  <span className="rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground">{item.fkey}</span>
+                )}
               </button>
             )
           })}

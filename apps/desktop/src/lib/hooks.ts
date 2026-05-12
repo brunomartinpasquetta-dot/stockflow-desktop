@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@
 import { api } from '@/lib/api'
 import type {
   ArticleDTO,
+  CardDTO,
   CashRegisterDTO,
   CashReportDTO,
   CreateSaleInputDTO,
@@ -72,6 +73,14 @@ export function useFamilies() {
 }
 export function useFamilyMutations() {
   return useEntityMutations<FamilyDTO>('families', api.families.create, api.families.update, api.families.delete)
+}
+
+// --- Tarjetas ---
+export function useCards() {
+  return useQuery<CardDTO[]>({ queryKey: ['cards'], queryFn: api.cards.list })
+}
+export function useCardMutations() {
+  return useEntityMutations<CardDTO>('cards', api.cards.create, api.cards.update, api.cards.delete)
 }
 
 // --- Usuarios ---
