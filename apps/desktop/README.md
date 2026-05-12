@@ -10,9 +10,26 @@ local y los servicios de dominio; el renderer los consume por IPC vía
 pnpm --filter @stockflow/desktop electron:dev
 ```
 
-Esto: levanta Vite (`http://127.0.0.1:5173`), bundlea el proceso main/preload
+Esto: levanta Vite (`http://localhost:5173`), bundlea el proceso main/preload
 (`scripts/build-electron.mjs` → `dist-electron/`) y abre Electron apuntando al
 dev server. La DB se crea/migra/seedea en `app.getPath('userData')/stockflow.db`.
+
+> **Módulos nativos (better-sqlite3) — importante.** `better-sqlite3` es un módulo
+> nativo con binario ABI-específico (NAN, no N-API): un `pnpm install` lo compila
+> contra el Node del sistema (ej. Node 24 → `NODE_MODULE_VERSION 137`), pero
+> Electron 30 embebe Node 20 (`NODE_MODULE_VERSION 123`) y no puede cargar ese
+> binario. Por eso `apps/desktop` tiene un `postinstall` que ejecuta
+> `electron-rebuild -f -w better-sqlite3` (vía `@electron/rebuild`) para recompilarlo
+> contra los headers de Electron. Si el `postinstall` no corrió por algún motivo,
+> hacelo a mano: `pnpm --filter @stockflow/desktop rebuild:native`.
+>
+> Consecuencia: tras `pnpm install` el binario queda en ABI Electron → `electron:dev`
+> anda, pero los smoke tests que corren con `tsx` (Node) — `test:ipc`,
+> `@stockflow/db`/`@stockflow/core` — **no podrán cargar `better-sqlite3`** hasta
+> recompilarlo para Node. Para volver al binario de Node:
+> `cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3 && node-gyp rebuild --release`
+> (y `pnpm --filter @stockflow/desktop rebuild:native` para volver a Electron). Esto
+> se resuelve de forma definitiva al empaquetar con `electron-builder` (P11).
 
 Otros scripts:
 
@@ -21,6 +38,7 @@ Otros scripts:
 | `pnpm --filter @stockflow/desktop dev` | Sólo el renderer (Vite), sin Electron |
 | `pnpm --filter @stockflow/desktop build:electron` | Bundlea main + preload + copia migraciones |
 | `pnpm --filter @stockflow/desktop build` | Build web + build electron |
+| `pnpm --filter @stockflow/desktop rebuild:native` | Recompila `better-sqlite3` contra Electron (`@electron/rebuild`) |
 | `pnpm --filter @stockflow/desktop type-check` | `tsc` del renderer y de `electron/` |
 | `pnpm --filter @stockflow/desktop test:ipc` | Test de integración del bridge IPC (sin Electron, `tsx`) |
 | `pnpm --filter @stockflow/desktop lint` | ESLint |
