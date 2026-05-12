@@ -13,17 +13,24 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "db:generate:local": "drizzle-kit generate --config=drizzle.config.ts",
-    "db:push:local": "drizzle-kit push --config=drizzle.config.ts"
+    "db:push:local": "drizzle-kit push --config=drizzle.config.ts",
+    "test:smoke": "tsx src/__tests__/local.smoke.ts",
+    "test:smoke:repos": "tsx src/tests/repositories.smoke.ts"
   },
   "dependencies": {
+    "@stockflow/shared": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.10.0",
     "drizzle-orm": "^0.36.4",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "uuid": "^14.0.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.0.0",
     "drizzle-kit": "^0.28.1",
+    "tsx": "^4.19.2",
     "typescript": "~6.0.2"
   }
 }
