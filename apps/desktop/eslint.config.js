@@ -20,6 +20,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  // Componentes shadcn/ui (exportan `xxxVariants`), contextos (exportan hooks) y
+  // el router: no aplican la regla "sólo exportar componentes" (no son HMR-fast-refresh).
+  {
+    files: ['src/components/ui/**/*.{ts,tsx}', 'src/contexts/**/*.{ts,tsx}', 'src/router.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
   // Proceso main de Electron + tests de integración (Node)
   {
     files: ['electron/**/*.{ts,tsx,mts,cts}'],
