@@ -1,0 +1,20 @@
+{
+  "name": "@stockflow/root",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:desktop": "pnpm --filter @stockflow/desktop dev",
+    "dev:cloud": "pnpm --filter @stockflow/cloud dev",
+    "build:desktop": "pnpm --filter @stockflow/desktop build",
+    "build:cloud": "pnpm --filter @stockflow/cloud build",
+    "lint": "pnpm -r --if-present run lint",
+    "type-check": "pnpm -r --if-present run type-check"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "electron", "esbuild"]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@stockflow/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build:web": "tsc -b && vite build",
+    "build:electron": "tsc -p tsconfig.electron.json && node scripts/postbuild-electron.mjs",
+    "build": "pnpm build:web && pnpm build:electron",
+    "electron:dev": "concurrently -k -n vite,electron \"vite\" \"pnpm build:electron && wait-on tcp:127.0.0.1:5173 && cross-env NODE_ENV=development electron .\"",
+    "lint": "eslint .",
+    "type-check": "tsc -b && tsc -p tsconfig.electron.json --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@stockflow/shared": "workspace:*",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.3.0",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.2",
+    "vite": "^8.0.12",
+    "wait-on": "^8.0.1"
+  }
+}

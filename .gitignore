@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+*.sqlite
+*.db
+userData/
+.DS_Store
+.turbo
+*.log

@@ -1,0 +1,29 @@
+{
+  "name": "@stockflow/db",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema/local": "./src/schema/local.ts",
+    "./schema/cloud": "./src/schema/cloud.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "db:generate:local": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:push:local": "drizzle-kit push --config=drizzle.config.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.0.0",
+    "drizzle-kit": "^0.28.1",
+    "typescript": "~6.0.2"
+  }
+}
