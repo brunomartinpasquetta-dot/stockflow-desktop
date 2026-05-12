@@ -114,6 +114,13 @@ async function main(): Promise<void> {
     pms.ok ? pms.data.map((p) => p.name).join(', ') : JSON.stringify(pms),
   );
 
+  // company:get / company:upsert (priceMode)
+  const comp1 = await invoke<{ priceMode: string }>(handlers, 'company:get');
+  check('company:get priceMode default = gross', comp1.ok && comp1.data.priceMode === 'gross', JSON.stringify(comp1));
+  const compUp = await invoke<{ priceMode: string }>(handlers, 'company:upsert', { name: 'Mi Empresa', priceMode: 'net' });
+  check('company:upsert priceMode = net', compUp.ok && compUp.data.priceMode === 'net', JSON.stringify(compUp));
+  await invoke(handlers, 'company:upsert', { name: 'Mi Empresa', priceMode: 'gross' }); // restaurar
+
   // cash:open
   const cashOpen = await invoke<{ id: string; status: string }>(handlers, 'cash:open', { openingAmount: '1000.0000' });
   check('cash:open', cashOpen.ok && cashOpen.data.status === 'open', JSON.stringify(cashOpen));

@@ -7,11 +7,17 @@
 import {
   type Article,
   type Customer,
+  type PriceMode,
+  addDecimal,
   gteDecimal,
   mulDecimal,
   subDecimal,
   sumDecimals,
+  vatBreakdown,
 } from '@stockflow/shared';
+
+export type { PriceMode } from '@stockflow/shared';
+export { vatBreakdown } from '@stockflow/shared';
 
 /**
  * Precio unitario que corresponde a una línea, según:
@@ -44,26 +50,17 @@ export function applyDiscount(price: string, discountPct: string, decimals = 4):
 }
 
 /**
- * Desglosa IVA. Con `included = true` (default) el `grossAmount` ya incluye IVA
- * ("IVA contenido"): `net = gross / (1 + rate/100)`, `vat = gross - net`.
- * Con `included = false`, `grossAmount` es neto y se le suma el IVA.
+ * Desglosa IVA según el modo de precios de la empresa:
+ *  - 'gross' (default): el importe ya incluye IVA ("IVA contenido").
+ *  - 'net': el importe es neto y se le suma el IVA.
+ * Devuelve siempre `{ net, vat, gross }`.
  */
 export function calculateVAT(
-  grossAmount: string,
+  amount: string,
   vatRate: string,
-  included = true,
+  mode: PriceMode = 'gross',
 ): { net: string; vat: string; gross: string } {
-  const amount = Number(grossAmount);
-  const rate = Number(vatRate);
-  if (!Number.isFinite(amount) || !Number.isFinite(rate)) {
-    throw new RangeError(`Valores inválidos en calculateVAT: ${grossAmount}, ${vatRate}`);
-  }
-  if (!included) {
-    const vat = (amount * rate) / 100;
-    return { net: amount.toFixed(4), vat: vat.toFixed(4), gross: (amount + vat).toFixed(4) };
-  }
-  const net = rate > 0 ? amount / (1 + rate / 100) : amount;
-  return { net: net.toFixed(4), vat: (amount - net).toFixed(4), gross: amount.toFixed(4) };
+  return vatBreakdown(amount, vatRate, mode);
 }
 
 export interface SaleTotalsLineInput {
@@ -77,7 +74,7 @@ export interface SaleTotalsLineInput {
 
 export interface SaleTotalsLine extends Required<SaleTotalsLineInput> {
   lineNumber: number;
-  /** importe de la línea con IVA incluido = quantity*unitPrice - discount */
+  /** importe de la línea = quantity*unitPrice - discount (con IVA en 'gross', neto en 'net') */
   lineTotal: string;
   net: string;
   vat: string;
@@ -85,29 +82,35 @@ export interface SaleTotalsLine extends Required<SaleTotalsLineInput> {
 
 export interface SaleTotals {
   lines: SaleTotalsLine[];
-  /** suma de los lineTotal (con IVA) */
+  /** suma de los lineTotal (con IVA en 'gross', neto en 'net') */
   subtotal: string;
   /** descuento global aplicado */
   discount: string;
-  /** IVA contenido total */
+  /** IVA total */
   vatAmount: string;
-  /** total final = subtotal - descuento global */
+  /** total final efectivo a cobrar */
   total: string;
+  /** modo con el que se calculó */
+  priceMode: PriceMode;
 }
 
 /**
  * Calcula los totales de una venta a partir de sus líneas (función pura, para
  * preview en la UI). Replica el criterio que aplica `SaleRepository.createWithLines`.
+ *
+ *  - 'gross': subtotal ya incluye IVA → total = subtotal − descuento global.
+ *  - 'net':   subtotal es neto → total = subtotal + IVA − descuento global.
  */
 export function calculateSaleTotals(
   lines: ReadonlyArray<SaleTotalsLineInput>,
   globalDiscount = '0.0000',
+  mode: PriceMode = 'gross',
 ): SaleTotals {
   const computed: SaleTotalsLine[] = lines.map((l, idx) => {
     const discount = l.discount ?? '0.0000';
     const vatRate = l.vatRate ?? '21.00';
     const lineTotal = subDecimal(mulDecimal(l.quantity, l.unitPrice, 4), discount, 4);
-    const { net, vat } = calculateVAT(lineTotal, vatRate, true);
+    const { net, vat } = vatBreakdown(lineTotal, vatRate, mode);
     return {
       lineNumber: idx + 1,
       quantity: l.quantity,
@@ -121,6 +124,9 @@ export function calculateSaleTotals(
   });
   const subtotal = sumDecimals(computed.map((c) => c.lineTotal));
   const vatAmount = sumDecimals(computed.map((c) => c.vat));
-  const total = subDecimal(subtotal, globalDiscount, 4);
-  return { lines: computed, subtotal, discount: globalDiscount, vatAmount, total };
+  const total =
+    mode === 'gross'
+      ? subDecimal(subtotal, globalDiscount, 4)
+      : subDecimal(addDecimal(subtotal, vatAmount, 4), globalDiscount, 4);
+  return { lines: computed, subtotal, discount: globalDiscount, vatAmount, total, priceMode: mode };
 }

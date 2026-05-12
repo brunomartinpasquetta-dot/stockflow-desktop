@@ -6,6 +6,7 @@ import { Loader2, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import {
   useArticles,
+  useCompany,
   useCreateSale,
   useCurrentCash,
   useCustomerBalances,
@@ -15,7 +16,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { usePrintSaleTicket } from '@/lib/usePrint'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
-import { calculateSaleTotals, lineTotal, resolvePrice } from '@/lib/pricing'
+import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
 import type { SaleTicketData, SaleTicketLine, SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
@@ -27,7 +28,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQuery } from '@tanstack/react-query'
-import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, VoucherType } from '@/types/api'
+import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, PriceMode, VoucherType } from '@/types/api'
 
 interface CartLine {
   article: ArticleDTO
@@ -125,7 +126,7 @@ function NoCash() {
 }
 
 const FALLBACK_COMPANY: CompanyDTO = {
-  id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, createdAt: 0, updatedAt: 0,
+  id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, priceMode: 'gross', createdAt: 0, updatedAt: 0,
 }
 
 function PDV() {
@@ -134,10 +135,11 @@ function PDV() {
   const customersQuery = useCustomers()
   const balancesQuery = useCustomerBalances()
   const paymentMethodsQuery = usePaymentMethods()
-  const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
+  const companyQuery = useCompany()
   const createSale = useCreateSale()
   const printSaleTicket = usePrintSaleTicket()
 
+  const priceMode: PriceMode = companyQuery.data?.priceMode ?? 'gross'
   const allArticles = useMemo(() => (articlesQuery.data ?? []).filter((a) => a.active), [articlesQuery.data])
   const customers = useMemo(() => customersQuery.data ?? [], [customersQuery.data])
   const activeMethods = useMemo(() => (paymentMethodsQuery.data ?? []).filter((m) => m.active), [paymentMethodsQuery.data])
@@ -172,6 +174,7 @@ function PDV() {
   const totals = calculateSaleTotals(
     cart.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, discount: l.discount, vatRate: l.article.vatRate })),
     parseCurrencyInput(globalDiscount),
+    priceMode,
   )
   const totalNum = Number(totals.total)
 
@@ -306,6 +309,7 @@ function PDV() {
     return {
       company: companyQuery.data ?? FALLBACK_COMPANY,
       sale: result.sale,
+      priceMode,
       lines,
       customerName:
         cf || !customer ? null : `${customer.lastName}${customer.firstName ? `, ${customer.firstName}` : ''}`,
@@ -409,7 +413,12 @@ function PDV() {
             <Input readOnly value={today} className="bg-muted" />
           </div>
         </div>
-        <div className="col-span-4 text-xs text-muted-foreground">Vendedor: {currentUser?.fullName}</div>
+        <div className="col-span-4 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Vendedor: {currentUser?.fullName}</span>
+          <Badge variant={priceMode === 'gross' ? 'outline' : 'warning'}>
+            Modo: Precios {priceMode === 'gross' ? 'con IVA incluido' : 'netos + IVA'}
+          </Badge>
+        </div>
       </div>
 
       {/* ── Zona central: carrito ── */}
@@ -456,9 +465,9 @@ function PDV() {
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-2 py-1.5">Producto</th>
                 <th className="w-24 px-2 py-1.5 text-right">Cantidad</th>
-                <th className="w-28 px-2 py-1.5 text-right">P. unitario</th>
+                <th className="w-28 px-2 py-1.5 text-right">{priceMode === 'gross' ? 'P. unit. (c/IVA)' : 'P. unit. (neto)'}</th>
                 <th className="w-24 px-2 py-1.5 text-right">Desc.</th>
-                <th className="w-28 px-2 py-1.5 text-right">Subtotal</th>
+                <th className="w-28 px-2 py-1.5 text-right">{priceMode === 'gross' ? 'Subtotal' : 'Subtotal neto'}</th>
                 <th className="w-8 px-2 py-1.5" />
               </tr>
             </thead>
@@ -508,7 +517,14 @@ function PDV() {
                           onBlur={() => setLineDiscount(i, parseCurrencyInput(l.discount))}
                         />
                       </td>
-                      <td className="px-2 py-1 text-right tabular-nums font-medium">{formatCurrency(lineTotal(l))}</td>
+                      <td className="px-2 py-1 text-right tabular-nums font-medium">
+                        {formatCurrency(lineTotal(l))}
+                        {priceMode === 'net' && (
+                          <div className="text-[10px] font-normal text-muted-foreground">
+                            c/IVA {formatCurrency(vatBreakdown(lineTotal(l), l.article.vatRate, 'net').gross.toFixed(4))}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-2 py-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeLine(i)}>
                           <Trash2 className="h-3.5 w-3.5" />
@@ -528,7 +544,7 @@ function PDV() {
         {/* totales */}
         <div className="flex flex-col gap-1 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal</span>
+            <span className="text-muted-foreground">{priceMode === 'gross' ? 'Subtotal (con IVA)' : 'Subtotal neto'}</span>
             <span className="tabular-nums">{formatCurrency(totals.subtotal)}</span>
           </div>
           <div className="flex items-center justify-between">
@@ -542,7 +558,7 @@ function PDV() {
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>IVA contenido</span>
+            <span>{priceMode === 'gross' ? 'IVA contenido' : 'IVA'}</span>
             <span className="tabular-nums">{formatCurrency(totals.vatAmount)}</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between border-t pt-1">

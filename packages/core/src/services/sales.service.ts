@@ -15,6 +15,7 @@ import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
 import { BusinessRuleError, NotFoundError } from '../errors';
 import {
+  type PriceMode,
   type SaleTotals,
   type SaleTotalsLineInput,
   calculateSaleTotals,
@@ -76,8 +77,9 @@ export class SalesService {
   static calculateTotals(
     lines: ReadonlyArray<SaleTotalsLineInput>,
     globalDiscount?: string,
+    mode: PriceMode = 'gross',
   ): SaleTotals {
-    return calculateSaleTotals(lines, globalDiscount);
+    return calculateSaleTotals(lines, globalDiscount, mode);
   }
 
   private async resolveOpenRegister() {
@@ -141,7 +143,9 @@ export class SalesService {
 
     // Límite de crédito (creditLimit '0.0000' = sin límite).
     if (isAccountSale && Number(customer.creditLimit) > 0) {
-      const preview = calculateSaleTotals(resolvedLines, draft.discount ?? '0.0000');
+      const company = await repos.company.getOrCreate();
+      const mode: PriceMode = company.priceMode === 'net' ? 'net' : 'gross';
+      const preview = calculateSaleTotals(resolvedLines, draft.discount ?? '0.0000', mode);
       const currentBalance = await repos.accountsReceivable.getTotalBalance(customer.id);
       if (Number(currentBalance) + Number(preview.total) > Number(customer.creditLimit)) {
         throw new BusinessRuleError(

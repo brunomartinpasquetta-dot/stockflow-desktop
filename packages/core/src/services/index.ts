@@ -5,6 +5,7 @@ import type { ServiceContext } from '../context';
 import { AccountsReceivableService } from './accountsReceivable.service';
 import { AuthService } from './auth.service';
 import { CashService } from './cash.service';
+import { CompanyService } from './company.service';
 import { InventoryService } from './inventory.service';
 import { PaymentMethodService } from './paymentMethod.service';
 import { PurchasesService } from './purchases.service';
@@ -12,6 +13,7 @@ import { ReportsService } from './reports.service';
 import { SalesService } from './sales.service';
 
 export { AuthService, type LoginResult } from './auth.service';
+export { CompanyService } from './company.service';
 export {
   SalesService,
   type CreateSaleInput,
@@ -58,6 +60,7 @@ export {
 
 export interface Services {
   auth: AuthService;
+  company: CompanyService;
   sales: SalesService;
   purchases: PurchasesService;
   cash: CashService;
@@ -71,6 +74,7 @@ export interface Services {
 export function createServices(ctx: ServiceContext): Services {
   return {
     auth: new AuthService(ctx.repos),
+    company: new CompanyService(ctx),
     sales: new SalesService(ctx),
     purchases: new PurchasesService(ctx),
     cash: new CashService(ctx),

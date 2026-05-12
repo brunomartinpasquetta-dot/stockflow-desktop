@@ -3,7 +3,7 @@
  * Recibe los datos ya ensamblados (las líneas necesitan la descripción del
  * artículo y los pagos el nombre del medio, que los DTOs crudos no traen).
  */
-import type { CompanyDTO, SaleDTO, VoucherType } from '@/types/api'
+import type { CompanyDTO, PriceMode, SaleDTO, VoucherType } from '@/types/api'
 import { formatCurrency, formatDateTime, formatNumber } from '@/lib/format'
 
 const VOUCHER_LABELS: Record<VoucherType, string> = {
@@ -28,6 +28,8 @@ export interface SaleTicketPayment {
 export interface SaleTicketData {
   company: CompanyDTO
   sale: SaleDTO
+  /** Modo de precios vigente al emitir el comprobante. */
+  priceMode: PriceMode
   lines: SaleTicketLine[]
   /** Nombre del cliente; `null` para Consumidor Final (no se imprime). */
   customerName: string | null
@@ -47,7 +49,14 @@ function Hr() {
 }
 
 export function SaleTicket({ data }: { data: SaleTicketData }) {
-  const { company, sale, lines, customerName, customerDoc, isAccountSale, payments, received, change } = data
+  const { company, sale, priceMode, lines, customerName, customerDoc, isAccountSale, payments, received, change } = data
+  const discountNum = Number(sale.discount)
+  const vatNum = Number(sale.vatAmount)
+  const subtotalNum = Number(sale.subtotal)
+  // En 'gross' el subtotal incluye IVA → el neto es subtotal − IVA. En 'net' el subtotal ya es neto.
+  const netSubtotal = priceMode === 'gross' ? subtotalNum - vatNum : subtotalNum
+  // Los comprobantes A discriminan IVA siempre (obligatorio fiscalmente).
+  const discriminateVat = sale.type === 'A' || priceMode === 'net'
   return (
     <div className="print-ticket">
       <div className="text-center">
@@ -76,20 +85,43 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
         </div>
       ))}
       <Hr />
-      <div className="flex justify-between">
-        <span>Subtotal</span>
-        <span>{formatCurrency(sale.subtotal)}</span>
-      </div>
-      {Number(sale.discount) > 0 && (
-        <div className="flex justify-between">
-          <span>Descuento</span>
-          <span>-{formatCurrency(sale.discount)}</span>
-        </div>
+      {discriminateVat ? (
+        <>
+          <div className="flex justify-between">
+            <span>Subtotal neto</span>
+            <span>{formatCurrency(netSubtotal.toFixed(4))}</span>
+          </div>
+          {discountNum > 0 && (
+            <div className="flex justify-between">
+              <span>Descuento</span>
+              <span>-{formatCurrency(sale.discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span>IVA</span>
+            <span>{formatCurrency(sale.vatAmount)}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>{formatCurrency(sale.subtotal)}</span>
+          </div>
+          {discountNum > 0 && (
+            <div className="flex justify-between">
+              <span>Descuento</span>
+              <span>-{formatCurrency(sale.discount)}</span>
+            </div>
+          )}
+          {vatNum > 0 && (
+            <div className="flex justify-between text-[10px]">
+              <span>(Incluye IVA</span>
+              <span>{formatCurrency(sale.vatAmount)})</span>
+            </div>
+          )}
+        </>
       )}
-      <div className="flex justify-between text-[10px]">
-        <span>IVA contenido</span>
-        <span>{formatCurrency(sale.vatAmount)}</span>
-      </div>
       <div className="mt-0.5 flex justify-between text-sm font-bold">
         <span>TOTAL</span>
         <span>{formatCurrency(sale.total)}</span>

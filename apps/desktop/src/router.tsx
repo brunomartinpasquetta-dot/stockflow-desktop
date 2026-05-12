@@ -9,6 +9,7 @@ import { Articulos } from '@/pages/Articulos'
 import { Proveedores } from '@/pages/Proveedores'
 import { Clientes } from '@/pages/Clientes'
 import { CuentasCorrientes } from '@/pages/CuentasCorrientes'
+import { Empresa } from '@/pages/Empresa'
 import { Familias } from '@/pages/Familias'
 import { MediosDePago } from '@/pages/MediosDePago'
 import { Usuarios } from '@/pages/Usuarios'
@@ -37,7 +38,10 @@ export const router = createHashRouter([
           },
           {
             element: <RoleGuard roles={['admin']} />,
-            children: [{ path: '/usuarios', element: <Usuarios /> }],
+            children: [
+              { path: '/usuarios', element: <Usuarios /> },
+              { path: '/empresa', element: <Empresa /> },
+            ],
           },
         ],
       },

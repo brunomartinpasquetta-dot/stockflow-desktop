@@ -38,17 +38,29 @@ const updatedAtCol = () =>
 /* ------------------------------------------------------------------ */
 /* companies — datos de la empresa del cliente (una sola fila)         */
 /* ------------------------------------------------------------------ */
-export const companies = sqliteTable('companies', {
-  id: pk(),
-  name: text('name').notNull(),
-  address: text('address'),
-  phone: text('phone'),
-  email: text('email'),
-  cuit: text('cuit'),
-  ingBrutos: text('ing_brutos'),
-  createdAt: createdAtCol(),
-  updatedAt: updatedAtCol(),
-});
+export const companies = sqliteTable(
+  'companies',
+  {
+    id: pk(),
+    name: text('name').notNull(),
+    address: text('address'),
+    phone: text('phone'),
+    email: text('email'),
+    cuit: text('cuit'),
+    ingBrutos: text('ing_brutos'),
+    /**
+     * Modo de precios:
+     *  - 'gross' = los precios cargados YA incluyen IVA (IVA contenido; default).
+     *  - 'net'   = los precios cargados son netos; el IVA se suma al vender.
+     */
+    priceMode: text('price_mode', { enum: ['gross', 'net'] }).notNull().default('gross'),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    priceModeCheck: check('companies_price_mode_check', sql`${t.priceMode} in ('gross', 'net')`),
+  }),
+);
 
 /* ------------------------------------------------------------------ */
 /* users                                                              */

@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import { z } from 'zod'
 import { toast } from 'sonner'
 
-import { useArticleMutations, useArticles, useFamilies, useSuppliers } from '@/lib/hooks'
-import { formatCurrency, formatNumber } from '@/lib/format'
+import { useArticleMutations, useArticles, useCompany, useFamilies, useSuppliers } from '@/lib/hooks'
+import { formatCurrency, formatNumber, parseCurrencyInput } from '@/lib/format'
+import { vatBreakdown } from '@/lib/pricing'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
-import type { ArticleDTO } from '@/types/api'
+import { Badge } from '@/components/ui/badge'
+import type { ArticleDTO, PriceMode } from '@/types/api'
 
 const VAT_OPTIONS = [
   { value: '0.00', label: '0%' },
@@ -37,13 +39,29 @@ const articleSchema = z.object({
   soldByWeight: z.boolean(),
 })
 
+/** Pista de desglose de IVA debajo de un campo de precio, según el modo. */
+function priceHint(raw: unknown, rateRaw: unknown, mode: PriceMode): string | null {
+  const amount = Number(parseCurrencyInput(typeof raw === 'string' ? raw : String(raw ?? '')))
+  const rate = Number(rateRaw ?? '0')
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  if (rate <= 0) return mode === 'gross' ? 'IVA 0% — el importe es totalmente neto.' : 'IVA 0% — sin IVA agregado.'
+  const b = vatBreakdown(amount, rate, mode)
+  return mode === 'gross'
+    ? `Neto: ${formatCurrency(b.net.toFixed(4))} · IVA: ${formatCurrency(b.vat.toFixed(4))}`
+    : `Final con IVA: ${formatCurrency(b.gross.toFixed(4))} (IVA: ${formatCurrency(b.vat.toFixed(4))})`
+}
+
 export function Articulos() {
   const articles = useArticles()
   const families = useFamilies()
   const suppliers = useSuppliers()
+  const company = useCompany()
   const m = useArticleMutations()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ArticleDTO | null>(null)
+
+  const priceMode: PriceMode = company.data?.priceMode ?? 'gross'
+  const priceSuffix = priceMode === 'gross' ? 'con IVA incluido' : 'neto'
 
   const familyName = useMemo(() => {
     const map = new Map<string, string>()
@@ -57,7 +75,13 @@ export function Articulos() {
     { key: 'brand', header: 'Marca', render: (r) => r.brand ?? '—' },
     { key: 'familyId', header: 'Familia', render: (r) => (r.familyId ? (familyName.get(r.familyId) ?? '—') : '—') },
     { key: 'stock', header: 'Stock', align: 'right', sortValue: (r) => Number(r.stock), render: (r) => formatNumber(r.stock, 3) },
-    { key: 'listPrice1', header: 'Precio venta', align: 'right', sortValue: (r) => Number(r.listPrice1), render: (r) => formatCurrency(r.listPrice1) },
+    {
+      key: 'listPrice1',
+      header: `Precio venta (${priceSuffix})`,
+      align: 'right',
+      sortValue: (r) => Number(r.listPrice1),
+      render: (r) => formatCurrency(r.listPrice1),
+    },
   ]
 
   const fields: FieldConfig[] = [
@@ -78,8 +102,8 @@ export function Articulos() {
       allowEmpty: true,
       options: (suppliers.data ?? []).map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` })),
     },
-    { name: 'costPrice', label: 'Precio de costo', type: 'currency', placeholder: '0,00' },
-    { name: 'listPrice1', label: 'Precio de venta', type: 'currency', placeholder: '0,00' },
+    { name: 'costPrice', label: `Costo (${priceSuffix})`, type: 'currency', placeholder: '0,00' },
+    { name: 'listPrice1', label: `Precio de venta (${priceSuffix})`, type: 'currency', placeholder: '0,00' },
     { name: 'vatRate', label: 'IVA', type: 'select', options: VAT_OPTIONS },
     { name: 'stock', label: 'Stock actual', type: 'currency', placeholder: '0,000' },
     { name: 'minStock', label: 'Stock mínimo', type: 'currency', placeholder: '0,000' },
@@ -131,7 +155,12 @@ export function Articulos() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-lg font-semibold">Artículos</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Artículos</h1>
+        <Badge variant={priceMode === 'gross' ? 'outline' : 'warning'}>
+          Modo: Precios {priceMode === 'gross' ? 'CON IVA incluido' : 'NETOS (IVA aparte)'}
+        </Badge>
+      </div>
       <EntityTable
         columns={columns}
         data={articles.data}
@@ -155,10 +184,19 @@ export function Articulos() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Editar artículo' : 'Nuevo artículo'}
+        description={
+          priceMode === 'gross'
+            ? 'Modo: los precios que cargás YA incluyen el IVA. El sistema lo desglosa al facturar.'
+            : 'Modo: los precios que cargás son NETOS. El sistema agrega el IVA al vender.'
+        }
         fields={fields}
         schema={articleSchema}
         defaultValues={defaultValues}
         onSubmit={handleSubmit}
+        liveHints={(v) => ({
+          costPrice: priceHint(v.costPrice, v.vatRate, priceMode),
+          listPrice1: priceHint(v.listPrice1, v.vatRate, priceMode),
+        })}
       />
     </div>
   )

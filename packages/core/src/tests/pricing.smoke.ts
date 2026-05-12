@@ -92,13 +92,14 @@ check('applyDiscount 10%', applyDiscount('100', '10') === '90.0000');
 check('applyDiscount 0%', applyDiscount('100', '0') === '100.0000');
 check('applyDiscount 50% sobre 250', applyDiscount('250.0000', '50') === '125.0000');
 
-// IVA contenido
-const vat = calculateVAT('121.0000', '21.00', true);
-check('calculateVAT contenido: net', vat.net === '100.0000', `net=${vat.net}`);
-check('calculateVAT contenido: vat', vat.vat === '21.0000', `vat=${vat.vat}`);
-const vatAdd = calculateVAT('100.0000', '21.00', false);
-check('calculateVAT agregado: gross', vatAdd.gross === '121.0000', `gross=${vatAdd.gross}`);
-check('calculateVAT tasa 0 → vat 0', calculateVAT('100.0000', '0.00', true).vat === '0.0000');
+// IVA contenido (modo 'gross') vs agregado (modo 'net')
+const vat = calculateVAT('121.0000', '21.00', 'gross');
+check('calculateVAT gross: net', vat.net === '100.0000', `net=${vat.net}`);
+check('calculateVAT gross: vat', vat.vat === '21.0000', `vat=${vat.vat}`);
+const vatAdd = calculateVAT('100.0000', '21.00', 'net');
+check('calculateVAT net: gross', vatAdd.gross === '121.0000', `gross=${vatAdd.gross}`);
+check('calculateVAT net: vat', vatAdd.vat === '21.0000', `vat=${vatAdd.vat}`);
+check('calculateVAT tasa 0 → vat 0', calculateVAT('100.0000', '0.00', 'gross').vat === '0.0000');
 
 // calculateSaleTotals
 const totals = calculateSaleTotals(

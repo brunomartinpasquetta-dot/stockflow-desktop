@@ -243,8 +243,43 @@ async function main(): Promise<void> {
   console.log('\n[pricing]');
   check('resolvePrice quantity=5 < minQty → listPrice1', resolvePrice(art, gomez, '5.000') === '850.0000');
   check('resolvePrice quantity=15 >= minQty → wholesalePrice', resolvePrice(art, gomez, '15.000') === '700.0000');
-  const vat = calculateVAT('121.0000', '21.00', true);
-  check('IVA contenido 121@21 → 100/21', vat.net === '100.0000' && vat.vat === '21.0000');
+  const vatGross = calculateVAT('121.0000', '21.00', 'gross');
+  check('calculateVAT gross 121@21 → net 100 / vat 21', vatGross.net === '100.0000' && vatGross.vat === '21.0000');
+  const vatNet = calculateVAT('100.0000', '21.00', 'net');
+  check('calculateVAT net 100@21 → vat 21 / gross 121', vatNet.vat === '21.0000' && vatNet.gross === '121.0000');
+
+  // ----------------------------------------------------- modo de precios (gross / net)
+  console.log('\n[modo de precios]');
+  check('company.getPriceMode default = gross', (await admin.company.getPriceMode()) === 'gross');
+  const artGross = await repos.articles.create({ barcode: '7790000000031', description: 'Artículo precio con IVA', listPrice1: '121.0000', vatRate: '21.00', stock: '20.000' });
+  const ventaGross = await seller.sales.createSale({
+    type: 'B', customerId: cf.id,
+    payments: [{ paymentMethodId: PM_CASH, amount: '121.0000' }],
+    lines: [{ articleId: artGross.id, quantity: '1.000' }],
+  });
+  check(
+    'modo gross: venta de art a $121 IVA 21% → vatAmount 21, subtotal 121, total 121',
+    ventaGross.sale.vatAmount === '21.0000' && ventaGross.sale.subtotal === '121.0000' && ventaGross.sale.total === '121.0000',
+    JSON.stringify({ sub: ventaGross.sale.subtotal, vat: ventaGross.sale.vatAmount, tot: ventaGross.sale.total }),
+  );
+
+  await admin.company.setPriceMode('net');
+  check('company.getPriceMode tras cambio = net', (await admin.company.getPriceMode()) === 'net');
+  const artNet = await repos.articles.create({ barcode: '7790000000048', description: 'Artículo precio neto', listPrice1: '100.0000', vatRate: '21.00', stock: '20.000' });
+  const ventaNet = await seller.sales.createSale({
+    type: 'B', customerId: cf.id,
+    payments: [{ paymentMethodId: PM_CASH, amount: '121.0000' }],
+    lines: [{ articleId: artNet.id, quantity: '1.000' }],
+  });
+  check(
+    'modo net: venta de art a $100 neto IVA 21% → vatAmount 21, subtotal neto 100, total 121',
+    ventaNet.sale.vatAmount === '21.0000' && ventaNet.sale.subtotal === '100.0000' && ventaNet.sale.total === '121.0000',
+    JSON.stringify({ sub: ventaNet.sale.subtotal, vat: ventaNet.sale.vatAmount, tot: ventaNet.sale.total }),
+  );
+  // la venta gross anterior queda inmutable
+  const ventaGrossReload = await repos.sales.findById(ventaGross.sale.id);
+  check('cambio de modo no toca ventas viejas', ventaGrossReload?.subtotal === '121.0000' && ventaGrossReload?.vatAmount === '21.0000');
+  await admin.company.setPriceMode('gross'); // restaurar para el resto del smoke
 
   // -------------------------------------------------------- cuenta corriente
   console.log('\n[accounts receivable]');
@@ -279,14 +314,14 @@ async function main(): Promise<void> {
     (e) => e instanceof PermissionDeniedError,
   );
 
-  // efectivo: apertura 1000 + 1700 (contado) + 400 (mixta) + 500 (cobranza) + 500 (aporte) − 400 (anulación mixta) = 3700
-  const { register: closedReg, report } = await admin.cash.closeCashRegister(reg.id, '3700.0000', 'cierre de prueba');
+  // efectivo: apertura 1000 + 1700 (contado) + 400 (mixta) + 121 (gross) + 121 (net) + 500 (cobranza) + 500 (aporte) − 400 (anulación mixta) = 3942
+  const { register: closedReg, report } = await admin.cash.closeCashRegister(reg.id, '3942.0000', 'cierre de prueba');
   check('closeCashRegister', closedReg.status === 'closed');
-  check('reporte: efectivo esperado = 3700', report.expectedCash === '3700.0000', `expected=${report.expectedCash}`);
+  check('reporte: efectivo esperado = 3942', report.expectedCash === '3942.0000', `expected=${report.expectedCash}`);
   check('reporte: diferencia = 0', report.difference === '0.0000', `diff=${report.difference}`);
   const efectivoBd = report.byPaymentMethod.find((b) => b.paymentMethodId === PM_CASH);
   const transferBd = report.byPaymentMethod.find((b) => b.paymentMethodId === PM_TRANSFER);
-  check('reporte: desglose Efectivo neto = 2700', efectivoBd?.net === '2700.0000', `efectivo=${efectivoBd?.net}`);
+  check('reporte: desglose Efectivo neto = 2942', efectivoBd?.net === '2942.0000', `efectivo=${efectivoBd?.net}`);
   check('reporte: desglose Transferencia neto = 1100', transferBd?.net === '1100.0000', `transferencia=${transferBd?.net}`);
   check(
     'reporte: notes con observaciones del cierre + arqueo',

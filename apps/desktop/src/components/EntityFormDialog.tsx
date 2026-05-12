@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useState, type ReactNode } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ZodTypeAny } from 'zod'
 import { toast } from 'sonner'
@@ -38,12 +38,14 @@ interface EntityFormDialogProps {
   open: boolean
   onClose: () => void
   title: string
-  description?: string
+  description?: ReactNode
   fields: FieldConfig[]
   schema: ZodTypeAny
   defaultValues: Record<string, unknown>
   onSubmit: (values: Record<string, unknown>) => Promise<void>
   submitLabel?: string
+  /** Pistas calculadas en vivo a partir de los valores del formulario, por nombre de campo. */
+  liveHints?: (values: Record<string, unknown>) => Partial<Record<string, ReactNode>>
 }
 
 type FormValues = Record<string, unknown>
@@ -58,6 +60,7 @@ export function EntityFormDialog({
   defaultValues,
   onSubmit,
   submitLabel = 'Guardar',
+  liveHints,
 }: EntityFormDialogProps) {
   const [submitting, setSubmitting] = useState(false)
   const {
@@ -66,8 +69,11 @@ export function EntityFormDialog({
     reset,
     setValue,
     getValues,
+    control,
     formState: { errors },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues })
+  const watched = useWatch({ control })
+  const hints = liveHints ? liveHints(watched) : {}
 
   useEffect(() => {
     if (open) reset(defaultValues)
@@ -162,6 +168,9 @@ export function EntityFormDialog({
                       })()
                     )}
                     {f.helpText && !errMsg && <span className="text-xs text-muted-foreground">{f.helpText}</span>}
+                    {hints[f.name] != null && (
+                      <span className="text-xs text-muted-foreground">{hints[f.name]}</span>
+                    )}
                   </>
                 )}
                 {errMsg && <span className="text-xs text-destructive">{errMsg}</span>}

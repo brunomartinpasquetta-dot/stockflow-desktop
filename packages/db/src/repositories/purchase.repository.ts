@@ -2,10 +2,13 @@ import { and, eq, gte, lte, max, sql } from 'drizzle-orm';
 import {
   CreatePurchaseWithLinesSchema,
   type CreatePurchaseWithLinesInput,
+  type PriceMode,
   type VoucherType,
+  addDecimal,
   mulDecimal,
   subDecimal,
   sumDecimals,
+  vatBreakdown,
 } from '@stockflow/shared';
 
 import { ConstraintError, rethrowDbError } from '../errors';
@@ -13,6 +16,7 @@ import type { LocalDatabase } from '../local/client';
 import {
   articles,
   cashMovements,
+  companies,
   purchaseLines,
   purchases,
   type NewPurchaseLine,
@@ -24,13 +28,6 @@ import { BaseRepository } from './base.repository';
 export interface PurchaseWithLines {
   purchase: Purchase;
   lines: PurchaseLine[];
-}
-
-function vatContained(lineTotal: string, vatRate: string): string {
-  const rate = Number(vatRate);
-  if (!Number.isFinite(rate) || rate === 0) return '0.0000';
-  const base = Number(lineTotal) / (1 + rate / 100);
-  return (Number(lineTotal) - base).toFixed(4);
 }
 
 export class PurchaseRepository extends BaseRepository<
@@ -76,8 +73,14 @@ export class PurchaseRepository extends BaseRepository<
           .get();
         const number = (numRow?.value ?? 0) + 1;
 
+        // Modo de precios de la empresa. P08 (UI de compras) debe respetarlo: en 'gross'
+        // el costo unitario ingresado ya incluye IVA; en 'net' es neto y el IVA se agrega.
+        const cmpRow = tx.select({ priceMode: companies.priceMode }).from(companies).limit(1).get();
+        const priceMode: PriceMode = cmpRow?.priceMode === 'net' ? 'net' : 'gross';
+
         const computedLines = data.lines.map((line, idx) => {
           const lineTotal = mulDecimal(line.quantity, line.costPrice, 4);
+          const { vat } = vatBreakdown(lineTotal, line.vatRate ?? '21.00', priceMode);
           return {
             articleId: line.articleId,
             lineNumber: idx + 1,
@@ -86,13 +89,17 @@ export class PurchaseRepository extends BaseRepository<
             salePrice: line.salePrice,
             vatRate: line.vatRate ?? '21.00',
             lineTotal,
-            vat: vatContained(lineTotal, line.vatRate ?? '21.00'),
+            vat,
           };
         });
 
-        const subtotal = sumDecimals(computedLines.map((l) => l.lineTotal));
+        const lineSum = sumDecimals(computedLines.map((l) => l.lineTotal));
         const vatAmount = sumDecimals(computedLines.map((l) => l.vat));
-        const total = subDecimal(subtotal, purchaseDiscount, 4);
+        const subtotal = lineSum;
+        const total =
+          priceMode === 'gross'
+            ? subDecimal(lineSum, purchaseDiscount, 4)
+            : subDecimal(addDecimal(lineSum, vatAmount, 4), purchaseDiscount, 4);
 
         const insertedPurchase = tx
           .insert(purchases)

@@ -9,6 +9,7 @@ import type {
   ArticleDTO,
   CashRegisterDTO,
   CashReportDTO,
+  CompanyDTO,
   CreateSaleInputDTO,
   CreateSaleResultDTO,
   CustomerBalanceDTO,
@@ -73,6 +74,11 @@ export function useFamilies() {
 }
 export function useFamilyMutations() {
   return useEntityMutations<FamilyDTO>('families', api.families.create, api.families.update, api.families.delete)
+}
+
+// --- Empresa (fila única; incluye `priceMode`) ---
+export function useCompany() {
+  return useQuery<CompanyDTO>({ queryKey: ['company'], queryFn: api.company.get })
 }
 
 // --- Medios de pago ---

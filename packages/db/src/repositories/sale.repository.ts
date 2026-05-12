@@ -2,12 +2,15 @@ import { and, eq, gte, inArray, lte, max, sql } from 'drizzle-orm';
 import {
   CreateSaleWithLinesSchema,
   type CreateSaleWithLinesInput,
+  type PriceMode,
   type VoucherType,
+  addDecimal,
   cmpDecimal,
   gteDecimal,
   mulDecimal,
   subDecimal,
   sumDecimals,
+  vatBreakdown,
 } from '@stockflow/shared';
 
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
@@ -15,6 +18,7 @@ import type { LocalDatabase } from '../local/client';
 import {
   articles,
   cashMovements,
+  companies,
   paymentMethods,
   saleLines,
   salePayments,
@@ -31,14 +35,6 @@ export interface SaleWithLines {
   lines: SaleLine[];
   /** Pagos de la venta (vacío si es a cuenta corriente). */
   payments: SalePayment[];
-}
-
-/** IVA contenido en un importe que ya incluye impuestos (criterio MVP). */
-function vatContained(lineTotal: string, vatRate: string): string {
-  const rate = Number(vatRate);
-  if (!Number.isFinite(rate) || rate === 0) return '0.0000';
-  const base = Number(lineTotal) / (1 + rate / 100);
-  return (Number(lineTotal) - base).toFixed(4);
 }
 
 export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInsert> {
@@ -86,13 +82,18 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .get();
         const number = (numRow?.value ?? 0) + 1;
 
-        // Calcular importes de líneas.
+        // Modo de precios vigente de la empresa: define cómo se calcula el IVA y el total.
+        const cmpRow = tx.select({ priceMode: companies.priceMode }).from(companies).limit(1).get();
+        const priceMode: PriceMode = cmpRow?.priceMode === 'net' ? 'net' : 'gross';
+
+        // Calcular importes de líneas. En 'gross' los unitPrice ya incluyen IVA; en 'net' son netos.
         const computedLines = data.lines.map((line, idx) => {
           const lineTotal = subDecimal(
             mulDecimal(line.quantity, line.unitPrice, 4),
             line.discount ?? '0.0000',
             4,
           );
+          const { vat } = vatBreakdown(lineTotal, line.vatRate ?? '21.00', priceMode);
           return {
             articleId: line.articleId,
             lineNumber: idx + 1,
@@ -101,13 +102,19 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             discount: line.discount ?? '0.0000',
             vatRate: line.vatRate ?? '21.00',
             lineTotal,
-            vat: vatContained(lineTotal, line.vatRate ?? '21.00'),
+            vat,
           };
         });
 
-        const subtotal = sumDecimals(computedLines.map((l) => l.lineTotal));
+        const lineSum = sumDecimals(computedLines.map((l) => l.lineTotal));
         const vatAmount = sumDecimals(computedLines.map((l) => l.vat));
-        const total = subDecimal(subtotal, saleDiscount, 4);
+        // 'gross': subtotal ya incluye IVA → total = subtotal − descuento global.
+        // 'net':   subtotal es neto → total = subtotal + IVA − descuento global.
+        const subtotal = lineSum;
+        const total =
+          priceMode === 'gross'
+            ? subDecimal(lineSum, saleDiscount, 4)
+            : subDecimal(addDecimal(lineSum, vatAmount, 4), saleDiscount, 4);
 
         // Validación de pagos.
         if (data.isAccountSale) {

@@ -60,6 +60,8 @@ export type PurchasePaymentType = 'cash' | 'credit';
 export type CashStatus = 'open' | 'closed';
 export type CashMovementType = 'income' | 'expense';
 export type ArStatus = 'open' | 'paid' | 'partial';
+/** Modo de precios de la empresa: 'gross' = precios con IVA incluido / 'net' = precios netos + IVA aparte. */
+export type PriceMode = 'gross' | 'net';
 export type PaymentMethodType =
   | 'cash'
   | 'transfer'
@@ -179,6 +181,8 @@ export interface CompanyDTO {
   email: string | null;
   cuit: string | null;
   ingBrutos: string | null;
+  /** 'gross' = los precios cargados ya incluyen IVA; 'net' = son netos. */
+  priceMode: PriceMode;
   createdAt: number;
   updatedAt: number;
 }
