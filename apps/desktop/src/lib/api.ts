@@ -4,6 +4,7 @@
  */
 import type {
   ArticleDTO,
+  CashMovementDTO,
   CashRegisterDTO,
   CashReportDTO,
   CompanyDTO,
@@ -11,6 +12,7 @@ import type {
   CreatePurchaseResultDTO,
   CreateSaleInputDTO,
   CreateSaleResultDTO,
+  CustomerBalanceDTO,
   CustomerDTO,
   CustomerStatementDTO,
   EntityPayload,
@@ -134,10 +136,12 @@ export const api = {
   },
   cash: {
     open: (openingAmount: string): Promise<CashRegisterDTO> => unwrap(sf().cash.open({ openingAmount })),
-    close: (registerId: string, closingAmount: string): Promise<{ register: CashRegisterDTO; report: CashReportDTO }> =>
-      unwrap(sf().cash.close({ registerId, closingAmount })),
+    close: (registerId: string, closingAmount: string, notes?: string): Promise<{ register: CashRegisterDTO; report: CashReportDTO }> =>
+      unwrap(sf().cash.close({ registerId, closingAmount, notes: notes ?? null })),
     getCurrent: (): Promise<CashRegisterDTO | null> => unwrap(sf().cash.getCurrent()),
     getReport: (registerId: string): Promise<CashReportDTO> => unwrap(sf().cash.getReport({ registerId })),
+    addMovement: (type: 'income' | 'expense', description: string, amount: string): Promise<CashMovementDTO> =>
+      unwrap(sf().cash.addMovement({ type, description, amount })),
   },
   inventory: {
     checkStock: (articleId: string, quantity: string): Promise<StockCheckDTO> => unwrap(sf().inventory.checkStock({ articleId, quantity })),
@@ -149,6 +153,7 @@ export const api = {
     receivePayment: (input: ReceivePaymentInputDTO): Promise<ReceivePaymentResultDTO> => unwrap(sf().accounts.receivePayment(input)),
     getStatement: (customerId: string): Promise<CustomerStatementDTO> => unwrap(sf().accounts.getStatement({ customerId })),
     getTotalReceivables: (): Promise<{ total: string }> => unwrap(sf().accounts.getTotalReceivables()),
+    listBalances: (): Promise<CustomerBalanceDTO[]> => unwrap(sf().accounts.listBalances()),
   },
   system: {
     getInfo: (): Promise<SystemInfoDTO> => unwrap(sf().system.getInfo()),

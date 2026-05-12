@@ -2,6 +2,7 @@ import { AccountsReceivableService } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
+  CustomerBalanceDTO,
   CustomerStatementDTO,
   ReceivePaymentInputDTO,
   ReceivePaymentResultDTO,
@@ -27,6 +28,10 @@ export function buildAccountsHandlers(deps: HandlerDeps): HandlerMap {
       async (_payload, ctx): Promise<{ total: string }> => ({
         total: await new AccountsReceivableService(ctx).getTotalReceivables(),
       }),
+    ),
+    'accounts:listBalances': withSession(
+      deps,
+      (_payload, ctx): Promise<CustomerBalanceDTO[]> => new AccountsReceivableService(ctx).listCustomerBalances(),
     ),
   };
 }

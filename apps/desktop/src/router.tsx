@@ -10,6 +10,8 @@ import { Proveedores } from '@/pages/Proveedores'
 import { Clientes } from '@/pages/Clientes'
 import { Familias } from '@/pages/Familias'
 import { Usuarios } from '@/pages/Usuarios'
+import { Caja } from '@/pages/Caja'
+import { Ventas } from '@/pages/Ventas'
 
 export const router = createHashRouter([
   {
@@ -20,6 +22,8 @@ export const router = createHashRouter([
         element: <ProtectedRoute />,
         children: [
           { index: true, element: <Home /> },
+          { path: '/ventas', element: <Ventas /> },
+          { path: '/caja', element: <Caja /> },
           { path: '/articulos', element: <Articulos /> },
           { path: '/proveedores', element: <Proveedores /> },
           { path: '/clientes', element: <Clientes /> },

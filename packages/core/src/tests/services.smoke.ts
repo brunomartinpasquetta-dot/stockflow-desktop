@@ -163,6 +163,14 @@ async function main(): Promise<void> {
   });
   check('createSale a cuenta #2 → AR', accSale2.accountReceivable?.balance === '1000.0000');
 
+  const balancesBeforeVoid = await seller.accountsReceivable.listCustomerBalances();
+  const gomezBalance = balancesBeforeVoid.find((b) => b.customerId === gomez.id);
+  check(
+    'listCustomerBalances: deuda agregada del cliente (850 + 1000) y 2 comprobantes',
+    gomezBalance?.totalDebt === '1850.0000' && gomezBalance?.openInvoicesCount === 2,
+    JSON.stringify(gomezBalance),
+  );
+
   await expectThrows(
     'voidSale como seller → PermissionDeniedError',
     () => seller.sales.voidSale(cashSale.sale.id),

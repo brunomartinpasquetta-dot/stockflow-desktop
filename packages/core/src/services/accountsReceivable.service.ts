@@ -40,6 +40,14 @@ export interface CustomerStatement {
   currentBalance: string;
 }
 
+export interface CustomerBalance {
+  customerId: string;
+  customerName: string;
+  totalDebt: string;
+  openInvoicesCount: number;
+  lastPaymentDate: number | null;
+}
+
 export class AccountsReceivableService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -147,5 +155,27 @@ export class AccountsReceivableService {
   async getTotalReceivables(): Promise<string> {
     const accounts = await this.ctx.repos.accountsReceivable.findAll();
     return sumDecimals(accounts.map((a) => a.balance));
+  }
+
+  /** Deuda por cliente (sólo los que deben), con nombre y fecha del último pago. */
+  async listCustomerBalances(): Promise<CustomerBalance[]> {
+    const { repos } = this.ctx;
+    const [balances, lastPayments, customers] = await Promise.all([
+      repos.accountsReceivable.listBalances(),
+      repos.accountsReceivable.lastPaymentByCustomer(),
+      repos.customers.findAll(),
+    ]);
+    const nameById = new Map(
+      customers.map((c) => [c.id, c.firstName ? `${c.lastName}, ${c.firstName}` : c.lastName]),
+    );
+    return balances
+      .filter((b) => Number(b.totalDebt) > 0)
+      .map((b) => ({
+        customerId: b.customerId,
+        customerName: nameById.get(b.customerId) ?? b.customerId,
+        totalDebt: b.totalDebt,
+        openInvoicesCount: b.openInvoicesCount,
+        lastPaymentDate: lastPayments.get(b.customerId) ?? null,
+      }));
   }
 }

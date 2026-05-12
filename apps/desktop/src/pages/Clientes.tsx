@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { z } from 'zod'
 import { toast } from 'sonner'
 
-import { useCustomerMutations, useCustomers } from '@/lib/hooks'
+import { useCustomerBalances, useCustomerMutations, useCustomers } from '@/lib/hooks'
 import { validateCUIT } from '@/lib/cuit'
+import { formatCurrency } from '@/lib/format'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
 import { Badge } from '@/components/ui/badge'
@@ -63,9 +64,16 @@ const customerSchema = z
 
 export function Clientes() {
   const customers = useCustomers()
+  const balances = useCustomerBalances()
   const m = useCustomerMutations()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CustomerDTO | null>(null)
+
+  const debtById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const b of balances.data ?? []) map.set(b.customerId, b.totalDebt)
+    return map
+  }, [balances.data])
 
   const columns: Column<CustomerDTO>[] = [
     { key: 'lastName', header: 'Apellido / Razón social' },
@@ -76,6 +84,19 @@ export function Clientes() {
       key: 'category',
       header: 'Categoría',
       render: (r) => <Badge variant="outline">{CATEGORY_LABEL[r.category] ?? r.category}</Badge>,
+    },
+    {
+      key: 'saldo',
+      header: 'Saldo',
+      align: 'right',
+      sortValue: (r) => Number(debtById.get(r.id) ?? 0),
+      render: (r) => {
+        const debt = Number(debtById.get(r.id) ?? 0)
+        if (debt <= 0) return <span className="text-muted-foreground">—</span>
+        const limit = Number(r.creditLimit)
+        const variant = limit > 0 && debt > limit ? 'destructive' : 'warning'
+        return <Badge variant={variant}>{formatCurrency(debt)}</Badge>
+      },
     },
   ]
 

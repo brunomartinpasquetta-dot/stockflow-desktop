@@ -89,6 +89,7 @@ const api: ApiSurface = {
     receivePayment: (p) => call('accounts:receivePayment', p),
     getStatement: (p) => call('accounts:getStatement', p),
     getTotalReceivables: () => call('accounts:getTotalReceivables'),
+    listBalances: () => call('accounts:listBalances'),
   },
   reports: {
     salesByDateRange: (p) => call('reports:salesByDateRange', p),

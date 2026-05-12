@@ -102,7 +102,9 @@ export class CashRegisterRepository extends BaseRepository<
           4,
         );
         const difference = subDecimal(data.closingAmount, expected, 4);
-        const notes = `Esperado: ${expected} | Declarado: ${data.closingAmount} | Diferencia: ${difference}`;
+        const arqueo = `Esperado: ${expected} | Declarado: ${data.closingAmount} | Diferencia: ${difference}`;
+        const userNotes = data.notes?.trim();
+        const notes = userNotes ? `${userNotes}\n${arqueo}` : arqueo;
 
         const updated = tx
           .update(cashRegisters)

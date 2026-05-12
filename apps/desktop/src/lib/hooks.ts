@@ -7,6 +7,11 @@ import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@
 import { api } from '@/lib/api'
 import type {
   ArticleDTO,
+  CashRegisterDTO,
+  CashReportDTO,
+  CreateSaleInputDTO,
+  CreateSaleResultDTO,
+  CustomerBalanceDTO,
   CustomerDTO,
   EntityPayload,
   FamilyDTO,
@@ -75,4 +80,57 @@ export function useUsers() {
 }
 export function useUserMutations() {
   return useEntityMutations<UserDTO>('users', api.users.create, api.users.update, api.users.delete)
+}
+
+// --- Cuentas corrientes (saldos por cliente) ---
+export function useCustomerBalances() {
+  return useQuery<CustomerBalanceDTO[]>({ queryKey: ['customerBalances'], queryFn: api.accounts.listBalances })
+}
+
+// --- Caja ---
+export function useCurrentCash() {
+  return useQuery<CashRegisterDTO | null>({ queryKey: ['cash', 'current'], queryFn: api.cash.getCurrent })
+}
+export function useCashReport(registerId: string | undefined) {
+  return useQuery<CashReportDTO>({
+    queryKey: ['cash', 'report', registerId],
+    queryFn: () => api.cash.getReport(registerId as string),
+    enabled: Boolean(registerId),
+    refetchInterval: 30_000,
+  })
+}
+export function useCashMutations() {
+  const qc = useQueryClient()
+  const invalidateCash = () => {
+    void qc.invalidateQueries({ queryKey: ['cash'] })
+  }
+  return {
+    open: useMutation({
+      mutationFn: (openingAmount: string) => api.cash.open(openingAmount),
+      onSuccess: invalidateCash,
+    }),
+    close: useMutation({
+      mutationFn: ({ registerId, closingAmount, notes }: { registerId: string; closingAmount: string; notes?: string }) =>
+        api.cash.close(registerId, closingAmount, notes),
+      onSuccess: invalidateCash,
+    }),
+    addMovement: useMutation({
+      mutationFn: ({ type, description, amount }: { type: 'income' | 'expense'; description: string; amount: string }) =>
+        api.cash.addMovement(type, description, amount),
+      onSuccess: invalidateCash,
+    }),
+  }
+}
+
+// --- Ventas ---
+export function useCreateSale(): UseMutationResult<CreateSaleResultDTO, Error, CreateSaleInputDTO> {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateSaleInputDTO) => api.sales.create(input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['articles'] })
+      void qc.invalidateQueries({ queryKey: ['cash'] })
+      void qc.invalidateQueries({ queryKey: ['customerBalances'] })
+    },
+  })
 }

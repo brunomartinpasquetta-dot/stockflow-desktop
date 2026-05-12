@@ -16,12 +16,13 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
     'cash:close': withSession(
       deps,
       async (
-        payload: { registerId: string; closingAmount: string },
+        payload: { registerId: string; closingAmount: string; notes?: string | null },
         ctx,
       ): Promise<{ register: CashRegisterDTO; report: CashReportDTO }> => {
         const result = await new CashService(ctx).closeCashRegister(
           payload.registerId,
           payload.closingAmount,
+          payload.notes ?? undefined,
         );
         if (deps.sessionStore.getCurrentCashRegister()?.id === payload.registerId) {
           deps.sessionStore.setCurrentCashRegister(null);

@@ -25,6 +25,8 @@ export const OpenCashRegisterSchema = z.object({
 /** Cerrar caja. */
 export const CloseCashRegisterSchema = z.object({
   closingAmount: moneySchema,
+  /** Observaciones del cierre (se anteponen a la línea de arqueo automática). */
+  notes: z.string().max(500).nullish(),
 });
 
 export type CashRegisterOutput = z.infer<typeof CashRegisterSchema>;

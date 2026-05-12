@@ -416,6 +416,14 @@ export interface CustomerStatementDTO {
   currentBalance: string;
 }
 
+export interface CustomerBalanceDTO {
+  customerId: string;
+  customerName: string;
+  totalDebt: string;
+  openInvoicesCount: number;
+  lastPaymentDate: number | null;
+}
+
 export interface DateRangeDTO {
   from: number;
   to: number;
@@ -556,7 +564,7 @@ export interface ApiSurface {
   };
   cash: {
     open(payload: { openingAmount: string }): Res<CashRegisterDTO>;
-    close(payload: { registerId: string; closingAmount: string }): Res<{
+    close(payload: { registerId: string; closingAmount: string; notes?: string | null }): Res<{
       register: CashRegisterDTO;
       report: CashReportDTO;
     }>;
@@ -573,6 +581,7 @@ export interface ApiSurface {
     receivePayment(payload: ReceivePaymentInputDTO): Res<ReceivePaymentResultDTO>;
     getStatement(payload: { customerId: string; dateRange?: DateRangeDTO }): Res<CustomerStatementDTO>;
     getTotalReceivables(): Res<{ total: string }>;
+    listBalances(): Res<CustomerBalanceDTO[]>;
   };
   reports: {
     salesByDateRange(payload: DateRangeDTO & { sellerId?: string; customerId?: string }): Res<SalesReportDTO>;

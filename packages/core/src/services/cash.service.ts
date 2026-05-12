@@ -51,6 +51,7 @@ export class CashService {
   async closeCashRegister(
     registerId: string,
     closingAmount: string,
+    notes?: string,
   ): Promise<{ register: CashRegister; report: CashReport }> {
     const { repos, currentUser } = this.ctx;
     const register = await repos.cashRegisters.findById(registerId);
@@ -62,7 +63,7 @@ export class CashService {
       throw new BusinessRuleError('cash_already_closed', `La caja ${registerId} ya está cerrada`);
     }
 
-    const closed = await repos.cashRegisters.closeRegister(registerId, { closingAmount });
+    const closed = await repos.cashRegisters.closeRegister(registerId, { closingAmount, notes });
     const report = await this.buildReport(closed);
     return { register: closed, report };
   }

@@ -1,0 +1,355 @@
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { Loader2, Plus, Wallet } from 'lucide-react'
+
+import { useCashMutations, useCashReport, useCurrentCash } from '@/lib/hooks'
+import { usePermission } from '@/contexts/AuthContext'
+import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import type { CashMovementDTO } from '@/types/api'
+
+function movementKind(m: CashMovementDTO): string {
+  if (m.relatedSaleId) return m.type === 'income' ? 'Venta' : 'Anulación'
+  if (m.relatedPurchaseId) return 'Compra'
+  if (m.description.toLowerCase().startsWith('cobranza')) return 'Cobro'
+  return 'Movimiento'
+}
+
+function SummaryCard({ label, value, accent }: { label: string; value: string; accent?: 'income' | 'expense' | 'main' }) {
+  return (
+    <Card>
+      <CardHeader className="pb-1">
+        <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <span
+          className={cn(
+            'text-2xl font-semibold tabular-nums',
+            accent === 'income' && 'text-success',
+            accent === 'expense' && 'text-destructive',
+          )}
+        >
+          {value}
+        </span>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Estado A: caja cerrada ────────────────────────────────────────────────
+function CajaCerrada() {
+  const { open } = useCashMutations()
+  const [amount, setAmount] = useState('0')
+
+  async function abrir(): Promise<void> {
+    try {
+      await open.mutateAsync(parseCurrencyInput(amount))
+      toast.success('Caja abierta')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo abrir la caja')
+    }
+  }
+
+  return (
+    <div className="flex h-full items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center gap-2 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Wallet className="h-7 w-7" />
+          </div>
+          <CardTitle className="text-lg">Caja cerrada</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Para registrar ventas hay que abrir la caja. Ingresá el monto inicial en efectivo del cajón.
+          </p>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="apertura">Monto inicial</Label>
+            <Input
+              id="apertura"
+              autoFocus
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              onBlur={() => setAmount(parseCurrencyInput(amount))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void abrir()
+              }}
+            />
+          </div>
+          <Button variant="success" className="w-full" onClick={() => void abrir()} disabled={open.isPending}>
+            {open.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Abrir caja
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ── Estado B: caja abierta ────────────────────────────────────────────────
+function CajaAbierta({ registerId }: { registerId: string }) {
+  const report = useCashReport(registerId)
+  const { close, addMovement } = useCashMutations()
+  const canMove = usePermission('add_cash_movement')
+
+  const [movOpen, setMovOpen] = useState(false)
+  const [movType, setMovType] = useState<'income' | 'expense'>('income')
+  const [movDesc, setMovDesc] = useState('')
+  const [movAmount, setMovAmount] = useState('0')
+
+  const [closeOpen, setCloseOpen] = useState(false)
+  const [closeAmount, setCloseAmount] = useState('')
+  const [closeNotes, setCloseNotes] = useState('')
+
+  const r = report.data
+  const expected = r?.expectedCash ?? '0'
+
+  async function guardarMovimiento(): Promise<void> {
+    if (movDesc.trim().length < 3) {
+      toast.error('La descripción debe tener al menos 3 caracteres')
+      return
+    }
+    const amt = parseCurrencyInput(movAmount)
+    if (Number(amt) <= 0) {
+      toast.error('El monto debe ser mayor a cero')
+      return
+    }
+    try {
+      await addMovement.mutateAsync({ type: movType, description: movDesc.trim(), amount: amt })
+      toast.success('Movimiento registrado')
+      setMovOpen(false)
+      setMovDesc('')
+      setMovAmount('0')
+      setMovType('income')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo registrar el movimiento')
+    }
+  }
+
+  async function confirmarCierre(): Promise<void> {
+    const amt = parseCurrencyInput(closeAmount)
+    try {
+      const result = await close.mutateAsync({
+        registerId,
+        closingAmount: amt,
+        notes: closeNotes.trim() || undefined,
+      })
+      setCloseOpen(false)
+      const diff = result.report.difference ?? '0'
+      toast.success(
+        `Caja cerrada — esperado ${formatCurrency(result.report.expectedCash)}, contado ${formatCurrency(amt)}, diferencia ${formatCurrency(diff)}`,
+        { action: { label: 'Imprimir', onClick: () => window.print() } },
+      )
+      setCloseAmount('')
+      setCloseNotes('')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo cerrar la caja')
+    }
+  }
+
+  const closeDiff = closeAmount ? (Number(parseCurrencyInput(closeAmount)) - Number(expected)).toFixed(4) : null
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold">Caja</h1>
+          <p className="text-sm text-muted-foreground">
+            {r ? `Caja #${r.register.number} abierta desde ${formatDateTime(r.register.openDate)}` : 'Cargando…'}
+          </p>
+        </div>
+        <Button variant="destructive" onClick={() => setCloseOpen(true)}>
+          Cerrar caja
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <SummaryCard label="Saldo actual (efectivo esperado)" value={formatCurrency(expected)} accent="main" />
+        <SummaryCard label="Ingresos del día" value={formatCurrency(r?.incomeTotal ?? '0')} accent="income" />
+        <SummaryCard label="Egresos del día" value={formatCurrency(r?.expenseTotal ?? '0')} accent="expense" />
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle>
+            Movimientos del día
+            {r && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                · {r.salesCount} venta(s) por {formatCurrency(r.salesTotal)} · apertura {formatCurrency(r.openingAmount)}
+              </span>
+            )}
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!canMove}
+            title={canMove ? undefined : 'Requiere permiso de encargado o administrador'}
+            onClick={() => setMovOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo movimiento
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Hora</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Ingreso</TableHead>
+                <TableHead className="text-right">Egreso</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                    Cargando…
+                  </TableCell>
+                </TableRow>
+              ) : !r || r.movements.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                    Sin movimientos todavía
+                  </TableCell>
+                </TableRow>
+              ) : (
+                [...r.movements]
+                  .sort((a, b) => b.date - a.date)
+                  .map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{movementKind(m)}</Badge>
+                      </TableCell>
+                      <TableCell>{m.description}</TableCell>
+                      <TableCell className="text-right tabular-nums text-success">
+                        {m.type === 'income' ? formatCurrency(m.amount) : ''}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        {m.type === 'expense' ? formatCurrency(m.amount) : ''}
+                      </TableCell>
+                    </TableRow>
+                  ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Dialog: nuevo movimiento */}
+      <Dialog open={movOpen} onOpenChange={(o) => { if (!o) setMovOpen(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo movimiento de caja</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1.5 text-sm">
+                <input type="radio" name="movtype" checked={movType === 'income'} onChange={() => setMovType('income')} />
+                Ingreso
+              </label>
+              <label className="flex items-center gap-1.5 text-sm">
+                <input type="radio" name="movtype" checked={movType === 'expense'} onChange={() => setMovType('expense')} />
+                Egreso
+              </label>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mov-desc">Descripción</Label>
+              <Input id="mov-desc" value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Ej: pago de flete" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mov-amount">Monto</Label>
+              <Input
+                id="mov-amount"
+                inputMode="decimal"
+                value={movAmount}
+                onChange={(e) => setMovAmount(e.target.value)}
+                onBlur={() => setMovAmount(parseCurrencyInput(movAmount))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMovOpen(false)} disabled={addMovement.isPending}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void guardarMovimiento()} disabled={addMovement.isPending}>
+              {addMovement.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: cerrar caja */}
+      <Dialog open={closeOpen} onOpenChange={(o) => { if (!o) setCloseOpen(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cerrar caja</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-md bg-muted px-3 py-2 text-sm">
+              Saldo esperado por el sistema: <span className="font-semibold tabular-nums">{formatCurrency(expected)}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="close-amount">Monto real contado</Label>
+              <Input
+                id="close-amount"
+                autoFocus
+                inputMode="decimal"
+                value={closeAmount}
+                onChange={(e) => setCloseAmount(e.target.value)}
+                onBlur={() => closeAmount && setCloseAmount(parseCurrencyInput(closeAmount))}
+              />
+            </div>
+            {closeDiff != null && Number(closeDiff) !== 0 && (
+              <Badge variant={Number(closeDiff) < 0 ? 'destructive' : 'warning'}>
+                {Number(closeDiff) < 0 ? 'Faltante' : 'Sobrante'} de {formatCurrency(Math.abs(Number(closeDiff)))}
+              </Badge>
+            )}
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="close-notes">Observaciones (opcional)</Label>
+              <textarea
+                id="close-notes"
+                rows={2}
+                value={closeNotes}
+                onChange={(e) => setCloseNotes(e.target.value)}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloseOpen(false)} disabled={close.isPending}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={() => void confirmarCierre()} disabled={close.isPending || !closeAmount}>
+              {close.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmar cierre
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+export function Caja() {
+  const current = useCurrentCash()
+  if (current.isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  return current.data ? <CajaAbierta registerId={current.data.id} /> : <CajaCerrada />
+}
