@@ -151,13 +151,19 @@ async function main(): Promise<void> {
     (e) => e instanceof ConstraintError,
   );
 
+  const PM_CASH = 'pm-efectivo';
+  const PM_TRANSFER = 'pm-transferencia';
   const stockBefore = (await repos.articles.findById(art.id))!.stock;
-  const { sale, lines } = await repos.sales.createWithLines({
+  const { sale, lines, payments } = await repos.sales.createWithLines({
     type: 'B',
     customerId: cf.id,
     sellerId: admin.id,
     cashRegisterId: reg.id,
-    paymentType: 'cash',
+    isAccountSale: false,
+    payments: [
+      { paymentMethodId: PM_CASH, amount: '1500.0000' },
+      { paymentMethodId: PM_TRANSFER, amount: '300.0000' },
+    ],
     lines: [
       { articleId: art.id, quantity: '2.000', unitPrice: '850.0000', vatRate: '21.00' },
       { articleId: lowArt.id, quantity: '1.000', unitPrice: '100.0000', vatRate: '21.00' },
@@ -166,6 +172,7 @@ async function main(): Promise<void> {
   check('sales.createWithLines crea la venta', !!sale.id && sale.number === 1, `total=${sale.total}`);
   check('sales.createWithLines crea 2 líneas', lines.length === 2);
   check('sales.createWithLines total correcto', sale.total === '1800.0000', `total=${sale.total}`);
+  check('sales.createWithLines crea 2 sale_payments', payments.length === 2);
 
   const stockAfter = (await repos.articles.findById(art.id))!.stock;
   check(
@@ -175,21 +182,46 @@ async function main(): Promise<void> {
   );
 
   const movs = await repos.cashMovements.findByRegister(reg.id);
-  const income = movs.find((m) => m.relatedSaleId === sale.id);
+  const cashIncome = movs.find((m) => m.relatedSaleId === sale.id && m.paymentMethodId === PM_CASH);
+  const transferIncome = movs.find((m) => m.relatedSaleId === sale.id && m.paymentMethodId === PM_TRANSFER);
   check(
-    'sales.createWithLines genera cashMovement de ingreso',
-    !!income && income.type === 'income' && income.amount === '1800.0000',
-    income ? `amount=${income.amount}` : '',
+    'sales.createWithLines genera 1 cashMovement por pago, sólo efectivo afecta el cajón',
+    cashIncome?.amount === '1500.0000' && transferIncome?.amount === '300.0000',
+    `efectivo=${cashIncome?.amount} transferencia=${transferIncome?.amount}`,
+  );
+
+  // Venta a cuenta corriente: sin sale_payments.
+  const cust2 = await repos.customers.create({
+    lastName: 'LOPEZ', firstName: 'Eva', category: 'CF', docType: 'DNI', docNumber: '30111118',
+  });
+  const accSale = await repos.sales.createWithLines({
+    type: 'B', customerId: cust2.id, sellerId: admin.id, cashRegisterId: reg.id, isAccountSale: true,
+    lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '500.0000' }],
+  });
+  check('sales.createWithLines a cuenta → isAccountSale, sin pagos', accSale.sale.isAccountSale === true && accSale.payments.length === 0);
+
+  await expectThrows(
+    'sales.createWithLines con pagos que no suman el total → ConstraintError',
+    () => repos.sales.createWithLines({
+      type: 'B', customerId: cf.id, sellerId: admin.id, cashRegisterId: reg.id, isAccountSale: false,
+      payments: [{ paymentMethodId: PM_CASH, amount: '999.0000' }],
+      lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }],
+    }),
+    (e) => e instanceof ConstraintError,
   );
 
   const nextNum = await repos.sales.getNextNumber('B');
-  check('sales.getNextNumber', nextNum === 2, `next=${nextNum}`);
+  check('sales.getNextNumber', nextNum === 3, `next=${nextNum}`);
 
-  // anulación
+  // anulación de la venta mixta → reverso de caja sólo por la parte efectivo, sale_payments eliminados
+  const stockBeforeVoid = (await repos.articles.findById(art.id))!.stock;
   const voided = await repos.sales.voidSale(sale.id);
   check('sales.voidSale marca voided', voided.status === 'voided');
   const stockRestored = (await repos.articles.findById(art.id))!.stock;
-  check('sales.voidSale restaura stock', stockRestored === stockBefore, `stock=${stockRestored}`);
+  check('sales.voidSale restaura stock', Number(stockRestored) - Number(stockBeforeVoid) === 2, `${stockBeforeVoid}→${stockRestored}`);
+  check('sales.voidSale elimina los sale_payments', (await repos.salePayments.findBySale(sale.id)).length === 0);
+  const reversal = (await repos.cashMovements.findByRegister(reg.id)).find((m) => m.relatedSaleId === sale.id && m.type === 'expense');
+  check('sales.voidSale reverso de caja sólo por efectivo (1500)', reversal?.amount === '1500.0000', `reversal=${reversal?.amount}`);
 
   await expectThrows(
     'sales.createWithLines con stock insuficiente revierte y lanza ConstraintError',
@@ -199,7 +231,8 @@ async function main(): Promise<void> {
         customerId: cf.id,
         sellerId: admin.id,
         cashRegisterId: reg.id,
-        paymentType: 'cash',
+        isAccountSale: false,
+        payments: [{ paymentMethodId: PM_CASH, amount: '99999.0000' }],
         lines: [{ articleId: art.id, quantity: '99999.000', unitPrice: '1.0000' }],
       }),
     (e) => e instanceof ConstraintError,
@@ -227,7 +260,7 @@ async function main(): Promise<void> {
 
 main()
   .catch((err) => {
-    console.error('\n✗ Excepción durante el smoke test:', err);
+    console.error('\n✗ Excepción durante el smoke test:', err instanceof Error ? (err.stack ?? err.message) : String(err));
     failures++;
   })
   .finally(() => {

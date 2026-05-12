@@ -13,6 +13,7 @@ import type { LocalDatabase } from '../local/client';
 import {
   cashMovements,
   cashRegisters,
+  paymentMethods,
   type CashRegister,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
@@ -89,13 +90,21 @@ export class CashRegisterRepository extends BaseRepository<
           throw new ConstraintError('CASH_ALREADY_CLOSED', `La caja ${id} ya está cerrada`);
         }
 
+        // Sólo los movimientos en efectivo físico (o sin medio asignado: legacy) afectan el arqueo.
         const movements = tx
-          .select({ type: cashMovements.type, amount: cashMovements.amount })
+          .select({
+            type: cashMovements.type,
+            amount: cashMovements.amount,
+            pmId: cashMovements.paymentMethodId,
+            isCash: paymentMethods.isPhysicalCash,
+          })
           .from(cashMovements)
+          .leftJoin(paymentMethods, eq(cashMovements.paymentMethodId, paymentMethods.id))
           .where(eq(cashMovements.cashRegisterId, id))
           .all();
-        const incomes = sumDecimals(movements.filter((m) => m.type === 'income').map((m) => m.amount));
-        const expenses = sumDecimals(movements.filter((m) => m.type === 'expense').map((m) => m.amount));
+        const cashMovs = movements.filter((m) => m.pmId == null || m.isCash === true);
+        const incomes = sumDecimals(cashMovs.filter((m) => m.type === 'income').map((m) => m.amount));
+        const expenses = sumDecimals(cashMovs.filter((m) => m.type === 'expense').map((m) => m.amount));
         const expected = subDecimal(
           sumDecimals([register.openingAmount, incomes]),
           expenses,

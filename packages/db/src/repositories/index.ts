@@ -14,10 +14,12 @@ import { CompanyRepository } from './company.repository';
 import { CustomerRepository } from './customer.repository';
 import { FamilyRepository } from './family.repository';
 import { PaymentRepository } from './payment.repository';
+import { PaymentMethodRepository } from './paymentMethod.repository';
 import { PurchaseRepository } from './purchase.repository';
 import { PurchaseLineRepository } from './purchaseLine.repository';
 import { SaleRepository } from './sale.repository';
 import { SaleLineRepository } from './saleLine.repository';
+import { SalePaymentRepository } from './salePayment.repository';
 import { SupplierRepository } from './supplier.repository';
 import { UserRepository } from './user.repository';
 
@@ -31,10 +33,12 @@ export { CompanyRepository } from './company.repository';
 export { CustomerRepository, type CustomerWithBalance } from './customer.repository';
 export { FamilyRepository } from './family.repository';
 export { PaymentRepository } from './payment.repository';
+export { PaymentMethodRepository } from './paymentMethod.repository';
 export { PurchaseRepository, type PurchaseWithLines } from './purchase.repository';
 export { PurchaseLineRepository } from './purchaseLine.repository';
 export { SaleRepository, type SaleWithLines } from './sale.repository';
 export { SaleLineRepository } from './saleLine.repository';
+export { SalePaymentRepository, type SalePaymentInput } from './salePayment.repository';
 export { SupplierRepository } from './supplier.repository';
 export { UserRepository, type SafeUser } from './user.repository';
 
@@ -46,12 +50,15 @@ export interface Repositories {
   families: FamilyRepository;
   sales: SaleRepository;
   saleLines: SaleLineRepository;
+  salePayments: SalePaymentRepository;
   purchases: PurchaseRepository;
   purchaseLines: PurchaseLineRepository;
   cashRegisters: CashRegisterRepository;
   cashMovements: CashMovementRepository;
   accountsReceivable: AccountsReceivableRepository;
   payments: PaymentRepository;
+  paymentMethods: PaymentMethodRepository;
+  /** Tabla `cards` heredada: queda en DB sin uso activo desde P07.2. */
   cards: CardRepository;
   company: CompanyRepository;
 }
@@ -66,12 +73,14 @@ export function createRepositories(db: LocalDatabase): Repositories {
     families: new FamilyRepository(db),
     sales: new SaleRepository(db),
     saleLines: new SaleLineRepository(db),
+    salePayments: new SalePaymentRepository(db),
     purchases: new PurchaseRepository(db),
     purchaseLines: new PurchaseLineRepository(db),
     cashRegisters: new CashRegisterRepository(db),
     cashMovements: new CashMovementRepository(db),
     accountsReceivable: new AccountsReceivableRepository(db),
     payments: new PaymentRepository(db),
+    paymentMethods: new PaymentMethodRepository(db),
     cards: new CardRepository(db),
     company: new CompanyRepository(db),
   };

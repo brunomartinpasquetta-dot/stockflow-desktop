@@ -1,8 +1,8 @@
 /**
  * Servicio de caja: apertura/cierre, movimientos manuales y reportes de arqueo.
  */
-import type { CashMovement, CashRegister } from '@stockflow/shared';
-import { subDecimal, sumDecimals } from '@stockflow/shared';
+import type { CashMovement, CashRegister, PaymentMethod, PaymentMethodType } from '@stockflow/shared';
+import { addDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { hasPermission, requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -12,6 +12,8 @@ export interface AddMovementInput {
   type: 'income' | 'expense';
   description: string;
   amount: string;
+  /** Medio de pago del movimiento (default en la UI: Efectivo). null = efectivo físico. */
+  paymentMethodId?: string | null;
   /** Si se omite, se usa la caja activa del contexto / la caja abierta actual. */
   cashRegisterId?: string;
 }
@@ -20,6 +22,19 @@ export interface AddMovementInput {
 export type CashMovementWithStatus = CashMovement & {
   relatedSaleStatus?: 'completed' | 'voided' | 'pending';
 };
+
+/** Desglose de ingresos/egresos por medio de pago (para el dashboard de caja). */
+export interface PaymentMethodBreakdown {
+  /** null = movimientos sin medio asignado (legacy). */
+  paymentMethodId: string | null;
+  name: string;
+  type: PaymentMethodType | null;
+  /** true = afecta el arqueo físico del cajón. */
+  isPhysicalCash: boolean;
+  incomeTotal: string;
+  expenseTotal: string;
+  net: string;
+}
 
 export interface CashReport {
   register: CashRegister;
@@ -30,12 +45,14 @@ export interface CashReport {
   expenseTotal: string;
   salesCount: number;
   salesTotal: string;
-  /** efectivo esperado en caja = apertura + ingresos − egresos */
+  /** efectivo físico esperado = apertura + ingresos en efectivo − egresos en efectivo */
   expectedCash: string;
   /** monto declarado al cerrar (null si la caja sigue abierta) */
   closingAmount: string | null;
   /** declarado − esperado (null si la caja sigue abierta) */
   difference: string | null;
+  /** Desglose por medio de pago (efectivo, transferencia, tarjetas, ...). */
+  byPaymentMethod: PaymentMethodBreakdown[];
   movements: CashMovementWithStatus[];
 }
 
@@ -100,31 +117,71 @@ export class CashService {
       description: input.description,
       amount: input.amount,
       userId: currentUser.id,
+      paymentMethodId: input.paymentMethodId ?? null,
       date: Date.now(),
     });
   }
 
   private async buildReport(register: CashRegister): Promise<CashReport> {
     const { repos } = this.ctx;
-    const rawMovements = await repos.cashMovements.findByRegister(register.id);
-    const saleIds = [...new Set(rawMovements.filter((m) => m.relatedSaleId).map((m) => m.relatedSaleId as string))];
+    const [rawMovements, pmById] = await Promise.all([
+      repos.cashMovements.findByRegister(register.id),
+      repos.paymentMethods.byId(),
+    ]);
+    const saleIds = [
+      ...new Set(rawMovements.filter((m) => m.relatedSaleId).map((m) => m.relatedSaleId as string)),
+    ];
     const saleStatuses = await repos.sales.findStatusesByIds(saleIds);
     const movements: CashMovementWithStatus[] = rawMovements.map((m) => {
       const status = m.relatedSaleId ? saleStatuses.get(m.relatedSaleId) : undefined;
       return status ? { ...m, relatedSaleStatus: status } : m;
     });
+
+    const isPhysical = (m: CashMovement): boolean =>
+      m.paymentMethodId == null || pmById.get(m.paymentMethodId)?.isPhysicalCash === true;
+
     const incomes = movements.filter((m) => m.type === 'income');
     const expenses = movements.filter((m) => m.type === 'expense');
     const incomeTotal = sumDecimals(incomes.map((m) => m.amount));
     const expenseTotal = sumDecimals(expenses.map((m) => m.amount));
+
+    const cashIncome = sumDecimals(incomes.filter(isPhysical).map((m) => m.amount));
+    const cashExpense = sumDecimals(expenses.filter(isPhysical).map((m) => m.amount));
+    const expectedCash = subDecimal(sumDecimals([register.openingAmount, cashIncome]), cashExpense, 4);
+
+    // Desglose por medio de pago.
+    const byPmMap = new Map<string, PaymentMethodBreakdown>();
+    const NONE_KEY = '__none__';
+    for (const m of movements) {
+      const key = m.paymentMethodId ?? NONE_KEY;
+      let b = byPmMap.get(key);
+      if (!b) {
+        const pm: PaymentMethod | undefined = m.paymentMethodId ? pmById.get(m.paymentMethodId) : undefined;
+        b = {
+          paymentMethodId: m.paymentMethodId ?? null,
+          name: pm?.name ?? (m.paymentMethodId ? `(${m.paymentMethodId})` : 'Efectivo (sin asignar)'),
+          type: pm?.type ?? null,
+          isPhysicalCash: pm?.isPhysicalCash ?? m.paymentMethodId == null,
+          incomeTotal: '0.0000',
+          expenseTotal: '0.0000',
+          net: '0.0000',
+        };
+        byPmMap.set(key, b);
+      }
+      if (m.type === 'income') b.incomeTotal = addDecimal(b.incomeTotal, m.amount, 4);
+      else b.expenseTotal = addDecimal(b.expenseTotal, m.amount, 4);
+    }
+    const byPaymentMethod = [...byPmMap.values()]
+      .map((b) => ({ ...b, net: subDecimal(b.incomeTotal, b.expenseTotal, 4) }))
+      .sort((a, b) => {
+        const oa = a.paymentMethodId ? pmById.get(a.paymentMethodId)?.sortOrder ?? 999 : 0;
+        const ob = b.paymentMethodId ? pmById.get(b.paymentMethodId)?.sortOrder ?? 999 : 0;
+        return oa - ob;
+      });
+
     const sales = await repos.sales.findAll({ cashRegisterId: register.id });
     const completedSales = sales.filter((s) => s.status === 'completed');
     const salesTotal = sumDecimals(completedSales.map((s) => s.total));
-    const expectedCash = subDecimal(
-      sumDecimals([register.openingAmount, incomeTotal]),
-      expenseTotal,
-      4,
-    );
     const difference =
       register.closingAmount != null ? subDecimal(register.closingAmount, expectedCash, 4) : null;
 
@@ -140,6 +197,7 @@ export class CashService {
       expectedCash,
       closingAmount: register.closingAmount ?? null,
       difference,
+      byPaymentMethod,
       movements,
     };
   }

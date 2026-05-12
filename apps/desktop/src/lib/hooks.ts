@@ -7,7 +7,6 @@ import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@
 import { api } from '@/lib/api'
 import type {
   ArticleDTO,
-  CardDTO,
   CashRegisterDTO,
   CashReportDTO,
   CreateSaleInputDTO,
@@ -16,6 +15,7 @@ import type {
   CustomerDTO,
   EntityPayload,
   FamilyDTO,
+  PaymentMethodDTO,
   SupplierDTO,
   UserDTO,
 } from '@/types/api'
@@ -75,12 +75,17 @@ export function useFamilyMutations() {
   return useEntityMutations<FamilyDTO>('families', api.families.create, api.families.update, api.families.delete)
 }
 
-// --- Tarjetas ---
-export function useCards() {
-  return useQuery<CardDTO[]>({ queryKey: ['cards'], queryFn: api.cards.list })
+// --- Medios de pago ---
+export function usePaymentMethods() {
+  return useQuery<PaymentMethodDTO[]>({ queryKey: ['paymentMethods'], queryFn: api.paymentMethods.list })
 }
-export function useCardMutations() {
-  return useEntityMutations<CardDTO>('cards', api.cards.create, api.cards.update, api.cards.delete)
+export function usePaymentMethodMutations() {
+  return useEntityMutations<PaymentMethodDTO>(
+    'paymentMethods',
+    api.paymentMethods.create,
+    api.paymentMethods.update,
+    api.paymentMethods.delete,
+  )
 }
 
 // --- Usuarios ---
@@ -124,8 +129,17 @@ export function useCashMutations() {
       onSuccess: invalidateCash,
     }),
     addMovement: useMutation({
-      mutationFn: ({ type, description, amount }: { type: 'income' | 'expense'; description: string; amount: string }) =>
-        api.cash.addMovement(type, description, amount),
+      mutationFn: ({
+        type,
+        description,
+        amount,
+        paymentMethodId,
+      }: {
+        type: 'income' | 'expense'
+        description: string
+        amount: string
+        paymentMethodId?: string | null
+      }) => api.cash.addMovement(type, description, amount, paymentMethodId ?? null),
       onSuccess: invalidateCash,
     }),
   }

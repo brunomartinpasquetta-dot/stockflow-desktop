@@ -7,6 +7,7 @@ import type {
   Customer,
   Sale,
   SaleLine,
+  SalePayment,
   VoucherType,
 } from '@stockflow/shared';
 
@@ -32,12 +33,20 @@ export interface SaleLineDraft {
   vatRate?: string;
 }
 
+/** Un pago de la venta (un medio de pago + monto). */
+export interface SalePaymentDraft {
+  paymentMethodId: string;
+  amount: string;
+  reference?: string | null;
+}
+
 export interface CreateSaleInput {
   type: VoucherType;
   customerId: string;
-  paymentType: 'cash' | 'card' | 'mixed' | 'account';
-  cardId?: string | null;
-  cardAmount?: string;
+  /** true = venta a cuenta corriente (no lleva pagos; abre una AR). */
+  isAccountSale?: boolean;
+  /** Pagos de la venta; obligatorio (≥1) si NO es a cuenta corriente. */
+  payments?: SalePaymentDraft[];
   /** Descuento global (absoluto) sobre el total. */
   discount?: string;
   notes?: string | null;
@@ -47,6 +56,7 @@ export interface CreateSaleInput {
 export interface CreateSaleResult {
   sale: Sale;
   lines: SaleLine[];
+  payments: SalePayment[];
   accountReceivable: AccountReceivable | null;
 }
 
@@ -90,17 +100,22 @@ export class SalesService {
     if (lines.length === 0) {
       throw new BusinessRuleError('empty_sale', 'La venta debe tener al menos una línea');
     }
+    const isAccountSale = draft.isAccountSale === true;
+    const payments = isAccountSale ? [] : (draft.payments ?? []);
 
     const register = await this.resolveOpenRegister();
 
     const customer = await repos.customers.findById(draft.customerId);
     if (!customer) throw new NotFoundError('Cliente', draft.customerId);
 
-    if (draft.paymentType === 'account' && !customerCanUseAccount(customer)) {
+    if (isAccountSale && !customerCanUseAccount(customer)) {
       throw new BusinessRuleError(
         'customer_not_account_eligible',
         `El cliente "${customer.lastName}" no puede operar en cuenta corriente (falta documento identificatorio)`,
       );
+    }
+    if (!isAccountSale && payments.length === 0) {
+      throw new BusinessRuleError('no_payments', 'La venta debe registrar al menos un pago');
     }
 
     // Resolver precios e IVA línea por línea.
@@ -125,7 +140,7 @@ export class SalesService {
     }
 
     // Límite de crédito (creditLimit '0.0000' = sin límite).
-    if (draft.paymentType === 'account' && Number(customer.creditLimit) > 0) {
+    if (isAccountSale && Number(customer.creditLimit) > 0) {
       const preview = calculateSaleTotals(resolvedLines, draft.discount ?? '0.0000');
       const currentBalance = await repos.accountsReceivable.getTotalBalance(customer.id);
       if (Number(currentBalance) + Number(preview.total) > Number(customer.creditLimit)) {
@@ -136,22 +151,21 @@ export class SalesService {
       }
     }
 
-    // La transacción atómica (cabecera + líneas + stock + caja) la hace el repo.
-    const { sale, lines: savedLines } = await repos.sales.createWithLines({
+    // La transacción atómica (cabecera + líneas + stock + pagos + caja) la hace el repo.
+    const { sale, lines: savedLines, payments: savedPayments } = await repos.sales.createWithLines({
       type: draft.type,
       customerId: customer.id,
       sellerId: currentUser.id,
       cashRegisterId: register.id,
-      paymentType: draft.paymentType,
-      cardId: draft.cardId ?? null,
-      cardAmount: draft.cardAmount ?? '0.0000',
+      isAccountSale,
+      payments,
       discount: draft.discount ?? '0.0000',
       notes: draft.notes ?? null,
       lines: resolvedLines,
     });
 
     let accountReceivable: AccountReceivable | null = null;
-    if (draft.paymentType === 'account') {
+    if (isAccountSale) {
       accountReceivable = await repos.accountsReceivable.create({
         customerId: customer.id,
         saleId: sale.id,
@@ -159,7 +173,7 @@ export class SalesService {
       });
     }
 
-    return { sale, lines: savedLines, accountReceivable };
+    return { sale, lines: savedLines, payments: savedPayments, accountReceivable };
   }
 
   /**
@@ -194,10 +208,16 @@ export class SalesService {
     return voided;
   }
 
-  async getSale(saleId: string): Promise<{ sale: Sale; lines: SaleLine[] }> {
-    const sale = await this.ctx.repos.sales.findById(saleId);
+  async getSale(
+    saleId: string,
+  ): Promise<{ sale: Sale; lines: SaleLine[]; payments: SalePayment[] }> {
+    const { repos } = this.ctx;
+    const sale = await repos.sales.findById(saleId);
     if (!sale) throw new NotFoundError('Venta', saleId);
-    const lines = await this.ctx.repos.saleLines.findBySale(saleId);
-    return { sale, lines };
+    const [lines, payments] = await Promise.all([
+      repos.saleLines.findBySale(saleId),
+      repos.salePayments.findBySale(saleId),
+    ]);
+    return { sale, lines, payments };
   }
 }

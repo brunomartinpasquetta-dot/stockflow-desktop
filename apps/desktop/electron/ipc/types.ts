@@ -56,12 +56,18 @@ export type DocType = 'DNI' | 'CUIT' | 'CUIL' | 'PASS' | 'CF';
 export type FiscalCategory = 'RI' | 'MT' | 'CF' | 'EX';
 export type VoucherType = 'A' | 'B' | 'C' | 'X';
 export type SaleStatus = 'completed' | 'voided' | 'pending';
-export type SalePaymentType = 'cash' | 'card' | 'mixed' | 'account';
 export type PurchasePaymentType = 'cash' | 'credit';
 export type CashStatus = 'open' | 'closed';
 export type CashMovementType = 'income' | 'expense';
 export type ArStatus = 'open' | 'paid' | 'partial';
-export type PaymentMethod = 'cash' | 'transfer' | 'card';
+export type PaymentMethodType =
+  | 'cash'
+  | 'transfer'
+  | 'debit_card'
+  | 'credit_card'
+  | 'mp'
+  | 'check'
+  | 'other';
 
 export interface UserDTO {
   id: string;
@@ -152,6 +158,19 @@ export interface CardDTO {
   createdAt: number;
 }
 
+export interface PaymentMethodDTO {
+  id: string;
+  name: string;
+  type: PaymentMethodType;
+  /** Sólo este afecta el arqueo físico del cajón. */
+  isPhysicalCash: boolean;
+  commissionPct: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface CompanyDTO {
   id: string;
   name: string;
@@ -187,6 +206,8 @@ export interface CashMovementDTO {
   userId: string;
   relatedSaleId: string | null;
   relatedPurchaseId: string | null;
+  /** Medio de pago del movimiento (null = movimiento antiguo / sin asignar). */
+  paymentMethodId: string | null;
   createdAt: number;
   /** Estado de la venta relacionada (sólo presente cuando hay `relatedSaleId`). */
   relatedSaleStatus?: SaleStatus;
@@ -200,9 +221,8 @@ export interface SaleDTO {
   customerId: string;
   sellerId: string;
   cashRegisterId: string;
-  paymentType: SalePaymentType;
-  cardId: string | null;
-  cardAmount: string | null;
+  /** true = venta a cuenta corriente (sin pagos hasta que se cobre). */
+  isAccountSale: boolean;
   subtotal: string;
   discount: string;
   vatAmount: string;
@@ -227,6 +247,15 @@ export interface SaleLineDTO {
   discount: string;
   vatRate: string;
   lineTotal: string;
+  createdAt: number;
+}
+
+export interface SalePaymentDTO {
+  id: string;
+  saleId: string;
+  paymentMethodId: string;
+  amount: string;
+  reference: string | null;
   createdAt: number;
 }
 
@@ -278,9 +307,16 @@ export interface PaymentDTO {
   accountId: string;
   amount: string;
   date: number;
-  method: PaymentMethod;
+  paymentMethodId: string;
   notes: string | null;
   createdAt: number;
+}
+
+/** Una línea de pago (medio + monto), usada en ventas y cobranzas. */
+export interface PaymentInputDTO {
+  paymentMethodId: string;
+  amount: string;
+  reference?: string | null;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -312,9 +348,10 @@ export interface SaleLineDraftDTO {
 export interface CreateSaleInputDTO {
   type: VoucherType;
   customerId: string;
-  paymentType: SalePaymentType;
-  cardId?: string | null;
-  cardAmount?: string;
+  /** true = venta a cuenta corriente (no lleva pagos). */
+  isAccountSale?: boolean;
+  /** Pagos de la venta; obligatorio (≥1) si NO es a cuenta corriente. */
+  payments?: PaymentInputDTO[];
   discount?: string;
   notes?: string | null;
   lines: SaleLineDraftDTO[];
@@ -323,6 +360,7 @@ export interface CreateSaleInputDTO {
 export interface CreateSaleResultDTO {
   sale: SaleDTO;
   lines: SaleLineDTO[];
+  payments: SalePaymentDTO[];
   accountReceivable: AccountReceivableDTO | null;
 }
 
@@ -351,6 +389,16 @@ export interface CreatePurchaseResultDTO {
   lines: PurchaseLineDTO[];
 }
 
+export interface PaymentMethodBreakdownDTO {
+  paymentMethodId: string | null;
+  name: string;
+  type: PaymentMethodType | null;
+  isPhysicalCash: boolean;
+  incomeTotal: string;
+  expenseTotal: string;
+  net: string;
+}
+
 export interface CashReportDTO {
   register: CashRegisterDTO;
   openingAmount: string;
@@ -360,9 +408,11 @@ export interface CashReportDTO {
   expenseTotal: string;
   salesCount: number;
   salesTotal: string;
+  /** efectivo físico esperado en caja = apertura + ingresos en efectivo − egresos en efectivo */
   expectedCash: string;
   closingAmount: string | null;
   difference: string | null;
+  byPaymentMethod: PaymentMethodBreakdownDTO[];
   movements: CashMovementDTO[];
 }
 
@@ -392,14 +442,14 @@ export interface LowStockEntryDTO {
 
 export interface ReceivePaymentInputDTO {
   accountId: string;
-  amount: string;
-  method: PaymentMethod;
+  /** Una o más líneas de pago; la suma es lo cobrado. */
+  payments: PaymentInputDTO[];
   notes?: string | null;
   cashRegisterId?: string;
 }
 
 export interface ReceivePaymentResultDTO {
-  payment: PaymentDTO;
+  payments: PaymentDTO[];
   account: AccountReceivableDTO;
 }
 
@@ -476,6 +526,8 @@ export interface AddMovementInputDTO {
   type: CashMovementType;
   description: string;
   amount: string;
+  /** Medio de pago del movimiento (default en la UI: Efectivo). */
+  paymentMethodId?: string | null;
   cashRegisterId?: string;
 }
 
@@ -541,11 +593,11 @@ export interface ApiSurface {
     update(payload: UpdatePayload): Res<FamilyDTO>;
     delete(payload: IdPayload): Res<{ deleted: true }>;
   };
-  cards: {
-    list(): Res<CardDTO[]>;
-    get(payload: IdPayload): Res<CardDTO | null>;
-    create(payload: EntityPayload): Res<CardDTO>;
-    update(payload: UpdatePayload): Res<CardDTO>;
+  paymentMethods: {
+    list(): Res<PaymentMethodDTO[]>;
+    get(payload: IdPayload): Res<PaymentMethodDTO | null>;
+    create(payload: EntityPayload): Res<PaymentMethodDTO>;
+    update(payload: UpdatePayload): Res<PaymentMethodDTO>;
     delete(payload: IdPayload): Res<{ deleted: true }>;
   };
   users: {
@@ -562,7 +614,7 @@ export interface ApiSurface {
   sales: {
     create(payload: CreateSaleInputDTO): Res<CreateSaleResultDTO>;
     void(payload: IdPayload): Res<SaleDTO>;
-    get(payload: IdPayload): Res<{ sale: SaleDTO; lines: SaleLineDTO[] }>;
+    get(payload: IdPayload): Res<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }>;
     listByDateRange(payload: DateRangeDTO): Res<SaleDTO[]>;
     getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;
   };
@@ -591,6 +643,7 @@ export interface ApiSurface {
     getStatement(payload: { customerId: string; dateRange?: DateRangeDTO }): Res<CustomerStatementDTO>;
     getTotalReceivables(): Res<{ total: string }>;
     listBalances(): Res<CustomerBalanceDTO[]>;
+    listOpenByCustomer(payload: { customerId: string }): Res<AccountReceivableDTO[]>;
   };
   reports: {
     salesByDateRange(payload: DateRangeDTO & { sellerId?: string; customerId?: string }): Res<SalesReportDTO>;

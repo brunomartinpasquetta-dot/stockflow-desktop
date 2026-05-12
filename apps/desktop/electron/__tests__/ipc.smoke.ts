@@ -105,28 +105,51 @@ async function main(): Promise<void> {
   const list = await invoke<Array<{ id: string }>>(handlers, 'articles:list');
   check('articles:list incluye el artículo recién creado', list.ok && list.data.some((a) => a.id === created.data.id), JSON.stringify(list).slice(0, 200));
 
+  // paymentMethods:list (seed: 4 medios)
+  const pms = await invoke<Array<{ id: string; name: string; isPhysicalCash: boolean }>>(handlers, 'paymentMethods:list');
+  const efectivo = pms.ok ? pms.data.find((p) => p.id === 'pm-efectivo') : undefined;
+  check(
+    'paymentMethods:list devuelve los 4 medios del seed (Efectivo con efectivo físico)',
+    pms.ok && pms.data.length === 4 && !!efectivo && efectivo.isPhysicalCash === true,
+    pms.ok ? pms.data.map((p) => p.name).join(', ') : JSON.stringify(pms),
+  );
+
   // cash:open
   const cashOpen = await invoke<{ id: string; status: string }>(handlers, 'cash:open', { openingAmount: '1000.0000' });
   check('cash:open', cashOpen.ok && cashOpen.data.status === 'open', JSON.stringify(cashOpen));
 
-  // sales:create end-to-end
-  const sale = await invoke<{ sale: { total: string; status: string }; lines: unknown[]; accountReceivable: unknown }>(
+  // sales:create end-to-end con el nuevo formato (payments: [{ paymentMethodId, amount }])
+  const sale = await invoke<{ sale: { total: string; status: string; isAccountSale: boolean }; lines: unknown[]; payments: unknown[]; accountReceivable: unknown }>(
     handlers,
     'sales:create',
-    { type: 'B', customerId: cf.id, paymentType: 'cash', lines: [{ articleId: created.data.id, quantity: '2.000' }] },
+    {
+      type: 'B',
+      customerId: cf.id,
+      payments: [{ paymentMethodId: 'pm-efectivo', amount: '1000.0000' }],
+      lines: [{ articleId: created.data.id, quantity: '2.000' }],
+    },
   );
   check(
-    'sales:create end-to-end (precio resuelto, stock, caja)',
-    sale.ok && sale.data.sale.total === '1000.0000' && sale.data.lines.length === 1 && sale.data.accountReceivable === null,
+    'sales:create end-to-end (precio resuelto, stock, caja, 1 pago en efectivo)',
+    sale.ok && sale.data.sale.total === '1000.0000' && sale.data.lines.length === 1 && sale.data.payments.length === 1 && sale.data.accountReceivable === null && sale.data.sale.isAccountSale === false,
     sale.ok ? `total=${sale.data.sale.total}` : JSON.stringify(sale),
   );
 
   const articleAfter = await invoke<{ stock: string } | null>(handlers, 'articles:get', { id: created.data.id });
   check('sales:create descontó stock', articleAfter.ok && articleAfter.data?.stock === '18.000', articleAfter.ok ? `stock=${articleAfter.data?.stock}` : JSON.stringify(articleAfter));
 
-  // cash:getReport
-  const report = await invoke<{ incomeTotal: string; salesCount: number }>(handlers, 'cash:getReport', { registerId: cashOpen.ok ? cashOpen.data.id : '' });
-  check('cash:getReport', report.ok && report.data.incomeTotal === '1000.0000', JSON.stringify(report));
+  // cash:getReport (incluye desglose por medio de pago)
+  const report = await invoke<{ incomeTotal: string; expectedCash: string; byPaymentMethod: Array<{ paymentMethodId: string | null; net: string }> }>(
+    handlers,
+    'cash:getReport',
+    { registerId: cashOpen.ok ? cashOpen.data.id : '' },
+  );
+  const efectivoBd = report.ok ? report.data.byPaymentMethod.find((b) => b.paymentMethodId === 'pm-efectivo') : undefined;
+  check(
+    'cash:getReport (ingresos en efectivo + desglose)',
+    report.ok && report.data.incomeTotal === '1000.0000' && report.data.expectedCash === '2000.0000' && efectivoBd?.net === '1000.0000',
+    JSON.stringify(report).slice(0, 300),
+  );
 
   // error tipado: sales:get inexistente → NOT_FOUND
   const notFound = await invoke(handlers, 'sales:get', { id: 'no-existe' });

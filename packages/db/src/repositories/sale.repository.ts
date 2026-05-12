@@ -3,6 +3,7 @@ import {
   CreateSaleWithLinesSchema,
   type CreateSaleWithLinesInput,
   type VoucherType,
+  cmpDecimal,
   gteDecimal,
   mulDecimal,
   subDecimal,
@@ -14,17 +15,22 @@ import type { LocalDatabase } from '../local/client';
 import {
   articles,
   cashMovements,
+  paymentMethods,
   saleLines,
+  salePayments,
   sales,
   type NewSaleLine,
   type Sale,
   type SaleLine,
+  type SalePayment,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
 
 export interface SaleWithLines {
   sale: Sale;
   lines: SaleLine[];
+  /** Pagos de la venta (vacío si es a cuenta corriente). */
+  payments: SalePayment[];
 }
 
 /** IVA contenido en un importe que ya incluye impuestos (criterio MVP). */
@@ -56,8 +62,10 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
 
   /**
    * Crea una venta de forma atómica: cabecera + líneas + descuento de stock +
-   * movimiento de caja (ingreso). Lanza `ConstraintError` si algún artículo no
-   * tiene stock suficiente (toda la transacción se revierte).
+   * pagos (sale_payments) + movimientos de caja (uno por pago; sólo los de
+   * efectivo físico afectan el arqueo). Si `isAccountSale`, no lleva pagos y la
+   * AR la abre el servicio. Lanza `ConstraintError` si falta stock o si la suma
+   * de pagos no coincide con el total.
    */
   async createWithLines(rawData: unknown): Promise<SaleWithLines> {
     try {
@@ -67,6 +75,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
       );
       const now = data.date ?? Date.now();
       const saleDiscount = data.discount ?? '0.0000';
+      const paymentsIn = data.payments ?? [];
 
       return this.db.transaction((tx) => {
         // Número de comprobante (dentro de la transacción para evitar carreras).
@@ -100,6 +109,24 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         const vatAmount = sumDecimals(computedLines.map((l) => l.vat));
         const total = subDecimal(subtotal, saleDiscount, 4);
 
+        // Validación de pagos.
+        if (data.isAccountSale) {
+          if (paymentsIn.length > 0) {
+            throw new ConstraintError(
+              'ACCOUNT_SALE_WITH_PAYMENTS',
+              'Una venta a cuenta corriente no lleva pagos',
+            );
+          }
+        } else {
+          const paid = sumDecimals(paymentsIn.map((p) => p.amount));
+          if (cmpDecimal(paid, total) !== 0) {
+            throw new ConstraintError(
+              'SALE_PAYMENTS_MISMATCH',
+              `La suma de los pagos (${paid}) no coincide con el total de la venta (${total})`,
+            );
+          }
+        }
+
         // Cabecera.
         const insertedSale = tx
           .insert(sales)
@@ -110,9 +137,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             customerId: data.customerId,
             sellerId: data.sellerId,
             cashRegisterId: data.cashRegisterId,
-            paymentType: data.paymentType,
-            cardId: data.cardId ?? null,
-            cardAmount: data.cardAmount ?? '0.0000',
+            isAccountSale: data.isAccountSale,
             subtotal,
             discount: saleDiscount,
             vatAmount,
@@ -161,27 +186,53 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           if (inserted) insertedLines.push(inserted);
         }
 
-        // Movimiento de caja: sólo la parte que entra en efectivo al cajón.
-        // cash -> total ; mixed -> total - cardAmount ; card/account -> nada al cajón.
-        const cashIn =
-          data.paymentType === 'cash'
-            ? total
-            : data.paymentType === 'mixed'
-              ? subDecimal(total, data.cardAmount ?? '0', 4)
-              : '0';
-        if (Number(cashIn) > 0) {
-          tx.insert(cashMovements).values({
-            cashRegisterId: data.cashRegisterId,
-            type: 'income',
-            description: `Venta ${data.type} #${number}`,
-            amount: cashIn,
-            date: now,
-            userId: data.sellerId,
-            relatedSaleId: insertedSale.id,
-          }).run();
+        // Pagos + movimientos de caja.
+        const insertedPayments: SalePayment[] = [];
+        if (!data.isAccountSale && paymentsIn.length > 0) {
+          const pmIds = [...new Set(paymentsIn.map((p) => p.paymentMethodId))];
+          const pmRows = tx
+            .select()
+            .from(paymentMethods)
+            .where(inArray(paymentMethods.id, pmIds))
+            .all();
+          const pmMap = new Map(pmRows.map((r) => [r.id, r]));
+          for (const p of paymentsIn) {
+            const pm = pmMap.get(p.paymentMethodId);
+            if (!pm) throw new NotFoundError('Medio de pago', p.paymentMethodId);
+            const sp = tx
+              .insert(salePayments)
+              .values({
+                saleId: insertedSale.id,
+                paymentMethodId: p.paymentMethodId,
+                amount: p.amount,
+                reference: p.reference ?? null,
+              })
+              .returning()
+              .all()[0];
+            if (!sp) {
+              throw new ConstraintError('SALE_PAYMENT_INSERT', 'No se pudo registrar el pago de la venta');
+            }
+            insertedPayments.push(sp);
+            const desc = pm.isPhysicalCash
+              ? `Venta ${data.type} #${number}`
+              : `Venta ${data.type} #${number} — ${pm.name}`;
+            tx
+              .insert(cashMovements)
+              .values({
+                cashRegisterId: data.cashRegisterId,
+                type: 'income',
+                description: desc,
+                amount: p.amount,
+                date: now,
+                userId: data.sellerId,
+                relatedSaleId: insertedSale.id,
+                paymentMethodId: pm.id,
+              })
+              .run();
+          }
         }
 
-        return { sale: insertedSale, lines: insertedLines };
+        return { sale: insertedSale, lines: insertedLines, payments: insertedPayments };
       });
     } catch (err) {
       return rethrowDbError(err);
@@ -189,8 +240,9 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
   }
 
   /**
-   * Anula una venta: marca `status = 'voided'`, restaura el stock de cada línea
-   * y registra un movimiento de caja de egreso (reverso). Atómico.
+   * Anula una venta: marca `status = 'voided'`, restaura el stock de cada línea,
+   * genera un movimiento de caja de egreso por la parte que entró en efectivo
+   * físico y elimina sus `sale_payments`. Atómico.
    */
   async voidSale(id: string): Promise<Sale> {
     try {
@@ -212,6 +264,38 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             .run();
         }
 
+        // Reverso de caja: sólo la parte en efectivo físico.
+        const sps = tx
+          .select({
+            amount: salePayments.amount,
+            pmId: salePayments.paymentMethodId,
+            isCash: paymentMethods.isPhysicalCash,
+          })
+          .from(salePayments)
+          .leftJoin(paymentMethods, eq(salePayments.paymentMethodId, paymentMethods.id))
+          .where(eq(salePayments.saleId, id))
+          .all();
+        const cashBack = sumDecimals(sps.filter((s) => s.isCash === true).map((s) => s.amount));
+        const cashPmId = sps.find((s) => s.isCash === true)?.pmId ?? null;
+        if (!sale.isAccountSale && cashPmId && Number(cashBack) > 0) {
+          tx
+            .insert(cashMovements)
+            .values({
+              cashRegisterId: sale.cashRegisterId,
+              type: 'expense',
+              description: `Anulación venta ${sale.type} #${sale.number}`,
+              amount: cashBack,
+              date: Date.now(),
+              userId: sale.sellerId,
+              relatedSaleId: sale.id,
+              paymentMethodId: cashPmId,
+            })
+            .run();
+        }
+
+        // Eliminar los pagos de la venta.
+        tx.delete(salePayments).where(eq(salePayments.saleId, id)).run();
+
         const updated = tx
           .update(sales)
           .set({ status: 'voided' })
@@ -219,25 +303,6 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .returning()
           .all()[0];
         if (!updated) throw new NotFoundError(this.entityName, id);
-
-        const cashBack =
-          sale.paymentType === 'cash'
-            ? sale.total
-            : sale.paymentType === 'mixed'
-              ? subDecimal(sale.total, sale.cardAmount ?? '0', 4)
-              : '0';
-        if (sale.paymentType !== 'account' && Number(cashBack) > 0) {
-          tx.insert(cashMovements).values({
-            cashRegisterId: sale.cashRegisterId,
-            type: 'expense',
-            description: `Anulación venta ${sale.type} #${sale.number}`,
-            amount: cashBack,
-            date: Date.now(),
-            userId: sale.sellerId,
-            relatedSaleId: sale.id,
-          }).run();
-        }
-
         return updated;
       });
     } catch (err) {

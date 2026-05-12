@@ -1,28 +1,27 @@
 import { z } from 'zod';
 
 import { idSchema, moneySchema, timestampSchema } from './common';
+import { PaymentInputSchema } from './paymentMethod.schema';
 
-const paymentMethodSchema = z.enum(['cash', 'transfer', 'card']);
-
-/** Shape completo de `payments` (matches DB). */
+/** Shape completo de `payments` (matches DB). Una cobranza puede generar N filas. */
 export const PaymentSchema = z.object({
   id: idSchema,
   accountId: idSchema,
   amount: moneySchema,
   date: timestampSchema,
-  method: paymentMethodSchema,
+  paymentMethodId: idSchema,
   notes: z.string().nullable(),
   createdAt: timestampSchema,
 });
 
-/** Input para registrar una cobranza contra una cuenta corriente. */
+/** Input para registrar una cobranza (posiblemente mixta) contra una cuenta corriente. */
 export const CreatePaymentSchema = z.object({
   accountId: idSchema,
-  amount: moneySchema,
-  method: paymentMethodSchema,
+  /** Una o más líneas de pago; la suma es el total cobrado. */
+  payments: z.array(PaymentInputSchema).min(1, 'Debe registrarse al menos un pago'),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),
-  /** Caja donde impacta el ingreso (necesario para generar el cashMovement). */
+  /** Caja donde impacta el ingreso (necesario para el cashMovement de la parte en efectivo). */
   cashRegisterId: idSchema,
   /** Usuario que registra la cobranza. */
   userId: idSchema,

@@ -21,10 +21,12 @@ const EXPECTED_TABLES = [
   'articles',
   'customers',
   'cards',
+  'payment_methods',
   'cash_registers',
   'cash_movements',
   'sales',
   'sale_lines',
+  'sale_payments',
   'purchases',
   'purchase_lines',
   'accounts_receivable',
@@ -99,6 +101,14 @@ try {
   check('familia ARTICULOS existe', !!fam);
   const company = db.$client.prepare('SELECT name FROM companies LIMIT 1').get() as { name: string } | undefined;
   check('company stub existe', !!company, company?.name);
+
+  // 6b) Medios de pago pre-cargados (los inserta la migración 0001)
+  const pmRow = db.$client.prepare('SELECT COUNT(*) AS c FROM payment_methods').get() as { c: number };
+  const efectivoRow = db.$client
+    .prepare("SELECT is_physical_cash AS f FROM payment_methods WHERE id = 'pm-efectivo'")
+    .get() as { f: number } | undefined;
+  check('4 medios de pago pre-cargados', pmRow.c === 4, `count=${pmRow.c}`);
+  check('Efectivo es el medio de efectivo físico', efectivoRow?.f === 1);
 
   // 7) Idempotencia: re-ejecutar el seed no debe crear nada
   const { seedLocalDb } = await import('../seed');

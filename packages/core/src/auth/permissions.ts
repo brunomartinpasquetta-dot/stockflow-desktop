@@ -9,6 +9,7 @@
  *  manage_suppliers  |   ✓   |    ✓    |   ✗
  *  manage_families   |   ✓   |    ✓    |   ✗
  *  manage_cards      |   ✓   |    ✓    |   ✗
+ *  manage_payment_methods | ✓ |   ✓    |   ✗
  *  manage_purchases  |   ✓   |    ✓    |   ✗
  *  void_sale         |   ✓   |    ✓    |   ✗
  *  close_cash        |   ✓   |    ✓    |   ✗(*)
@@ -34,6 +35,7 @@ export const PERMISSION_ACTIONS = [
   'manage_suppliers',
   'manage_families',
   'manage_cards',
+  'manage_payment_methods',
   'manage_purchases',
   'void_sale',
   'close_cash',

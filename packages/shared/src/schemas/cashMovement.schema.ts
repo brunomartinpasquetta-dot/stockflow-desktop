@@ -13,6 +13,7 @@ export const CashMovementSchema = z.object({
   userId: idSchema,
   relatedSaleId: idSchema.nullable(),
   relatedPurchaseId: idSchema.nullable(),
+  paymentMethodId: idSchema.nullable(),
   createdAt: timestampSchema,
 });
 
@@ -26,6 +27,7 @@ export const CreateCashMovementSchema = z.object({
   date: timestampSchema.optional(),
   relatedSaleId: idSchema.nullish(),
   relatedPurchaseId: idSchema.nullish(),
+  paymentMethodId: idSchema.nullish(),
 });
 
 export const UpdateCashMovementSchema = CreateCashMovementSchema.partial();

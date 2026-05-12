@@ -50,12 +50,12 @@ const api: ApiSurface = {
     update: (p) => call('families:update', p),
     delete: (p) => call('families:delete', p),
   },
-  cards: {
-    list: () => call('cards:list'),
-    get: (p) => call('cards:get', p),
-    create: (p) => call('cards:create', p),
-    update: (p) => call('cards:update', p),
-    delete: (p) => call('cards:delete', p),
+  paymentMethods: {
+    list: () => call('paymentMethods:list'),
+    get: (p) => call('paymentMethods:get', p),
+    create: (p) => call('paymentMethods:create', p),
+    update: (p) => call('paymentMethods:update', p),
+    delete: (p) => call('paymentMethods:delete', p),
   },
   users: {
     list: () => call('users:list'),
@@ -97,6 +97,7 @@ const api: ApiSurface = {
     getStatement: (p) => call('accounts:getStatement', p),
     getTotalReceivables: () => call('accounts:getTotalReceivables'),
     listBalances: () => call('accounts:listBalances'),
+    listOpenByCustomer: (p) => call('accounts:listOpenByCustomer', p),
   },
   reports: {
     salesByDateRange: (p) => call('reports:salesByDateRange', p),

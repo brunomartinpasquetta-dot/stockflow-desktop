@@ -6,6 +6,7 @@ import type {
   CreateSaleResultDTO,
   SaleDTO,
   SaleLineDTO,
+  SalePaymentDTO,
   VoucherType,
 } from '../types';
 
@@ -22,7 +23,10 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
     ),
     'sales:get': withSession(
       deps,
-      (payload: { id: string }, ctx): Promise<{ sale: SaleDTO; lines: SaleLineDTO[] }> =>
+      (
+        payload: { id: string },
+        ctx,
+      ): Promise<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }> =>
         new SalesService(ctx).getSale(payload.id),
     ),
     'sales:listByDateRange': withSession(

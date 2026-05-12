@@ -3,8 +3,8 @@
  * uniforme `{ ok, data } | { ok:false, code, ... }` y, en error, lanza `ApiError`.
  */
 import type {
+  AccountReceivableDTO,
   ArticleDTO,
-  CardDTO,
   CashMovementDTO,
   CashRegisterDTO,
   CashReportDTO,
@@ -22,12 +22,14 @@ import type {
   IpcResponse,
   LoginResultDTO,
   LowStockEntryDTO,
+  PaymentMethodDTO,
   PurchaseDTO,
   PurchaseLineDTO,
   ReceivePaymentInputDTO,
   ReceivePaymentResultDTO,
   SaleDTO,
   SaleLineDTO,
+  SalePaymentDTO,
   StockAdjustmentDTO,
   StockCheckDTO,
   SupplierDTO,
@@ -112,12 +114,12 @@ export const api = {
     update: (id: string, data: EntityPayload): Promise<FamilyDTO> => unwrap(sf().families.update({ id, data })),
     delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().families.delete({ id })),
   },
-  cards: {
-    list: (): Promise<CardDTO[]> => unwrap(sf().cards.list()),
-    get: (id: string): Promise<CardDTO | null> => unwrap(sf().cards.get({ id })),
-    create: (data: EntityPayload): Promise<CardDTO> => unwrap(sf().cards.create(data)),
-    update: (id: string, data: EntityPayload): Promise<CardDTO> => unwrap(sf().cards.update({ id, data })),
-    delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().cards.delete({ id })),
+  paymentMethods: {
+    list: (): Promise<PaymentMethodDTO[]> => unwrap(sf().paymentMethods.list()),
+    get: (id: string): Promise<PaymentMethodDTO | null> => unwrap(sf().paymentMethods.get({ id })),
+    create: (data: EntityPayload): Promise<PaymentMethodDTO> => unwrap(sf().paymentMethods.create(data)),
+    update: (id: string, data: EntityPayload): Promise<PaymentMethodDTO> => unwrap(sf().paymentMethods.update({ id, data })),
+    delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().paymentMethods.delete({ id })),
   },
   users: {
     list: (): Promise<UserDTO[]> => unwrap(sf().users.list()),
@@ -133,7 +135,8 @@ export const api = {
   sales: {
     create: (input: CreateSaleInputDTO): Promise<CreateSaleResultDTO> => unwrap(sf().sales.create(input)),
     void: (id: string): Promise<SaleDTO> => unwrap(sf().sales.void({ id })),
-    get: (id: string): Promise<{ sale: SaleDTO; lines: SaleLineDTO[] }> => unwrap(sf().sales.get({ id })),
+    get: (id: string): Promise<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }> =>
+      unwrap(sf().sales.get({ id })),
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
   },
@@ -148,8 +151,13 @@ export const api = {
       unwrap(sf().cash.close({ registerId, closingAmount, notes: notes ?? null })),
     getCurrent: (): Promise<CashRegisterDTO | null> => unwrap(sf().cash.getCurrent()),
     getReport: (registerId: string): Promise<CashReportDTO> => unwrap(sf().cash.getReport({ registerId })),
-    addMovement: (type: 'income' | 'expense', description: string, amount: string): Promise<CashMovementDTO> =>
-      unwrap(sf().cash.addMovement({ type, description, amount })),
+    addMovement: (
+      type: 'income' | 'expense',
+      description: string,
+      amount: string,
+      paymentMethodId?: string | null,
+    ): Promise<CashMovementDTO> =>
+      unwrap(sf().cash.addMovement({ type, description, amount, paymentMethodId: paymentMethodId ?? null })),
   },
   inventory: {
     checkStock: (articleId: string, quantity: string): Promise<StockCheckDTO> => unwrap(sf().inventory.checkStock({ articleId, quantity })),
@@ -162,6 +170,7 @@ export const api = {
     getStatement: (customerId: string): Promise<CustomerStatementDTO> => unwrap(sf().accounts.getStatement({ customerId })),
     getTotalReceivables: (): Promise<{ total: string }> => unwrap(sf().accounts.getTotalReceivables()),
     listBalances: (): Promise<CustomerBalanceDTO[]> => unwrap(sf().accounts.listBalances()),
+    listOpenByCustomer: (customerId: string): Promise<AccountReceivableDTO[]> => unwrap(sf().accounts.listOpenByCustomer({ customerId })),
   },
   system: {
     getInfo: (): Promise<SystemInfoDTO> => unwrap(sf().system.getInfo()),

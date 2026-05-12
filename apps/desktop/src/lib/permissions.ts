@@ -11,6 +11,7 @@ export type PermissionAction =
   | 'manage_suppliers'
   | 'manage_families'
   | 'manage_cards'
+  | 'manage_payment_methods'
   | 'manage_purchases'
   | 'void_sale'
   | 'close_cash'
@@ -29,6 +30,7 @@ const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_suppliers',
   'manage_families',
   'manage_cards',
+  'manage_payment_methods',
   'manage_purchases',
   'void_sale',
   'close_cash',

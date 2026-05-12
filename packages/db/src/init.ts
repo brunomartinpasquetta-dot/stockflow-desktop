@@ -51,7 +51,16 @@ export function initLocalDb(
   const db = createLocalDb(dbPath);
 
   // 3) Aplicar migraciones.
-  migrate(db, { migrationsFolder });
+  //    Algunas migraciones recrean tablas (patrón estándar de SQLite para DROP/ALTER
+  //    de columnas con constraints). `migrate()` corre dentro de una transacción, donde
+  //    `PRAGMA foreign_keys` es no-op; por eso desactivamos la verificación de FKs
+  //    *antes* de la transacción y la restauramos al terminar.
+  db.$client.pragma('foreign_keys = OFF');
+  try {
+    migrate(db, { migrationsFolder });
+  } finally {
+    db.$client.pragma('foreign_keys = ON');
+  }
 
   // 4) Seed.
   const seedResult: SeedResult = seed
@@ -61,6 +70,7 @@ export function initLocalDb(
         consumidorFinalCreated: false,
         defaultFamilyCreated: false,
         companyCreated: false,
+        paymentMethodsCreated: 0,
       };
 
   return { db, seed: seedResult };

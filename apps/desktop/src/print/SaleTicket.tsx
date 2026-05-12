@@ -1,7 +1,7 @@
 /**
  * Ticket de venta estilo impresora térmica de 80mm (ancho fijo, monoespaciado).
  * Recibe los datos ya ensamblados (las líneas necesitan la descripción del
- * artículo, que el `SaleLineDTO` no trae).
+ * artículo y los pagos el nombre del medio, que los DTOs crudos no traen).
  */
 import type { CompanyDTO, SaleDTO, VoucherType } from '@/types/api'
 import { formatCurrency, formatDateTime, formatNumber } from '@/lib/format'
@@ -20,6 +20,11 @@ export interface SaleTicketLine {
   lineTotal: string
 }
 
+export interface SaleTicketPayment {
+  methodName: string
+  amount: string
+}
+
 export interface SaleTicketData {
   company: CompanyDTO
   sale: SaleDTO
@@ -28,11 +33,12 @@ export interface SaleTicketData {
   customerName: string | null
   /** Documento del cliente ("DNI 12345678"); `null` si no aplica. */
   customerDoc: string | null
-  /** "Efectivo" / "Tarjeta" / "Mixto" / "Cuenta corriente". */
-  paymentLabel: string
-  cardName: string | null
-  /** Sólo en pagos en efectivo. */
+  isAccountSale: boolean
+  /** Desglose de pagos (vacío si es venta a cuenta corriente). */
+  payments: SaleTicketPayment[]
+  /** Total efectivamente entregado por el cliente (suma de pagos + vuelto). */
   received: number | null
+  /** Vuelto entregado (informativo). */
   change: number | null
 }
 
@@ -41,8 +47,7 @@ function Hr() {
 }
 
 export function SaleTicket({ data }: { data: SaleTicketData }) {
-  const { company, sale, lines, customerName, customerDoc, paymentLabel, cardName, received, change } = data
-  const cardAmount = sale.cardAmount ? Number(sale.cardAmount) : 0
+  const { company, sale, lines, customerName, customerDoc, isAccountSale, payments, received, change } = data
   return (
     <div className="print-ticket">
       <div className="text-center">
@@ -90,27 +95,30 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
         <span>{formatCurrency(sale.total)}</span>
       </div>
       <Hr />
-      <div>
-        Forma de pago: {paymentLabel}
-        {cardName ? ` (${cardName})` : ''}
-      </div>
-      {cardAmount > 0 && (
-        <div className="flex justify-between">
-          <span>En tarjeta</span>
-          <span>{formatCurrency(cardAmount)}</span>
-        </div>
-      )}
-      {received != null && (
-        <div className="flex justify-between">
-          <span>Recibido</span>
-          <span>{formatCurrency(received)}</span>
-        </div>
-      )}
-      {change != null && change > 0 && (
-        <div className="flex justify-between">
-          <span>Vuelto</span>
-          <span>{formatCurrency(change)}</span>
-        </div>
+      {isAccountSale ? (
+        <div className="font-bold">Forma de pago: CUENTA CORRIENTE</div>
+      ) : (
+        <>
+          <div>Forma de pago:</div>
+          {payments.map((p, i) => (
+            <div key={i} className="flex justify-between">
+              <span>{p.methodName}</span>
+              <span>{formatCurrency(p.amount)}</span>
+            </div>
+          ))}
+          {received != null && (
+            <div className="flex justify-between">
+              <span>Total pagado</span>
+              <span>{formatCurrency(received)}</span>
+            </div>
+          )}
+          {change != null && change > 0 && (
+            <div className="flex justify-between">
+              <span>Vuelto</span>
+              <span>{formatCurrency(change)}</span>
+            </div>
+          )}
+        </>
       )}
       <Hr />
       <div className="mt-1 text-center">¡Gracias por su compra!</div>

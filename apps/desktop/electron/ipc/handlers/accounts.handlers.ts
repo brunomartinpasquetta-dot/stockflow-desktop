@@ -2,6 +2,7 @@ import { AccountsReceivableService } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
+  AccountReceivableDTO,
   CustomerBalanceDTO,
   CustomerStatementDTO,
   ReceivePaymentInputDTO,
@@ -32,6 +33,11 @@ export function buildAccountsHandlers(deps: HandlerDeps): HandlerMap {
     'accounts:listBalances': withSession(
       deps,
       (_payload, ctx): Promise<CustomerBalanceDTO[]> => new AccountsReceivableService(ctx).listCustomerBalances(),
+    ),
+    'accounts:listOpenByCustomer': withSession(
+      deps,
+      (payload: { customerId: string }, ctx): Promise<AccountReceivableDTO[]> =>
+        ctx.repos.accountsReceivable.findOpenByCustomer(payload.customerId),
     ),
   };
 }

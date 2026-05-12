@@ -85,7 +85,9 @@ export class ReportsService {
       count: completed.length,
       total: sumDecimals(completed.map((s) => s.total)),
       byStatus: groupAccumulate(sales.map((s) => ({ key: s.status, total: s.total }))),
-      byPaymentType: groupAccumulate(completed.map((s) => ({ key: s.paymentType, total: s.total }))),
+      byPaymentType: groupAccumulate(
+        completed.map((s) => ({ key: s.isAccountSale ? 'cuenta_corriente' : 'contado', total: s.total })),
+      ),
       sales,
     };
   }

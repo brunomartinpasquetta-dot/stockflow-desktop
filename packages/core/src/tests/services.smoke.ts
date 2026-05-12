@@ -3,8 +3,9 @@
  *   pnpm --filter @stockflow/core test:smoke
  *
  * Inicializa una DB temporal, arma repos + servicios, ejercita los flujos
- * principales (auth/permisos, ventas, anulación, cuenta corriente, caja, reportes,
- * inventario) y limpia los archivos al terminar. Sale con código 1 si algo falla.
+ * principales (auth/permisos, ventas con N pagos, anulación, cuenta corriente con
+ * cobranzas mixtas, caja con desglose por medio, reportes, inventario) y limpia
+ * los archivos al terminar. Sale con código 1 si algo falla.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,6 +23,9 @@ import {
   resolvePrice,
   calculateVAT,
 } from '../index';
+
+const PM_CASH = 'pm-efectivo';
+const PM_TRANSFER = 'pm-transferencia';
 
 let failures = 0;
 function check(label: string, ok: boolean, detail = ''): void {
@@ -72,9 +76,15 @@ async function main(): Promise<void> {
     role: 'seller',
   });
   check('checkPermission admin manage_users', authService.checkPermission(adminUser, 'manage_users'));
-  check('checkPermission seller !manage_users', !authService.checkPermission(sellerUser, 'manage_users'));
+  check('checkPermission admin manage_payment_methods', authService.checkPermission(adminUser, 'manage_payment_methods'));
+  check('checkPermission seller !manage_payment_methods', !authService.checkPermission(sellerUser, 'manage_payment_methods'));
   check('checkPermission seller create_sale', authService.checkPermission(sellerUser, 'create_sale'));
-  check('checkPermission seller !void_sale', !authService.checkPermission(sellerUser, 'void_sale'));
+
+  // -------------------------------------------------------- medios de pago
+  console.log('\n[payment methods]');
+  const methods = await repos.paymentMethods.findOrdered();
+  check('seed: 4 medios de pago', methods.length === 4, methods.map((m) => m.name).join(', '));
+  check('Efectivo es el único de efectivo físico', methods.filter((m) => m.isPhysicalCash).length === 1 && methods.find((m) => m.id === PM_CASH)?.isPhysicalCash === true);
 
   // ----------------------------------------------------------- datos base
   const cf = (await repos.customers.findOne({ lastName: 'CONSUMIDOR FINAL' }))!;
@@ -117,91 +127,91 @@ async function main(): Promise<void> {
   const reg = await seller.cash.openCashRegister('1000.0000');
   check('seller puede abrir caja', reg.status === 'open');
 
+  // Venta 100% efectivo → 1 sale_payment + 1 cashMovement por el total.
   const cashSale = await seller.sales.createSale({
     type: 'B',
     customerId: cf.id,
-    paymentType: 'cash',
-    lines: [{ articleId: art.id, quantity: '2.000' }], // unitPrice resuelto = listPrice1
+    payments: [{ paymentMethodId: PM_CASH, amount: '1700.0000' }],
+    lines: [{ articleId: art.id, quantity: '2.000' }], // unitPrice resuelto = listPrice1 (850)
   });
   check(
-    'createSale (seller, contado, precio resuelto)',
-    cashSale.sale.total === '1700.0000' && cashSale.lines.length === 1 && cashSale.accountReceivable === null,
+    'createSale (contado, 100% efectivo, precio resuelto)',
+    cashSale.sale.total === '1700.0000' && cashSale.payments.length === 1 && cashSale.accountReceivable === null && !cashSale.sale.isAccountSale,
     `total=${cashSale.sale.total}`,
   );
 
   await expectThrows(
-    'createSale a cuenta con CONSUMIDOR FINAL → BusinessRuleError',
-    () =>
-      seller.sales.createSale({
-        type: 'B',
-        customerId: cf.id,
-        paymentType: 'account',
-        lines: [{ articleId: art.id, quantity: '1.000' }],
-      }),
+    'createSale sin pagos y sin cuenta corriente → BusinessRuleError',
+    () => seller.sales.createSale({ type: 'B', customerId: cf.id, payments: [], lines: [{ articleId: art.id, quantity: '1.000' }] }),
     (e) => e instanceof BusinessRuleError,
   );
 
+  await expectThrows(
+    'createSale con pagos que no suman el total → falla',
+    () => seller.sales.createSale({ type: 'B', customerId: cf.id, payments: [{ paymentMethodId: PM_CASH, amount: '999.0000' }], lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }] }),
+    (e) => e instanceof Error,
+  );
+
+  await expectThrows(
+    'createSale a cuenta con CONSUMIDOR FINAL → BusinessRuleError',
+    () => seller.sales.createSale({ type: 'B', customerId: cf.id, isAccountSale: true, lines: [{ articleId: art.id, quantity: '1.000' }] }),
+    (e) => e instanceof BusinessRuleError,
+  );
+
+  // Venta a cuenta corriente → sin sale_payments, AR creada.
   const accSale1 = await seller.sales.createSale({
     type: 'B',
     customerId: gomez.id,
-    paymentType: 'account',
+    isAccountSale: true,
     lines: [{ articleId: art.id, quantity: '1.000' }],
   });
   check(
-    'createSale a cuenta con cliente real → crea AR',
+    'createSale a cuenta corriente → AR creada, sin pagos',
     accSale1.accountReceivable != null &&
       accSale1.accountReceivable.balance === accSale1.sale.total &&
-      accSale1.accountReceivable.status === 'open',
+      accSale1.accountReceivable.status === 'open' &&
+      accSale1.payments.length === 0 &&
+      accSale1.sale.isAccountSale === true,
     `balance=${accSale1.accountReceivable?.balance}`,
   );
 
   const accSale2 = await seller.sales.createSale({
     type: 'B',
     customerId: gomez.id,
-    paymentType: 'account',
+    isAccountSale: true,
     lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }],
   });
-  check('createSale a cuenta #2 → AR', accSale2.accountReceivable?.balance === '1000.0000');
+  check('createSale a cuenta #2 → AR balance 1000', accSale2.accountReceivable?.balance === '1000.0000');
 
-  const balancesBeforeVoid = await seller.accountsReceivable.listCustomerBalances();
-  const gomezBalance = balancesBeforeVoid.find((b) => b.customerId === gomez.id);
+  const gomezBalance = (await seller.accountsReceivable.listCustomerBalances()).find((b) => b.customerId === gomez.id);
   check(
     'listCustomerBalances: deuda agregada del cliente (850 + 1000) y 2 comprobantes',
     gomezBalance?.totalDebt === '1850.0000' && gomezBalance?.openInvoicesCount === 2,
     JSON.stringify(gomezBalance),
   );
 
-  // --- pagos con tarjeta / mixto ---
-  console.log('\n[tarjetas / pago mixto]');
-  const visa = await repos.cards.create({ name: 'Visa', commissionPct: '3.00' });
-  check('cards.create', !!visa.id && visa.name === 'Visa' && visa.active === true);
-  const cardSale = await seller.sales.createSale({
-    type: 'B',
-    customerId: cf.id,
-    paymentType: 'card',
-    cardId: visa.id,
-    cardAmount: '1000.0000',
-    lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }],
-  });
-  check(
-    'venta con tarjeta se registra (cardId + cardAmount)',
-    cardSale.sale.paymentType === 'card' && cardSale.sale.cardId === visa.id && cardSale.sale.cardAmount === '1000.0000',
-    JSON.stringify({ pt: cardSale.sale.paymentType, cardId: cardSale.sale.cardId, ca: cardSale.sale.cardAmount }),
-  );
+  // Venta 50% efectivo + 50% transferencia → cashMovement de efectivo sólo por la parte efectivo.
   const mixedSale = await seller.sales.createSale({
     type: 'B',
     customerId: cf.id,
-    paymentType: 'mixed',
-    cardId: visa.id,
-    cardAmount: '600.0000',
+    payments: [
+      { paymentMethodId: PM_CASH, amount: '400.0000' },
+      { paymentMethodId: PM_TRANSFER, amount: '600.0000' },
+    ],
     lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }],
   });
-  check('venta mixta se registra', mixedSale.sale.paymentType === 'mixed' && mixedSale.sale.cardAmount === '600.0000');
-  const reportAfterCardSales = await seller.cash.getCashReport(reg.id);
+  check('createSale mixta (efectivo + transferencia) → 2 sale_payments', mixedSale.payments.length === 2 && mixedSale.sale.total === '1000.0000');
+
+  const reportAfterMixed = await seller.cash.getCashReport(reg.id);
   check(
-    'caja: la venta con tarjeta no aporta efectivo; la mixta sólo la parte en efectivo (1700 + 0 + 400 = 2100)',
-    reportAfterCardSales.incomeTotal === '2100.0000',
-    `incomeTotal=${reportAfterCardSales.incomeTotal}`,
+    'caja: efectivo esperado = 1000 (apertura) + 1700 (contado) + 400 (parte efectivo de la mixta) = 3100',
+    reportAfterMixed.expectedCash === '3100.0000',
+    `expectedCash=${reportAfterMixed.expectedCash}`,
+  );
+  check(
+    'caja: ingresos totales incluyen la transferencia (1700 + 1000 = 2700)',
+    reportAfterMixed.incomeTotal === '2700.0000',
+    `incomeTotal=${reportAfterMixed.incomeTotal}`,
   );
 
   await expectThrows(
@@ -216,11 +226,18 @@ async function main(): Promise<void> {
   const admin = createServices(adminCtx);
 
   const stockBeforeVoid = (await repos.articles.findById(art.id))!.stock;
-  const voided = await admin.sales.voidSale(accSale1.sale.id);
-  check('voidSale admin OK', voided.status === 'voided');
+  const voided1 = await admin.sales.voidSale(accSale1.sale.id);
+  check('voidSale (a cuenta sin pagos) → voided', voided1.status === 'voided');
   check('voidSale elimina la AR sin pagos', (await repos.accountsReceivable.findById(accSale1.accountReceivable!.id)) === null);
   const stockAfterVoid = (await repos.articles.findById(art.id))!.stock;
   check('voidSale restaura stock', Number(stockAfterVoid) - Number(stockBeforeVoid) === 1, `${stockBeforeVoid}→${stockAfterVoid}`);
+
+  const voided2 = await admin.sales.voidSale(mixedSale.sale.id);
+  check('voidSale (mixta) → voided', voided2.status === 'voided');
+  check('voidSale (mixta) elimina los sale_payments', (await repos.salePayments.findBySale(mixedSale.sale.id)).length === 0);
+  const movsReg = await repos.cashMovements.findByRegister(reg.id);
+  const reversal = movsReg.find((m) => m.relatedSaleId === mixedSale.sale.id && m.type === 'expense');
+  check('voidSale (mixta) genera un egreso de caja sólo por la parte efectivo (400)', reversal?.amount === '400.0000', `reversal=${reversal?.amount}`);
 
   // -------------------------------------------------------------- pricing
   console.log('\n[pricing]');
@@ -231,45 +248,46 @@ async function main(): Promise<void> {
 
   // -------------------------------------------------------- cuenta corriente
   console.log('\n[accounts receivable]');
-  const pay1 = await seller.accountsReceivable.receivePayment({
+  // Cobranza mixta: 500 efectivo + 500 transferencia sobre saldo 1000.
+  const pay = await seller.accountsReceivable.receivePayment({
     accountId: accSale2.accountReceivable!.id,
-    amount: '400.0000',
-    method: 'cash',
+    payments: [
+      { paymentMethodId: PM_CASH, amount: '500.0000' },
+      { paymentMethodId: PM_TRANSFER, amount: '500.0000' },
+    ],
   });
-  check('receivePayment parcial → status partial', pay1.account.status === 'partial' && pay1.account.balance === '600.0000', `balance=${pay1.account.balance}`);
-  const pay2 = await seller.accountsReceivable.receivePayment({
-    accountId: accSale2.accountReceivable!.id,
-    amount: '600.0000',
-    method: 'transfer',
-  });
-  check('receivePayment total → status paid', pay2.account.status === 'paid' && pay2.account.balance === '0.0000', `balance=${pay2.account.balance}`);
+  check('receivePayment mixto → cuenta saldada', pay.account.status === 'paid' && pay.account.balance === '0.0000', `balance=${pay.account.balance}`);
+  check('receivePayment mixto → 2 filas de pago', pay.payments.length === 2 && (await repos.payments.findByAccount(accSale2.accountReceivable!.id)).length === 2);
   await expectThrows(
     'receivePayment que supera el saldo → BusinessRuleError',
-    () => seller.accountsReceivable.receivePayment({ accountId: accSale2.accountReceivable!.id, amount: '10.0000', method: 'cash' }),
+    () => seller.accountsReceivable.receivePayment({ accountId: accSale2.accountReceivable!.id, payments: [{ paymentMethodId: PM_CASH, amount: '10.0000' }] }),
     (e) => e instanceof BusinessRuleError,
   );
 
   const statement = await admin.accountsReceivable.getCustomerStatement(gomez.id);
-  check('getCustomerStatement: 3 movimientos (1 venta + 2 pagos)', statement.entries.length === 3, `entries=${statement.entries.length}`);
+  check('getCustomerStatement: 3 movimientos (1 venta a cuenta + 2 cobros)', statement.entries.length === 3, `entries=${statement.entries.length}`);
   check('getCustomerStatement: saldo final 0', statement.currentBalance === '0.0000', `saldo=${statement.currentBalance}`);
   check('getTotalReceivables = 0', (await admin.accountsReceivable.getTotalReceivables()) === '0.0000');
 
   // ------------------------------------------------------------------ caja
   console.log('\n[cash]');
-  const mov = await admin.cash.addMovement({ type: 'income', description: 'Aporte de socio', amount: '500.0000' });
-  check('addMovement (admin)', mov.type === 'income' && mov.amount === '500.0000');
+  const mov = await admin.cash.addMovement({ type: 'income', description: 'Aporte de socio', amount: '500.0000', paymentMethodId: PM_CASH });
+  check('addMovement (admin, efectivo)', mov.type === 'income' && mov.amount === '500.0000' && mov.paymentMethodId === PM_CASH);
   await expectThrows(
     'addMovement como seller → PermissionDeniedError',
     () => seller.cash.addMovement({ type: 'income', description: 'x', amount: '1.0000' }),
     (e) => e instanceof PermissionDeniedError,
   );
 
-  // ingresos en efectivo: venta contado 1700 + venta tarjeta 0 + venta mixta 400 + cobranzas 400 + 600 + aporte 500 = 3600
-  const { register: closedReg, report } = await admin.cash.closeCashRegister(reg.id, '4600.0000', 'cierre de prueba');
+  // efectivo: apertura 1000 + 1700 (contado) + 400 (mixta) + 500 (cobranza) + 500 (aporte) − 400 (anulación mixta) = 3700
+  const { register: closedReg, report } = await admin.cash.closeCashRegister(reg.id, '3700.0000', 'cierre de prueba');
   check('closeCashRegister', closedReg.status === 'closed');
-  check('reporte: ingresos en efectivo = 3600', report.incomeTotal === '3600.0000', `incomeTotal=${report.incomeTotal}`);
-  check('reporte: efectivo esperado = 4600', report.expectedCash === '4600.0000', `expected=${report.expectedCash}`);
+  check('reporte: efectivo esperado = 3700', report.expectedCash === '3700.0000', `expected=${report.expectedCash}`);
   check('reporte: diferencia = 0', report.difference === '0.0000', `diff=${report.difference}`);
+  const efectivoBd = report.byPaymentMethod.find((b) => b.paymentMethodId === PM_CASH);
+  const transferBd = report.byPaymentMethod.find((b) => b.paymentMethodId === PM_TRANSFER);
+  check('reporte: desglose Efectivo neto = 2700', efectivoBd?.net === '2700.0000', `efectivo=${efectivoBd?.net}`);
+  check('reporte: desglose Transferencia neto = 1100', transferBd?.net === '1100.0000', `transferencia=${transferBd?.net}`);
   check(
     'reporte: notes con observaciones del cierre + arqueo',
     typeof closedReg.notes === 'string' && closedReg.notes!.includes('cierre de prueba') && closedReg.notes!.includes('Diferencia'),
@@ -285,7 +303,6 @@ async function main(): Promise<void> {
   const now = Date.now();
   const salesReport = await admin.reports.salesByDateRange(0, now + 86_400_000);
   check('salesByDateRange: al menos 3 ventas registradas', salesReport.sales.length >= 3, `total=${salesReport.sales.length}`);
-  check('salesByDateRange: completadas >= 2', salesReport.count >= 2, `count=${salesReport.count}`);
   const top = await admin.reports.topArticles(0, now + 86_400_000);
   check('topArticles devuelve filas', top.length >= 1 && top[0]!.articleId === art.id);
   const byFamily = await admin.reports.inventoryByFamily();

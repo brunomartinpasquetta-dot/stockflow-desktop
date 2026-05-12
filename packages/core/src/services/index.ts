@@ -6,6 +6,7 @@ import { AccountsReceivableService } from './accountsReceivable.service';
 import { AuthService } from './auth.service';
 import { CashService } from './cash.service';
 import { InventoryService } from './inventory.service';
+import { PaymentMethodService } from './paymentMethod.service';
 import { PurchasesService } from './purchases.service';
 import { ReportsService } from './reports.service';
 import { SalesService } from './sales.service';
@@ -16,6 +17,7 @@ export {
   type CreateSaleInput,
   type CreateSaleResult,
   type SaleLineDraft,
+  type SalePaymentDraft,
 } from './sales.service';
 export {
   PurchasesService,
@@ -23,7 +25,14 @@ export {
   type CreatePurchaseResult,
   type PurchaseLineDraft,
 } from './purchases.service';
-export { CashService, type AddMovementInput, type CashReport } from './cash.service';
+export {
+  CashService,
+  type AddMovementInput,
+  type CashReport,
+  type CashMovementWithStatus,
+  type PaymentMethodBreakdown,
+} from './cash.service';
+export { PaymentMethodService } from './paymentMethod.service';
 export {
   InventoryService,
   type LowStockEntry,
@@ -33,6 +42,7 @@ export {
 export {
   AccountsReceivableService,
   type CustomerStatement,
+  type PaymentDraft,
   type ReceivePaymentInput,
   type ReceivePaymentResult,
   type StatementEntry,
@@ -53,6 +63,7 @@ export interface Services {
   cash: CashService;
   inventory: InventoryService;
   accountsReceivable: AccountsReceivableService;
+  paymentMethods: PaymentMethodService;
   reports: ReportsService;
 }
 
@@ -65,6 +76,7 @@ export function createServices(ctx: ServiceContext): Services {
     cash: new CashService(ctx),
     inventory: new InventoryService(ctx),
     accountsReceivable: new AccountsReceivableService(ctx),
+    paymentMethods: new PaymentMethodService(ctx),
     reports: new ReportsService(ctx),
   };
 }

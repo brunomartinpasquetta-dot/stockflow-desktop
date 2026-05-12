@@ -3,14 +3,22 @@ import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Loader2, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
-import { api, ApiError } from '@/lib/api'
-import { useArticles, useCards, useCreateSale, useCurrentCash, useCustomerBalances, useCustomers } from '@/lib/hooks'
+import { api } from '@/lib/api'
+import {
+  useArticles,
+  useCreateSale,
+  useCurrentCash,
+  useCustomerBalances,
+  useCustomers,
+  usePaymentMethods,
+} from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePrintSaleTicket } from '@/lib/usePrint'
+import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
-import { cn } from '@/lib/utils'
-import type { SaleTicketData, SaleTicketLine } from '@/print/SaleTicket'
+import type { SaleTicketData, SaleTicketLine, SaleTicketPayment } from '@/print/SaleTicket'
+import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,15 +44,12 @@ const VOUCHER_OPTIONS: { value: VoucherType; label: string }[] = [
   { value: 'X', label: 'Comprobante X' },
 ]
 
-const PAYMENT_LABELS: Record<'cash' | 'card' | 'mixed' | 'account', string> = {
-  cash: 'Efectivo',
-  card: 'Tarjeta',
-  mixed: 'Mixto',
-  account: 'Cuenta corriente',
-}
-
 /** Imprimir el ticket automáticamente al confirmar la venta (sin pasar por el toast). */
 const AUTO_PRINT_TICKET = false
+
+function isCfCustomer(c: CustomerDTO | null): boolean {
+  return c == null || c.lastName.toUpperCase() === 'CONSUMIDOR FINAL' || c.docType === 'CF'
+}
 
 function CustomerPicker({
   open,
@@ -119,19 +124,24 @@ function NoCash() {
   )
 }
 
+const FALLBACK_COMPANY: CompanyDTO = {
+  id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, createdAt: 0, updatedAt: 0,
+}
+
 function PDV() {
   const { currentUser } = useAuth()
   const articlesQuery = useArticles()
   const customersQuery = useCustomers()
   const balancesQuery = useCustomerBalances()
-  const cardsQuery = useCards()
+  const paymentMethodsQuery = usePaymentMethods()
   const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
   const createSale = useCreateSale()
   const printSaleTicket = usePrintSaleTicket()
 
   const allArticles = useMemo(() => (articlesQuery.data ?? []).filter((a) => a.active), [articlesQuery.data])
   const customers = useMemo(() => customersQuery.data ?? [], [customersQuery.data])
-  const activeCards = useMemo(() => (cardsQuery.data ?? []).filter((c) => c.active), [cardsQuery.data])
+  const activeMethods = useMemo(() => (paymentMethodsQuery.data ?? []).filter((m) => m.active), [paymentMethodsQuery.data])
+  const methodNameById = useMemo(() => new Map(activeMethods.map((m) => [m.id, m.name])), [activeMethods])
   const cfCustomer = useMemo(() => customers.find((c) => c.lastName.toUpperCase() === 'CONSUMIDOR FINAL'), [customers])
   const [today] = useState(() => formatDate(Date.now()))
 
@@ -140,6 +150,7 @@ function PDV() {
   const selectedCustomer = (customerId != null ? customers.find((c) => c.id === customerId) : null) ?? cfCustomer ?? null
   const effectiveCustomerId = selectedCustomer?.id
   const customerDebt = (balancesQuery.data ?? []).find((b) => b.customerId === effectiveCustomerId)?.totalDebt ?? '0'
+  const isCF = isCfCustomer(selectedCustomer)
 
   const [voucherType, setVoucherType] = useState<VoucherType>('B')
   const numberQuery = useQuery({
@@ -149,10 +160,7 @@ function PDV() {
 
   const [cart, setCart] = useState<CartLine[]>([])
   const [globalDiscount, setGlobalDiscount] = useState('0')
-  const [paymentType, setPaymentType] = useState<'cash' | 'card' | 'mixed' | 'account'>('cash')
-  const [received, setReceived] = useState('')
-  const [mixedCard, setMixedCard] = useState('')
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [isAccountSale, setIsAccountSale] = useState(false)
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
@@ -166,6 +174,10 @@ function PDV() {
     parseCurrencyInput(globalDiscount),
   )
   const totalNum = Number(totals.total)
+
+  // cuenta corriente sólo disponible si el cliente no es Consumidor Final
+  const accountSale = isAccountSale && !isCF
+  const split = usePaymentSplit(activeMethods, totalNum, { allowOverpay: true })
 
   // --- carrito ---
   function addArticle(article: ArticleDTO): void {
@@ -217,11 +229,18 @@ function PDV() {
       return next
     })
   }
+  function clearSale(): void {
+    setCart([])
+    setGlobalDiscount('0')
+    setIsAccountSale(false)
+    split.reset()
+    barcodeRef.current?.focus()
+  }
   function pickCustomer(c: CustomerDTO): void {
     setCustomerId(c.id)
     setCustomerPickerOpen(false)
     setCart((prev) => prev.map((l) => (l.priceManuallySet ? l : { ...l, unitPrice: resolvePrice(l.article, c, l.quantity) })))
-    if (paymentType === 'account') setPaymentType('cash')
+    if (isCfCustomer(c)) setIsAccountSale(false)
     barcodeRef.current?.focus()
   }
 
@@ -253,46 +272,26 @@ function PDV() {
     barcodeRef.current?.focus()
   }
 
-  // --- pago ---
-  const cardRequired = paymentType === 'card' || paymentType === 'mixed'
-  const noCards = cardRequired && activeCards.length === 0
-  const effectiveCardId =
-    selectedCardId != null && activeCards.some((c) => c.id === selectedCardId)
-      ? selectedCardId
-      : activeCards[0]?.id ?? null
-  const receivedNum = received ? Number(parseCurrencyInput(received)) : 0
-  const change = paymentType === 'cash' ? Math.max(0, receivedNum - totalNum) : 0
-  const mixedCardNum = mixedCard ? Number(parseCurrencyInput(mixedCard)) : 0
-  const mixedCashNum = paymentType === 'mixed' ? Math.max(0, totalNum - mixedCardNum) : 0
-  const mixedValid = mixedCardNum > 0 && mixedCardNum < totalNum
+  // --- cuenta corriente ---
   const accountEligible =
     selectedCustomer != null &&
     selectedCustomer.docType != null &&
     selectedCustomer.docType !== 'CF' &&
     !!selectedCustomer.docNumber
   const creditLimitNum = Number(selectedCustomer?.creditLimit ?? '0')
-  const overCredit =
-    paymentType === 'account' && creditLimitNum > 0 && Number(customerDebt) + totalNum > creditLimitNum
+  const overCredit = accountSale && creditLimitNum > 0 && Number(customerDebt) + totalNum > creditLimitNum
+  const noMethods = !accountSale && activeMethods.length === 0
 
   const canConfirm =
     cart.length > 0 &&
     totalNum > 0 &&
     effectiveCustomerId != null &&
     !createSale.isPending &&
-    !(paymentType === 'cash' && receivedNum < totalNum) &&
-    !(paymentType === 'account' && (!accountEligible || overCredit)) &&
-    !(cardRequired && effectiveCardId == null) &&
-    !(paymentType === 'mixed' && !mixedValid)
-
-  const FALLBACK_COMPANY: CompanyDTO = {
-    id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, createdAt: 0, updatedAt: 0,
-  }
+    (accountSale ? accountEligible && !overCredit : split.valid && activeMethods.length > 0)
 
   function buildTicket(result: CreateSaleResultDTO): SaleTicketData {
-    const isCF =
-      selectedCustomer == null ||
-      selectedCustomer.lastName.toUpperCase() === 'CONSUMIDOR FINAL' ||
-      selectedCustomer.docType === 'CF'
+    const customer = selectedCustomer
+    const cf = isCfCustomer(customer)
     const descById = new Map(cart.map((l) => [l.article.id, l.article.description]))
     const lines: SaleTicketLine[] = result.lines.map((l) => ({
       description: descById.get(l.articleId) ?? '—',
@@ -300,34 +299,32 @@ function PDV() {
       unitPrice: l.unitPrice,
       lineTotal: l.lineTotal,
     }))
-    const pt = result.sale.paymentType
+    const ticketPayments: SaleTicketPayment[] = result.payments.map((p) => ({
+      methodName: methodNameById.get(p.paymentMethodId) ?? 'Medio de pago',
+      amount: p.amount,
+    }))
     return {
       company: companyQuery.data ?? FALLBACK_COMPANY,
       sale: result.sale,
       lines,
       customerName:
-        isCF || !selectedCustomer
-          ? null
-          : `${selectedCustomer.lastName}${selectedCustomer.firstName ? `, ${selectedCustomer.firstName}` : ''}`,
-      customerDoc:
-        !isCF && selectedCustomer?.docNumber ? `${selectedCustomer.docType ?? ''} ${selectedCustomer.docNumber}`.trim() : null,
-      paymentLabel: PAYMENT_LABELS[pt],
-      cardName: pt === 'card' || pt === 'mixed' ? activeCards.find((c) => c.id === result.sale.cardId)?.name ?? null : null,
-      received: pt === 'cash' ? receivedNum : null,
-      change: pt === 'cash' ? Math.max(0, receivedNum - Number(result.sale.total)) : null,
+        cf || !customer ? null : `${customer.lastName}${customer.firstName ? `, ${customer.firstName}` : ''}`,
+      customerDoc: !cf && customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
+      isAccountSale: result.sale.isAccountSale,
+      payments: ticketPayments,
+      received: result.sale.isAccountSale ? null : split.sumNum,
+      change: result.sale.isAccountSale ? null : split.change,
     }
   }
 
   async function confirmar(): Promise<void> {
-    if (!effectiveCustomerId) return
+    if (!effectiveCustomerId || !canConfirm) return
     try {
       const result = await createSale.mutateAsync({
         type: voucherType,
         customerId: effectiveCustomerId,
-        paymentType,
-        cardId: cardRequired ? effectiveCardId : null,
-        cardAmount:
-          paymentType === 'card' ? totals.total : paymentType === 'mixed' ? mixedCardNum.toFixed(4) : '0.0000',
+        isAccountSale: accountSale,
+        payments: accountSale ? [] : split.payments,
         discount: parseCurrencyInput(globalDiscount),
         notes: null,
         lines: cart.map((l) => ({
@@ -338,36 +335,38 @@ function PDV() {
           vatRate: l.article.vatRate,
         })),
       })
-      const vuelto = paymentType === 'cash' ? Math.max(0, receivedNum - Number(result.sale.total)) : 0
-      // Armamos los datos del ticket ahora (antes de limpiar el estado del PDV).
+      const vuelto = result.sale.isAccountSale ? 0 : split.change
       const ticketData = buildTicket(result)
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} registrada — Total ${formatCurrency(result.sale.total)}${vuelto > 0 ? ` — Vuelto ${formatCurrency(vuelto)}` : ''}`,
         { action: { label: 'Imprimir', onClick: () => printSaleTicket(ticketData) } },
       )
       if (AUTO_PRINT_TICKET) printSaleTicket(ticketData)
-      setCart([])
-      setGlobalDiscount('0')
-      setReceived('')
-      setMixedCard('')
-      setPaymentType('cash')
+      clearSale()
       void numberQuery.refetch()
-      barcodeRef.current?.focus()
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'VALIDATION' && err.field === 'cardId') {
-        toast.error('Debe seleccionar una tarjeta para este tipo de pago')
-        return
-      }
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
     }
   }
 
-  const PAYMENT_TABS: { value: typeof paymentType; label: string }[] = [
-    { value: 'cash', label: 'Efectivo' },
-    { value: 'card', label: 'Tarjeta' },
-    { value: 'mixed', label: 'Mixto' },
-    { value: 'account', label: 'Cuenta corriente' },
-  ]
+  // Atajos globales del PDV (fase de captura, para ganarle al handler de F-keys del Layout).
+  // Sin deps: se re-suscribe en cada render para que el closure vea siempre el estado vigente.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return
+      if (e.key === 'F2') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (canConfirm) void confirmar()
+        return
+      }
+      if (e.key === 'Escape' && barcode.trim() === '' && cart.length > 0) {
+        if (window.confirm('¿Vaciar la venta actual?')) clearSale()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, { capture: true })
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
+  })
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -425,7 +424,7 @@ function PDV() {
             onChange={(e) => setBarcode(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') commitBarcode()
-              if (e.key === 'Escape') setBarcode('')
+              if (e.key === 'Escape' && barcode.trim() !== '') setBarcode('')
             }}
           />
           {suggestions.length > 0 && (
@@ -554,89 +553,18 @@ function PDV() {
 
         {/* pago */}
         <div className="flex flex-col gap-2">
-          <div className="grid grid-cols-2 gap-1">
-            {PAYMENT_TABS.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setPaymentType(t.value)}
-                className={cn(
-                  'rounded-md border px-2 py-1.5 text-sm transition-colors',
-                  paymentType === t.value ? 'border-primary bg-primary/10 font-medium text-primary' : 'hover:bg-accent',
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          {paymentType === 'cash' && (
-            <div className="flex flex-col gap-1 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">Recibido</span>
-                <Input
-                  className="h-8 w-32 text-right tabular-nums"
-                  inputMode="decimal"
-                  value={received}
-                  onChange={(e) => setReceived(e.target.value)}
-                  onBlur={() => received && setReceived(parseCurrencyInput(received))}
-                />
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Vuelto</span>
-                <span className="tabular-nums font-medium">{formatCurrency(change)}</span>
-              </div>
-            </div>
+          {!isCF && (
+            <label className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={isAccountSale}
+                onChange={(e) => setIsAccountSale(e.target.checked)}
+              />
+              <span>Venta a cuenta corriente</span>
+            </label>
           )}
-          {cardRequired && (
-            noCards ? (
-              <p className="text-xs text-destructive">
-                No hay tarjetas configuradas.{' '}
-                <Link to="/tarjetas" className="font-medium underline">
-                  Crear tarjetas
-                </Link>
-              </p>
-            ) : (
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="text-muted-foreground">Tarjeta</span>
-                <Select
-                  className="h-8 w-44"
-                  value={effectiveCardId ?? ''}
-                  onChange={(e) => setSelectedCardId(e.target.value || null)}
-                >
-                  {activeCards.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            )
-          )}
-          {paymentType === 'card' && !noCards && (
-            <p className="text-xs text-muted-foreground">Se cobra {formatCurrency(totals.total)} con tarjeta.</p>
-          )}
-          {paymentType === 'mixed' && !noCards && (
-            <div className="flex flex-col gap-1 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">En tarjeta</span>
-                <Input
-                  className="h-8 w-32 text-right tabular-nums"
-                  inputMode="decimal"
-                  value={mixedCard}
-                  onChange={(e) => setMixedCard(e.target.value)}
-                  onBlur={() => mixedCard && setMixedCard(parseCurrencyInput(mixedCard))}
-                />
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">En efectivo</span>
-                <span className="tabular-nums font-medium">{formatCurrency(mixedCashNum)}</span>
-              </div>
-              {mixedCard.trim() !== '' && !mixedValid && (
-                <p className="text-xs text-destructive">El monto en tarjeta debe ser mayor a 0 y menor al total.</p>
-              )}
-            </div>
-          )}
-          {paymentType === 'account' && (
+          {accountSale ? (
             <div className="text-xs">
               {!accountEligible ? (
                 <p className="text-destructive">El cliente no puede operar en cuenta corriente (falta documento identificatorio).</p>
@@ -648,6 +576,15 @@ function PDV() {
                 </p>
               )}
             </div>
+          ) : noMethods ? (
+            <p className="text-xs text-destructive">
+              No hay medios de pago configurados.{' '}
+              <Link to="/medios-de-pago" className="font-medium underline">
+                Configurar medios de pago
+              </Link>
+            </p>
+          ) : (
+            <PaymentSplitInput methods={activeMethods} split={split} showChange />
           )}
         </div>
 
@@ -660,12 +597,12 @@ function PDV() {
             onClick={() => void confirmar()}
           >
             {createSale.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
-            Confirmar venta — {formatCurrency(totals.total)}
+            Confirmar venta (F2) — {formatCurrency(totals.total)}
           </Button>
           {cart.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => setCart([])} disabled={createSale.isPending}>
+            <Button variant="ghost" size="sm" onClick={clearSale} disabled={createSale.isPending}>
               <X className="h-4 w-4" />
-              Vaciar carrito
+              Vaciar venta
             </Button>
           )}
         </div>

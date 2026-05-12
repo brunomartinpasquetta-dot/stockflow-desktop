@@ -198,6 +198,35 @@ export const cards = sqliteTable('cards', {
 });
 
 /* ------------------------------------------------------------------ */
+/* paymentMethods — medios de pago configurables                       */
+/* ------------------------------------------------------------------ */
+export const paymentMethods = sqliteTable(
+  'payment_methods',
+  {
+    id: pk(),
+    name: text('name').notNull().unique(),
+    type: text('type', {
+      enum: ['cash', 'transfer', 'debit_card', 'credit_card', 'mp', 'check', 'other'],
+    }).notNull(),
+    /** Sólo los medios con este flag afectan el arqueo físico del cajón. */
+    isPhysicalCash: integer('is_physical_cash', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    commissionPct: text('commission_pct').notNull().default('0.00'),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    typeCheck: check(
+      'payment_methods_type_check',
+      sql`${t.type} in ('cash', 'transfer', 'debit_card', 'credit_card', 'mp', 'check', 'other')`,
+    ),
+  }),
+);
+
+/* ------------------------------------------------------------------ */
 /* cashRegisters — aperturas/cierres de caja                          */
 /* ------------------------------------------------------------------ */
 export const cashRegisters = sqliteTable(
@@ -247,6 +276,8 @@ export const cashMovements = sqliteTable(
     relatedPurchaseId: text('related_purchase_id').references(
       () => purchases.id,
     ),
+    /** Medio de pago del movimiento (nullable: movimientos antiguos no lo tienen). */
+    paymentMethodId: text('payment_method_id').references(() => paymentMethods.id),
     createdAt: createdAtCol(),
   },
   (t) => ({
@@ -277,11 +308,10 @@ export const sales = sqliteTable(
     cashRegisterId: text('cash_register_id')
       .notNull()
       .references(() => cashRegisters.id),
-    paymentType: text('payment_type', {
-      enum: ['cash', 'card', 'mixed', 'account'],
-    }).notNull(),
-    cardId: text('card_id').references(() => cards.id),
-    cardAmount: text('card_amount').default('0.0000'),
+    /** true = venta a cuenta corriente (sin pagos hasta que se cobre, AR abierta). */
+    isAccountSale: integer('is_account_sale', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     subtotal: text('subtotal').notNull(),
     discount: text('discount').notNull().default('0.0000'),
     vatAmount: text('vat_amount').notNull().default('0.0000'),
@@ -303,14 +333,33 @@ export const sales = sqliteTable(
     sellerIdx: index('idx_sales_seller').on(t.sellerId),
     numberIdx: uniqueIndex('idx_sales_number').on(t.type, t.number),
     typeCheck: check('sales_type_check', sql`${t.type} in ('A', 'B', 'C', 'X')`),
-    paymentTypeCheck: check(
-      'sales_payment_type_check',
-      sql`${t.paymentType} in ('cash', 'card', 'mixed', 'account')`,
-    ),
     statusCheck: check(
       'sales_status_check',
       sql`${t.status} in ('completed', 'voided', 'pending')`,
     ),
+  }),
+);
+
+/* ------------------------------------------------------------------ */
+/* salePayments — pagos de una venta (N por venta, sólo si no es CC)   */
+/* ------------------------------------------------------------------ */
+export const salePayments = sqliteTable(
+  'sale_payments',
+  {
+    id: pk(),
+    saleId: text('sale_id')
+      .notNull()
+      .references(() => sales.id, { onDelete: 'cascade' }),
+    paymentMethodId: text('payment_method_id')
+      .notNull()
+      .references(() => paymentMethods.id),
+    amount: text('amount').notNull(),
+    /** Ej. últimos 4 dígitos de tarjeta, número de transferencia. */
+    reference: text('reference'),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    saleIdx: index('idx_sale_payments_sale').on(t.saleId),
   }),
 );
 
@@ -451,15 +500,14 @@ export const payments = sqliteTable(
       .references(() => accountsReceivable.id),
     amount: text('amount').notNull(),
     date: integer('date').notNull(),
-    method: text('method', { enum: ['cash', 'transfer', 'card'] }).notNull(),
+    paymentMethodId: text('payment_method_id')
+      .notNull()
+      .references(() => paymentMethods.id),
     notes: text('notes'),
     createdAt: createdAtCol(),
   },
   (t) => ({
-    methodCheck: check(
-      'payments_method_check',
-      sql`${t.method} in ('cash', 'transfer', 'card')`,
-    ),
+    accountIdx: index('idx_payments_account').on(t.accountId),
   }),
 );
 
@@ -506,8 +554,10 @@ export const customersRelations = relations(customers, ({ many }) => ({
   accountsReceivable: many(accountsReceivable),
 }));
 
-export const cardsRelations = relations(cards, ({ many }) => ({
-  sales: many(sales),
+export const paymentMethodsRelations = relations(paymentMethods, ({ many }) => ({
+  salePayments: many(salePayments),
+  payments: many(payments),
+  cashMovements: many(cashMovements),
 }));
 
 export const cashRegistersRelations = relations(
@@ -539,6 +589,10 @@ export const cashMovementsRelations = relations(cashMovements, ({ one }) => ({
     fields: [cashMovements.relatedPurchaseId],
     references: [purchases.id],
   }),
+  paymentMethod: one(paymentMethods, {
+    fields: [cashMovements.paymentMethodId],
+    references: [paymentMethods.id],
+  }),
 }));
 
 export const salesRelations = relations(sales, ({ one, many }) => ({
@@ -554,11 +608,8 @@ export const salesRelations = relations(sales, ({ one, many }) => ({
     fields: [sales.cashRegisterId],
     references: [cashRegisters.id],
   }),
-  card: one(cards, {
-    fields: [sales.cardId],
-    references: [cards.id],
-  }),
   lines: many(saleLines),
+  payments: many(salePayments),
   accountsReceivable: many(accountsReceivable),
 }));
 
@@ -570,6 +621,17 @@ export const saleLinesRelations = relations(saleLines, ({ one }) => ({
   article: one(articles, {
     fields: [saleLines.articleId],
     references: [articles.id],
+  }),
+}));
+
+export const salePaymentsRelations = relations(salePayments, ({ one }) => ({
+  sale: one(sales, {
+    fields: [salePayments.saleId],
+    references: [sales.id],
+  }),
+  paymentMethod: one(paymentMethods, {
+    fields: [salePayments.paymentMethodId],
+    references: [paymentMethods.id],
   }),
 }));
 
@@ -612,6 +674,10 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
     fields: [payments.accountId],
     references: [accountsReceivable.id],
   }),
+  paymentMethod: one(paymentMethods, {
+    fields: [payments.paymentMethodId],
+    references: [paymentMethods.id],
+  }),
 }));
 
 /* ================================================================== */
@@ -632,6 +698,8 @@ export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 export type Card = typeof cards.$inferSelect;
 export type NewCard = typeof cards.$inferInsert;
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type NewPaymentMethod = typeof paymentMethods.$inferInsert;
 export type CashRegister = typeof cashRegisters.$inferSelect;
 export type NewCashRegister = typeof cashRegisters.$inferInsert;
 export type CashMovement = typeof cashMovements.$inferSelect;
@@ -640,6 +708,8 @@ export type Sale = typeof sales.$inferSelect;
 export type NewSale = typeof sales.$inferInsert;
 export type SaleLine = typeof saleLines.$inferSelect;
 export type NewSaleLine = typeof saleLines.$inferInsert;
+export type SalePayment = typeof salePayments.$inferSelect;
+export type NewSalePayment = typeof salePayments.$inferInsert;
 export type Purchase = typeof purchases.$inferSelect;
 export type NewPurchase = typeof purchases.$inferInsert;
 export type PurchaseLine = typeof purchaseLines.$inferSelect;
@@ -658,10 +728,12 @@ export const localSchema = {
   articles,
   customers,
   cards,
+  paymentMethods,
   cashRegisters,
   cashMovements,
   sales,
   saleLines,
+  salePayments,
   purchases,
   purchaseLines,
   accountsReceivable,
@@ -671,11 +743,12 @@ export const localSchema = {
   articlesRelations,
   usersRelations,
   customersRelations,
-  cardsRelations,
+  paymentMethodsRelations,
   cashRegistersRelations,
   cashMovementsRelations,
   salesRelations,
   saleLinesRelations,
+  salePaymentsRelations,
   purchasesRelations,
   purchaseLinesRelations,
   accountsReceivableRelations,

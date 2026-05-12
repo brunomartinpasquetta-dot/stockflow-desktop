@@ -8,17 +8,24 @@ import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
 import { BusinessRuleError, NotFoundError } from '../errors';
 
+/** Una línea de cobranza (un medio de pago + monto). */
+export interface PaymentDraft {
+  paymentMethodId: string;
+  amount: string;
+  reference?: string | null;
+}
+
 export interface ReceivePaymentInput {
   accountId: string;
-  amount: string;
-  method: 'cash' | 'transfer' | 'card';
+  /** Una o más líneas de pago; la suma es lo cobrado. */
+  payments: PaymentDraft[];
   notes?: string | null;
   /** Caja donde impacta el ingreso (default: caja activa / caja abierta). */
   cashRegisterId?: string;
 }
 
 export interface ReceivePaymentResult {
-  payment: Payment;
+  payments: Payment[];
   account: AccountReceivable;
 }
 
@@ -61,13 +68,17 @@ export class AccountsReceivableService {
 
     const account = await repos.accountsReceivable.findById(input.accountId);
     if (!account) throw new NotFoundError('Cuenta corriente', input.accountId);
-    if (cmpDecimal(input.amount, '0') <= 0) {
-      throw new BusinessRuleError('invalid_payment_amount', 'El monto del pago debe ser positivo');
+    if (input.payments.length === 0) {
+      throw new BusinessRuleError('no_payment_lines', 'Hay que registrar al menos un pago');
     }
-    if (cmpDecimal(input.amount, account.balance) > 0) {
+    const totalPaid = sumDecimals(input.payments.map((p) => p.amount));
+    if (cmpDecimal(totalPaid, '0') <= 0) {
+      throw new BusinessRuleError('invalid_payment_amount', 'El monto cobrado debe ser positivo');
+    }
+    if (cmpDecimal(totalPaid, account.balance) > 0) {
       throw new BusinessRuleError(
         'payment_exceeds_balance',
-        `El pago (${input.amount}) supera el saldo de la cuenta (${account.balance})`,
+        `El pago (${totalPaid}) supera el saldo de la cuenta (${account.balance})`,
       );
     }
 
@@ -80,17 +91,20 @@ export class AccountsReceivableService {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el ingreso');
     }
 
-    const payment = await repos.payments.createPayment({
+    const payments = await repos.payments.createPayment({
       accountId: input.accountId,
-      amount: input.amount,
-      method: input.method,
+      payments: input.payments.map((p) => ({
+        paymentMethodId: p.paymentMethodId,
+        amount: p.amount,
+        reference: p.reference ?? null,
+      })),
       notes: input.notes ?? null,
       cashRegisterId,
       userId: currentUser.id,
     });
     const updatedAccount = await repos.accountsReceivable.findById(input.accountId);
     if (!updatedAccount) throw new NotFoundError('Cuenta corriente', input.accountId);
-    return { payment, account: updatedAccount };
+    return { payments, account: updatedAccount };
   }
 
   /** Estado de cuenta cronológico de un cliente (ventas a cuenta + pagos). */
@@ -108,6 +122,7 @@ export class AccountsReceivableService {
       const sale = await repos.sales.findById(ac.saleId);
       if (sale) salesById.set(ac.saleId, sale);
     }
+    const pmById = await repos.paymentMethods.byId();
 
     type RawEntry = { date: number; kind: 'sale' | 'payment'; reference: string; debit: string; credit: string };
     const raw: RawEntry[] = [];
@@ -123,10 +138,11 @@ export class AccountsReceivableService {
       });
       const payments = await repos.payments.findByAccount(ac.id);
       for (const p of payments) {
+        const pmName = pmById.get(p.paymentMethodId)?.name ?? 'medio desconocido';
         raw.push({
           date: p.date,
           kind: 'payment',
-          reference: `Pago ${p.method}`,
+          reference: `Cobranza — ${pmName}`,
           debit: '0.0000',
           credit: p.amount,
         });

@@ -10,12 +10,12 @@ import type { IpcMain } from 'electron';
 import { buildAccountsHandlers } from './handlers/accounts.handlers';
 import { buildArticlesHandlers } from './handlers/articles.handlers';
 import { buildAuthHandlers } from './handlers/auth.handlers';
-import { buildCardsHandlers } from './handlers/cards.handlers';
 import { buildCashHandlers } from './handlers/cash.handlers';
 import { buildCompanyHandlers } from './handlers/company.handlers';
 import { buildCustomersHandlers } from './handlers/customers.handlers';
 import { buildFamiliesHandlers } from './handlers/families.handlers';
 import { buildInventoryHandlers } from './handlers/inventory.handlers';
+import { buildPaymentMethodsHandlers } from './handlers/paymentMethods.handlers';
 import { buildPurchasesHandlers } from './handlers/purchases.handlers';
 import { buildReportsHandlers } from './handlers/reports.handlers';
 import { buildSalesHandlers } from './handlers/sales.handlers';
@@ -30,7 +30,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildCustomersHandlers,
   buildSuppliersHandlers,
   buildFamiliesHandlers,
-  buildCardsHandlers,
+  buildPaymentMethodsHandlers,
   buildUsersHandlers,
   buildCompanyHandlers,
   buildSalesHandlers,
