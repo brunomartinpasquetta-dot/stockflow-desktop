@@ -10,7 +10,7 @@
     "build:electron": "node scripts/build-electron.mjs",
     "build": "pnpm build:web && pnpm build:electron",
     "clean": "rimraf dist dist-electron node_modules/.tmp",
-    "electron:dev": "concurrently -k -n vite,electron \"vite\" \"pnpm build:electron && wait-on tcp:127.0.0.1:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:dev": "concurrently -k -n vite,electron \"vite\" \"pnpm build:electron && wait-on -t 60000 http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "lint": "eslint .",
     "type-check": "tsc -b && tsc -p tsconfig.electron.json --noEmit",
     "test:ipc": "tsx electron/__tests__/ipc.smoke.ts",
@@ -22,7 +22,6 @@
     "@stockflow/shared": "workspace:*",
     "better-sqlite3": "^11.10.0",
     "electron-log": "^5.2.0",
-    "electron-store": "^8.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

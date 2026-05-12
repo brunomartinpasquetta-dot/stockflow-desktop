@@ -80,6 +80,24 @@ electron/
 4. Si es un grupo nuevo, sumar su `build...Handlers` a `BUILDERS` en `electron/ipc/index.ts`.
 5. Cubrirlo en `electron/__tests__/ipc.smoke.ts`.
 
+## Bundling de Electron
+
+`scripts/build-electron.mjs` empaqueta `electron/main.ts` como **ESM** (`dist-electron/main.mjs`)
+y `electron/preload.ts` como **CJS** (`dist-electron/preload.cjs`, requerido por `sandbox: true`).
+Son **external** (no se bundlean): `electron` (lo provee el runtime), `better-sqlite3` (nativo) y
+todas las `dependencies` de `package.json` que no sean `@stockflow/*` (p.ej. `electron-log`) — se
+generan dinámicamente leyendo `package.json`. Los `@stockflow/*` (código `.ts`) sí se bundlean.
+
+Reglas al importar paquetes external en `electron/`:
+
+- **No bundlear deps CJS con `require` dinámicos** (como `electron-log` o el viejo `electron-store`):
+  embebidas rompen el bundle ESM (`Dynamic require of "x" is not supported`). Déjalas external.
+- **Cuando un paquete external CJS se importa por subpath en un bundle ESM, usar la extensión `.js`
+  explícita o, mejor, importar el entrypoint raíz.** En ESM, Node no autocompleta `.js` en subpaths
+  de paquetes sin campo `exports`: `import x from 'pkg/sub'` falla con `ERR_MODULE_NOT_FOUND` (hay
+  que usar `'pkg/sub.js'` o `'pkg'`). Ej.: usamos `import log from 'electron-log'` (no
+  `'electron-log/main'`).
+
 ## Canales disponibles
 
 `auth:` login, logout, getCurrentUser ·

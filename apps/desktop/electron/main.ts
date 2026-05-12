@@ -10,7 +10,8 @@ import { SessionStore } from './ipc/session-store';
 import { setupLogger } from './logger';
 
 const isDev = process.env.NODE_ENV === 'development';
-const DEV_SERVER_URL = 'http://127.0.0.1:5173';
+// Vite escucha en `localhost` (puede resolver a ::1 / IPv6): usar el nombre, no 127.0.0.1.
+const DEV_SERVER_URL = 'http://localhost:5173';
 /** Directorio del bundle (dist-electron/). */
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 

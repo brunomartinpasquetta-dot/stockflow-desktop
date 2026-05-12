@@ -1,13 +1,13 @@
 /**
- * Identificador de máquina: hash SHA-256 estable por PC, cacheado en electron-store.
+ * Identificador de máquina: hash SHA-256 estable por PC, cacheado en el JSON store.
  * (Servirá para vincular licencias a una instalación en prompts posteriores.)
  */
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 
-import Store from 'electron-store';
+import { JsonStore } from './json-store';
 
-interface MachineSchema {
+interface MachineSchema extends Record<string, unknown> {
   machineId?: string;
 }
 
@@ -38,7 +38,7 @@ export function computeMachineId(): string {
 
 /** Devuelve el machineId, generándolo y cacheándolo si no existía. */
 export function getMachineId(): string {
-  const store = new Store<MachineSchema>({ name: 'stockflow' });
+  const store = new JsonStore<MachineSchema>('stockflow');
   const cached = store.get('machineId');
   if (typeof cached === 'string' && cached.length === 64) return cached;
   const id = computeMachineId();

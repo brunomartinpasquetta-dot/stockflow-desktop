@@ -2,16 +2,19 @@
  * Build del proceso main + preload de Electron.
  *
  * - `main` → bundle ESM (`dist-electron/main.mjs`): inlinea los workspace
- *   packages (@stockflow/*) y sus deps JS (drizzle-orm, bcryptjs, uuid,
- *   electron-log, electron-store, ...). ESM para que `import.meta.url` funcione.
+ *   packages (@stockflow/*) y sus deps JS (drizzle-orm, bcryptjs, uuid).
+ *   ESM para que `import.meta.url` funcione.
  * - `preload` → bundle CJS (`dist-electron/preload.cjs`): los preload con
  *   `sandbox: true` deben ser CommonJS.
- * - Externos en ambos: `electron` (lo provee el runtime) y `better-sqlite3`
- *   (módulo nativo: se resuelve desde node_modules en runtime).
+ * - Externos: `electron` (lo provee el runtime) + TODAS las `dependencies` de
+ *   apps/desktop/package.json que NO sean workspace packages (`@stockflow/*`).
+ *   Así `electron-log` y cualquier dep CJS la carga Node directamente (con su
+ *   propio loader CJS) en vez de bundlearla y romper los `require` dinámicos en
+ *   el output ESM; `better-sqlite3` (nativo) queda external por la misma razón.
  * - Copia las migraciones de @stockflow/db a `dist-electron/migrations/`.
  */
 import { build } from 'esbuild';
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,6 +24,10 @@ const outDir = join(appRoot, 'dist-electron');
 const repoRoot = resolve(appRoot, '..', '..');
 const dbMigrations = join(repoRoot, 'packages', 'db', 'migrations');
 
+const pkg = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'));
+const runtimeDeps = Object.keys(pkg.dependencies ?? {});
+const external = ['electron', ...runtimeDeps.filter((d) => !d.startsWith('@stockflow/'))];
+
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 
@@ -29,7 +36,7 @@ const common = {
   platform: 'node',
   target: 'node20',
   sourcemap: true,
-  external: ['electron', 'better-sqlite3'],
+  external,
   logLevel: 'info',
 };
 
@@ -51,4 +58,5 @@ if (existsSync(dbMigrations)) {
   cpSync(dbMigrations, join(outDir, 'migrations'), { recursive: true });
 }
 
+console.log(`[build-electron] externals: ${external.join(', ')}`);
 console.log('[build-electron] dist-electron/{main.mjs,preload.cjs,migrations} listo');

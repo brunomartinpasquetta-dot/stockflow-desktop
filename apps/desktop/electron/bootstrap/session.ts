@@ -2,16 +2,16 @@
  * Secreto de sesión persistente (firma de los tokens de AuthService).
  *
  * Se guarda cifrado con `safeStorage` (clave gestionada por el OS) cuando está
- * disponible; si no, se cae a texto plano en electron-store (dev / plataformas
+ * disponible; si no, se cae a texto plano en el JSON store (dev / plataformas
  * sin keychain). El secreto se publica en `process.env.STOCKFLOW_SESSION_SECRET`
  * para que `@stockflow/core` lo lea.
  */
 import { safeStorage } from 'electron';
 import { randomBytes } from 'node:crypto';
 
-import Store from 'electron-store';
+import { JsonStore } from './json-store';
 
-interface SecretsSchema {
+interface SecretsSchema extends Record<string, unknown> {
   /** secreto cifrado con safeStorage, en base64 */
   sessionSecretEnc?: string;
   /** secreto en texto plano (sólo si safeStorage no está disponible) */
@@ -24,12 +24,12 @@ function newSecret(): string {
 
 /** Lee o genera+persiste el secreto de sesión. */
 export function getOrCreateSessionSecret(): string {
-  const store = new Store<SecretsSchema>({ name: 'stockflow' });
+  const store = new JsonStore<SecretsSchema>('stockflow');
   const canEncrypt = safeStorage.isEncryptionAvailable();
 
   if (canEncrypt) {
     const enc = store.get('sessionSecretEnc');
-    if (typeof enc === 'string' && enc.length > 0) {
+    if (enc) {
       try {
         return safeStorage.decryptString(Buffer.from(enc, 'base64'));
       } catch {
@@ -38,7 +38,7 @@ export function getOrCreateSessionSecret(): string {
     }
   } else {
     const plain = store.get('sessionSecret');
-    if (typeof plain === 'string' && plain.length > 0) return plain;
+    if (plain) return plain;
   }
 
   const fresh = newSecret();
