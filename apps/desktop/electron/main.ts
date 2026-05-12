@@ -1,46 +1,100 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { getDatabasePath, initialize, shutdown, type DbHandle } from './bootstrap/db';
+import { getMachineId } from './bootstrap/machine';
+import { applySessionSecret } from './bootstrap/session';
+import { registerIpcHandlers } from './ipc';
+import { SessionStore } from './ipc/session-store';
+import { setupLogger } from './logger';
 
 const isDev = process.env.NODE_ENV === 'development';
-const DEV_SERVER_URL = 'http://localhost:5173';
+const DEV_SERVER_URL = 'http://127.0.0.1:5173';
+/** Directorio del bundle (dist-electron/). */
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+let mainWindow: BrowserWindow | null = null;
+let dbHandle: DbHandle | null = null;
 
 function createWindow(): void {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(HERE, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
   });
 
-  win.once('ready-to-show', () => {
-    win.show();
+  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 
   if (isDev) {
-    void win.loadURL(DEV_SERVER_URL);
-    win.webContents.openDevTools({ mode: 'detach' });
+    void mainWindow.loadURL(DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    void win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    void mainWindow.loadFile(path.join(HERE, '..', 'dist', 'index.html'));
   }
 }
 
-app.whenReady().then(() => {
-  createWindow();
+function bootstrap(): void {
+  setupLogger();
+  applySessionSecret();
+  const machineId = getMachineId();
+  const dbPath = getDatabasePath();
+  dbHandle = initialize(dbPath);
+  const sessionStore = new SessionStore();
+  const channels = registerIpcHandlers(ipcMain, {
+    db: dbHandle.db,
+    repos: dbHandle.repos,
+    sessionStore,
+    machineId,
+    appVersion: app.getVersion(),
+    dbPath,
+  });
+  console.info(`[main] StockFlow listo — DB: ${dbPath} — ${channels.length} canales IPC registrados`);
+}
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+// Una sola instancia: si ya hay otra corriendo, ceder y enfocar la existente.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+  app
+    .whenReady()
+    .then(() => {
+      bootstrap();
+      createWindow();
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      });
+    })
+    .catch((err: unknown) => {
+      console.error('[main] Error fatal en el arranque:', err);
+      shutdown(dbHandle);
+      app.quit();
+    });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      shutdown(dbHandle);
+      app.quit();
+    }
+  });
+
+  app.on('before-quit', () => {
+    shutdown(dbHandle);
+  });
+}

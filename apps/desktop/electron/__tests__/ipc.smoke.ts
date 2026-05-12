@@ -1,0 +1,156 @@
+/**
+ * Test de integración del bridge IPC, sin levantar Electron (corre con `tsx`).
+ *
+ *   pnpm --filter @stockflow/desktop test:ipc
+ *
+ * Arma los handlers con `buildAllHandlers` sobre una DB temporal y los invoca
+ * manualmente con payloads de prueba, verificando el contrato `{ ok, ... }`.
+ */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { closeLocalDb, createRepositories, initLocalDb } from '@stockflow/db';
+
+import { buildAllHandlers } from '../ipc/index';
+import { SessionStore } from '../ipc/session-store';
+import type { HandlerMap } from '../ipc/handler-context';
+import type { IpcResponse } from '../ipc/types';
+
+let failures = 0;
+function check(label: string, ok: boolean, detail = ''): void {
+  if (ok) console.log(`  ✓ ${label}${detail ? ` — ${detail}` : ''}`);
+  else {
+    console.error(`  ✗ ${label}${detail ? ` — ${detail}` : ''}`);
+    failures++;
+  }
+}
+
+async function invoke<T = unknown>(
+  handlers: HandlerMap,
+  channel: string,
+  payload?: unknown,
+): Promise<IpcResponse<T>> {
+  const handler = handlers[channel];
+  if (!handler) throw new Error(`canal IPC no registrado: ${channel}`);
+  return (await handler(payload)) as IpcResponse<T>;
+}
+
+process.env.NODE_ENV = 'test';
+process.env.STOCKFLOW_SESSION_SECRET = 'ipc-smoke-secret';
+
+const tmpDir = mkdtempSync(join(tmpdir(), 'stockflow-ipc-smoke-'));
+const dbPath = join(tmpDir, 'stockflow.db');
+console.log(`\nTest de integración IPC — DB temporal: ${dbPath}\n`);
+
+async function main(): Promise<void> {
+  const { db } = initLocalDb(dbPath);
+  const repos = createRepositories(db);
+  const sessionStore = new SessionStore();
+  const handlers = buildAllHandlers({
+    db,
+    repos,
+    sessionStore,
+    machineId: 'test-machine',
+    appVersion: '0.0.0-test',
+    dbPath,
+  });
+  check('buildAllHandlers registra >= 40 canales', Object.keys(handlers).length >= 40, `${Object.keys(handlers).length} canales`);
+
+  // system (sin sesión)
+  const ver = await invoke<{ version: string }>(handlers, 'system:getVersion');
+  check('system:getVersion', ver.ok && ver.data.version === '0.0.0-test', JSON.stringify(ver));
+
+  // call que requiere sesión, sin login → UNAUTHENTICATED
+  const noSession = await invoke(handlers, 'articles:list');
+  check('articles:list sin sesión → UNAUTHENTICATED', !noSession.ok && noSession.code === 'UNAUTHENTICATED', JSON.stringify(noSession));
+
+  // login
+  const login = await invoke<{ user: { username: string; role: string }; sessionToken: string }>(
+    handlers,
+    'auth:login',
+    { username: 'admin', password: 'admin' },
+  );
+  check(
+    'auth:login admin/admin',
+    login.ok && login.data.user.username === 'admin' && login.data.user.role === 'admin' && typeof login.data.sessionToken === 'string' && login.data.sessionToken.length > 0,
+    login.ok ? '' : JSON.stringify(login),
+  );
+
+  const badLogin = await invoke(handlers, 'auth:login', { username: 'admin', password: 'mala' });
+  check('auth:login contraseña errónea → VALIDATION', !badLogin.ok && badLogin.code === 'VALIDATION', JSON.stringify(badLogin));
+  // re-login para asegurar sesión activa
+  await invoke(handlers, 'auth:login', { username: 'admin', password: 'admin' });
+
+  const me = await invoke<{ username: string } | null>(handlers, 'auth:getCurrentUser');
+  check('auth:getCurrentUser', me.ok && me.data?.username === 'admin', JSON.stringify(me));
+
+  // customers:list incluye CONSUMIDOR FINAL (seed)
+  const customers = await invoke<Array<{ id: string; lastName: string }>>(handlers, 'customers:list');
+  const cf = customers.ok ? customers.data.find((c) => c.lastName === 'CONSUMIDOR FINAL') : undefined;
+  check('customers:list devuelve el seed (CONSUMIDOR FINAL)', !!cf, cf ? `id=${cf.id}` : JSON.stringify(customers).slice(0, 200));
+  if (!cf) throw new Error('Falta el cliente CONSUMIDOR FINAL del seed');
+
+  // articles:create + articles:list
+  const created = await invoke<{ id: string; barcode: string; stock: string }>(handlers, 'articles:create', {
+    barcode: '7790000099999',
+    description: 'Producto IPC test',
+    listPrice1: '500.0000',
+    stock: '20.000',
+    minStock: '5.000',
+  });
+  check('articles:create', created.ok && created.data.barcode === '7790000099999', JSON.stringify(created));
+  if (!created.ok) throw new Error('articles:create falló');
+
+  const list = await invoke<Array<{ id: string }>>(handlers, 'articles:list');
+  check('articles:list incluye el artículo recién creado', list.ok && list.data.some((a) => a.id === created.data.id), JSON.stringify(list).slice(0, 200));
+
+  // cash:open
+  const cashOpen = await invoke<{ id: string; status: string }>(handlers, 'cash:open', { openingAmount: '1000.0000' });
+  check('cash:open', cashOpen.ok && cashOpen.data.status === 'open', JSON.stringify(cashOpen));
+
+  // sales:create end-to-end
+  const sale = await invoke<{ sale: { total: string; status: string }; lines: unknown[]; accountReceivable: unknown }>(
+    handlers,
+    'sales:create',
+    { type: 'B', customerId: cf.id, paymentType: 'cash', lines: [{ articleId: created.data.id, quantity: '2.000' }] },
+  );
+  check(
+    'sales:create end-to-end (precio resuelto, stock, caja)',
+    sale.ok && sale.data.sale.total === '1000.0000' && sale.data.lines.length === 1 && sale.data.accountReceivable === null,
+    sale.ok ? `total=${sale.data.sale.total}` : JSON.stringify(sale),
+  );
+
+  const articleAfter = await invoke<{ stock: string } | null>(handlers, 'articles:get', { id: created.data.id });
+  check('sales:create descontó stock', articleAfter.ok && articleAfter.data?.stock === '18.000', articleAfter.ok ? `stock=${articleAfter.data?.stock}` : JSON.stringify(articleAfter));
+
+  // cash:getReport
+  const report = await invoke<{ incomeTotal: string; salesCount: number }>(handlers, 'cash:getReport', { registerId: cashOpen.ok ? cashOpen.data.id : '' });
+  check('cash:getReport', report.ok && report.data.incomeTotal === '1000.0000', JSON.stringify(report));
+
+  // error tipado: sales:get inexistente → NOT_FOUND
+  const notFound = await invoke(handlers, 'sales:get', { id: 'no-existe' });
+  check('sales:get id inexistente → NOT_FOUND', !notFound.ok && notFound.code === 'NOT_FOUND', JSON.stringify(notFound));
+
+  // logout → vuelve a UNAUTHENTICATED
+  await invoke(handlers, 'auth:logout');
+  const afterLogout = await invoke(handlers, 'articles:list');
+  check('articles:list tras logout → UNAUTHENTICATED', !afterLogout.ok && afterLogout.code === 'UNAUTHENTICATED', JSON.stringify(afterLogout));
+
+  closeLocalDb(db);
+}
+
+main()
+  .catch((err) => {
+    console.error('\n✗ Excepción durante el test:', err);
+    failures++;
+  })
+  .finally(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    console.log(`\nArchivos temporales eliminados: ${tmpDir}`);
+    if (failures > 0) {
+      console.error(`\nTEST IPC FALLÓ — ${failures} check(s) con error.\n`);
+      process.exit(1);
+    }
+    console.log('\nTEST IPC OK ✅\n');
+  });

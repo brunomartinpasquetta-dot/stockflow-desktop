@@ -1,14 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "node10",
-    "ignoreDeprecations": "6.0",
-    "outDir": "dist-electron",
-    "rootDir": "electron",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "types": ["node"],
-    "noEmit": false,
-    "sourceMap": true
+    "noEmit": true,
+    "skipLibCheck": true
   },
   "include": ["electron"]
 }

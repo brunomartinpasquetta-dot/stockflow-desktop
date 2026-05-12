@@ -1,73 +1,100 @@
-# React + TypeScript + Vite
+# @stockflow/desktop
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+App de escritorio (Electron + Vite + React). El proceso main hospeda la base
+local y los servicios de dominio; el renderer los consume por IPC vía
+`contextBridge` (sin `nodeIntegration`, sin `remote`).
 
-Currently, two official plugins are available:
+## Arrancar en desarrollo
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm --filter @stockflow/desktop electron:dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Esto: levanta Vite (`http://127.0.0.1:5173`), bundlea el proceso main/preload
+(`scripts/build-electron.mjs` → `dist-electron/`) y abre Electron apuntando al
+dev server. La DB se crea/migra/seedea en `app.getPath('userData')/stockflow.db`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Otros scripts:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Script | Qué hace |
+| --- | --- |
+| `pnpm --filter @stockflow/desktop dev` | Sólo el renderer (Vite), sin Electron |
+| `pnpm --filter @stockflow/desktop build:electron` | Bundlea main + preload + copia migraciones |
+| `pnpm --filter @stockflow/desktop build` | Build web + build electron |
+| `pnpm --filter @stockflow/desktop type-check` | `tsc` del renderer y de `electron/` |
+| `pnpm --filter @stockflow/desktop test:ipc` | Test de integración del bridge IPC (sin Electron, `tsx`) |
+| `pnpm --filter @stockflow/desktop lint` | ESLint |
+| `pnpm --filter @stockflow/desktop clean` | Borra `dist/`, `dist-electron/` |
+
+## Flujo de una llamada
+
 ```
+window.stockflow.<grupo>.<método>(payload)        (renderer)
+        │  ipcRenderer.invoke('<grupo>:<método>', payload)
+        ▼
+ipcMain.handle('<grupo>:<método>')                (electron/main, registerIpcHandlers)
+        │  withSession → arma ServiceContext (db + repos + currentUser + currentCashRegister)
+        ▼
+Service de dominio (@stockflow/core)              (reglas, permisos, validación Zod)
+        ▼
+Repository (@stockflow/db)                         (CRUD + transacciones)
+        ▼
+SQLite (better-sqlite3, en userData)
+        ▲
+        └─ errores → serializeError → { ok:false, code, message, ... }   (nunca `throw` al renderer)
+```
+
+## Estructura de `electron/`
+
+```
+electron/
+├── main.ts                  # entry: single-instance lock, bootstrap, ventana, ciclo de vida
+├── preload.ts               # contextBridge → window.stockflow (tipado por ipc/types.ts)
+├── logger.ts                # electron-log + redirección de console.* del main
+├── bootstrap/
+│   ├── db.ts                # initLocalDb en userData, repos, shutdown
+│   ├── session.ts           # secreto de sesión persistente (cifrado con safeStorage)
+│   └── machine.ts           # machineId (SHA-256, cacheado en electron-store)
+├── ipc/
+│   ├── index.ts             # buildAllHandlers / registerIpcHandlers
+│   ├── types.ts             # IpcResponse, DTOs, ApiSurface (auto-contenido; lo usa el renderer)
+│   ├── errors.ts            # serializeError (dominio → respuesta IPC)
+│   ├── session-store.ts     # estado in-memory: sesión actual + caja activa
+│   ├── handler-context.ts   # HandlerDeps, withSession, unguarded
+│   └── handlers/            # un archivo por grupo de canales
+└── __tests__/ipc.smoke.ts   # test de integración (tsx)
+```
+
+## Cómo agregar un nuevo canal IPC
+
+1. Definir request/response en `electron/ipc/types.ts` (DTOs y la entrada en `ApiSurface`).
+2. Implementar el handler en `electron/ipc/handlers/<grupo>.handlers.ts`:
+   ```ts
+   'grupo:metodo': withSession(deps, (payload: ReqDTO, ctx): Promise<ResDTO> => {
+     // requirePermission(ctx.currentUser, '...')  // si muta datos
+     return new MiService(ctx).hacerAlgo(payload);
+   }),
+   ```
+   (o `unguarded(deps, ...)` si no requiere sesión).
+3. Exponerlo en `electron/preload.ts`: `metodo: (p) => call('grupo:metodo', p)`.
+4. Si es un grupo nuevo, sumar su `build...Handlers` a `BUILDERS` en `electron/ipc/index.ts`.
+5. Cubrirlo en `electron/__tests__/ipc.smoke.ts`.
+
+## Canales disponibles
+
+`auth:` login, logout, getCurrentUser ·
+`articles:` list, get, create, update, delete, findByBarcode, searchByText, findLowStock ·
+`customers:` list, get, create, update, delete, searchByText, findByDocNumber ·
+`suppliers:` list, get, create, update, delete ·
+`families:` list, get, create, update, delete ·
+`users:` list, get, create, update, delete ·
+`company:` get, upsert ·
+`sales:` create, void, get, listByDateRange, getNextNumber ·
+`purchases:` create, get, listByDateRange ·
+`cash:` open, close, getCurrent, getReport, addMovement ·
+`inventory:` checkStock, adjustStock, getLowStockReport ·
+`accounts:` receivePayment, getStatement, getTotalReceivables ·
+`reports:` salesByDateRange, purchasesByDateRange, salesBySeller, inventoryByFamily, topArticles, cashRegisterReport ·
+`system:` getMachineId, getVersion, getDbPath, getInfo
+
+Todos devuelven `{ ok: true, data } | { ok: false, code, message, field?/constraint?/action?/rule? }`.
