@@ -1,10 +1,8 @@
 /**
  * Estado del "split" de pago: N medios de pago, un monto por cada uno.
  *
- * `allowOverpay: true` (PDV) → la suma puede superar el total; el excedente se
- * informa como "vuelto" y se descuenta de la línea de efectivo al armar los pagos
- * (los `payments` devueltos siempre suman exactamente `total`).
- * `allowOverpay: false` (cobranzas) → la suma debe coincidir con el total.
+ * La suma de los montos debe ser EXACTAMENTE igual al total a cobrar — no hay
+ * concepto de "vuelto": el cajero ingresa exactamente lo cobrado en cada medio.
  */
 import { useCallback, useMemo, useState } from 'react'
 
@@ -18,13 +16,15 @@ export interface PaymentSplit {
   fillAllInCash: () => void
   reset: () => void
   cashMethod: PaymentMethodDTO | undefined
-  sumNum: number
-  /** total − suma, ≥ 0 (lo que falta cobrar). */
-  restante: number
-  /** suma − total, ≥ 0 (vuelto; sólo informativo, no se guarda). */
-  change: number
-  valid: boolean
-  /** Pagos a enviar al backend (sólo los > 0; suman exactamente `total`). */
+  /** Suma de todos los montos ingresados. */
+  totalPaid: number
+  /** true si `totalPaid === total` (con tolerancia de centavos) y `total > 0`. */
+  isComplete: boolean
+  /** true si `totalPaid > total`. */
+  isExcess: boolean
+  /** `max(0, total − totalPaid)` — lo que falta cobrar. */
+  remaining: number
+  /** Pagos a enviar al backend (sólo los > 0). */
   payments: Array<{ paymentMethodId: string; amount: string }>
 }
 
@@ -32,11 +32,7 @@ function num(v: string | undefined): number {
   return v ? Number(parseCurrencyInput(v)) : 0
 }
 
-export function usePaymentSplit(
-  activeMethods: PaymentMethodDTO[],
-  total: number,
-  opts: { allowOverpay: boolean },
-): PaymentSplit {
+export function usePaymentSplit(activeMethods: PaymentMethodDTO[], total: number): PaymentSplit {
   const [amounts, setAmounts] = useState<Record<string, string>>({})
 
   const setAmount = useCallback((paymentMethodId: string, value: string) => {
@@ -67,30 +63,19 @@ export function usePaymentSplit(
     return out
   }, [activeMethods, amounts])
 
-  const sumNum = useMemo(
-    () => Object.values(numByPm).reduce((a, b) => a + b, 0),
-    [numByPm],
-  )
-  const restante = Math.max(0, Number((total - sumNum).toFixed(2)))
-  const change = Math.max(0, Number((sumNum - total).toFixed(2)))
-
-  const valid = opts.allowOverpay
-    ? total > 0 &&
-      sumNum >= total - 0.005 &&
-      (change <= 0.005 || (cashMethod != null && (numByPm[cashMethod.id] ?? 0) >= change - 0.005))
-    : total > 0 && Math.abs(sumNum - total) < 0.005
+  const totalPaid = useMemo(() => Object.values(numByPm).reduce((a, b) => a + b, 0), [numByPm])
+  const remaining = Math.max(0, Number((total - totalPaid).toFixed(2)))
+  const isExcess = totalPaid - total > 0.005
+  const isComplete = total > 0 && Math.abs(totalPaid - total) < 0.005
 
   const payments = useMemo(() => {
     const list: Array<{ paymentMethodId: string; amount: string }> = []
     for (const m of activeMethods) {
-      let amt = numByPm[m.id] ?? 0
-      if (opts.allowOverpay && change > 0.005 && cashMethod && m.id === cashMethod.id) {
-        amt = Number((amt - change).toFixed(4))
-      }
+      const amt = numByPm[m.id] ?? 0
       if (amt > 0.0001) list.push({ paymentMethodId: m.id, amount: amt.toFixed(4) })
     }
     return list
-  }, [activeMethods, numByPm, change, cashMethod, opts.allowOverpay])
+  }, [activeMethods, numByPm])
 
-  return { amounts, setAmount, fillAllInCash, reset, cashMethod, sumNum, restante, change, valid, payments }
+  return { amounts, setAmount, fillAllInCash, reset, cashMethod, totalPaid, isComplete, isExcess, remaining, payments }
 }

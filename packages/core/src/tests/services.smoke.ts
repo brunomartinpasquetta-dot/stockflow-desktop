@@ -147,9 +147,14 @@ async function main(): Promise<void> {
   );
 
   await expectThrows(
-    'createSale con pagos que no suman el total → falla',
+    'createSale con pagos que NO cubren el total → ValidationError',
     () => seller.sales.createSale({ type: 'B', customerId: cf.id, payments: [{ paymentMethodId: PM_CASH, amount: '999.0000' }], lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }] }),
-    (e) => e instanceof Error,
+    (e) => e instanceof ValidationError,
+  );
+  await expectThrows(
+    'createSale con pagos que EXCEDEN el total → ValidationError',
+    () => seller.sales.createSale({ type: 'B', customerId: cf.id, payments: [{ paymentMethodId: PM_CASH, amount: '1001.0000' }], lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '1000.0000' }] }),
+    (e) => e instanceof ValidationError,
   );
 
   await expectThrows(

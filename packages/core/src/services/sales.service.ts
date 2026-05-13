@@ -10,10 +10,11 @@ import type {
   SalePayment,
   VoucherType,
 } from '@stockflow/shared';
+import { cmpDecimal, sumDecimals } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
-import { BusinessRuleError, NotFoundError } from '../errors';
+import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 import {
   type PriceMode,
   type SaleTotals,
@@ -141,11 +142,25 @@ export class SalesService {
       });
     }
 
+    // Totales (preview): replica el cálculo del repositorio, según el modo de precios.
+    const company = await repos.company.getOrCreate();
+    const mode: PriceMode = company.priceMode === 'net' ? 'net' : 'gross';
+    const preview = calculateSaleTotals(resolvedLines, draft.discount ?? '0.0000', mode);
+
+    if (!isAccountSale) {
+      // La suma de los pagos debe ser EXACTAMENTE igual al total (no hay vuelto).
+      const paidSum = sumDecimals(payments.map((p) => p.amount));
+      const cmp = cmpDecimal(paidSum, preview.total);
+      if (cmp > 0) {
+        throw new ValidationError('payments', 'Los pagos exceden el total de la venta');
+      }
+      if (cmp < 0) {
+        throw new ValidationError('payments', 'Los pagos no cubren el total de la venta');
+      }
+    }
+
     // Límite de crédito (creditLimit '0.0000' = sin límite).
     if (isAccountSale && Number(customer.creditLimit) > 0) {
-      const company = await repos.company.getOrCreate();
-      const mode: PriceMode = company.priceMode === 'net' ? 'net' : 'gross';
-      const preview = calculateSaleTotals(resolvedLines, draft.discount ?? '0.0000', mode);
       const currentBalance = await repos.accountsReceivable.getTotalBalance(customer.id);
       if (Number(currentBalance) + Number(preview.total) > Number(customer.creditLimit)) {
         throw new BusinessRuleError(

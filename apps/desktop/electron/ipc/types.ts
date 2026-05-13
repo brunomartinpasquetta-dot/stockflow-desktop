@@ -448,6 +448,8 @@ export interface ReceivePaymentInputDTO {
   accountId: string;
   /** Una o más líneas de pago; la suma es lo cobrado. */
   payments: PaymentInputDTO[];
+  /** Si se indica, la suma de los pagos debe coincidir exactamente con este monto. */
+  expectedAmount?: string;
   notes?: string | null;
   cashRegisterId?: string;
 }

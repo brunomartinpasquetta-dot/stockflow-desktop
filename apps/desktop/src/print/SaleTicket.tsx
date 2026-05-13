@@ -36,12 +36,8 @@ export interface SaleTicketData {
   /** Documento del cliente ("DNI 12345678"); `null` si no aplica. */
   customerDoc: string | null
   isAccountSale: boolean
-  /** Desglose de pagos (vacío si es venta a cuenta corriente). */
+  /** Desglose de pagos (vacío si es venta a cuenta corriente). La suma es igual al total. */
   payments: SaleTicketPayment[]
-  /** Total efectivamente entregado por el cliente (suma de pagos + vuelto). */
-  received: number | null
-  /** Vuelto entregado (informativo). */
-  change: number | null
 }
 
 function Hr() {
@@ -49,7 +45,7 @@ function Hr() {
 }
 
 export function SaleTicket({ data }: { data: SaleTicketData }) {
-  const { company, sale, priceMode, lines, customerName, customerDoc, isAccountSale, payments, received, change } = data
+  const { company, sale, priceMode, lines, customerName, customerDoc, isAccountSale, payments } = data
   const discountNum = Number(sale.discount)
   const vatNum = Number(sale.vatAmount)
   const subtotalNum = Number(sale.subtotal)
@@ -138,18 +134,6 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
               <span>{formatCurrency(p.amount)}</span>
             </div>
           ))}
-          {received != null && (
-            <div className="flex justify-between">
-              <span>Total pagado</span>
-              <span>{formatCurrency(received)}</span>
-            </div>
-          )}
-          {change != null && change > 0 && (
-            <div className="flex justify-between">
-              <span>Vuelto</span>
-              <span>{formatCurrency(change)}</span>
-            </div>
-          )}
         </>
       )}
       <Hr />

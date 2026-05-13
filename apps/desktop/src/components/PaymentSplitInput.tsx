@@ -1,6 +1,7 @@
 /**
- * Zona de pago con N filas (una por medio de pago activo) + indicadores de
- * restante / vuelto + atajo "Todo en Efectivo". El estado vive en `usePaymentSplit`.
+ * Zona de pago con N filas (una por medio de pago activo) + indicador de estado
+ * (restante / completo / excede) + atajo "Todo en Efectivo". El estado vive en
+ * `usePaymentSplit`. La suma debe ser exactamente igual al total — no hay vuelto.
  */
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -11,12 +12,9 @@ import type { PaymentMethodDTO } from '@/types/api'
 export function PaymentSplitInput({
   methods,
   split,
-  showChange = false,
 }: {
   methods: PaymentMethodDTO[]
   split: PaymentSplit
-  /** Si true, muestra "Vuelto" cuando la suma supera el total (PDV). */
-  showChange?: boolean
 }) {
   if (methods.length === 0) {
     return <p className="text-xs text-destructive">No hay medios de pago activos. Configurá al menos uno en “Medios de pago”.</p>
@@ -46,15 +44,13 @@ export function PaymentSplitInput({
           </Button>
         )}
         <span className="ml-auto text-right">
-          {split.restante > 0.005 ? (
-            <span className="text-destructive">Restante: {formatCurrency(split.restante)}</span>
-          ) : showChange && split.change > 0.005 ? (
-            <span className="text-muted-foreground">
-              Vuelto: <span className="font-medium tabular-nums">{formatCurrency(split.change)}</span>
-            </span>
-          ) : (
+          {split.isExcess ? (
+            <span className="text-destructive">Excede el total. Ajustá los montos.</span>
+          ) : split.remaining > 0.005 ? (
+            <span className="text-destructive">Restante a cobrar: {formatCurrency(split.remaining)}</span>
+          ) : split.isComplete ? (
             <span className="text-success">Pagos completos</span>
-          )}
+          ) : null}
         </span>
       </div>
     </div>

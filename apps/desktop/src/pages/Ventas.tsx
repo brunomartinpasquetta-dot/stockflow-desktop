@@ -180,7 +180,7 @@ function PDV() {
 
   // cuenta corriente sólo disponible si el cliente no es Consumidor Final
   const accountSale = isAccountSale && !isCF
-  const split = usePaymentSplit(activeMethods, totalNum, { allowOverpay: true })
+  const split = usePaymentSplit(activeMethods, totalNum)
 
   // --- carrito ---
   function addArticle(article: ArticleDTO): void {
@@ -290,7 +290,7 @@ function PDV() {
     totalNum > 0 &&
     effectiveCustomerId != null &&
     !createSale.isPending &&
-    (accountSale ? accountEligible && !overCredit : split.valid && activeMethods.length > 0)
+    (accountSale ? accountEligible && !overCredit : split.isComplete && activeMethods.length > 0)
 
   function buildTicket(result: CreateSaleResultDTO): SaleTicketData {
     const customer = selectedCustomer
@@ -316,8 +316,6 @@ function PDV() {
       customerDoc: !cf && customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
       isAccountSale: result.sale.isAccountSale,
       payments: ticketPayments,
-      received: result.sale.isAccountSale ? null : split.sumNum,
-      change: result.sale.isAccountSale ? null : split.change,
     }
   }
 
@@ -339,10 +337,9 @@ function PDV() {
           vatRate: l.article.vatRate,
         })),
       })
-      const vuelto = result.sale.isAccountSale ? 0 : split.change
       const ticketData = buildTicket(result)
       toast.success(
-        `Venta ${result.sale.type} #${result.sale.number} registrada — Total ${formatCurrency(result.sale.total)}${vuelto > 0 ? ` — Vuelto ${formatCurrency(vuelto)}` : ''}`,
+        `Venta ${result.sale.type} #${result.sale.number} registrada — Total ${formatCurrency(result.sale.total)}`,
         { action: { label: 'Imprimir', onClick: () => printSaleTicket(ticketData) } },
       )
       if (AUTO_PRINT_TICKET) printSaleTicket(ticketData)
@@ -600,7 +597,7 @@ function PDV() {
               </Link>
             </p>
           ) : (
-            <PaymentSplitInput methods={activeMethods} split={split} showChange />
+            <PaymentSplitInput methods={activeMethods} split={split} />
           )}
         </div>
 

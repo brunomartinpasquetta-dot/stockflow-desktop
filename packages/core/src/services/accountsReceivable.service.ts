@@ -6,7 +6,7 @@ import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shar
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
-import { BusinessRuleError, NotFoundError } from '../errors';
+import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 
 /** Una línea de cobranza (un medio de pago + monto). */
 export interface PaymentDraft {
@@ -19,6 +19,8 @@ export interface ReceivePaymentInput {
   accountId: string;
   /** Una o más líneas de pago; la suma es lo cobrado. */
   payments: PaymentDraft[];
+  /** Si se indica, la suma de los pagos debe coincidir EXACTAMENTE con este monto. */
+  expectedAmount?: string;
   notes?: string | null;
   /** Caja donde impacta el ingreso (default: caja activa / caja abierta). */
   cashRegisterId?: string;
@@ -74,6 +76,11 @@ export class AccountsReceivableService {
     const totalPaid = sumDecimals(input.payments.map((p) => p.amount));
     if (cmpDecimal(totalPaid, '0') <= 0) {
       throw new BusinessRuleError('invalid_payment_amount', 'El monto cobrado debe ser positivo');
+    }
+    if (input.expectedAmount != null) {
+      const cmp = cmpDecimal(totalPaid, input.expectedAmount);
+      if (cmp > 0) throw new ValidationError('payments', 'Los pagos exceden el monto a cobrar');
+      if (cmp < 0) throw new ValidationError('payments', 'Los pagos no cubren el monto a cobrar');
     }
     if (cmpDecimal(totalPaid, account.balance) > 0) {
       throw new BusinessRuleError(

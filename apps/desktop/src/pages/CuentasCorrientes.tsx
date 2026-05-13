@@ -34,13 +34,18 @@ function CobranzaDialog({
   const [monto, setMonto] = useState<string>(account.balance)
   const montoNum = monto ? Number(parseCurrencyInput(monto)) : 0
   const balanceNum = Number(account.balance)
-  const split = usePaymentSplit(activeMethods, montoNum, { allowOverpay: false })
+  const split = usePaymentSplit(activeMethods, montoNum)
 
   const overBalance = montoNum > balanceNum + 0.005
-  const canConfirm = montoNum > 0 && !overBalance && split.valid && activeMethods.length > 0
+  const canConfirm = montoNum > 0 && !overBalance && split.isComplete && activeMethods.length > 0
 
   const mutation = useMutation({
-    mutationFn: () => api.accounts.receivePayment({ accountId: account.id, payments: split.payments }),
+    mutationFn: () =>
+      api.accounts.receivePayment({
+        accountId: account.id,
+        payments: split.payments,
+        expectedAmount: montoNum.toFixed(4),
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['customerBalances'] })
       void qc.invalidateQueries({ queryKey: ['accountStatement', customerId] })
