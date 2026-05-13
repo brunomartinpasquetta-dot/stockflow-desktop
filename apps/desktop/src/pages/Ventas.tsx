@@ -21,6 +21,7 @@ import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/li
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
 import type { SaleTicketData, SaleTicketLine, SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { WeightDialog } from '@/components/WeightDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -190,23 +191,31 @@ function PDV() {
   const split = usePaymentSplit(activeMethods, totalNum)
 
   // --- carrito ---
+  const [pendingWeightArticle, setPendingWeightArticle] = useState<ArticleDTO | null>(null)
   function addArticle(article: ArticleDTO): void {
+    if (article.soldByWeight) {
+      setPendingWeightArticle(article)
+      return
+    }
+    addArticleWithQty(article, '1')
+  }
+  function addArticleWithQty(article: ArticleDTO, qty: string): void {
     setCart((prev) => {
       const idx = prev.findIndex((l) => l.article.id === article.id)
       if (idx >= 0) {
         const next = [...prev]
         const line = next[idx]!
-        const qty = (Number(line.quantity) + 1).toString()
+        const newQty = (Number(line.quantity) + Number(qty)).toString()
         next[idx] = {
           ...line,
-          quantity: qty,
-          unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(article, selectedCustomer, qty),
+          quantity: newQty,
+          unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(article, selectedCustomer, newQty),
         }
         return next
       }
       return [
         ...prev,
-        { article, quantity: '1', unitPrice: resolvePrice(article, selectedCustomer, '1'), discount: '0', priceManuallySet: false },
+        { article, quantity: qty, unitPrice: resolvePrice(article, selectedCustomer, qty), discount: '0', priceManuallySet: false },
       ]
     })
   }
@@ -677,6 +686,14 @@ function PDV() {
       </div>
 
       <CustomerPicker open={customerPickerOpen} customers={customers} onClose={() => setCustomerPickerOpen(false)} onSelect={pickCustomer} />
+      <WeightDialog
+        open={pendingWeightArticle != null}
+        articleDescription={pendingWeightArticle?.description}
+        onClose={() => setPendingWeightArticle(null)}
+        onConfirm={(weightKg) => {
+          if (pendingWeightArticle) addArticleWithQty(pendingWeightArticle, weightKg)
+        }}
+      />
     </div>
   )
 }
