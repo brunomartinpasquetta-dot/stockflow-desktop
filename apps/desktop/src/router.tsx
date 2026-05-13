@@ -28,6 +28,7 @@ const Usuarios = lazy(() => import('@/pages/Usuarios').then((m) => ({ default: m
 const Caja = lazy(() => import('@/pages/Caja').then((m) => ({ default: m.Caja })))
 const Ventas = lazy(() => import('@/pages/Ventas').then((m) => ({ default: m.Ventas })))
 const AcercaDe = lazy(() => import('@/pages/AcercaDe').then((m) => ({ default: m.AcercaDe })))
+const Bienvenida = lazy(() => import('@/pages/Bienvenida').then((m) => ({ default: m.Bienvenida })))
 
 function SuspenseOutlet() {
   return (
@@ -41,6 +42,7 @@ export const router = createHashRouter([
   {
     element: <AuthShell />,
     children: [
+      { path: '/bienvenida', element: <Suspense fallback={<PageSpinner />}><Bienvenida /></Suspense> },
       { path: '/login', element: <Login /> },
       { path: '/activacion', element: <Suspense fallback={<PageSpinner />}><Activacion /></Suspense> },
       {

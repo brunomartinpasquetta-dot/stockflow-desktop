@@ -36,4 +36,22 @@ export class SessionStore {
   getCurrentCashRegister(): CashRegister | null {
     return this.cashRegister;
   }
+
+  /**
+   * Ejecuta `fn` con una sesión temporal (caso LAN: el server impersonar al
+   * usuario del JWT por la duración de un único RPC). SQLite + handlers son
+   * single-threaded en JS, así que es seguro siempre que `fn` no sea spawn
+   * paralelo de otros handlers. Restaura la sesión previa al terminar.
+   */
+  async runWith<T>(user: SafeUser, token: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.session;
+    const prevCash = this.cashRegister;
+    this.session = { user, token };
+    try {
+      return await fn();
+    } finally {
+      this.session = prev;
+      this.cashRegister = prevCash;
+    }
+  }
 }

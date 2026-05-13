@@ -14,7 +14,34 @@ import { requirePermission } from '@stockflow/core';
 import { LanManager } from '../../lan/LanManager';
 import type { LanConfig, LanMode } from '../../lan/types';
 import { DEFAULT_LAN_PORT } from '../../lan/types';
-import { type HandlerDeps, type HandlerMap, unguarded, withSession } from '../handler-context';
+import { type HandlerDeps, type HandlerMap, unguarded } from '../handler-context';
+
+export interface LanTestConnectionInput {
+  ip: string;
+  port: number;
+  token?: string;
+}
+
+export interface LanTestConnectionResult {
+  ok: boolean;
+  latencyMs?: number;
+  error?: string;
+}
+
+async function pingServer(ip: string, port: number, timeoutMs = 3000): Promise<LanTestConnectionResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const start = Date.now();
+  try {
+    const res = await fetch(`http://${ip}:${port}/lan/ping`, { signal: controller.signal });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return { ok: true, latencyMs: Date.now() - start };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'unreachable' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface LanSetModeInput {
   mode: LanMode;
@@ -32,17 +59,79 @@ function getManager(deps: HandlerDeps): LanManager {
 }
 
 export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
+  const extras = deps.lanExtras ?? {};
   return {
-    'lan:getConfig': unguarded(deps, async (): Promise<LanConfig> => {
-      return getManager(deps).getConfig();
+    'lan:getConfig': unguarded(deps, async (): Promise<LanConfig & { configured: boolean }> => {
+      const mgr = getManager(deps);
+      return { ...mgr.getConfig(), configured: mgr.isConfigured() };
     }),
     'lan:getLocalIp': unguarded(deps, async (): Promise<{ ip: string | null }> => {
       return { ip: LanManager.getLocalIp() };
     }),
-    'lan:setMode': withSession(
+    'lan:testConnection': unguarded(
       deps,
-      async (payload: LanSetModeInput, ctx): Promise<{ requiresRestart: true; config: LanConfig }> => {
-        requirePermission(ctx.currentUser, 'manage_hardware');
+      async (payload: LanTestConnectionInput): Promise<LanTestConnectionResult> => {
+        if (!payload?.ip || !payload?.port) {
+          return { ok: false, error: 'Faltan IP y/o puerto' };
+        }
+        return pingServer(payload.ip, payload.port);
+      },
+    ),
+    'lan:scanNetwork': unguarded(
+      deps,
+      async (): Promise<{ supported: boolean; results: { ip: string; port: number; name?: string }[] }> => {
+        // mDNS opcional vía bonjour-service (carga dinámica).
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const mod = require('bonjour-service') as {
+            Bonjour?: new () => {
+              find: (opts: object, cb: (svc: { addresses?: string[]; port?: number; name?: string }) => void) => { stop: () => void };
+              destroy?: () => void;
+            };
+          };
+          if (!mod.Bonjour) return { supported: false, results: [] };
+          const instance = new mod.Bonjour();
+          const results: { ip: string; port: number; name?: string }[] = [];
+          await new Promise<void>((resolve) => {
+            const browser = instance.find({ type: 'http' }, (svc) => {
+              const ip = (svc.addresses ?? []).find((a) => /^\d+\.\d+\.\d+\.\d+$/.test(a));
+              if (ip && svc.port) results.push({ ip, port: svc.port, name: svc.name });
+            });
+            setTimeout(() => {
+              browser.stop();
+              instance.destroy?.();
+              resolve();
+            }, 2500);
+          });
+          return { supported: true, results };
+        } catch {
+          return { supported: false, results: [] };
+        }
+      },
+    ),
+    'lan:getConnectedClients': unguarded(
+      deps,
+      async (): Promise<{ ip: string; lastSeen: number }[]> => {
+        return extras.getConnectedClients?.() ?? [];
+      },
+    ),
+    'lan:applyAndRestart': unguarded(
+      deps,
+      async (): Promise<{ ok: true }> => {
+        // Permitido sin sesión: el wizard de bienvenida lo usa antes del primer
+        // login. La operación sólo reinicia la app, no afecta datos.
+        setTimeout(() => extras.applyAndRestart?.(), 100);
+        return { ok: true };
+      },
+    ),
+    'lan:setMode': unguarded(
+      deps,
+      async (payload: LanSetModeInput): Promise<{ requiresRestart: true; config: LanConfig }> => {
+        // Si hay sesión activa exigimos el permiso; si no hay sesión (wizard
+        // primera ejecución), permitimos la operación porque sólo escribe el
+        // archivo de config y requiere restart manual.
+        const session = deps.sessionStore.getSession();
+        if (session) requirePermission(session.user, 'manage_hardware');
         const mgr = getManager(deps);
         const current = mgr.getConfig();
 

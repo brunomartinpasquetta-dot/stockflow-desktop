@@ -53,6 +53,14 @@ agregar StockFlow → "Permitir conexiones entrantes".
 sudo ufw allow 7777/tcp
 ```
 
+## Wizard de bienvenida (primera ejecución)
+
+La primera vez que se abre StockFlow en una PC, aparece la pantalla
+**Bienvenida** con tres opciones (PC única / Servidor / Cliente). Elegila y
+seguí los pasos: la app reinicia y queda en el modo elegido.
+
+Si necesitás cambiar el modo más adelante: **Configuración → LAN**.
+
 ## Activar modo servidor
 
 1. Abrir StockFlow en la PC que actuará de servidor.
@@ -80,6 +88,18 @@ Esa IP + PIN se entregan a cada caja cliente.
 
 A partir de ahí, el cliente no usa su base de datos local: todas las
 operaciones viajan por HTTP al servidor.
+
+## Autenticación entre cajas
+
+Cada cliente LAN tiene su propio login local. Al hacer login, el server LAN
+firma un **JWT (HS256)** corto (12 h) que el cliente envía en
+`Authorization: Bearer <jwt>` para los siguientes RPCs. El secret del JWT
+deriva del PIN compartido; cuando el PIN se regenera, las sesiones existentes
+quedan invalidadas y los clientes deben volver a loguearse.
+
+En el header del cliente aparece un indicador **LAN** verde (conectado) o rojo
+(reintentando…). Mientras el indicador esté rojo, la app bloquea operaciones
+de escritura (igual que en el caso `readOnly` de la licencia).
 
 ## Quota de licencias
 

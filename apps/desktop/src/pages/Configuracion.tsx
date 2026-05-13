@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
-import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw } from 'lucide-react'
+import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, RefreshCcw } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -473,6 +473,266 @@ function BackupSection() {
   )
 }
 
+/* ----------------------- LAN ----------------------- */
+function LanSection() {
+  const qc = useQueryClient()
+  const cfgQuery = useQuery({ queryKey: ['lan', 'config'], queryFn: () => api.lan.getConfig() })
+  const ipQuery = useQuery({ queryKey: ['lan', 'localIp'], queryFn: () => api.lan.getLocalIp() })
+
+  const [mode, setMode] = useState<'single' | 'server' | 'client'>('single')
+  const [serverPort, setServerPort] = useState<number>(7777)
+  const [token, setToken] = useState<string>('')
+  const [clientIp, setClientIp] = useState<string>('')
+  const [clientPort, setClientPort] = useState<number>(7777)
+  const [seeded, setSeeded] = useState<unknown>(undefined)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<string | null>(null)
+
+  if (cfgQuery.data && seeded !== cfgQuery.data) {
+    setSeeded(cfgQuery.data)
+    setMode(cfgQuery.data.mode)
+    setServerPort(cfgQuery.data.port ?? 7777)
+    setToken(cfgQuery.data.token ?? '')
+    setClientIp(cfgQuery.data.serverIp ?? '')
+    setClientPort(cfgQuery.data.serverPort ?? 7777)
+  }
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      if (mode === 'single') return api.lan.setMode({ mode: 'single' })
+      if (mode === 'server') return api.lan.setMode({ mode: 'server', port: serverPort })
+      return api.lan.setMode({ mode: 'client', serverIp: clientIp, serverPort: clientPort, token })
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['lan', 'config'] })
+      toast.success('Configuración LAN guardada. Reiniciando…')
+      setTimeout(() => void api.lan.applyAndRestart(), 600)
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo guardar'),
+  })
+
+  async function onScan(): Promise<void> {
+    try {
+      const r = await api.lan.scanNetwork()
+      if (!r.supported) {
+        toast.info('Búsqueda automática no disponible — ingresá la IP a mano')
+        return
+      }
+      if (r.results.length === 0) {
+        toast.info('No se encontró ningún servidor StockFlow en la red')
+        return
+      }
+      const first = r.results[0]!
+      setClientIp(first.ip)
+      setClientPort(first.port)
+      toast.success(`Encontrado: ${first.ip}:${first.port}`)
+    } catch {
+      toast.error('No se pudo buscar en la red')
+    }
+  }
+
+  async function onTest(): Promise<void> {
+    if (!clientIp) {
+      toast.error('Ingresá la IP del servidor')
+      return
+    }
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const r = await api.lan.testConnection(clientIp, clientPort, token)
+      if (r.ok) setTestResult(`Conectado (${r.latencyMs ?? 0} ms)`)
+      else setTestResult(`Sin conexión: ${r.error ?? 'desconocido'}`)
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  function regenPin(): void {
+    setToken(String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0'))
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Network className="h-4 w-4" /> Modo multi-caja (LAN)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
+          <Label>Modo de operación</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {(['single', 'server', 'client'] as const).map((m) => (
+              <label
+                key={m}
+                className={`flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs ${mode === m ? 'border-primary bg-primary/5' : ''}`}
+              >
+                <input type="radio" name="lan-mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">
+                    {m === 'single' ? 'PC única' : m === 'server' ? 'Servidor' : 'Cliente'}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {m === 'single' && 'Esta PC trabaja sola, sin red.'}
+                    {m === 'server' && 'Esta PC es la caja principal; otras se conectan a ella.'}
+                    {m === 'client' && 'Esta PC se conecta a un servidor StockFlow en la red.'}
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {mode === 'server' && (
+          <div className="flex flex-col gap-2 rounded-md border p-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <Label>Puerto</Label>
+                <Input type="number" value={serverPort} onChange={(e) => setServerPort(Number(e.target.value) || 7777)} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label>PIN de seguridad</Label>
+                <div className="flex gap-1">
+                  <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="6 dígitos" />
+                  <Button variant="outline" size="sm" onClick={regenPin} type="button">
+                    Generar
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              IP local: <span className="font-mono">{ipQuery.data?.ip ?? '—'}</span>
+              {ipQuery.data?.ip && (
+                <>
+                  {' '}
+                  · URL para clientes: <span className="font-mono">http://{ipQuery.data.ip}:{serverPort}</span>
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
+        {mode === 'client' && (
+          <div className="flex flex-col gap-2 rounded-md border p-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2 flex flex-col gap-1">
+                <Label>IP del servidor</Label>
+                <div className="flex gap-1">
+                  <Input value={clientIp} onChange={(e) => setClientIp(e.target.value)} placeholder="192.168.1.100" />
+                  <Button variant="outline" size="sm" onClick={onScan} type="button">
+                    Buscar
+                  </Button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label>Puerto</Label>
+                <Input type="number" value={clientPort} onChange={(e) => setClientPort(Number(e.target.value) || 7777)} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label>PIN de seguridad</Label>
+              <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="6 dígitos" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={onTest} type="button" disabled={testing}>
+                {testing && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                Probar conexión
+              </Button>
+              {testResult && <span className="text-xs">{testResult}</span>}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+            Guardar y reiniciar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ----------------------- ACTUALIZACIONES ----------------------- */
+function UpdatesSection() {
+  const versionQuery = useQuery({ queryKey: ['system', 'version'], queryFn: () => api.system.getVersion() })
+  const autoQuery = useQuery({ queryKey: ['updater', 'autoCheck'], queryFn: () => api.updater.getAutoCheck() })
+  const [auto, setAuto] = useState<boolean>(true)
+  const [seeded, setSeeded] = useState<unknown>(undefined)
+  const [checkStatus, setCheckStatus] = useState<string | null>(null)
+  const [downloaded, setDownloaded] = useState<string | null>(null)
+
+  if (autoQuery.data && seeded !== autoQuery.data) {
+    setSeeded(autoQuery.data)
+    setAuto(autoQuery.data.autoCheck)
+  }
+
+  useEffect(() => {
+    const off = api.updater.onDownloaded((info) => setDownloaded(info.version))
+    return () => off()
+  }, [])
+
+  const setAutoMut = useMutation({
+    mutationFn: (next: boolean) => api.updater.setAutoCheck(next),
+    onSuccess: () => toast.success('Preferencia guardada'),
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo guardar'),
+  })
+
+  async function checkNow(): Promise<void> {
+    setCheckStatus('Verificando…')
+    try {
+      const r = await api.updater.checkNow()
+      if (r.status === 'available' && r.version) setCheckStatus(`Versión ${r.version} disponible — descargando…`)
+      else if (r.status === 'not-available') setCheckStatus('Estás al día.')
+      else if (r.status === 'disabled') setCheckStatus('Auto-update deshabilitado en este entorno.')
+      else setCheckStatus(`Estado: ${r.status}${r.version ? ' — ' + r.version : ''}`)
+    } catch (err) {
+      setCheckStatus(err instanceof ApiError ? err.message : 'Error al verificar')
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <RefreshCcw className="h-4 w-4" /> Actualizaciones
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={auto}
+            onChange={(e) => {
+              setAuto(e.target.checked)
+              setAutoMut.mutate(e.target.checked)
+            }}
+          />
+          Verificar actualizaciones automáticamente
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Versión actual: <span className="font-mono">{versionQuery.data?.version ?? '—'}</span>
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => void checkNow()}>
+            Buscar actualizaciones ahora
+          </Button>
+          {checkStatus && <span className="text-xs">{checkStatus}</span>}
+        </div>
+        {downloaded && (
+          <div className="flex items-center gap-2 rounded-md border bg-emerald-500/10 p-2 text-sm">
+            <span>Versión {downloaded} lista para instalar.</span>
+            <Button size="sm" onClick={() => void api.updater.quitAndInstall()}>
+              Reiniciar e instalar
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 /* ----------------------- GENERAL ----------------------- */
 function GeneralSection() {
   const links: { to: string; label: string }[] = [
@@ -510,6 +770,8 @@ export function Configuracion() {
         <TabsList>
           <TabsTrigger value="hardware">Hardware</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
+          <TabsTrigger value="lan">LAN</TabsTrigger>
+          <TabsTrigger value="updates">Actualizaciones</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
         </TabsList>
         <TabsContent value="hardware" className="flex flex-col gap-3">
@@ -518,6 +780,12 @@ export function Configuracion() {
         </TabsContent>
         <TabsContent value="backup">
           <BackupSection />
+        </TabsContent>
+        <TabsContent value="lan">
+          <LanSection />
+        </TabsContent>
+        <TabsContent value="updates">
+          <UpdatesSection />
         </TabsContent>
         <TabsContent value="general">
           <GeneralSection />

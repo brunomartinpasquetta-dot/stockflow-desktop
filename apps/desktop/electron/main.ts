@@ -102,6 +102,16 @@ function bootstrap(): { lanArgs: string[] } {
     isDev,
   });
 
+  // applyAndRestart: usado por lan:applyAndRestart y wizard.
+  const applyAndRestart = (): void => {
+    try {
+      app.relaunch();
+      app.exit(0);
+    } catch (err) {
+      console.error('[main] applyAndRestart falló:', err);
+    }
+  };
+
   const deps = {
     db: dbHandle.db,
     repos: dbHandle.repos,
@@ -118,6 +128,10 @@ function bootstrap(): { lanArgs: string[] } {
       mainWindow?.webContents.send(channel, payload);
     },
     updater: updaterController,
+    lanExtras: {
+      applyAndRestart,
+      getConnectedClients: () => lanServer?.getConnectedClients() ?? [],
+    },
   };
 
   const channels = registerIpcHandlers(ipcMain, deps);
@@ -127,7 +141,20 @@ function bootstrap(): { lanArgs: string[] } {
     const handlers = buildAllHandlers(deps);
     const port = lanCfg.port ?? DEFAULT_LAN_PORT;
     const ip = LanManager.getLocalIp() ?? '0.0.0.0';
-    lanServer = new LanServer({ handlers, port, token: lanCfg.token, enableMdns: true });
+    lanServer = new LanServer({
+      handlers,
+      port,
+      token: lanCfg.token,
+      enableMdns: true,
+      sessionStore,
+      resolveUser: async (userId: string) => {
+        const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
+        if (!u) return null;
+        const { passwordHash: _ph, ...safe } = u;
+        void _ph;
+        return safe;
+      },
+    });
     lanServer
       .start()
       .then(() => console.info(`[LAN] modo=server puerto=${port} IP=${ip} PIN=${lanCfg.token}`))

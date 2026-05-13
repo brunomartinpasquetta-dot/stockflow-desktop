@@ -2,6 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import { useLanContext } from '@/contexts/LanContext'
 import type { LicenseStateDTO } from '@/types/api'
 
 interface LicenseContextValue {
@@ -35,10 +36,16 @@ export function useLicense(): LicenseContextValue {
   return ctx
 }
 
-/** true sólo cuando la licencia está activa (al día). En 'readOnly' devuelve false. */
+/**
+ * true sólo cuando la licencia está activa Y, en modo cliente LAN, la conexión
+ * con el servidor está online. En 'readOnly' o sin conexión devuelve false.
+ */
 export function useCanWrite(): boolean {
   const { state } = useLicense()
-  return state?.status === 'active'
+  const { mode, online } = useLanContext()
+  if (state?.status !== 'active') return false
+  if (mode === 'client' && !online) return false
+  return true
 }
 
 export type LicenseStatusValue = 'unlicensed' | 'active' | 'readOnly' | 'revoked' | 'loading'

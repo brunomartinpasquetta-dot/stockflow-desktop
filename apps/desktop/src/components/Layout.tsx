@@ -26,6 +26,7 @@ import {
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLicenseStatus } from '@/contexts/LicenseContext'
+import { LanStatusIndicator } from '@/components/LanStatusIndicator'
 import { ROLE_LABELS, hasPermission, type PermissionAction } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -175,6 +176,7 @@ export function Layout() {
         <header className="flex h-12 shrink-0 items-center justify-between border-b bg-background px-4">
           <div className="truncate text-sm font-medium">{companyName}</div>
           <div className="flex items-center gap-3 text-sm">
+            <LanStatusIndicator />
             <span className="text-muted-foreground">
               {currentUser?.fullName} ·{' '}
               <span className="font-medium">{currentUser ? ROLE_LABELS[currentUser.role] : ''}</span>

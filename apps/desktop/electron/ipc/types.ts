@@ -803,6 +803,10 @@ export interface ApiSurface {
     getConfig(): Res<LanConfigDTO>;
     getLocalIp(): Res<{ ip: string | null }>;
     setMode(payload: LanSetModeInputDTO): Res<{ requiresRestart: true; config: LanConfigDTO }>;
+    testConnection(payload: { ip: string; port: number; token?: string }): Res<{ ok: boolean; latencyMs?: number; error?: string }>;
+    scanNetwork(): Res<{ supported: boolean; results: { ip: string; port: number; name?: string }[] }>;
+    getConnectedClients(): Res<{ ip: string; lastSeen: number }[]>;
+    applyAndRestart(): Res<{ ok: true }>;
   };
   updater: {
     checkNow(): Res<{ status: string; version?: string }>;
@@ -826,6 +830,8 @@ export interface LanConfigDTO {
   token?: string;
   serverIp?: string;
   serverPort?: number;
+  /** true si ya existe lan.json (post-wizard). */
+  configured?: boolean;
 }
 
 export interface LanSetModeInputDTO {

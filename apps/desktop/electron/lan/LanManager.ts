@@ -21,6 +21,11 @@ export class LanManager {
     this.filePath = path.join(userDataDir, FILE_NAME);
   }
 
+  /** true si el archivo lan.json existe (el usuario ya pasó el wizard). */
+  isConfigured(): boolean {
+    return existsSync(this.filePath);
+  }
+
   getConfig(): LanConfig {
     if (this.cache) return this.cache;
     if (!existsSync(this.filePath)) {

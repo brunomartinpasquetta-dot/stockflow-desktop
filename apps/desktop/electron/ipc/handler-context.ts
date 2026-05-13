@@ -34,6 +34,11 @@ export interface HandlerDeps {
     getAutoCheck: () => boolean;
     setAutoCheck: (v: boolean) => void;
   };
+  /** Extras LAN (server-side): inyectados por main.ts cuando hay LanServer. */
+  lanExtras?: {
+    getConnectedClients?: () => { ip: string; lastSeen: number }[];
+    applyAndRestart?: () => void;
+  };
 }
 
 export type HandlerFn = (payload: unknown) => Promise<IpcResponse<unknown>>;

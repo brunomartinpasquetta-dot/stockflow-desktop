@@ -251,6 +251,29 @@ export const api = {
     getConfig: () => unwrap(sf().lan.getConfig()),
     getLocalIp: () => unwrap(sf().lan.getLocalIp()),
     setMode: (payload: import('@/types/api').LanSetModeInputDTO) => unwrap(sf().lan.setMode(payload)),
+    testConnection: (ip: string, port: number, token?: string) =>
+      unwrap(sf().lan.testConnection({ ip, port, token })),
+    scanNetwork: () => unwrap(sf().lan.scanNetwork()),
+    getConnectedClients: () => unwrap(sf().lan.getConnectedClients()),
+    applyAndRestart: () => unwrap(sf().lan.applyAndRestart()),
+    /**
+     * Ping directo desde el renderer (HTTP GET /lan/ping al server LAN).
+     * No usa IPC: el renderer puede hacer fetch sin CORS issues (server permite *).
+     */
+    pingServer: async (ip: string, port: number, timeoutMs = 3000): Promise<{ ok: boolean; latencyMs?: number }> => {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+      const start = Date.now()
+      try {
+        const res = await fetch(`http://${ip}:${port}/lan/ping`, { signal: controller.signal })
+        if (!res.ok) return { ok: false }
+        return { ok: true, latencyMs: Date.now() - start }
+      } catch {
+        return { ok: false }
+      } finally {
+        clearTimeout(timer)
+      }
+    },
   },
   updater: {
     checkNow: () => unwrap(sf().updater.checkNow()),
