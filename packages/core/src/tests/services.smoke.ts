@@ -338,6 +338,82 @@ async function main(): Promise<void> {
     (e) => e instanceof BusinessRuleError,
   );
 
+  // ---------------------------------------------- compras + cuentas proveedores
+  console.log('\n[compras / cuentas proveedores]');
+  const reg2 = await admin.cash.openCashRegister('1000.0000');
+  check('reabrir caja para compras', reg2.status === 'open');
+  const prov = await repos.suppliers.create({ code: 'P001', name: 'Distribuidora Test' });
+
+  // Compra contado mixta (600 efectivo + 400 transferencia = 1000).
+  const compraContado = await admin.purchases.createPurchase({
+    type: 'A',
+    supplierId: prov.id,
+    payments: [
+      { paymentMethodId: PM_CASH, amount: '600.0000' },
+      { paymentMethodId: PM_TRANSFER, amount: '400.0000' },
+    ],
+    lines: [{ articleId: art.id, quantity: '2.000', costPrice: '500.0000', vatRate: '21.00' }],
+  });
+  check('createPurchase contado → total 1000, sin cuenta', compraContado.purchase.total === '1000.0000' && compraContado.accountPayable === null && compraContado.purchase.paymentType === 'cash', `total=${compraContado.purchase.total}`);
+  const compraMovs = await repos.cashMovements.findByRegister(reg2.id);
+  const compraEfectivo = compraMovs.find((m) => m.relatedPurchaseId === compraContado.purchase.id && m.type === 'expense' && m.paymentMethodId === PM_CASH);
+  const compraTransfer = compraMovs.find((m) => m.relatedPurchaseId === compraContado.purchase.id && m.type === 'expense' && m.paymentMethodId === PM_TRANSFER);
+  check('compra contado: 1 egreso de caja por pago, sólo efectivo afecta el cajón (600/400)', compraEfectivo?.amount === '600.0000' && compraTransfer?.amount === '400.0000', `efectivo=${compraEfectivo?.amount} transferencia=${compraTransfer?.amount}`);
+  await expectThrows(
+    'createPurchase con pagos que no cubren el total → ValidationError',
+    () => admin.purchases.createPurchase({ type: 'A', supplierId: prov.id, payments: [{ paymentMethodId: PM_CASH, amount: '900.0000' }], lines: [{ articleId: art.id, quantity: '1.000', costPrice: '1000.0000', vatRate: '21.00' }] }),
+    (e) => e instanceof ValidationError,
+  );
+
+  // Compra con updatePrices → actualiza costPrice y listPrice1 del artículo.
+  await admin.purchases.createPurchase({
+    type: 'A',
+    supplierId: prov.id,
+    payments: [{ paymentMethodId: PM_CASH, amount: '650.0000' }],
+    updatePrices: true,
+    lines: [{ articleId: art.id, quantity: '1.000', costPrice: '650.0000', salePrice: '900.0000', vatRate: '21.00' }],
+  });
+  const artAfterPurchase = await repos.articles.findById(art.id);
+  check('compra con updatePrices → costPrice y listPrice1 actualizados (650 / 900)', artAfterPurchase?.costPrice === '650.0000' && artAfterPurchase?.listPrice1 === '900.0000', `cost=${artAfterPurchase?.costPrice} list=${artAfterPurchase?.listPrice1}`);
+
+  // Compra a cuenta del proveedor → crea cuenta por pagar.
+  const compraAcuenta = await admin.purchases.createPurchase({
+    type: 'A',
+    supplierId: prov.id,
+    isAccountPurchase: true,
+    lines: [{ articleId: art.id, quantity: '1.000', costPrice: '700.0000', vatRate: '21.00' }],
+  });
+  check('createPurchase a cuenta → AR de proveedor creada (balance 700, status open)', compraAcuenta.accountPayable?.balance === '700.0000' && compraAcuenta.accountPayable?.status === 'open' && compraAcuenta.purchase.paymentType === 'credit');
+  const provBalances = await admin.supplierAccounts.listSupplierBalances();
+  check('supplierAccounts.listBalances incluye al proveedor con deuda 700', provBalances.find((b) => b.supplierId === prov.id)?.totalDebt === '700.0000');
+
+  // Pago parcial mixto a la cuenta del proveedor (200 efectivo + 100 transferencia = 300 de 700).
+  const provPay = await admin.supplierAccounts.payInvoice({
+    accountId: compraAcuenta.accountPayable!.id,
+    payments: [
+      { paymentMethodId: PM_CASH, amount: '200.0000' },
+      { paymentMethodId: PM_TRANSFER, amount: '100.0000' },
+    ],
+    expectedAmount: '300.0000',
+  });
+  check('payInvoice parcial mixto → status partial, balance 400, 2 filas de pago', provPay.account.status === 'partial' && provPay.account.balance === '400.0000' && provPay.payments.length === 2, `balance=${provPay.account.balance}`);
+  await expectThrows(
+    'payInvoice que supera el saldo → BusinessRuleError',
+    () => admin.supplierAccounts.payInvoice({ accountId: compraAcuenta.accountPayable!.id, payments: [{ paymentMethodId: PM_CASH, amount: '999.0000' }] }),
+    (e) => e instanceof BusinessRuleError,
+  );
+
+  // Anular una compra contado → vuelve voided + reverso de caja por la parte efectivo.
+  const voidedPurchase = await admin.purchases.voidPurchase(compraContado.purchase.id);
+  check('voidPurchase contado → voided', voidedPurchase.status === 'voided');
+  const reversalP = (await repos.cashMovements.findByRegister(reg2.id)).find((m) => m.relatedPurchaseId === compraContado.purchase.id && m.type === 'income');
+  check('voidPurchase genera ingreso de caja por la parte efectivo (600)', reversalP?.amount === '600.0000', `reversal=${reversalP?.amount}`);
+  await expectThrows(
+    'voidPurchase a cuenta con pagos → BusinessRuleError',
+    () => admin.purchases.voidPurchase(compraAcuenta.purchase.id),
+    (e) => e instanceof BusinessRuleError,
+  );
+
   // --------------------------------------------------------------- reportes
   console.log('\n[reports]');
   const now = Date.now();

@@ -523,6 +523,59 @@ export const payments = sqliteTable(
   }),
 );
 
+/* ------------------------------------------------------------------ */
+/* supplierAccountsPayable — cuentas corrientes con proveedores        */
+/* ------------------------------------------------------------------ */
+export const supplierAccountsPayable = sqliteTable(
+  'supplier_accounts_payable',
+  {
+    id: pk(),
+    supplierId: text('supplier_id')
+      .notNull()
+      .references(() => suppliers.id),
+    purchaseId: text('purchase_id')
+      .notNull()
+      .references(() => purchases.id),
+    total: text('total').notNull(),
+    balance: text('balance').notNull(),
+    status: text('status', { enum: ['open', 'paid', 'partial'] })
+      .notNull()
+      .default('open'),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    supplierIdx: index('idx_sap_supplier').on(t.supplierId),
+    statusCheck: check(
+      'supplier_accounts_payable_status_check',
+      sql`${t.status} in ('open', 'paid', 'partial')`,
+    ),
+  }),
+);
+
+/* ------------------------------------------------------------------ */
+/* supplierPayments — pagos aplicados a cuentas corrientes de proveedor */
+/* ------------------------------------------------------------------ */
+export const supplierPayments = sqliteTable(
+  'supplier_payments',
+  {
+    id: pk(),
+    accountId: text('account_id')
+      .notNull()
+      .references(() => supplierAccountsPayable.id),
+    paymentMethodId: text('payment_method_id')
+      .notNull()
+      .references(() => paymentMethods.id),
+    amount: text('amount').notNull(),
+    date: integer('date').notNull(),
+    reference: text('reference'),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    accountIdx: index('idx_supplier_payments_account').on(t.accountId),
+  }),
+);
+
 /* ================================================================== */
 /* Relaciones (joins type-safe)                                       */
 /* ================================================================== */
@@ -692,6 +745,32 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   }),
 }));
 
+export const supplierAccountsPayableRelations = relations(
+  supplierAccountsPayable,
+  ({ one, many }) => ({
+    supplier: one(suppliers, {
+      fields: [supplierAccountsPayable.supplierId],
+      references: [suppliers.id],
+    }),
+    purchase: one(purchases, {
+      fields: [supplierAccountsPayable.purchaseId],
+      references: [purchases.id],
+    }),
+    payments: many(supplierPayments),
+  }),
+);
+
+export const supplierPaymentsRelations = relations(supplierPayments, ({ one }) => ({
+  account: one(supplierAccountsPayable, {
+    fields: [supplierPayments.accountId],
+    references: [supplierAccountsPayable.id],
+  }),
+  paymentMethod: one(paymentMethods, {
+    fields: [supplierPayments.paymentMethodId],
+    references: [paymentMethods.id],
+  }),
+}));
+
 /* ================================================================== */
 /* Tipos inferidos (select / insert)                                  */
 /* ================================================================== */
@@ -730,6 +809,10 @@ export type AccountReceivable = typeof accountsReceivable.$inferSelect;
 export type NewAccountReceivable = typeof accountsReceivable.$inferInsert;
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
+export type SupplierAccountPayable = typeof supplierAccountsPayable.$inferSelect;
+export type NewSupplierAccountPayable = typeof supplierAccountsPayable.$inferInsert;
+export type SupplierPayment = typeof supplierPayments.$inferSelect;
+export type NewSupplierPayment = typeof supplierPayments.$inferInsert;
 
 /** Objeto schema agregado (para pasar a drizzle({ schema })). */
 export const localSchema = {
@@ -750,6 +833,8 @@ export const localSchema = {
   purchaseLines,
   accountsReceivable,
   payments,
+  supplierAccountsPayable,
+  supplierPayments,
   familiesRelations,
   suppliersRelations,
   articlesRelations,
@@ -765,4 +850,6 @@ export const localSchema = {
   purchaseLinesRelations,
   accountsReceivableRelations,
   paymentsRelations,
+  supplierAccountsPayableRelations,
+  supplierPaymentsRelations,
 };

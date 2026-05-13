@@ -316,6 +316,27 @@ export interface PaymentDTO {
   createdAt: number;
 }
 
+export interface SupplierAccountPayableDTO {
+  id: string;
+  supplierId: string;
+  purchaseId: string;
+  total: string;
+  balance: string;
+  status: ArStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SupplierPaymentDTO {
+  id: string;
+  accountId: string;
+  paymentMethodId: string;
+  amount: string;
+  date: number;
+  reference: string | null;
+  createdAt: number;
+}
+
 /** Una línea de pago (medio + monto), usada en ventas y cobranzas. */
 export interface PaymentInputDTO {
   paymentMethodId: string;
@@ -372,15 +393,20 @@ export interface PurchaseLineDraftDTO {
   articleId: string;
   quantity: string;
   costPrice: string;
-  salePrice: string;
+  /** Nuevo precio de venta sugerido; vacío/omitido = no cambia listPrice1. */
+  salePrice?: string;
   vatRate?: string;
 }
 
 export interface CreatePurchaseInputDTO {
   type: VoucherType;
   supplierId: string;
-  paymentType: PurchasePaymentType;
   supplierInvoiceNumber?: string | null;
+  date?: number;
+  /** true = compra a cuenta del proveedor (no lleva pagos). */
+  isAccountPurchase?: boolean;
+  /** Pagos de la compra (contado); obligatorio (≥1) si NO es a cuenta. */
+  payments?: PaymentInputDTO[];
   updatePrices?: boolean;
   discount?: string;
   notes?: string | null;
@@ -391,6 +417,42 @@ export interface CreatePurchaseInputDTO {
 export interface CreatePurchaseResultDTO {
   purchase: PurchaseDTO;
   lines: PurchaseLineDTO[];
+  accountPayable: SupplierAccountPayableDTO | null;
+}
+
+export interface SupplierBalanceDTO {
+  supplierId: string;
+  supplierName: string;
+  totalDebt: string;
+  openInvoicesCount: number;
+}
+
+export interface PaySupplierInvoiceInputDTO {
+  accountId: string;
+  payments: PaymentInputDTO[];
+  expectedAmount?: string;
+  notes?: string | null;
+  cashRegisterId?: string;
+}
+
+export interface PaySupplierInvoiceResultDTO {
+  payments: SupplierPaymentDTO[];
+  account: SupplierAccountPayableDTO;
+}
+
+export interface SupplierStatementEntryDTO {
+  date: number;
+  kind: 'purchase' | 'payment';
+  reference: string;
+  debit: string;
+  credit: string;
+  runningBalance: string;
+}
+
+export interface SupplierStatementDTO {
+  supplier: SupplierDTO;
+  entries: SupplierStatementEntryDTO[];
+  currentBalance: string;
 }
 
 export interface PaymentMethodBreakdownDTO {
@@ -626,8 +688,16 @@ export interface ApiSurface {
   };
   purchases: {
     create(payload: CreatePurchaseInputDTO): Res<CreatePurchaseResultDTO>;
+    void(payload: IdPayload): Res<PurchaseDTO>;
     get(payload: IdPayload): Res<{ purchase: PurchaseDTO; lines: PurchaseLineDTO[] }>;
     listByDateRange(payload: DateRangeDTO): Res<PurchaseDTO[]>;
+    getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;
+  };
+  supplierAccounts: {
+    listBalances(): Res<SupplierBalanceDTO[]>;
+    payInvoice(payload: PaySupplierInvoiceInputDTO): Res<PaySupplierInvoiceResultDTO>;
+    getStatement(payload: { supplierId: string; dateRange?: DateRangeDTO }): Res<SupplierStatementDTO>;
+    listOpenBySupplier(payload: { supplierId: string }): Res<SupplierAccountPayableDTO[]>;
   };
   cash: {
     open(payload: { openingAmount: string }): Res<CashRegisterDTO>;

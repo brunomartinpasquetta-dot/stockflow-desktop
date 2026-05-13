@@ -21,6 +21,8 @@ import { SaleRepository } from './sale.repository';
 import { SaleLineRepository } from './saleLine.repository';
 import { SalePaymentRepository } from './salePayment.repository';
 import { SupplierRepository } from './supplier.repository';
+import { SupplierAccountPayableRepository } from './supplierAccountPayable.repository';
+import { SupplierPaymentRepository } from './supplierPayment.repository';
 import { UserRepository } from './user.repository';
 
 export { BaseRepository };
@@ -40,6 +42,11 @@ export { SaleRepository, type SaleWithLines } from './sale.repository';
 export { SaleLineRepository } from './saleLine.repository';
 export { SalePaymentRepository, type SalePaymentInput } from './salePayment.repository';
 export { SupplierRepository } from './supplier.repository';
+export {
+  SupplierAccountPayableRepository,
+  type SupplierBalanceRow,
+} from './supplierAccountPayable.repository';
+export { SupplierPaymentRepository } from './supplierPayment.repository';
 export { UserRepository, type SafeUser } from './user.repository';
 
 export interface Repositories {
@@ -57,6 +64,8 @@ export interface Repositories {
   cashMovements: CashMovementRepository;
   accountsReceivable: AccountsReceivableRepository;
   payments: PaymentRepository;
+  supplierAccountsPayable: SupplierAccountPayableRepository;
+  supplierPayments: SupplierPaymentRepository;
   paymentMethods: PaymentMethodRepository;
   /** Tabla `cards` heredada: queda en DB sin uso activo desde P07.2. */
   cards: CardRepository;
@@ -80,6 +89,8 @@ export function createRepositories(db: LocalDatabase): Repositories {
     cashMovements: new CashMovementRepository(db),
     accountsReceivable: new AccountsReceivableRepository(db),
     payments: new PaymentRepository(db),
+    supplierAccountsPayable: new SupplierAccountPayableRepository(db),
+    supplierPayments: new SupplierPaymentRepository(db),
     paymentMethods: new PaymentMethodRepository(db),
     cards: new CardRepository(db),
     company: new CompanyRepository(db),

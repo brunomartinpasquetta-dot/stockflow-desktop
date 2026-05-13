@@ -17,6 +17,7 @@ import type {
   EntityPayload,
   FamilyDTO,
   PaymentMethodDTO,
+  SupplierBalanceDTO,
   SupplierDTO,
   UserDTO,
 } from '@/types/api'
@@ -105,6 +106,11 @@ export function useUserMutations() {
 // --- Cuentas corrientes (saldos por cliente) ---
 export function useCustomerBalances() {
   return useQuery<CustomerBalanceDTO[]>({ queryKey: ['customerBalances'], queryFn: api.accounts.listBalances })
+}
+
+// --- Cuentas corrientes de proveedores ---
+export function useSupplierBalances() {
+  return useQuery<SupplierBalanceDTO[]>({ queryKey: ['supplierBalances'], queryFn: api.supplierAccounts.listBalances })
 }
 
 // --- Caja ---

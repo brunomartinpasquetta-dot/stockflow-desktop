@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { CreatePurchaseLineInputSchema } from './purchaseLine.schema';
+import { PaymentInputSchema } from './paymentMethod.schema';
 import { idSchema, moneySchema, timestampSchema, voucherTypeSchema } from './common';
 
 const purchasePaymentTypeSchema = z.enum(['cash', 'credit']);
@@ -38,11 +39,13 @@ export const CreatePurchaseSchema = z.object({
   notes: z.string().nullish(),
 });
 
-/** Compra + líneas (mínimo 1 línea). */
+/** Compra + líneas (mínimo 1 línea) + pagos (N; sólo si es contado). */
 export const CreatePurchaseWithLinesSchema = CreatePurchaseSchema.extend({
   lines: z
     .array(CreatePurchaseLineInputSchema)
     .min(1, 'La compra debe tener al menos una línea'),
+  /** Pagos de la compra (cuando es contado). Vacío si es a cuenta del proveedor. */
+  payments: z.array(PaymentInputSchema).default([]),
   /** Si se paga en efectivo, caja donde impacta el egreso (opcional). */
   cashRegisterId: idSchema.nullish(),
   /** Usuario que registra la compra (necesario si se genera el movimiento de caja). */

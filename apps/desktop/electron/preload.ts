@@ -77,8 +77,16 @@ const api: ApiSurface = {
   },
   purchases: {
     create: (p) => call('purchases:create', p),
+    void: (p) => call('purchases:void', p),
     get: (p) => call('purchases:get', p),
     listByDateRange: (p) => call('purchases:listByDateRange', p),
+    getNextNumber: (p) => call('purchases:getNextNumber', p),
+  },
+  supplierAccounts: {
+    listBalances: () => call('supplierAccounts:listBalances'),
+    payInvoice: (p) => call('supplierAccounts:payInvoice', p),
+    getStatement: (p) => call('supplierAccounts:getStatement', p),
+    listOpenBySupplier: (p) => call('supplierAccounts:listOpenBySupplier', p),
   },
   cash: {
     open: (p) => call('cash:open', p),

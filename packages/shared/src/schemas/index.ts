@@ -15,3 +15,4 @@ export * from './purchaseLine.schema';
 export * from './purchase.schema';
 export * from './accountsReceivable.schema';
 export * from './payment.schema';
+export * from './supplierAccount.schema';

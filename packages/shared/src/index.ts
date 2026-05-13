@@ -52,4 +52,8 @@ export type {
   NewAccountReceivable,
   Payment,
   NewPayment,
+  SupplierAccountPayable,
+  NewSupplierAccountPayable,
+  SupplierPayment,
+  NewSupplierPayment,
 } from '@stockflow/db';

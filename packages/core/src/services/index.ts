@@ -11,6 +11,7 @@ import { PaymentMethodService } from './paymentMethod.service';
 import { PurchasesService } from './purchases.service';
 import { ReportsService } from './reports.service';
 import { SalesService } from './sales.service';
+import { SupplierAccountsService } from './supplierAccounts.service';
 
 export { AuthService, type LoginResult } from './auth.service';
 export { CompanyService } from './company.service';
@@ -26,6 +27,7 @@ export {
   type CreatePurchaseInput,
   type CreatePurchaseResult,
   type PurchaseLineDraft,
+  type PurchasePaymentDraft,
 } from './purchases.service';
 export {
   CashService,
@@ -50,6 +52,15 @@ export {
   type StatementEntry,
 } from './accountsReceivable.service';
 export {
+  SupplierAccountsService,
+  type PaySupplierInvoiceInput,
+  type PaySupplierInvoiceResult,
+  type SupplierBalance,
+  type SupplierPaymentDraft,
+  type SupplierStatement,
+  type SupplierStatementEntry,
+} from './supplierAccounts.service';
+export {
   ReportsService,
   type FamilyInventoryRow,
   type PurchasesReport,
@@ -66,6 +77,7 @@ export interface Services {
   cash: CashService;
   inventory: InventoryService;
   accountsReceivable: AccountsReceivableService;
+  supplierAccounts: SupplierAccountsService;
   paymentMethods: PaymentMethodService;
   reports: ReportsService;
 }
@@ -80,6 +92,7 @@ export function createServices(ctx: ServiceContext): Services {
     cash: new CashService(ctx),
     inventory: new InventoryService(ctx),
     accountsReceivable: new AccountsReceivableService(ctx),
+    supplierAccounts: new SupplierAccountsService(ctx),
     paymentMethods: new PaymentMethodService(ctx),
     reports: new ReportsService(ctx),
   };

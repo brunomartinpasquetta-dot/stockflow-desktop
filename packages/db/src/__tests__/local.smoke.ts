@@ -31,6 +31,8 @@ const EXPECTED_TABLES = [
   'purchase_lines',
   'accounts_receivable',
   'payments',
+  'supplier_accounts_payable',
+  'supplier_payments',
 ];
 
 let failures = 0;

@@ -121,6 +121,10 @@ async function main(): Promise<void> {
   check('company:upsert priceMode = net', compUp.ok && compUp.data.priceMode === 'net', JSON.stringify(compUp));
   await invoke(handlers, 'company:upsert', { name: 'Mi Empresa', priceMode: 'gross' }); // restaurar
 
+  // supplierAccounts:listBalances (vacío al inicio, pero el canal debe responder ok)
+  const supBal = await invoke<unknown[]>(handlers, 'supplierAccounts:listBalances');
+  check('supplierAccounts:listBalances responde ok (sin deuda inicial)', supBal.ok && Array.isArray(supBal.data) && supBal.data.length === 0, JSON.stringify(supBal));
+
   // cash:open
   const cashOpen = await invoke<{ id: string; status: string }>(handlers, 'cash:open', { openingAmount: '1000.0000' });
   check('cash:open', cashOpen.ok && cashOpen.data.status === 'open', JSON.stringify(cashOpen));

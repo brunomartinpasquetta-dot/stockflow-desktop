@@ -11,6 +11,7 @@
  *  manage_cards      |   ✓   |    ✓    |   ✗
  *  manage_payment_methods | ✓ |   ✓    |   ✗
  *  manage_purchases  |   ✓   |    ✓    |   ✗
+ *  manage_supplier_accounts | ✓ | ✓   |   ✗
  *  void_sale         |   ✓   |    ✓    |   ✗
  *  close_cash        |   ✓   |    ✓    |   ✗(*)
  *  add_cash_movement |   ✓   |    ✓    |   ✗
@@ -37,6 +38,7 @@ export const PERMISSION_ACTIONS = [
   'manage_cards',
   'manage_payment_methods',
   'manage_purchases',
+  'manage_supplier_accounts',
   'void_sale',
   'close_cash',
   'add_cash_movement',
