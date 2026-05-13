@@ -39,7 +39,11 @@ interface EntityTableProps<T extends { id: string }> {
   searchPlaceholder?: string
   searchFields?: (keyof T)[]
   emptyMessage?: string
+  /** Si true, deshabilita los botones de alta/edición/borrado (modo sólo-lectura). */
+  readOnly?: boolean
 }
+
+const READ_ONLY_HINT = 'Suscripción suspendida — sólo lectura'
 
 const PAGE_SIZE = 50
 
@@ -60,6 +64,7 @@ export function EntityTable<T extends { id: string }>({
   searchPlaceholder = 'Buscar…',
   searchFields,
   emptyMessage = 'No hay registros aún',
+  readOnly = false,
 }: EntityTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
@@ -144,7 +149,12 @@ export function EntityTable<T extends { id: string }>({
           />
         </div>
         {onNew && (
-          <Button variant="success" onClick={onNew}>
+          <Button
+            variant="success"
+            onClick={onNew}
+            disabled={readOnly}
+            title={readOnly ? READ_ONLY_HINT : undefined}
+          >
             <Plus className="h-4 w-4" />
             {newLabel}
           </Button>
@@ -197,8 +207,10 @@ export function EntityTable<T extends { id: string }>({
                 return (
                   <TableRow
                     key={row.id}
-                    className={onEdit ? 'cursor-pointer' : undefined}
-                    onDoubleClick={() => onEdit?.(row)}
+                    className={onEdit && !readOnly ? 'cursor-pointer' : undefined}
+                    onDoubleClick={() => {
+                      if (!readOnly) onEdit?.(row)
+                    }}
                   >
                     {columns.map((c) => (
                       <TableCell key={c.key} className={cn(alignClass(c.align), c.className)}>
@@ -209,7 +221,14 @@ export function EntityTable<T extends { id: string }>({
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           {onEdit && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(row)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={readOnly}
+                              title={readOnly ? READ_ONLY_HINT : undefined}
+                              onClick={() => !readOnly && onEdit(row)}
+                            >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           )}
@@ -218,8 +237,9 @@ export function EntityTable<T extends { id: string }>({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                              disabled={!deletable}
-                              onClick={() => deletable && setPendingDelete(row)}
+                              disabled={!deletable || readOnly}
+                              title={readOnly ? READ_ONLY_HINT : undefined}
+                              onClick={() => deletable && !readOnly && setPendingDelete(row)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>

@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useArticles, useFamilies, useFamilyMutations } from '@/lib/hooks'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import type { FamilyDTO } from '@/types/api'
 
 const familySchema = z.object({
@@ -39,6 +40,7 @@ function treeOrder(list: FamilyDTO[]): OrderedNode[] {
 }
 
 export function Familias() {
+  const canWrite = useCanWrite()
   const families = useFamilies()
   const articles = useArticles()
   const m = useFamilyMutations()
@@ -109,6 +111,7 @@ export function Familias() {
     <div className="flex flex-col gap-3">
       <h1 className="text-lg font-semibold">Familias</h1>
       <EntityTable
+        readOnly={!canWrite}
         columns={columns}
         data={ordered.map((o) => o.row)}
         isLoading={families.isLoading}
@@ -128,6 +131,7 @@ export function Familias() {
         deleteTitle={(r) => r.name}
       />
       <EntityFormDialog
+        readOnly={!canWrite}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Editar familia' : 'Nueva familia'}

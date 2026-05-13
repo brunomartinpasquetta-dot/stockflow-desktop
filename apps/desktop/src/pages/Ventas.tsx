@@ -14,6 +14,7 @@ import {
   usePaymentMethods,
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePrintSaleTicket } from '@/lib/usePrint'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
@@ -131,6 +132,7 @@ const FALLBACK_COMPANY: CompanyDTO = {
 
 function PDV() {
   const { currentUser } = useAuth()
+  const canWrite = useCanWrite()
   const articlesQuery = useArticles()
   const customersQuery = useCustomers()
   const balancesQuery = useCustomerBalances()
@@ -286,6 +288,7 @@ function PDV() {
   const noMethods = !accountSale && activeMethods.length === 0
 
   const canConfirm =
+    canWrite &&
     cart.length > 0 &&
     totalNum > 0 &&
     effectiveCustomerId != null &&

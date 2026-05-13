@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { LicenseProvider } from '@/contexts/LicenseContext'
 import { PrintProvider } from '@/contexts/PrintContext'
 import { queryClient } from '@/lib/queryClient'
 import { router } from '@/router'
@@ -18,8 +19,10 @@ createRoot(rootEl).render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
         <PrintProvider>
-          <RouterProvider router={router} />
-          <Toaster position="top-right" richColors closeButton />
+          <LicenseProvider>
+            <RouterProvider router={router} />
+            <Toaster position="top-right" richColors closeButton />
+          </LicenseProvider>
         </PrintProvider>
       </TooltipProvider>
     </QueryClientProvider>

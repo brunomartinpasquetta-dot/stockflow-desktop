@@ -22,6 +22,7 @@ import {
 
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { useLicenseStatus } from '@/contexts/LicenseContext'
 import { ROLE_LABELS, hasPermission, type PermissionAction } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -69,6 +70,7 @@ export function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { currentUser, logout } = useAuth()
+  const licenseStatus = useLicenseStatus()
   const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
   const companyName = companyQuery.data?.name ?? 'StockFlow'
 
@@ -159,6 +161,11 @@ export function Layout() {
 
       {/* Columna principal */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {licenseStatus === 'readOnly' && (
+          <div className="shrink-0 bg-destructive px-4 py-1.5 text-center text-xs font-medium text-destructive-foreground">
+            ⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.
+          </div>
+        )}
         <header className="flex h-12 shrink-0 items-center justify-between border-b bg-background px-4">
           <div className="truncate text-sm font-medium">{companyName}</div>
           <div className="flex items-center gap-3 text-sm">

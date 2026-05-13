@@ -8,6 +8,7 @@ import { useCustomerBalances } from '@/lib/hooks'
 import { usePaymentMethods } from '@/lib/hooks'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { usePermission } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -99,7 +100,8 @@ function CobranzaDialog({
 }
 
 function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: () => void }) {
-  const canCobrar = usePermission('receive_payment')
+  const canWrite = useCanWrite()
+  const canCobrar = usePermission('receive_payment') && canWrite
   const statementQuery = useQuery({
     queryKey: ['accountStatement', customerId],
     queryFn: () => api.accounts.getStatement(customerId),

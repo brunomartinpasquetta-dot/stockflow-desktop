@@ -12,6 +12,7 @@ import {
   useSuppliers,
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
@@ -110,6 +111,7 @@ function SupplierPicker({
 
 export function Compras() {
   const { currentUser } = useAuth()
+  const canWrite = useCanWrite()
   const navigate = useNavigate()
   const articlesQuery = useArticles()
   const suppliersQuery = useSuppliers()
@@ -249,6 +251,7 @@ export function Compras() {
   })
 
   const canConfirm =
+    canWrite &&
     cart.length > 0 &&
     totalNum > 0 &&
     supplierId != null &&

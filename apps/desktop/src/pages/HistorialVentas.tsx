@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useCustomers, usePaymentMethods } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
@@ -155,7 +156,8 @@ function SaleDetailDialog({
 export function HistorialVentas() {
   const { currentUser } = useAuth()
   const isAdmin = currentUser?.role === 'admin'
-  const canVoid = usePermission('void_sale')
+  const canWrite = useCanWrite()
+  const canVoid = usePermission('void_sale') && canWrite
   const customersQuery = useCustomers()
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: api.users.list, enabled: isAdmin })
 

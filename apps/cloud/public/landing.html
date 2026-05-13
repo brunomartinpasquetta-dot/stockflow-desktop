@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StockFlow — Sistema de gestión para tu comercio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <header class="bg-indigo-700 text-white">
+    <div class="max-w-4xl mx-auto px-6 py-16 text-center">
+      <h1 class="text-4xl font-bold mb-3">StockFlow — Sistema de gestión para tu comercio</h1>
+      <p class="text-lg text-indigo-100">Control de stock, ventas, caja y facturación electrónica. Simple, rápido y pensado para Argentina.</p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6 py-12 space-y-12">
+    <!-- Comparativa de planes -->
+    <section>
+      <h2 class="text-2xl font-semibold mb-6 text-center">Planes</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full border border-slate-200 bg-white rounded-lg overflow-hidden">
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="text-left p-4">Característica</th>
+              <th class="p-4">Plan Básico<br /><span class="text-indigo-700 font-bold">$15.000/mes</span></th>
+              <th class="p-4">Plan Pro<br /><span class="text-indigo-700 font-bold">$25.000/mes</span></th>
+            </tr>
+          </thead>
+          <tbody class="text-center">
+            <tr class="border-t border-slate-200"><td class="text-left p-4">Stock, ventas y caja</td><td class="p-4">✓</td><td class="p-4">✓</td></tr>
+            <tr class="border-t border-slate-200"><td class="text-left p-4">Reportes</td><td class="p-4">✓</td><td class="p-4">✓</td></tr>
+            <tr class="border-t border-slate-200"><td class="text-left p-4">Facturación electrónica ARCA</td><td class="p-4 text-slate-400">—</td><td class="p-4">✓</td></tr>
+            <tr class="border-t border-slate-200"><td class="text-left p-4">Soporte prioritario</td><td class="p-4 text-slate-400">—</td><td class="p-4">✓</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-slate-500 mt-2 text-center">El Plan Pro incluye facturación electrónica ARCA.</p>
+    </section>
+
+    <!-- Formulario de alta -->
+    <section class="bg-white border border-slate-200 rounded-lg p-8 max-w-xl mx-auto">
+      <h2 class="text-2xl font-semibold mb-6">Empezá ahora</h2>
+      <form id="subscribe-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1" for="email">Email</label>
+          <input id="email" name="email" type="email" required class="w-full border border-slate-300 rounded-md px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="fullName">Nombre y apellido</label>
+          <input id="fullName" name="fullName" type="text" required class="w-full border border-slate-300 rounded-md px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="phone">Teléfono</label>
+          <input id="phone" name="phone" type="tel" class="w-full border border-slate-300 rounded-md px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="companyName">Nombre del comercio</label>
+          <input id="companyName" name="companyName" type="text" required class="w-full border border-slate-300 rounded-md px-3 py-2" />
+        </div>
+        <fieldset>
+          <legend class="block text-sm font-medium mb-1">Plan</legend>
+          <label class="inline-flex items-center mr-6"><input type="radio" name="plan" value="basic" checked class="mr-2" /> Básico ($15.000/mes)</label>
+          <label class="inline-flex items-center"><input type="radio" name="plan" value="pro" class="mr-2" /> Pro ($25.000/mes)</label>
+        </fieldset>
+        <button type="submit" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-semibold rounded-md py-2.5">Suscribirme</button>
+      </form>
+      <p id="result" class="mt-4 text-sm"></p>
+    </section>
+  </main>
+
+  <footer class="text-center text-sm text-slate-400 py-8">StockFlow © 2026</footer>
+
+  <script>
+    const form = document.getElementById('subscribe-form');
+    const result = document.getElementById('result');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      result.textContent = 'Procesando...';
+      const fd = new FormData(form);
+      const payload = {
+        email: fd.get('email'),
+        fullName: fd.get('fullName'),
+        phone: fd.get('phone'),
+        companyName: fd.get('companyName'),
+        plan: fd.get('plan'),
+      };
+      try {
+        const res = await fetch('/api/billing/subscribe', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          result.textContent = data.error || 'Ocurrió un error. Intentá de nuevo.';
+          return;
+        }
+        if (data.initPoint) {
+          window.location = data.initPoint;
+          return;
+        }
+        result.textContent = `Tu solicitud se registró (id ${data.tenantId}). Te contactamos para completar el pago.`;
+      } catch (err) {
+        result.textContent = 'No se pudo conectar con el servidor.';
+      }
+    });
+  </script>
+</body>
+</html>

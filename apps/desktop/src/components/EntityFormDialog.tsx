@@ -46,6 +46,8 @@ interface EntityFormDialogProps {
   submitLabel?: string
   /** Pistas calculadas en vivo a partir de los valores del formulario, por nombre de campo. */
   liveHints?: (values: Record<string, unknown>) => Partial<Record<string, ReactNode>>
+  /** Si true, deshabilita el botón de guardar (modo sólo-lectura). */
+  readOnly?: boolean
 }
 
 type FormValues = Record<string, unknown>
@@ -61,6 +63,7 @@ export function EntityFormDialog({
   onSubmit,
   submitLabel = 'Guardar',
   liveHints,
+  readOnly = false,
 }: EntityFormDialogProps) {
   const [submitting, setSubmitting] = useState(false)
   const {
@@ -183,7 +186,12 @@ export function EntityFormDialog({
           <Button variant="outline" type="button" onClick={onClose} disabled={submitting}>
             Cancelar
           </Button>
-          <Button type="button" onClick={() => void submit()} disabled={submitting}>
+          <Button
+            type="button"
+            onClick={() => void submit()}
+            disabled={submitting || readOnly}
+            title={readOnly ? 'Suscripción suspendida — sólo lectura' : undefined}
+          >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {submitLabel}
           </Button>

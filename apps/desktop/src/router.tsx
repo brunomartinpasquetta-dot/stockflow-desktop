@@ -1,8 +1,10 @@
 import { Navigate, createHashRouter } from 'react-router-dom'
 
 import { AuthShell } from '@/components/AuthShell'
+import { LicenseGuard } from '@/components/LicenseGuard'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { RoleGuard } from '@/components/RoleGuard'
+import { Activacion } from '@/pages/Activacion'
 import { Login } from '@/pages/Login'
 import { Home } from '@/pages/Home'
 import { Articulos } from '@/pages/Articulos'
@@ -25,30 +27,36 @@ export const router = createHashRouter([
     element: <AuthShell />,
     children: [
       { path: '/login', element: <Login /> },
+      { path: '/activacion', element: <Activacion /> },
       {
-        element: <ProtectedRoute />,
+        element: <LicenseGuard />,
         children: [
-          { index: true, element: <Home /> },
-          { path: '/ventas', element: <Ventas /> },
-          { path: '/ventas/historial', element: <HistorialVentas /> },
-          { path: '/compras', element: <Compras /> },
-          { path: '/compras/historial', element: <HistorialCompras /> },
-          { path: '/caja', element: <Caja /> },
-          { path: '/articulos', element: <Articulos /> },
-          { path: '/proveedores', element: <Proveedores /> },
-          { path: '/clientes', element: <Clientes /> },
-          { path: '/cuentas-corrientes', element: <CuentasCorrientes /> },
-          { path: '/cuentas-corrientes-proveedores', element: <CuentasCorrientesProveedores /> },
-          { path: '/familias', element: <Familias /> },
           {
-            element: <RoleGuard roles={['admin', 'manager']} />,
-            children: [{ path: '/medios-de-pago', element: <MediosDePago /> }],
-          },
-          {
-            element: <RoleGuard roles={['admin']} />,
+            element: <ProtectedRoute />,
             children: [
-              { path: '/usuarios', element: <Usuarios /> },
-              { path: '/empresa', element: <Empresa /> },
+              { index: true, element: <Home /> },
+              { path: '/ventas', element: <Ventas /> },
+              { path: '/ventas/historial', element: <HistorialVentas /> },
+              { path: '/compras', element: <Compras /> },
+              { path: '/compras/historial', element: <HistorialCompras /> },
+              { path: '/caja', element: <Caja /> },
+              { path: '/articulos', element: <Articulos /> },
+              { path: '/proveedores', element: <Proveedores /> },
+              { path: '/clientes', element: <Clientes /> },
+              { path: '/cuentas-corrientes', element: <CuentasCorrientes /> },
+              { path: '/cuentas-corrientes-proveedores', element: <CuentasCorrientesProveedores /> },
+              { path: '/familias', element: <Familias /> },
+              {
+                element: <RoleGuard roles={['admin', 'manager']} />,
+                children: [{ path: '/medios-de-pago', element: <MediosDePago /> }],
+              },
+              {
+                element: <RoleGuard roles={['admin']} />,
+                children: [
+                  { path: '/usuarios', element: <Usuarios /> },
+                  { path: '/empresa', element: <Empresa /> },
+                ],
+              },
             ],
           },
         ],

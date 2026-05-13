@@ -121,6 +121,11 @@ const api: ApiSurface = {
     getDbPath: () => call('system:getDbPath'),
     getInfo: () => call('system:getInfo'),
   },
+  license: {
+    getState: () => call('license:getState'),
+    activate: (p) => call('license:activate', p),
+    heartbeat: () => call('license:heartbeat'),
+  },
 };
 
 contextBridge.exposeInMainWorld('stockflow', api);

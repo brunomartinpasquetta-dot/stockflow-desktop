@@ -5,6 +5,7 @@
 import type { ServiceContext } from '@stockflow/core';
 import type { LocalDatabase, Repositories } from '@stockflow/db';
 
+import type { LicenseManager } from '../license/LicenseManager';
 import { serializeError, unauthenticated } from './errors';
 import type { SessionStore } from './session-store';
 import type { IpcResponse } from './types';
@@ -16,6 +17,7 @@ export interface HandlerDeps {
   machineId: string;
   appVersion: string;
   dbPath: string;
+  licenseManager: LicenseManager;
 }
 
 export type HandlerFn = (payload: unknown) => Promise<IpcResponse<unknown>>;

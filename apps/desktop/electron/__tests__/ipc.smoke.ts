@@ -12,6 +12,7 @@ import { join } from 'node:path';
 
 import { closeLocalDb, createRepositories, initLocalDb } from '@stockflow/db';
 
+import { LicenseManager } from '../license/LicenseManager';
 import { buildAllHandlers } from '../ipc/index';
 import { SessionStore } from '../ipc/session-store';
 import type { HandlerMap } from '../ipc/handler-context';
@@ -47,6 +48,12 @@ async function main(): Promise<void> {
   const { db } = initLocalDb(dbPath);
   const repos = createRepositories(db);
   const sessionStore = new SessionStore();
+  const licenseManager = new LicenseManager({
+    userDataDir: tmpDir,
+    machineId: 'test-machine',
+    apiUrl: 'http://localhost:1',
+    publicKeyPem: '',
+  });
   const handlers = buildAllHandlers({
     db,
     repos,
@@ -54,6 +61,7 @@ async function main(): Promise<void> {
     machineId: 'test-machine',
     appVersion: '0.0.0-test',
     dbPath,
+    licenseManager,
   });
   check('buildAllHandlers registra >= 40 canales', Object.keys(handlers).length >= 40, `${Object.keys(handlers).length} canales`);
 

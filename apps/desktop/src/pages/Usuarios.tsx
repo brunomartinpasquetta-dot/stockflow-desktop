@@ -7,6 +7,7 @@ import { ROLE_LABELS } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { Badge } from '@/components/ui/badge'
 import type { UserDTO } from '@/types/api'
 
@@ -29,6 +30,7 @@ const editUserSchema = z.object({
 })
 
 export function Usuarios() {
+  const canWrite = useCanWrite()
   const users = useUsers()
   const m = useUserMutations()
   const [formOpen, setFormOpen] = useState(false)
@@ -129,6 +131,7 @@ export function Usuarios() {
     <div className="flex flex-col gap-3">
       <h1 className="text-lg font-semibold">Usuarios</h1>
       <EntityTable
+        readOnly={!canWrite}
         columns={columns}
         data={users.data}
         isLoading={users.isLoading}
@@ -149,6 +152,7 @@ export function Usuarios() {
         deleteTitle={(u) => u.username}
       />
       <EntityFormDialog
+        readOnly={!canWrite}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Editar usuario' : 'Nuevo usuario'}

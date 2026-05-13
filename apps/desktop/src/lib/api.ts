@@ -20,6 +20,7 @@ import type {
   FamilyDTO,
   IpcErrorCode,
   IpcResponse,
+  LicenseStateDTO,
   LoginResultDTO,
   LowStockEntryDTO,
   PaySupplierInvoiceInputDTO,
@@ -189,5 +190,10 @@ export const api = {
     getInfo: (): Promise<SystemInfoDTO> => unwrap(sf().system.getInfo()),
     getVersion: (): Promise<{ version: string }> => unwrap(sf().system.getVersion()),
     getDbPath: (): Promise<{ dbPath: string }> => unwrap(sf().system.getDbPath()),
+  },
+  license: {
+    getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),
+    activate: (key: string): Promise<LicenseStateDTO> => unwrap(sf().license.activate({ licenseKey: key })),
+    heartbeat: (): Promise<LicenseStateDTO> => unwrap(sf().license.heartbeat()),
   },
 }

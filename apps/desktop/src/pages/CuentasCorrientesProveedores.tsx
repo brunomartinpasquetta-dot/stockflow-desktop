@@ -8,6 +8,7 @@ import { useSupplierBalances } from '@/lib/hooks'
 import { usePaymentMethods } from '@/lib/hooks'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { usePermission } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -99,7 +100,8 @@ function PagoDialog({
 }
 
 function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: () => void }) {
-  const canPagar = usePermission('manage_supplier_accounts')
+  const canWrite = useCanWrite()
+  const canPagar = usePermission('manage_supplier_accounts') && canWrite
   const statementQuery = useQuery({
     queryKey: ['supplierStatement', supplierId],
     queryFn: () => api.supplierAccounts.getStatement(supplierId),

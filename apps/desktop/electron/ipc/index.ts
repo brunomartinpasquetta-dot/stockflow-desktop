@@ -15,6 +15,7 @@ import { buildCompanyHandlers } from './handlers/company.handlers';
 import { buildCustomersHandlers } from './handlers/customers.handlers';
 import { buildFamiliesHandlers } from './handlers/families.handlers';
 import { buildInventoryHandlers } from './handlers/inventory.handlers';
+import { buildLicenseHandlers } from './handlers/license.handlers';
 import { buildPaymentMethodsHandlers } from './handlers/paymentMethods.handlers';
 import { buildPurchasesHandlers } from './handlers/purchases.handlers';
 import { buildReportsHandlers } from './handlers/reports.handlers';
@@ -42,6 +43,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildAccountsHandlers,
   buildReportsHandlers,
   buildSystemHandlers,
+  buildLicenseHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {

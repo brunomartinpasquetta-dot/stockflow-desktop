@@ -7,6 +7,7 @@ import { formatCurrency, formatNumber, parseCurrencyInput } from '@/lib/format'
 import { vatBreakdown } from '@/lib/pricing'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { Badge } from '@/components/ui/badge'
 import type { ArticleDTO, PriceMode } from '@/types/api'
 
@@ -52,6 +53,7 @@ function priceHint(raw: unknown, rateRaw: unknown, mode: PriceMode): string | nu
 }
 
 export function Articulos() {
+  const canWrite = useCanWrite()
   const articles = useArticles()
   const families = useFamilies()
   const suppliers = useSuppliers()
@@ -162,6 +164,7 @@ export function Articulos() {
         </Badge>
       </div>
       <EntityTable
+        readOnly={!canWrite}
         columns={columns}
         data={articles.data}
         isLoading={articles.isLoading}
@@ -181,6 +184,7 @@ export function Articulos() {
         deleteTitle={(r) => r.description}
       />
       <EntityFormDialog
+        readOnly={!canWrite}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Editar artículo' : 'Nuevo artículo'}

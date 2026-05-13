@@ -606,6 +606,22 @@ export interface SystemInfoDTO {
   platform: string;
 }
 
+/* ----------------------------------------------------------------------- */
+/* Licencias                                                                */
+/* ----------------------------------------------------------------------- */
+
+export type LicensePlanDTO = 'basic' | 'pro';
+export type LicenseStatusDTO = 'unlicensed' | 'active' | 'readOnly' | 'revoked';
+
+export interface LicenseStateDTO {
+  status: LicenseStatusDTO;
+  plan: LicensePlanDTO | null;
+  expiresAt: number | null;
+  licenseKey: string | null;
+  tenantName: string | null;
+  lastError: string | null;
+}
+
 /** Payload genérico para create/update de entidades simples (validado server-side por Zod). */
 export type EntityPayload = Record<string, unknown>;
 export interface IdPayload {
@@ -734,5 +750,10 @@ export interface ApiSurface {
     getVersion(): Res<{ version: string }>;
     getDbPath(): Res<{ dbPath: string }>;
     getInfo(): Res<SystemInfoDTO>;
+  };
+  license: {
+    getState(): Res<LicenseStateDTO>;
+    activate(payload: { licenseKey: string }): Res<LicenseStateDTO>;
+    heartbeat(): Res<LicenseStateDTO>;
   };
 }

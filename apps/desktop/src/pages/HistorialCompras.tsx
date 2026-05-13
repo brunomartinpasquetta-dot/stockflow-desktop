@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useSuppliers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
@@ -149,7 +150,8 @@ function PurchaseDetailDialog({
 }
 
 export function HistorialCompras() {
-  const canVoid = usePermission('manage_purchases')
+  const canWrite = useCanWrite()
+  const canVoid = usePermission('manage_purchases') && canWrite
   const suppliersQuery = useSuppliers()
 
   const [fromIso, setFromIso] = useState(() => todayIso())

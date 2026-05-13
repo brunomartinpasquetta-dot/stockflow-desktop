@@ -6,6 +6,7 @@ import { useSupplierMutations, useSuppliers } from '@/lib/hooks'
 import { validateCUIT } from '@/lib/cuit'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import type { SupplierDTO } from '@/types/api'
 
 const supplierSchema = z.object({
@@ -20,6 +21,7 @@ const supplierSchema = z.object({
 })
 
 export function Proveedores() {
+  const canWrite = useCanWrite()
   const suppliers = useSuppliers()
   const m = useSupplierMutations()
   const [formOpen, setFormOpen] = useState(false)
@@ -77,6 +79,7 @@ export function Proveedores() {
     <div className="flex flex-col gap-3">
       <h1 className="text-lg font-semibold">Proveedores</h1>
       <EntityTable
+        readOnly={!canWrite}
         columns={columns}
         data={suppliers.data}
         isLoading={suppliers.isLoading}
@@ -98,6 +101,7 @@ export function Proveedores() {
         deleteTitle={(r) => r.name}
       />
       <EntityFormDialog
+        readOnly={!canWrite}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Editar proveedor' : 'Nuevo proveedor'}

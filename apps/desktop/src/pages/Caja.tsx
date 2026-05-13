@@ -6,6 +6,7 @@ import { Loader2, Plus, Wallet } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useCashMutations, useCashReport, useCurrentCash, usePaymentMethods } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePrintCashClose } from '@/lib/usePrint'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -50,6 +51,7 @@ function SummaryCard({ label, value, accent }: { label: string; value: string; a
 // ── Estado A: caja cerrada ────────────────────────────────────────────────
 function CajaCerrada() {
   const { open } = useCashMutations()
+  const canWrite = useCanWrite()
   const [amount, setAmount] = useState('0')
 
   async function abrir(): Promise<void> {
@@ -88,7 +90,13 @@ function CajaCerrada() {
               }}
             />
           </div>
-          <Button variant="success" className="w-full" onClick={() => void abrir()} disabled={open.isPending}>
+          <Button
+            variant="success"
+            className="w-full"
+            onClick={() => void abrir()}
+            disabled={open.isPending || !canWrite}
+            title={canWrite ? undefined : 'Suscripción suspendida — sólo lectura'}
+          >
             {open.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Abrir caja
           </Button>
@@ -102,7 +110,8 @@ function CajaCerrada() {
 function CajaAbierta({ registerId }: { registerId: string }) {
   const report = useCashReport(registerId)
   const { close, addMovement } = useCashMutations()
-  const canMove = usePermission('add_cash_movement')
+  const canWrite = useCanWrite()
+  const canMove = usePermission('add_cash_movement') && canWrite
   const { currentUser } = useAuth()
   const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
   const paymentMethodsQuery = usePaymentMethods()
@@ -204,7 +213,12 @@ function CajaAbierta({ registerId }: { registerId: string }) {
             {r ? `Caja #${r.register.number} abierta desde ${formatDateTime(r.register.openDate)}` : 'Cargando…'}
           </p>
         </div>
-        <Button variant="destructive" onClick={() => setCloseOpen(true)}>
+        <Button
+          variant="destructive"
+          onClick={() => setCloseOpen(true)}
+          disabled={!canWrite}
+          title={canWrite ? undefined : 'Suscripción suspendida — sólo lectura'}
+        >
           Cerrar caja
         </Button>
       </div>
@@ -374,7 +388,7 @@ function CajaAbierta({ registerId }: { registerId: string }) {
             <Button variant="outline" onClick={() => setMovOpen(false)} disabled={addMovement.isPending}>
               Cancelar
             </Button>
-            <Button onClick={() => void guardarMovimiento()} disabled={addMovement.isPending}>
+            <Button onClick={() => void guardarMovimiento()} disabled={addMovement.isPending || !canWrite}>
               {addMovement.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Guardar
             </Button>
@@ -435,7 +449,7 @@ function CajaAbierta({ registerId }: { registerId: string }) {
             <Button variant="outline" onClick={() => setCloseOpen(false)} disabled={close.isPending}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={() => void confirmarCierre()} disabled={close.isPending || !closeAmount}>
+            <Button variant="destructive" onClick={() => void confirmarCierre()} disabled={close.isPending || !closeAmount || !canWrite}>
               {close.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Confirmar cierre
             </Button>

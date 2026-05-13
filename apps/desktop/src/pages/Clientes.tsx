@@ -7,6 +7,7 @@ import { validateCUIT } from '@/lib/cuit'
 import { formatCurrency } from '@/lib/format'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { Badge } from '@/components/ui/badge'
 import type { CustomerDTO } from '@/types/api'
 
@@ -63,6 +64,7 @@ const customerSchema = z
   })
 
 export function Clientes() {
+  const canWrite = useCanWrite()
   const customers = useCustomers()
   const balances = useCustomerBalances()
   const m = useCustomerMutations()
@@ -165,6 +167,7 @@ export function Clientes() {
     <div className="flex flex-col gap-3">
       <h1 className="text-lg font-semibold">Clientes</h1>
       <EntityTable
+        readOnly={!canWrite}
         columns={columns}
         data={customers.data}
         isLoading={customers.isLoading}
@@ -187,6 +190,7 @@ export function Clientes() {
         deleteTitle={(r) => `${r.lastName}${r.firstName ? `, ${r.firstName}` : ''}`}
       />
       <EntityFormDialog
+        readOnly={!canWrite}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Editar cliente' : 'Nuevo cliente'}

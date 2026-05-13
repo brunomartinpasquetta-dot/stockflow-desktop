@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "type-check": "tsc -b && tsc -p tsconfig.electron.json --noEmit",
     "test:ipc": "tsx electron/__tests__/ipc.smoke.ts",
+    "test:license": "tsx electron/__tests__/license.smoke.ts",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -12,7 +12,8 @@
  *
  * Flujo de datos: input crudo → schema Zod (@stockflow/shared) → Repository → DB.
  *
- * Cloud (Postgres): schema/cloud todavía es placeholder; se completa más adelante.
+ * Cloud (Postgres): schema/cloud (tenants, licenses, billingEvents, adminUsers) +
+ * cloud/client (createCloudDb sobre postgres-js).
  */
 export * from './schema/local';
 export * from './local/client';
@@ -21,5 +22,6 @@ export * from './init';
 export * from './errors';
 export * from './repositories';
 
-// Schema cloud (placeholder por ahora).
-export * as cloudSchema from './schema/cloud';
+// Cloud (Postgres).
+export * from './schema/cloud';
+export * from './cloud/client';

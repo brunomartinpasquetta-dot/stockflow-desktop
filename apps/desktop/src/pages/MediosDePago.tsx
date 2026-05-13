@@ -8,6 +8,7 @@ import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
+import { useCanWrite } from '@/contexts/LicenseContext'
 import { Badge } from '@/components/ui/badge'
 import type { PaymentMethodDTO } from '@/types/api'
 
@@ -47,6 +48,7 @@ const pmSchema = z
   })
 
 export function MediosDePago() {
+  const canWrite = useCanWrite()
   const methods = usePaymentMethods()
   const m = usePaymentMethodMutations()
   const [formOpen, setFormOpen] = useState(false)
@@ -133,6 +135,7 @@ export function MediosDePago() {
     <div className="flex flex-col gap-3">
       <h1 className="text-lg font-semibold">Medios de pago</h1>
       <EntityTable
+        readOnly={!canWrite}
         columns={columns}
         data={methods.data}
         isLoading={methods.isLoading}
@@ -165,6 +168,7 @@ export function MediosDePago() {
         deleteTitle={(r) => r.name}
       />
       <EntityFormDialog
+        readOnly={!canWrite}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Editar medio de pago' : 'Nuevo medio de pago'}
