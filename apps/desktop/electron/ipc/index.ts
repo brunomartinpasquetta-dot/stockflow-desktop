@@ -10,7 +10,10 @@ import type { IpcMain } from 'electron';
 import { buildAccountsHandlers } from './handlers/accounts.handlers';
 import { buildArticlesHandlers } from './handlers/articles.handlers';
 import { buildAuthHandlers } from './handlers/auth.handlers';
+import { buildBackupHandlers } from './handlers/backup.handlers';
 import { buildCashHandlers } from './handlers/cash.handlers';
+import { buildHardwareHandlers } from './handlers/hardware.handlers';
+import { buildImportHandlers } from './handlers/import.handlers';
 import { buildCompanyHandlers } from './handlers/company.handlers';
 import { buildCustomersHandlers } from './handlers/customers.handlers';
 import { buildFamiliesHandlers } from './handlers/families.handlers';
@@ -44,6 +47,9 @@ const BUILDERS: HandlerBuilder[] = [
   buildReportsHandlers,
   buildSystemHandlers,
   buildLicenseHandlers,
+  buildHardwareHandlers,
+  buildBackupHandlers,
+  buildImportHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {

@@ -2,9 +2,12 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { BackupService } from './backup/BackupService';
 import { getDatabasePath, initialize, shutdown, type DbHandle } from './bootstrap/db';
 import { getMachineId } from './bootstrap/machine';
 import { applySessionSecret } from './bootstrap/session';
+import { HardwareManager } from './hardware/HardwareManager';
+import { ExcelImportService } from './import/ExcelImportService';
 import { registerIpcHandlers } from './ipc';
 import { SessionStore } from './ipc/session-store';
 import { LicenseManager } from './license/LicenseManager';
@@ -22,6 +25,9 @@ let mainWindow: BrowserWindow | null = null;
 let dbHandle: DbHandle | null = null;
 let licenseManager: LicenseManager | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
+let hardwareManager: HardwareManager | null = null;
+let backupService: BackupService | null = null;
+let quittingForBackup = false;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -62,6 +68,13 @@ function bootstrap(): void {
     apiUrl: process.env.CLOUD_API_URL ?? 'http://localhost:3009',
     publicKeyPem: process.env.CLOUD_JWT_PUBLIC_KEY ?? '',
   });
+  hardwareManager = new HardwareManager({ userDataDir: app.getPath('userData') });
+  backupService = new BackupService({
+    dbPath,
+    backupDir: hardwareManager.getConfig().backup.destination,
+    appVersion: app.getVersion(),
+  });
+  const importService = new ExcelImportService();
   const channels = registerIpcHandlers(ipcMain, {
     db: dbHandle.db,
     repos: dbHandle.repos,
@@ -70,6 +83,12 @@ function bootstrap(): void {
     appVersion: app.getVersion(),
     dbPath,
     licenseManager,
+    hardware: hardwareManager,
+    backup: backupService,
+    importService,
+    emit: (channel, payload) => {
+      mainWindow?.webContents.send(channel, payload);
+    },
   });
   console.info(`[main] StockFlow listo — DB: ${dbPath} — ${channels.length} canales IPC registrados`);
 }
@@ -98,6 +117,9 @@ if (!app.requestSingleInstanceLock()) {
     .then(() => {
       bootstrap();
       createWindow();
+      hardwareManager?.setEmitter((channel, payload) => {
+        mainWindow?.webContents.send(channel, payload);
+      });
       mainWindow?.once('ready-to-show', () => startLicenseHeartbeat());
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -116,8 +138,24 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
 
-  app.on('before-quit', () => {
+  app.on('before-quit', (event) => {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (
+      !quittingForBackup &&
+      hardwareManager?.getConfig().backup.autoOnAppQuit &&
+      backupService
+    ) {
+      event.preventDefault();
+      quittingForBackup = true;
+      void backupService
+        .createBackup()
+        .catch((err) => console.error('[main] backup pre-quit falló:', err))
+        .finally(() => {
+          shutdown(dbHandle);
+          app.exit(0);
+        });
+      return;
+    }
     shutdown(dbHandle);
   });
 }

@@ -116,6 +116,7 @@ const api: ApiSurface = {
     cashRegisterReport: (p) => call('reports:cashRegisterReport', p),
   },
   system: {
+    pickFile: (p) => call('system:pickFile', p),
     getMachineId: () => call('system:getMachineId'),
     getVersion: () => call('system:getVersion'),
     getDbPath: () => call('system:getDbPath'),
@@ -125,6 +126,47 @@ const api: ApiSurface = {
     getState: () => call('license:getState'),
     activate: (p) => call('license:activate', p),
     heartbeat: () => call('license:heartbeat'),
+  },
+  hardware: {
+    listUsbDevices: () => call('hardware:printer:list-usb'),
+    listSerialPorts: () => call('hardware:printer:list-serial'),
+    printer: {
+      getConfig: () => call('hardware:printer:get-config'),
+      setConfig: (p) => call('hardware:printer:set-config', p),
+      test: () => call('hardware:printer:test'),
+      printSaleTicket: (p) => call('hardware:printer:print-sale-ticket', p),
+      printCashClose: (p) => call('hardware:printer:print-cash-close', p),
+    },
+    cashDrawer: {
+      open: () => call('hardware:cash-drawer:open'),
+    },
+    scale: {
+      getConfig: () => call('hardware:scale:get-config'),
+      setConfig: (p) => call('hardware:scale:set-config', p),
+      read: () => call('hardware:scale:read'),
+    },
+    onScaleWeight: (cb) => {
+      const listener = (_event: unknown, payload: unknown): void => cb(payload as never);
+      ipcRenderer.on('hardware:scale:weight', listener);
+      return () => ipcRenderer.removeListener('hardware:scale:weight', listener);
+    },
+  },
+  backup: {
+    create: () => call('backup:create'),
+    list: () => call('backup:list'),
+    restore: (p) => call('backup:restore', p),
+    getConfig: () => call('backup:get-config'),
+    setConfig: (p) => call('backup:set-config', p),
+  },
+  import: {
+    parseFile: (p) => call('import:parse-file', p),
+    validate: (p) => call('import:validate', p),
+    execute: (p) => call('import:execute', p),
+    onProgress: (cb) => {
+      const listener = (_event: unknown, payload: unknown): void => cb(payload as never);
+      ipcRenderer.on('import:progress', listener);
+      return () => ipcRenderer.removeListener('import:progress', listener);
+    },
   },
 };
 

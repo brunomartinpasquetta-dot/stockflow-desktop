@@ -12,6 +12,9 @@ import { join } from 'node:path';
 
 import { closeLocalDb, createRepositories, initLocalDb } from '@stockflow/db';
 
+import { BackupService } from '../backup/BackupService';
+import { HardwareManager } from '../hardware/HardwareManager';
+import { ExcelImportService } from '../import/ExcelImportService';
 import { LicenseManager } from '../license/LicenseManager';
 import { buildAllHandlers } from '../ipc/index';
 import { SessionStore } from '../ipc/session-store';
@@ -54,6 +57,9 @@ async function main(): Promise<void> {
     apiUrl: 'http://localhost:1',
     publicKeyPem: '',
   });
+  const hardware = new HardwareManager({ userDataDir: tmpDir });
+  const backup = new BackupService({ dbPath, backupDir: tmpDir, appVersion: '0.0.0-test' });
+  const importService = new ExcelImportService();
   const handlers = buildAllHandlers({
     db,
     repos,
@@ -62,6 +68,10 @@ async function main(): Promise<void> {
     appVersion: '0.0.0-test',
     dbPath,
     licenseManager,
+    hardware,
+    backup,
+    importService,
+    emit: () => { /* noop */ },
   });
   check('buildAllHandlers registra >= 40 canales', Object.keys(handlers).length >= 40, `${Object.keys(handlers).length} canales`);
 

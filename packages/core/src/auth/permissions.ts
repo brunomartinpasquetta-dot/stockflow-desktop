@@ -21,6 +21,9 @@
  *  view_articles     |   ✓   |    ✓    |   ✓
  *  open_cash         |   ✓   |    ✓    |   ✓
  *  receive_payment   |   ✓   |    ✓    |   ✓
+ *  manage_hardware   |   ✓   |    ✗    |   ✗
+ *  manage_backup     |   ✓   |    ✗    |   ✗
+ *  import_data       |   ✓   |    ✗    |   ✗
  *
  *  (*) un seller puede cerrar SU PROPIA caja aunque no tenga `close_cash`
  *      (la excepción la maneja CashService.closeCashRegister, no esta matriz).
@@ -48,6 +51,9 @@ export const PERMISSION_ACTIONS = [
   'view_articles',
   'open_cash',
   'receive_payment',
+  'manage_hardware',
+  'manage_backup',
+  'import_data',
 ] as const;
 
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
@@ -65,6 +71,9 @@ const MANAGER_DENIED: ReadonlySet<PermissionAction> = new Set([
   'manage_users',
   'manage_company',
   'adjust_stock',
+  'manage_hardware',
+  'manage_backup',
+  'import_data',
 ]);
 
 export const PERMISSION_MATRIX: Readonly<Record<UserRole, ReadonlySet<PermissionAction>>> = {

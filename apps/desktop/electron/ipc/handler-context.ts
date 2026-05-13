@@ -5,6 +5,9 @@
 import type { ServiceContext } from '@stockflow/core';
 import type { LocalDatabase, Repositories } from '@stockflow/db';
 
+import type { BackupService } from '../backup/BackupService';
+import type { HardwareManager } from '../hardware/HardwareManager';
+import type { ExcelImportService } from '../import/ExcelImportService';
 import type { LicenseManager } from '../license/LicenseManager';
 import { serializeError, unauthenticated } from './errors';
 import type { SessionStore } from './session-store';
@@ -18,6 +21,10 @@ export interface HandlerDeps {
   appVersion: string;
   dbPath: string;
   licenseManager: LicenseManager;
+  hardware: HardwareManager;
+  backup: BackupService;
+  importService: ExcelImportService;
+  emit: (channel: string, payload: unknown) => void;
 }
 
 export type HandlerFn = (payload: unknown) => Promise<IpcResponse<unknown>>;

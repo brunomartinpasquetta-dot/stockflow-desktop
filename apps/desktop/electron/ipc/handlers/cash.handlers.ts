@@ -27,6 +27,14 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
         if (deps.sessionStore.getCurrentCashRegister()?.id === payload.registerId) {
           deps.sessionStore.setCurrentCashRegister(null);
         }
+        // Backup post-cierre si está habilitado (no esperar, fire-and-forget).
+        if (deps.hardware.getConfig().backup.autoOnCashClose) {
+          const dest = deps.hardware.getConfig().backup.destination;
+          deps.backup.setBackupDir(dest);
+          void deps.backup.createBackup().catch((err) => {
+            console.error('[cash:close] backup automático falló:', err);
+          });
+        }
         return result;
       },
     ),

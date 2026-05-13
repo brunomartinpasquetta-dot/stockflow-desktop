@@ -5,6 +5,8 @@ import { LicenseGuard } from '@/components/LicenseGuard'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { RoleGuard } from '@/components/RoleGuard'
 import { Activacion } from '@/pages/Activacion'
+import { Configuracion } from '@/pages/Configuracion'
+import { ImportarStock } from '@/pages/ImportarStock'
 import { Login } from '@/pages/Login'
 import { Home } from '@/pages/Home'
 import { Articulos } from '@/pages/Articulos'
@@ -55,6 +57,8 @@ export const router = createHashRouter([
                 children: [
                   { path: '/usuarios', element: <Usuarios /> },
                   { path: '/empresa', element: <Empresa /> },
+                  { path: '/configuracion', element: <Configuracion /> },
+                  { path: '/importar-stock', element: <ImportarStock /> },
                 ],
               },
             ],

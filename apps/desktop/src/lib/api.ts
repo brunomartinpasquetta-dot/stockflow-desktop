@@ -5,6 +5,19 @@
 import type {
   AccountReceivableDTO,
   ArticleDTO,
+  BackupConfigDTO,
+  BackupEntryDTO,
+  CashCloseReportDataDTO,
+  ImportExecuteResultDTO,
+  ImportMappingDTO,
+  ImportOptionsDTO,
+  ImportValidationResultDTO,
+  PrinterConfigDTO,
+  SaleTicketDataDTO,
+  ScaleConfigDTO,
+  SerialPortInfoDTO,
+  UsbDeviceInfoDTO,
+  WeightReadingDTO,
   CashMovementDTO,
   CashRegisterDTO,
   CashReportDTO,
@@ -187,6 +200,8 @@ export const api = {
     listOpenByCustomer: (customerId: string): Promise<AccountReceivableDTO[]> => unwrap(sf().accounts.listOpenByCustomer({ customerId })),
   },
   system: {
+    pickFile: (filters?: { name: string; extensions: string[] }[]): Promise<{ filePath: string | null }> =>
+      unwrap(sf().system.pickFile({ filters })),
     getInfo: (): Promise<SystemInfoDTO> => unwrap(sf().system.getInfo()),
     getVersion: (): Promise<{ version: string }> => unwrap(sf().system.getVersion()),
     getDbPath: (): Promise<{ dbPath: string }> => unwrap(sf().system.getDbPath()),
@@ -195,5 +210,41 @@ export const api = {
     getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),
     activate: (key: string): Promise<LicenseStateDTO> => unwrap(sf().license.activate({ licenseKey: key })),
     heartbeat: (): Promise<LicenseStateDTO> => unwrap(sf().license.heartbeat()),
+  },
+  hardware: {
+    listUsbDevices: (): Promise<UsbDeviceInfoDTO[]> => unwrap(sf().hardware.listUsbDevices()),
+    listSerialPorts: (): Promise<SerialPortInfoDTO[]> => unwrap(sf().hardware.listSerialPorts()),
+    printer: {
+      getConfig: (): Promise<PrinterConfigDTO | null> => unwrap(sf().hardware.printer.getConfig()),
+      setConfig: (cfg: PrinterConfigDTO | null): Promise<{ ok: true }> => unwrap(sf().hardware.printer.setConfig(cfg)),
+      test: (): Promise<{ ok: true }> => unwrap(sf().hardware.printer.test()),
+      printSaleTicket: (data: SaleTicketDataDTO): Promise<{ ok: true }> => unwrap(sf().hardware.printer.printSaleTicket(data)),
+      printCashClose: (data: CashCloseReportDataDTO): Promise<{ ok: true }> => unwrap(sf().hardware.printer.printCashClose(data)),
+    },
+    cashDrawer: {
+      open: (): Promise<{ ok: true }> => unwrap(sf().hardware.cashDrawer.open()),
+    },
+    scale: {
+      getConfig: (): Promise<ScaleConfigDTO | null> => unwrap(sf().hardware.scale.getConfig()),
+      setConfig: (cfg: ScaleConfigDTO | null): Promise<{ ok: true }> => unwrap(sf().hardware.scale.setConfig(cfg)),
+      read: (): Promise<WeightReadingDTO> => unwrap(sf().hardware.scale.read()),
+    },
+    onScaleWeight: (cb: (reading: WeightReadingDTO) => void): (() => void) => sf().hardware.onScaleWeight(cb),
+  },
+  backup: {
+    create: (): Promise<BackupEntryDTO> => unwrap(sf().backup.create()),
+    list: (): Promise<BackupEntryDTO[]> => unwrap(sf().backup.list()),
+    restore: (zipPath: string): Promise<{ requiresRestart: true }> => unwrap(sf().backup.restore({ zipPath })),
+    getConfig: (): Promise<BackupConfigDTO> => unwrap(sf().backup.getConfig()),
+    setConfig: (cfg: BackupConfigDTO): Promise<{ ok: true }> => unwrap(sf().backup.setConfig(cfg)),
+  },
+  import: {
+    parseFile: (filePath: string): Promise<{ sheets: string[]; preview: Array<Record<string, unknown>>; headers: string[]; totalRows: number }> =>
+      unwrap(sf().import.parseFile({ filePath })),
+    validate: (filePath: string, mapping: ImportMappingDTO): Promise<ImportValidationResultDTO> =>
+      unwrap(sf().import.validate({ filePath, mapping })),
+    execute: (filePath: string, mapping: ImportMappingDTO, options: ImportOptionsDTO): Promise<ImportExecuteResultDTO> =>
+      unwrap(sf().import.execute({ filePath, mapping, options })),
+    onProgress: (cb: (p: { done: number; total: number }) => void): (() => void) => sf().import.onProgress(cb),
   },
 }

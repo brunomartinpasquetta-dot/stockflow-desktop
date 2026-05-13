@@ -134,3 +134,80 @@ Reglas al importar paquetes external en `electron/`:
 `system:` getMachineId, getVersion, getDbPath, getInfo
 
 Todos devuelven `{ ok: true, data } | { ok: false, code, message, field?/constraint?/action?/rule? }`.
+
+## Hardware (P10)
+
+StockFlow soporta impresora térmica ESC/POS, cajón monedero y balanza serial.
+Se configura en **Configuración → Hardware** (sólo administradores).
+
+### Impresoras testeadas
+
+| Modelo | Conexión | Ancho |
+| --- | --- | --- |
+| Epson TM-T20III | USB o Red | 80 mm |
+| 3nStar RPT008 | USB | 80 mm |
+| Bematech MP-4200 TH | USB | 80 mm |
+
+- **USB**: en *Probar impresión* primero usá *Refrescar* para listar dispositivos
+  y leer vendorId/productId. Ingresá la interfaz como `vendorId:productId`
+  (ej. `04b8:0202`). En macOS/Linux puede requerir permisos sobre el device
+  (`sudo` o `udev rules`).
+- **Red**: ingresá `ip:port` (típicamente `9100`, ej. `192.168.1.50:9100`).
+- **Archivo**: ruta absoluta a un archivo; útil para debug/QA.
+
+El cajón monedero usa el comando ESC/POS *Generate pulse* (`ESC p`) enviado a la
+impresora; se abre al cobrar en efectivo si el flag *Abrir cajón automáticamente*
+está activado.
+
+### Balanzas testeadas
+
+| Modelo | Protocolo | Baud por defecto |
+| --- | --- | --- |
+| Kretz Aura | `kretz` | 9600 8N1 |
+| Systel Croma | `systel` | 9600 8N1 |
+| Magris Eclipse | `magris` | 9600 8N1 |
+| Otras | `generic` | configurable |
+
+Modos:
+
+- **A pedido** (`request`): la app envía el comando del protocolo y espera una
+  respuesta (timeout 2 s). Recomendado para balanzas que no emiten en continuo.
+- **Continuo**: la balanza emite siempre y el main process re-emite vía
+  `hardware:scale:weight` al renderer.
+
+### Troubleshooting
+
+- **Linux/USB**: `ENOSYS` o `LIBUSB_ERROR_ACCESS` → agregar regla udev para el
+  vendorId de la impresora o correr Electron con `sudo` (no recomendado en prod).
+- **Windows**: instalar driver oficial del fabricante; muchas impresoras quedan
+  como "puerto genérico USB" hasta que se instala. Para red, deshabilitar firewall
+  para el puerto 9100.
+- **Puerto serial ocupado**: cerrar otras apps que estén leyendo la balanza
+  (la app del fabricante, terminales, etc.).
+- **Encoding**: si se ven caracteres raros en ñ/á/é, verificá que la impresora
+  soporte la página de códigos PC858 (Euro/Multilingual Latin 1). La mayoría sí.
+
+## Backup automático
+
+Se configura en **Configuración → Backup**. Por defecto crea un backup:
+
+- al cerrar caja (si el flag está activo),
+- al cerrar la aplicación (idem),
+- manual desde la página de configuración.
+
+Los archivos son `.zip` con `database/stockflow.db` + `metadata.json`. La
+retención es 7 diarios + 4 semanales + 12 mensuales (`cleanupOldBackups()`).
+Recomendamos apuntar la carpeta de destino a Dropbox/Google Drive/OneDrive para
+respaldo remoto automático.
+
+## Importación masiva de stock
+
+**Configuración → Importar stock** (admin). Wizard de 4 pasos:
+
+1. **Subir**: `.xlsx`, `.xls` o `.csv` (la primera hoja).
+2. **Mapear**: asocia columnas del archivo a campos del sistema. Auto-detecta
+   por nombre (`código`, `descripción`, etc.).
+3. **Validar**: detecta barcode vacío/duplicado, descripción vacía, precio/stock
+   no numérico, alícuota IVA inválida.
+4. **Importar**: crea artículos en lotes de 100, opcionalmente creando familias
+   y proveedores faltantes.

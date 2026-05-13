@@ -746,6 +746,7 @@ export interface ApiSurface {
     cashRegisterReport(payload: { registerId: string }): Res<CashReportDTO>;
   };
   system: {
+    pickFile(payload?: { filters?: { name: string; extensions: string[] }[] }): Res<{ filePath: string | null }>;
     getMachineId(): Res<{ machineId: string }>;
     getVersion(): Res<{ version: string }>;
     getDbPath(): Res<{ dbPath: string }>;
@@ -756,4 +757,192 @@ export interface ApiSurface {
     activate(payload: { licenseKey: string }): Res<LicenseStateDTO>;
     heartbeat(): Res<LicenseStateDTO>;
   };
+  hardware: {
+    listUsbDevices(): Res<UsbDeviceInfoDTO[]>;
+    listSerialPorts(): Res<SerialPortInfoDTO[]>;
+    printer: {
+      getConfig(): Res<PrinterConfigDTO | null>;
+      setConfig(payload: PrinterConfigDTO | null): Res<{ ok: true }>;
+      test(): Res<{ ok: true }>;
+      printSaleTicket(payload: SaleTicketDataDTO): Res<{ ok: true }>;
+      printCashClose(payload: CashCloseReportDataDTO): Res<{ ok: true }>;
+    };
+    cashDrawer: {
+      open(): Res<{ ok: true }>;
+    };
+    scale: {
+      getConfig(): Res<ScaleConfigDTO | null>;
+      setConfig(payload: ScaleConfigDTO | null): Res<{ ok: true }>;
+      read(): Res<WeightReadingDTO>;
+    };
+    onScaleWeight(cb: (reading: WeightReadingDTO) => void): () => void;
+  };
+  backup: {
+    create(): Res<BackupEntryDTO>;
+    list(): Res<BackupEntryDTO[]>;
+    restore(payload: { zipPath: string }): Res<{ requiresRestart: true }>;
+    getConfig(): Res<BackupConfigDTO>;
+    setConfig(payload: BackupConfigDTO): Res<{ ok: true }>;
+  };
+  import: {
+    parseFile(payload: { filePath: string }): Res<{
+      sheets: string[];
+      preview: Array<Record<string, unknown>>;
+      headers: string[];
+      totalRows: number;
+    }>;
+    validate(payload: { filePath: string; mapping: ImportMappingDTO }): Res<ImportValidationResultDTO>;
+    execute(payload: {
+      filePath: string;
+      mapping: ImportMappingDTO;
+      options: ImportOptionsDTO;
+    }): Res<ImportExecuteResultDTO>;
+    onProgress(cb: (p: { done: number; total: number }) => void): () => void;
+  };
+}
+
+/* ----------------------------------------------------------------------- */
+/* DTOs de hardware / backup / import (replican electron/hardware/types.ts) */
+/* ----------------------------------------------------------------------- */
+
+export type PrinterKindDTO = 'usb' | 'network' | 'file';
+export type PrinterWidthDTO = 58 | 80;
+
+export interface PrinterConfigDTO {
+  kind: PrinterKindDTO;
+  interface: string;
+  width: PrinterWidthDTO;
+  characterSet: string;
+  autoOpenDrawer: boolean;
+}
+
+export type ScaleProtocolDTO = 'kretz' | 'systel' | 'magris' | 'generic';
+
+export interface ScaleConfigDTO {
+  portPath: string;
+  baudRate: number;
+  protocol: ScaleProtocolDTO;
+  mode: 'continuous' | 'request';
+}
+
+export interface BackupConfigDTO {
+  destination: string;
+  autoOnCashClose: boolean;
+  autoOnAppQuit: boolean;
+}
+
+export interface WeightReadingDTO {
+  value: string;
+  unit: 'kg';
+  stable: boolean;
+  raw: string;
+}
+
+export interface UsbDeviceInfoDTO {
+  vendorId: number;
+  productId: number;
+  manufacturer?: string;
+  product?: string;
+  serialNumber?: string;
+}
+
+export interface SerialPortInfoDTO {
+  path: string;
+  manufacturer?: string;
+  serialNumber?: string;
+  vendorId?: string;
+  productId?: string;
+}
+
+export interface BackupEntryDTO {
+  filename: string;
+  fullPath: string;
+  sizeBytes: number;
+  createdAt: number;
+}
+
+export interface SaleTicketLineDataDTO {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  total: string;
+}
+
+export interface SaleTicketPaymentDataDTO {
+  method: string;
+  amount: string;
+}
+
+export interface SaleTicketDataDTO {
+  number: number;
+  voucherType: 'A' | 'B' | 'C' | 'X';
+  createdAt: number;
+  company: {
+    name: string;
+    cuit?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    ingBrutos?: string | null;
+  };
+  customer?: { name: string; docNumber?: string | null } | null;
+  lines: SaleTicketLineDataDTO[];
+  subtotal: string;
+  vatTotal: string;
+  total: string;
+  payments: SaleTicketPaymentDataDTO[];
+  accountSale?: boolean;
+}
+
+export interface CashCloseReportDataDTO {
+  company: { name: string };
+  registerNumber: number;
+  openDate: number;
+  closeDate: number;
+  openingAmount: string;
+  salesCount: number;
+  salesTotal: string;
+  paymentBreakdown: { method: string; amount: string }[];
+  incomeMovements: string;
+  expenseMovements: string;
+  expectedClosing: string;
+  declaredClosing: string;
+  difference: string;
+}
+
+export interface ImportMappingDTO {
+  barcode: string;
+  description: string;
+  listPrice1: string;
+  stock: string;
+  brand?: string | null;
+  familyName?: string | null;
+  supplierName?: string | null;
+  costPrice?: string | null;
+  vatRate?: string | null;
+  minStock?: string | null;
+}
+
+export interface ImportOptionsDTO {
+  createMissingFamilies: boolean;
+  createMissingSuppliers: boolean;
+  skipRowsWithErrors: boolean;
+}
+
+export interface ImportErrorDTO {
+  row: number;
+  field: string;
+  message: string;
+}
+
+export interface ImportValidationResultDTO {
+  valid: number;
+  errors: ImportErrorDTO[];
+  sampleValid: Array<Record<string, unknown>>;
+}
+
+export interface ImportExecuteResultDTO {
+  created: number;
+  skipped: number;
+  familiesCreated: number;
+  suppliersCreated: number;
 }
