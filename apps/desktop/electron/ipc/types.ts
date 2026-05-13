@@ -799,6 +799,41 @@ export interface ApiSurface {
     }): Res<ImportExecuteResultDTO>;
     onProgress(cb: (p: { done: number; total: number }) => void): () => void;
   };
+  lan: {
+    getConfig(): Res<LanConfigDTO>;
+    getLocalIp(): Res<{ ip: string | null }>;
+    setMode(payload: LanSetModeInputDTO): Res<{ requiresRestart: true; config: LanConfigDTO }>;
+  };
+  updater: {
+    checkNow(): Res<{ status: string; version?: string }>;
+    quitAndInstall(): Res<{ ok: true }>;
+    getAutoCheck(): Res<{ autoCheck: boolean }>;
+    setAutoCheck(payload: { autoCheck: boolean }): Res<{ ok: true }>;
+    onAvailable(cb: (info: { version: string }) => void): () => void;
+    onDownloaded(cb: (info: { version: string }) => void): () => void;
+  };
+}
+
+/* ----------------------------------------------------------------------- */
+/* LAN / multi-caja                                                         */
+/* ----------------------------------------------------------------------- */
+
+export type LanModeDTO = 'single' | 'server' | 'client';
+
+export interface LanConfigDTO {
+  mode: LanModeDTO;
+  port?: number;
+  token?: string;
+  serverIp?: string;
+  serverPort?: number;
+}
+
+export interface LanSetModeInputDTO {
+  mode: LanModeDTO;
+  serverIp?: string;
+  serverPort?: number;
+  token?: string;
+  port?: number;
 }
 
 /* ----------------------------------------------------------------------- */

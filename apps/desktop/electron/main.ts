@@ -8,17 +8,19 @@ import { getMachineId } from './bootstrap/machine';
 import { applySessionSecret } from './bootstrap/session';
 import { HardwareManager } from './hardware/HardwareManager';
 import { ExcelImportService } from './import/ExcelImportService';
-import { registerIpcHandlers } from './ipc';
+import { registerIpcHandlers, buildAllHandlers } from './ipc';
 import { SessionStore } from './ipc/session-store';
+import { LanManager } from './lan/LanManager';
+import { LanServer } from './lan/LanServer';
+import { DEFAULT_LAN_PORT } from './lan/types';
 import { LicenseManager } from './license/LicenseManager';
 import { setupLogger } from './logger';
+import { setupAutoUpdater, type UpdaterController } from './updater';
 
 const HEARTBEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const isDev = process.env.NODE_ENV === 'development';
-// Vite escucha en `localhost` (puede resolver a ::1 / IPv6): usar el nombre, no 127.0.0.1.
 const DEV_SERVER_URL = 'http://localhost:5173';
-/** Directorio del bundle (dist-electron/). */
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
@@ -27,9 +29,11 @@ let licenseManager: LicenseManager | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 let hardwareManager: HardwareManager | null = null;
 let backupService: BackupService | null = null;
+let lanServer: LanServer | null = null;
+let updaterController: UpdaterController | null = null;
 let quittingForBackup = false;
 
-function createWindow(): void {
+function createWindow(extraArgs: string[]): void {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -39,6 +43,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      additionalArguments: extraArgs,
     },
   });
 
@@ -55,42 +60,87 @@ function createWindow(): void {
   }
 }
 
-function bootstrap(): void {
+function bootstrap(): { lanArgs: string[] } {
   setupLogger();
   applySessionSecret();
   const machineId = getMachineId();
   const dbPath = getDatabasePath();
+  const userDataDir = app.getPath('userData');
+
+  // Cargar config LAN (siempre disponible). Si modo === 'client', pasamos los datos
+  // de conexión al renderer vía additionalArguments del BrowserWindow.
+  const lanManager = new LanManager(userDataDir);
+  const lanCfg = lanManager.getConfig();
+  const lanArgs: string[] = [];
+  if (lanCfg.mode === 'client' && lanCfg.serverIp && lanCfg.token) {
+    lanArgs.push(`--lan-mode=client`);
+    lanArgs.push(`--lan-server=${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`);
+    lanArgs.push(`--lan-token=${lanCfg.token}`);
+  }
+
   dbHandle = initialize(dbPath);
   const sessionStore = new SessionStore();
   licenseManager = new LicenseManager({
-    userDataDir: app.getPath('userData'),
+    userDataDir,
     machineId,
     apiUrl: process.env.CLOUD_API_URL ?? 'http://localhost:3009',
     publicKeyPem: process.env.CLOUD_JWT_PUBLIC_KEY ?? '',
   });
-  hardwareManager = new HardwareManager({ userDataDir: app.getPath('userData') });
+  hardwareManager = new HardwareManager({ userDataDir });
   backupService = new BackupService({
     dbPath,
     backupDir: hardwareManager.getConfig().backup.destination,
     appVersion: app.getVersion(),
   });
   const importService = new ExcelImportService();
-  const channels = registerIpcHandlers(ipcMain, {
+
+  // Updater (no-op en dev / sin empaquetar)
+  updaterController = setupAutoUpdater({
+    userDataDir,
+    getWindow: () => mainWindow,
+    isPackaged: app.isPackaged,
+    isDev,
+  });
+
+  const deps = {
     db: dbHandle.db,
     repos: dbHandle.repos,
     sessionStore,
     machineId,
     appVersion: app.getVersion(),
     dbPath,
+    userDataDir,
     licenseManager,
     hardware: hardwareManager,
     backup: backupService,
     importService,
-    emit: (channel, payload) => {
+    emit: (channel: string, payload: unknown) => {
       mainWindow?.webContents.send(channel, payload);
     },
-  });
+    updater: updaterController,
+  };
+
+  const channels = registerIpcHandlers(ipcMain, deps);
   console.info(`[main] StockFlow listo — DB: ${dbPath} — ${channels.length} canales IPC registrados`);
+
+  if (lanCfg.mode === 'server' && lanCfg.token) {
+    const handlers = buildAllHandlers(deps);
+    const port = lanCfg.port ?? DEFAULT_LAN_PORT;
+    const ip = LanManager.getLocalIp() ?? '0.0.0.0';
+    lanServer = new LanServer({ handlers, port, token: lanCfg.token, enableMdns: true });
+    lanServer
+      .start()
+      .then(() => console.info(`[LAN] modo=server puerto=${port} IP=${ip} PIN=${lanCfg.token}`))
+      .catch((err) => console.error('[LAN] no se pudo iniciar el servidor:', err));
+  } else if (lanCfg.mode === 'client') {
+    console.info(
+      `[LAN] modo=client server=${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`,
+    );
+  } else {
+    console.info('[LAN] modo=single (1 PC)');
+  }
+
+  return { lanArgs };
 }
 
 function startLicenseHeartbeat(): void {
@@ -101,7 +151,6 @@ function startLicenseHeartbeat(): void {
   }, HEARTBEAT_INTERVAL_MS);
 }
 
-// Una sola instancia: si ya hay otra corriendo, ceder y enfocar la existente.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -115,14 +164,14 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(() => {
-      bootstrap();
-      createWindow();
+      const { lanArgs } = bootstrap();
+      createWindow(lanArgs);
       hardwareManager?.setEmitter((channel, payload) => {
         mainWindow?.webContents.send(channel, payload);
       });
       mainWindow?.once('ready-to-show', () => startLicenseHeartbeat());
       app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+        if (BrowserWindow.getAllWindows().length === 0) createWindow(lanArgs);
       });
     })
     .catch((err: unknown) => {
@@ -140,6 +189,10 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', (event) => {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (lanServer) {
+      void lanServer.stop();
+      lanServer = null;
+    }
     if (
       !quittingForBackup &&
       hardwareManager?.getConfig().backup.autoOnAppQuit &&

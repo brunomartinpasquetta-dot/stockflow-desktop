@@ -7,7 +7,7 @@
  * así no depende de Fastify ni del par de claves.
  */
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { licenses, tenants, type License, type Tenant, type CloudDatabase } from '@stockflow/db';
 
 const KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O/1/I ambiguos
@@ -73,6 +73,22 @@ export class LicenseService {
     }
     if (license.machineId && license.machineId !== machineId) {
       throw httpError('Licencia ya activada en otra PC. Contactá soporte.', 409);
+    }
+
+    // Quota: contar licencias activas distintas a la que se está activando.
+    // Si esta licencia ya está activa, no consume cupo (re-activación).
+    if (license.status !== 'active') {
+      const activeOther = await db
+        .select({ id: licenses.id })
+        .from(licenses)
+        .where(and(eq(licenses.tenantId, tenant.id), eq(licenses.status, 'active'), ne(licenses.id, license.id)));
+      const quota = tenant.licensesQuota ?? 1;
+      if (activeOther.length >= quota) {
+        throw Object.assign(
+          new Error('Cuota de licencias alcanzada. Adquirí más cajas desde tu panel.'),
+          { statusCode: 403, code: 'QUOTA_REACHED' },
+        );
+      }
     }
 
     const now = new Date();

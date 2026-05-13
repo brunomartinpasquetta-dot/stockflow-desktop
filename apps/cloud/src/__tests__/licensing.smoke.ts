@@ -35,17 +35,20 @@ function check(label: string, ok: boolean, detail?: unknown): void {
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const migrationPath = path.resolve(here, '..', '..', '..', '..', 'packages', 'db', 'migrations', 'cloud', '0000_cloud_init.sql');
+const migrationDir = path.resolve(here, '..', '..', '..', '..', 'packages', 'db', 'migrations', 'cloud');
+const MIGRATIONS = ['0000_cloud_init.sql', '0001_licenses_quota.sql'];
 
 async function main(): Promise<void> {
   const pg = new PGlite();
-  const migrationSql = readFileSync(migrationPath, 'utf8');
-  const statements = migrationSql
-    .split('--> statement-breakpoint')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  for (const stmt of statements) {
-    await pg.exec(stmt);
+  for (const mig of MIGRATIONS) {
+    const sql = readFileSync(path.join(migrationDir, mig), 'utf8');
+    const statements = sql
+      .split('--> statement-breakpoint')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const stmt of statements) {
+      await pg.exec(stmt);
+    }
   }
 
   const cloudDb = drizzle(pg, { schema: cloudSchema });
@@ -168,6 +171,29 @@ async function main(): Promise<void> {
     'validateWebhookSignature (firma incorrecta) → false',
     mpSvc.validateWebhookSignature({ xSignature: `ts=${ts},v1=${'0'.repeat(goodHmac.length)}`, xRequestId: reqId, dataId }) === false,
   );
+
+  // --- Quota de licencias (tenant con quota=1 ya tiene una activa) ---
+  // Agregamos una segunda licencia pending al tenant inicial; debería rechazarse
+  // por QUOTA_REACHED al intentar activarla en otra máquina.
+  await cloudDb
+    .insert(licenses)
+    .values({ tenantId: tenant.id, licenseKey: 'SF-QQQQ-WWWW-EEEE-RRRR', status: 'pending' })
+    .returning();
+  const rq = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/activate',
+    payload: { licenseKey: 'SF-QQQQ-WWWW-EEEE-RRRR', machineId: 'machine-3' },
+  });
+  check('activate con quota agotada → 403', rq.statusCode === 403, rq.statusCode);
+
+  // Subiendo la quota a 2, debe permitir la activación.
+  await cloudDb.update(tenants).set({ licensesQuota: 2 }).where(eq(tenants.id, tenant.id));
+  const rq2 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/activate',
+    payload: { licenseKey: 'SF-QQQQ-WWWW-EEEE-RRRR', machineId: 'machine-3' },
+  });
+  check('activate con quota=2 → 200', rq2.statusCode === 200, rq2.statusCode);
 
   // --- generateLicenseKey ---
   const key = LicenseService.generateLicenseKey();

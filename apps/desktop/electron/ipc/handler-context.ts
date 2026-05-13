@@ -20,11 +20,20 @@ export interface HandlerDeps {
   machineId: string;
   appVersion: string;
   dbPath: string;
+  /** Directorio de datos del usuario (para configs auxiliares como lan.json, updater.json). */
+  userDataDir: string;
   licenseManager: LicenseManager;
   hardware: HardwareManager;
   backup: BackupService;
   importService: ExcelImportService;
   emit: (channel: string, payload: unknown) => void;
+  /** Solicitar al main process verificar actualizaciones (opcional). */
+  updater?: {
+    checkNow: () => Promise<{ status: string; version?: string }>;
+    quitAndInstall: () => void;
+    getAutoCheck: () => boolean;
+    setAutoCheck: (v: boolean) => void;
+  };
 }
 
 export type HandlerFn = (payload: unknown) => Promise<IpcResponse<unknown>>;

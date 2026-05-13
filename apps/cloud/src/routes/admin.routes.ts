@@ -105,6 +105,24 @@ export async function adminRoutes(app: FastifyInstance, opts?: { email?: EmailSe
     },
   );
 
+  app.patch<{ Params: { id: string }; Body: { licensesQuota?: number } }>(
+    '/api/admin/tenants/:id/quota',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const quota = Number(req.body?.licensesQuota);
+      if (!Number.isInteger(quota) || quota < 1 || quota > 1000) {
+        return reply.code(400).send({ error: 'licensesQuota debe ser un entero entre 1 y 1000.' });
+      }
+      const [t] = await app.cloudDb
+        .update(tenants)
+        .set({ licensesQuota: quota, updatedAt: new Date() })
+        .where(eq(tenants.id, req.params.id))
+        .returning();
+      if (!t) return reply.code(404).send({ error: 'Cuenta no encontrada' });
+      return reply.send({ ok: true, licensesQuota: t.licensesQuota });
+    },
+  );
+
   app.post<{ Params: { id: string } }>(
     '/api/admin/tenants/:id/regenerate-license',
     { preHandler: requireAdmin },

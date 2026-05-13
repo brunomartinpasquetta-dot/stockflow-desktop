@@ -247,4 +247,17 @@ export const api = {
       unwrap(sf().import.execute({ filePath, mapping, options })),
     onProgress: (cb: (p: { done: number; total: number }) => void): (() => void) => sf().import.onProgress(cb),
   },
+  lan: {
+    getConfig: () => unwrap(sf().lan.getConfig()),
+    getLocalIp: () => unwrap(sf().lan.getLocalIp()),
+    setMode: (payload: import('@/types/api').LanSetModeInputDTO) => unwrap(sf().lan.setMode(payload)),
+  },
+  updater: {
+    checkNow: () => unwrap(sf().updater.checkNow()),
+    quitAndInstall: () => unwrap(sf().updater.quitAndInstall()),
+    getAutoCheck: () => unwrap(sf().updater.getAutoCheck()),
+    setAutoCheck: (autoCheck: boolean) => unwrap(sf().updater.setAutoCheck({ autoCheck })),
+    onAvailable: (cb: (info: { version: string }) => void) => sf().updater.onAvailable(cb),
+    onDownloaded: (cb: (info: { version: string }) => void) => sf().updater.onDownloaded(cb),
+  },
 }

@@ -13,6 +13,7 @@ import { sql } from 'drizzle-orm';
 import {
   check,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -40,6 +41,8 @@ export const tenants = pgTable(
     nextBillingDate: timestamp('next_billing_date'),
     /** Cantidad de pagos rechazados consecutivos (para la regla de suspensión). */
     failedPayments: numeric('failed_payments', { precision: 4, scale: 0 }).notNull().default('0'),
+    /** Cantidad máxima de licencias activas para este tenant (modo multi-caja). */
+    licensesQuota: integer('licenses_quota').notNull().default(1),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

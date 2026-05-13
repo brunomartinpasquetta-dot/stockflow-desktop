@@ -67,6 +67,7 @@ async function main(): Promise<void> {
     machineId: 'test-machine',
     appVersion: '0.0.0-test',
     dbPath,
+    userDataDir: tmpDir,
     licenseManager,
     hardware,
     backup,

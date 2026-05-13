@@ -168,6 +168,27 @@ const api: ApiSurface = {
       return () => ipcRenderer.removeListener('import:progress', listener);
     },
   },
+  lan: {
+    getConfig: () => call('lan:getConfig'),
+    getLocalIp: () => call('lan:getLocalIp'),
+    setMode: (p) => call('lan:setMode', p),
+  },
+  updater: {
+    checkNow: () => call('updater:checkNow'),
+    quitAndInstall: () => call('updater:quitAndInstall'),
+    getAutoCheck: () => call('updater:getAutoCheck'),
+    setAutoCheck: (p) => call('updater:setAutoCheck', p),
+    onAvailable: (cb) => {
+      const listener = (_event: unknown, payload: unknown): void => cb(payload as never);
+      ipcRenderer.on('updater:available', listener);
+      return () => ipcRenderer.removeListener('updater:available', listener);
+    },
+    onDownloaded: (cb) => {
+      const listener = (_event: unknown, payload: unknown): void => cb(payload as never);
+      ipcRenderer.on('updater:downloaded', listener);
+      return () => ipcRenderer.removeListener('updater:downloaded', listener);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('stockflow', api);

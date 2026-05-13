@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -18,6 +18,14 @@
     "test:ipc": "tsx electron/__tests__/ipc.smoke.ts",
     "test:license": "tsx electron/__tests__/license.smoke.ts",
     "test:hardware": "tsx electron/__tests__/hardware.smoke.ts",
+    "test:lan": "tsx electron/__tests__/lan.smoke.ts",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl",
+    "publish:win": "electron-builder --win --publish=always",
+    "publish:mac": "electron-builder --mac --publish=always",
+    "package:dry": "electron-builder --mac --dir",
     "preview": "vite preview"
   },
   "dependencies": {

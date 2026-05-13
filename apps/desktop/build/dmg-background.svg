@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 380" width="540" height="380">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="540" height="380" fill="url(#g)"/>
+  <text x="270" y="60" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="white" text-anchor="middle">StockFlow</text>
+  <text x="270" y="340" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#cbd5f5" text-anchor="middle">Arrastrá StockFlow a Aplicaciones</text>
+</svg>
