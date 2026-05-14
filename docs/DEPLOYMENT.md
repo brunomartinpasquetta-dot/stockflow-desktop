@@ -8,10 +8,22 @@ Para probar el instalador en tu propia máquina:
 
 ```bash
 pnpm install
+pnpm --filter @stockflow/desktop run generate:icons # PNG/ICNS/ICO desde icon.svg
 pnpm --filter @stockflow/desktop run build          # web + electron
 pnpm --filter @stockflow/desktop run build:mac      # .dmg + .zip en release/
-pnpm --filter @stockflow/desktop run build:win      # .exe (NSIS)
+pnpm --filter @stockflow/desktop run build:win      # .exe (NSIS) — requiere Windows
 pnpm --filter @stockflow/desktop run build:linux    # .AppImage
+```
+
+Los scripts `build:*` corren vía `scripts/package.mjs`, un wrapper que sortea
+el bucle de symlinks workspace de pnpm que rompe a `app-builder`. Genera
+ambos arquitecturas (x64 + arm64) en macOS. Después del build, los binarios
+nativos (`better-sqlite3`, `usb`, `serialport`) quedan recompilados para la
+ABI de Electron; para volver a correr `test:ipc` con Node, ejecutá:
+
+```bash
+cd node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3
+node-gyp rebuild --release
 ```
 
 Los instaladores generados quedan en `apps/desktop/release/`.

@@ -14,6 +14,12 @@ dist-electron
 release
 *.local
 
+# Íconos binarios generados con scripts/generate-icons.mjs (se regeneran del SVG master)
+build/icon.png
+build/icon.icns
+build/icon.ico
+build/dmg-background.png
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
