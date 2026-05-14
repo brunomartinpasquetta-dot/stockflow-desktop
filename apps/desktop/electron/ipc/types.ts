@@ -465,6 +465,56 @@ export interface PaymentMethodBreakdownDTO {
   net: string;
 }
 
+export interface HistoricalCashRegisterDTO {
+  id: string;
+  number: number;
+  openDate: number;
+  closeDate: number | null;
+  userId: string;
+  userName: string;
+  openingAmount: string;
+  totalIncome: string;
+  totalExpense: string;
+  expectedAmount: string | null;
+  closingAmount: string | null;
+  difference: string | null;
+  status: CashStatus;
+  movementCount: number;
+}
+
+export interface HistoricalCashMovementDTO {
+  id: string;
+  date: number;
+  createdAt: number;
+  type: CashMovementType;
+  amount: string;
+  description: string;
+  paymentMethodId: string | null;
+  paymentMethodName: string | null;
+  relatedSaleId: string | null;
+  relatedPurchaseId: string | null;
+  saleNumber: number | null;
+  saleType: string | null;
+  purchaseNumber: number | null;
+}
+
+export interface HistoricalCashReportDTO {
+  register: CashRegisterDTO;
+  openingAmount: string;
+  incomeCount: number;
+  incomeTotal: string;
+  expenseCount: number;
+  expenseTotal: string;
+  salesCount: number;
+  salesTotal: string;
+  expectedCash: string;
+  closingAmount: string | null;
+  difference: string | null;
+  byPaymentMethod: PaymentMethodBreakdownDTO[];
+  movements: CashMovementDTO[];
+  movementsDetail: HistoricalCashMovementDTO[];
+}
+
 export interface CashReportDTO {
   register: CashRegisterDTO;
   openingAmount: string;
@@ -724,6 +774,8 @@ export interface ApiSurface {
     getCurrent(): Res<CashRegisterDTO | null>;
     getReport(payload: { registerId: string }): Res<CashReportDTO>;
     addMovement(payload: AddMovementInputDTO): Res<CashMovementDTO>;
+    listHistorical(payload: { from: number; to: number; userId?: string }): Res<HistoricalCashRegisterDTO[]>;
+    getHistoricalReport(payload: { cashRegisterId: string }): Res<HistoricalCashReportDTO>;
   };
   inventory: {
     checkStock(payload: { articleId: string; quantity: string }): Res<StockCheckDTO>;

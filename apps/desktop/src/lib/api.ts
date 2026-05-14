@@ -21,6 +21,8 @@ import type {
   CashMovementDTO,
   CashRegisterDTO,
   CashReportDTO,
+  HistoricalCashRegisterDTO,
+  HistoricalCashReportDTO,
   CompanyDTO,
   CreatePurchaseInputDTO,
   CreatePurchaseResultDTO,
@@ -185,6 +187,10 @@ export const api = {
       paymentMethodId?: string | null,
     ): Promise<CashMovementDTO> =>
       unwrap(sf().cash.addMovement({ type, description, amount, paymentMethodId: paymentMethodId ?? null })),
+    listHistorical: (from: number, to: number, userId?: string): Promise<HistoricalCashRegisterDTO[]> =>
+      unwrap(sf().cash.listHistorical({ from, to, userId })),
+    getHistoricalReport: (cashRegisterId: string): Promise<HistoricalCashReportDTO> =>
+      unwrap(sf().cash.getHistoricalReport({ cashRegisterId })),
   },
   inventory: {
     checkStock: (articleId: string, quantity: string): Promise<StockCheckDTO> => unwrap(sf().inventory.checkStock({ articleId, quantity })),

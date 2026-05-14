@@ -9,6 +9,8 @@ import type {
   ArticleDTO,
   CashRegisterDTO,
   CashReportDTO,
+  HistoricalCashRegisterDTO,
+  HistoricalCashReportDTO,
   CompanyDTO,
   CreateSaleInputDTO,
   CreateSaleResultDTO,
@@ -125,6 +127,20 @@ export function useCashReport(registerId: string | undefined) {
     refetchInterval: 30_000,
   })
 }
+export function useHistoricalCashRegisters(params: { from: number; to: number; userId?: string }) {
+  return useQuery<HistoricalCashRegisterDTO[]>({
+    queryKey: ['cash', 'historical', params.from, params.to, params.userId ?? ''],
+    queryFn: () => api.cash.listHistorical(params.from, params.to, params.userId),
+  })
+}
+export function useHistoricalCashReport(cashRegisterId: string | undefined) {
+  return useQuery<HistoricalCashReportDTO>({
+    queryKey: ['cash', 'historical', 'report', cashRegisterId],
+    queryFn: () => api.cash.getHistoricalReport(cashRegisterId as string),
+    enabled: Boolean(cashRegisterId),
+  })
+}
+
 export function useCashMutations() {
   const qc = useQueryClient()
   const invalidateCash = () => {

@@ -36,6 +36,39 @@ export interface PaymentMethodBreakdown {
   net: string;
 }
 
+export interface HistoricalCashRegisterSummary {
+  id: string;
+  openDate: number;
+  closeDate: number | null;
+  userId: string;
+  userName: string;
+  openingAmount: string;
+  totalIncome: string;
+  totalExpense: string;
+  expectedAmount: string | null;
+  closingAmount: string | null;
+  difference: string | null;
+  status: 'open' | 'closed';
+  movementCount: number;
+  number: number;
+}
+
+export interface HistoricalCashMovement {
+  id: string;
+  date: number;
+  createdAt: number;
+  type: 'income' | 'expense';
+  amount: string;
+  description: string;
+  paymentMethodId: string | null;
+  paymentMethodName: string | null;
+  relatedSaleId: string | null;
+  relatedPurchaseId: string | null;
+  saleNumber: number | null;
+  saleType: string | null;
+  purchaseNumber: number | null;
+}
+
 export interface CashReport {
   register: CashRegister;
   openingAmount: string;
@@ -95,6 +128,109 @@ export class CashService {
     const register = await this.ctx.repos.cashRegisters.findById(registerId);
     if (!register) throw new NotFoundError('Caja', registerId);
     return this.buildReport(register);
+  }
+
+  /**
+   * Lista cajas (abiertas y cerradas) dentro de un rango, con totales
+   * agregados de ingresos/egresos y nombre del cajero. Requiere `view_reports`.
+   */
+  async listHistoricalCashRegisters(input: {
+    from: number;
+    to: number;
+    userId?: string;
+  }): Promise<HistoricalCashRegisterSummary[]> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'view_reports');
+
+    const registers = await repos.cashRegisters.findByDateRange({
+      from: input.from,
+      to: input.to,
+      userId: input.userId,
+    });
+    if (registers.length === 0) return [];
+
+    // Cargamos en paralelo: usuarios involucrados + movimientos por caja.
+    const userIds = [...new Set(registers.map((r) => r.userId))];
+    const users = await Promise.all(userIds.map((id) => repos.users.findById(id)));
+    const userNameById = new Map<string, string>();
+    for (const u of users) {
+      if (u) userNameById.set(u.id, u.fullName);
+    }
+
+    const pmById = await repos.paymentMethods.byId();
+    const isPhysical = (paymentMethodId: string | null): boolean =>
+      paymentMethodId == null || pmById.get(paymentMethodId)?.isPhysicalCash === true;
+
+    const summaries: HistoricalCashRegisterSummary[] = [];
+    for (const r of registers) {
+      const movements = await repos.cashMovements.findByRegister(r.id);
+      const totalIncome = sumDecimals(movements.filter((m) => m.type === 'income').map((m) => m.amount));
+      const totalExpense = sumDecimals(movements.filter((m) => m.type === 'expense').map((m) => m.amount));
+      // Arqueo de efectivo: sólo movimientos en efectivo físico (igual que closeRegister).
+      const cashIncome = sumDecimals(
+        movements.filter((m) => m.type === 'income' && isPhysical(m.paymentMethodId)).map((m) => m.amount),
+      );
+      const cashExpense = sumDecimals(
+        movements.filter((m) => m.type === 'expense' && isPhysical(m.paymentMethodId)).map((m) => m.amount),
+      );
+      const expectedAmount = subDecimal(
+        sumDecimals([r.openingAmount, cashIncome]),
+        cashExpense,
+        4,
+      );
+      const difference =
+        r.closingAmount != null ? subDecimal(r.closingAmount, expectedAmount, 4) : null;
+      summaries.push({
+        id: r.id,
+        number: r.number,
+        openDate: r.openDate,
+        closeDate: r.closeDate,
+        userId: r.userId,
+        userName: userNameById.get(r.userId) ?? r.userId,
+        openingAmount: r.openingAmount,
+        totalIncome,
+        totalExpense,
+        expectedAmount,
+        closingAmount: r.closingAmount,
+        difference,
+        status: r.status,
+        movementCount: movements.length,
+      });
+    }
+    return summaries;
+  }
+
+  /**
+   * Reporte completo de una caja para drill-down histórico, con movimientos
+   * enriquecidos (medio de pago, número de venta/compra). Requiere `view_reports`.
+   */
+  async getHistoricalCashReport(
+    cashRegisterId: string,
+  ): Promise<CashReport & { movementsDetail: HistoricalCashMovement[] }> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'view_reports');
+
+    const register = await repos.cashRegisters.findById(cashRegisterId);
+    if (!register) throw new NotFoundError('Caja', cashRegisterId);
+
+    const report = await this.buildReport(register);
+    const enriched = await repos.cashRegisters.getMovementsByCashRegister(cashRegisterId);
+    const movementsDetail: HistoricalCashMovement[] = enriched.map((m) => ({
+      id: m.id,
+      date: m.date,
+      createdAt: m.createdAt,
+      type: m.type,
+      amount: m.amount,
+      description: m.description,
+      paymentMethodId: m.paymentMethodId,
+      paymentMethodName: m.paymentMethodName,
+      relatedSaleId: m.relatedSaleId,
+      relatedPurchaseId: m.relatedPurchaseId,
+      saleNumber: m.saleNumber,
+      saleType: m.saleType,
+      purchaseNumber: m.purchaseNumber,
+    }));
+    return { ...report, movementsDetail };
   }
 
   /** Registra un movimiento manual de caja (ingreso/egreso). */

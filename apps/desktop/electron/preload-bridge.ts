@@ -280,6 +280,8 @@ export function createApiBridge(
       getCurrent: () => c<never>('cash:getCurrent'),
       getReport: (p) => c<never>('cash:getReport', p),
       addMovement: (p) => c<never>('cash:addMovement', p),
+      listHistorical: (p) => c<never>('cash:listHistorical', p),
+      getHistoricalReport: (p) => c<never>('cash:getHistoricalReport', p),
     },
     inventory: {
       checkStock: (p) => c<never>('inventory:checkStock', p),

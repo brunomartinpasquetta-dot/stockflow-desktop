@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, max } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte, max } from 'drizzle-orm';
 import {
   CloseCashRegisterSchema,
   OpenCashRegisterSchema,
@@ -14,9 +14,20 @@ import {
   cashMovements,
   cashRegisters,
   paymentMethods,
+  purchases,
+  sales,
+  type CashMovement,
   type CashRegister,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
+
+/** Movimiento enriquecido con datos de venta/compra/medio de pago para el detalle histórico. */
+export type CashMovementEnriched = CashMovement & {
+  paymentMethodName: string | null;
+  saleNumber: number | null;
+  saleType: string | null;
+  purchaseNumber: number | null;
+};
 
 export class CashRegisterRepository extends BaseRepository<
   CashRegister,
@@ -134,13 +145,54 @@ export class CashRegisterRepository extends BaseRepository<
     }
   }
 
-  async findByDateRange(from: number, to: number): Promise<CashRegister[]> {
+  async findByDateRange(opts: {
+    from: number;
+    to: number;
+    userId?: string;
+  }): Promise<CashRegister[]> {
     try {
+      const conds = [gte(cashRegisters.openDate, opts.from), lte(cashRegisters.openDate, opts.to)];
+      if (opts.userId) conds.push(eq(cashRegisters.userId, opts.userId));
       return this.db
         .select()
         .from(cashRegisters)
-        .where(and(gte(cashRegisters.openDate, from), lte(cashRegisters.openDate, to)))
+        .where(and(...conds))
+        .orderBy(desc(cashRegisters.openDate))
         .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Movimientos de una caja enriquecidos con: nombre del medio de pago,
+   * número/tipo de la venta relacionada y número de la compra relacionada.
+   * Ordenados por fecha ASC.
+   */
+  async getMovementsByCashRegister(cashRegisterId: string): Promise<CashMovementEnriched[]> {
+    try {
+      const rows = this.db
+        .select({
+          mov: cashMovements,
+          paymentMethodName: paymentMethods.name,
+          saleNumber: sales.number,
+          saleType: sales.type,
+          purchaseNumber: purchases.number,
+        })
+        .from(cashMovements)
+        .leftJoin(paymentMethods, eq(cashMovements.paymentMethodId, paymentMethods.id))
+        .leftJoin(sales, eq(cashMovements.relatedSaleId, sales.id))
+        .leftJoin(purchases, eq(cashMovements.relatedPurchaseId, purchases.id))
+        .where(eq(cashMovements.cashRegisterId, cashRegisterId))
+        .orderBy(asc(cashMovements.date))
+        .all();
+      return rows.map((r) => ({
+        ...r.mov,
+        paymentMethodName: r.paymentMethodName ?? null,
+        saleNumber: r.saleNumber ?? null,
+        saleType: r.saleType ?? null,
+        purchaseNumber: r.purchaseNumber ?? null,
+      }));
     } catch (err) {
       return rethrowDbError(err);
     }

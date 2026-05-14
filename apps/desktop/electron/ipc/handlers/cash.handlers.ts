@@ -1,7 +1,14 @@
 import { CashService } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
-import type { AddMovementInputDTO, CashMovementDTO, CashRegisterDTO, CashReportDTO } from '../types';
+import type {
+  AddMovementInputDTO,
+  CashMovementDTO,
+  CashRegisterDTO,
+  CashReportDTO,
+  HistoricalCashRegisterDTO,
+  HistoricalCashReportDTO,
+} from '../types';
 
 export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
   return {
@@ -52,6 +59,19 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: AddMovementInputDTO, ctx): Promise<CashMovementDTO> =>
         new CashService(ctx).addMovement(payload),
+    ),
+    'cash:listHistorical': withSession(
+      deps,
+      (
+        payload: { from: number; to: number; userId?: string },
+        ctx,
+      ): Promise<HistoricalCashRegisterDTO[]> =>
+        new CashService(ctx).listHistoricalCashRegisters(payload),
+    ),
+    'cash:getHistoricalReport': withSession(
+      deps,
+      (payload: { cashRegisterId: string }, ctx): Promise<HistoricalCashReportDTO> =>
+        new CashService(ctx).getHistoricalCashReport(payload.cashRegisterId),
     ),
   };
 }

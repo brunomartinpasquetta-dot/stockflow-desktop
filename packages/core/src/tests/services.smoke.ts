@@ -431,6 +431,43 @@ async function main(): Promise<void> {
     (e) => e instanceof PermissionDeniedError,
   );
 
+  // ----------------------------------------------------- histórico de cajas
+  console.log('\n[cash history]');
+  // En este punto hay 2 cajas: `reg` (cerrada por admin sobre arqueo 3942)
+  // y `reg2` (abierta por admin para compras). Backdateamos `reg` 5 días.
+  const fiveDaysAgo = Date.now() - 5 * 86_400_000;
+  await repos.cashRegisters.update(reg.id, { openDate: fiveDaysAgo, closeDate: fiveDaysAgo + 3_600_000 });
+
+  const fullHistory = await admin.cash.listHistoricalCashRegisters({ from: 0, to: Date.now() + 86_400_000 });
+  check('listHistoricalCashRegisters: incluye las 2 cajas', fullHistory.length >= 2, `cajas=${fullHistory.length}`);
+  const summReg = fullHistory.find((r) => r.id === reg.id);
+  check(
+    'historical reg cerrada: difference 0 / status closed / userName',
+    summReg != null && summReg.status === 'closed' && summReg.difference === '0.0000' && summReg.userName.length > 0,
+    JSON.stringify({ status: summReg?.status, diff: summReg?.difference, user: summReg?.userName }),
+  );
+  const summReg2 = fullHistory.find((r) => r.id === reg2.id);
+  check('historical reg2 abierta: status open + difference null', summReg2?.status === 'open' && summReg2?.difference === null);
+
+  // Filtro por rango excluyendo la caja antigua: sólo debería aparecer reg2.
+  const recentOnly = await admin.cash.listHistoricalCashRegisters({ from: Date.now() - 3_600_000, to: Date.now() + 86_400_000 });
+  check('listHistoricalCashRegisters: filtro por rango excluye la caja antigua', recentOnly.every((r) => r.id !== reg.id) && recentOnly.some((r) => r.id === reg2.id), `len=${recentOnly.length}`);
+
+  // Filtro por cajero.
+  const byAdmin = await admin.cash.listHistoricalCashRegisters({ from: 0, to: Date.now() + 86_400_000, userId: adminUser.id });
+  check('listHistoricalCashRegisters: filtro por userId', byAdmin.every((r) => r.userId === adminUser.id));
+
+  // getHistoricalCashReport sobre reg incluye movimientos enriquecidos.
+  const histReport = await admin.cash.getHistoricalCashReport(reg.id);
+  check('getHistoricalCashReport: register correcto', histReport.register.id === reg.id);
+  check('getHistoricalCashReport: trae movementsDetail con paymentMethodName', histReport.movementsDetail.length > 0 && histReport.movementsDetail.some((m) => m.paymentMethodName != null));
+
+  await expectThrows(
+    'listHistoricalCashRegisters como seller → PermissionDeniedError',
+    () => seller.cash.listHistoricalCashRegisters({ from: 0, to: Date.now() }),
+    (e) => e instanceof PermissionDeniedError,
+  );
+
   // ------------------------------------------------------------- inventario
   console.log('\n[inventory]');
   const chk = await admin.inventory.checkStock(art.id, '5.000');

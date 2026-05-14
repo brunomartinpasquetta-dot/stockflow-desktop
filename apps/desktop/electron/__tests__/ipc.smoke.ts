@@ -181,6 +181,29 @@ async function main(): Promise<void> {
     JSON.stringify(report).slice(0, 300),
   );
 
+  // cash:listHistorical y cash:getHistoricalReport
+  const histList = await invoke<Array<{ id: string; totalIncome: string; userName: string; movementCount: number }>>(
+    handlers,
+    'cash:listHistorical',
+    { from: 0, to: Date.now() + 86_400_000 },
+  );
+  check(
+    'cash:listHistorical devuelve la caja abierta con ingresos calculados',
+    histList.ok && histList.data.length >= 1 && histList.data.some((r) => r.totalIncome === '1000.0000' && r.userName.length > 0),
+    histList.ok ? `len=${histList.data.length}` : JSON.stringify(histList),
+  );
+  const histReport = await invoke<{ register: { id: string }; byPaymentMethod: Array<{ paymentMethodId: string | null; incomeTotal: string }>; movementsDetail: unknown[] }>(
+    handlers,
+    'cash:getHistoricalReport',
+    { cashRegisterId: cashOpen.ok ? cashOpen.data.id : '' },
+  );
+  const histEfectivo = histReport.ok ? histReport.data.byPaymentMethod.find((b) => b.paymentMethodId === 'pm-efectivo') : undefined;
+  check(
+    'cash:getHistoricalReport (byPaymentMethod efectivo + movementsDetail)',
+    histReport.ok && histEfectivo?.incomeTotal === '1000.0000' && histReport.data.movementsDetail.length >= 1,
+    histReport.ok ? `mov=${histReport.data.movementsDetail.length}` : JSON.stringify(histReport).slice(0, 300),
+  );
+
   // error tipado: sales:get inexistente → NOT_FOUND
   const notFound = await invoke(handlers, 'sales:get', { id: 'no-existe' });
   check('sales:get id inexistente → NOT_FOUND', !notFound.ok && notFound.code === 'NOT_FOUND', JSON.stringify(notFound));

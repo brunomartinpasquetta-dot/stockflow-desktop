@@ -26,6 +26,7 @@ const HistorialVentas = lazy(() => import('@/pages/HistorialVentas').then((m) =>
 const MediosDePago = lazy(() => import('@/pages/MediosDePago').then((m) => ({ default: m.MediosDePago })))
 const Usuarios = lazy(() => import('@/pages/Usuarios').then((m) => ({ default: m.Usuarios })))
 const Caja = lazy(() => import('@/pages/Caja').then((m) => ({ default: m.Caja })))
+const HistorialCajas = lazy(() => import('@/pages/HistorialCajas').then((m) => ({ default: m.HistorialCajas })))
 const Ventas = lazy(() => import('@/pages/Ventas').then((m) => ({ default: m.Ventas })))
 const AcercaDe = lazy(() => import('@/pages/AcercaDe').then((m) => ({ default: m.AcercaDe })))
 const Bienvenida = lazy(() => import('@/pages/Bienvenida').then((m) => ({ default: m.Bienvenida })))
@@ -69,7 +70,10 @@ export const router = createHashRouter([
                   { path: '/acerca-de', element: <AcercaDe /> },
                   {
                     element: <RoleGuard roles={['admin', 'manager']} />,
-                    children: [{ path: '/medios-de-pago', element: <MediosDePago /> }],
+                    children: [
+                      { path: '/medios-de-pago', element: <MediosDePago /> },
+                      { path: '/consultas/caja', element: <HistorialCajas /> },
+                    ],
                   },
                   {
                     element: <RoleGuard roles={['admin']} />,
