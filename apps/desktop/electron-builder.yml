@@ -80,6 +80,7 @@ linux:
 
 publish:
   - provider: github
-    owner: stockflow-ar
+    owner: brunomartinpasquetta-dot
     repo: stockflow-desktop
     private: true
+    releaseType: release

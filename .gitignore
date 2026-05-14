@@ -1,9 +1,18 @@
 node_modules
 dist
+dist-electron
+release
 .env
+.env.local
 *.sqlite
 *.db
 userData/
 .DS_Store
 .turbo
 *.log
+
+# Íconos binarios generados con scripts/generate-icons.mjs (se regeneran del SVG)
+apps/desktop/build/icon.png
+apps/desktop/build/icon.icns
+apps/desktop/build/icon.ico
+apps/desktop/build/dmg-background.png
