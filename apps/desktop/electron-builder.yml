@@ -14,19 +14,6 @@ files:
   # excluirlos del traversal de node_modules para evitar el bucle de symlinks de pnpm.
   - "!**/node_modules/@stockflow/**"
 
-# Quitar los workspace deps del package.json embebido en el .app: esbuild ya los inlineó
-# y `app-builder` se recurre en los symlinks de pnpm al intentar coleccionarlos.
-extraMetadata:
-  dependencies:
-    better-sqlite3: "^11.10.0"
-    electron-log: "^5.2.0"
-    usb: "^2.14.0"
-    serialport: "^12.0.0"
-    "@serialport/parser-readline": "^12.0.0"
-    archiver: "^7.0.1"
-    xlsx: "^0.18.5"
-    "node-thermal-printer": "^4.4.5"
-
 extraResources:
   - from: ../../packages/db/migrations/local
     to: migrations/local
