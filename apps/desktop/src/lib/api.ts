@@ -111,6 +111,12 @@ export const api = {
     findByBarcode: (barcode: string): Promise<ArticleDTO | null> => unwrap(sf().articles.findByBarcode({ barcode })),
     searchByText: (query: string): Promise<ArticleDTO[]> => unwrap(sf().articles.searchByText({ query })),
     findLowStock: (): Promise<ArticleDTO[]> => unwrap(sf().articles.findLowStock()),
+    uploadImage: (articleId: string, sourcePath: string): Promise<{ imagePath: string }> =>
+      unwrap(sf().articles.uploadImage({ articleId, sourcePath })),
+    removeImage: (articleId: string): Promise<{ ok: true }> =>
+      unwrap(sf().articles.removeImage({ articleId })),
+    getImageDataUrl: (articleId: string): Promise<{ dataUrl: string | null }> =>
+      unwrap(sf().articles.getImageDataUrl({ articleId })),
   },
   customers: {
     list: (): Promise<CustomerDTO[]> => unwrap(sf().customers.list()),
@@ -208,6 +214,7 @@ export const api = {
   system: {
     pickFile: (filters?: { name: string; extensions: string[] }[]): Promise<{ filePath: string | null }> =>
       unwrap(sf().system.pickFile({ filters })),
+    pickImage: (): Promise<{ filePath: string | null }> => unwrap(sf().system.pickImage()),
     getInfo: (): Promise<SystemInfoDTO> => unwrap(sf().system.getInfo()),
     getVersion: (): Promise<{ version: string }> => unwrap(sf().system.getVersion()),
     getDbPath: (): Promise<{ dbPath: string }> => unwrap(sf().system.getDbPath()),

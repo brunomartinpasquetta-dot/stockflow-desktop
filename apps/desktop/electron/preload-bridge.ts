@@ -211,6 +211,9 @@ export function createApiBridge(
       findByBarcode: (p) => c<never>('articles:findByBarcode', p),
       searchByText: (p) => c<never>('articles:searchByText', p),
       findLowStock: () => c<never>('articles:findLowStock'),
+      uploadImage: (p) => c<never>('articles:uploadImage', p),
+      removeImage: (p) => c<never>('articles:removeImage', p),
+      getImageDataUrl: (p) => c<never>('articles:getImageDataUrl', p),
     },
     customers: {
       list: () => c<never>('customers:list'),
@@ -307,6 +310,7 @@ export function createApiBridge(
     },
     system: {
       pickFile: (p) => c<never>('system:pickFile', p),
+      pickImage: () => c<never>('system:pickImage'),
       getMachineId: () => c<never>('system:getMachineId'),
       getVersion: () => c<never>('system:getVersion'),
       getDbPath: () => c<never>('system:getDbPath'),

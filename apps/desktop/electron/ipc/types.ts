@@ -703,6 +703,9 @@ export interface ApiSurface {
     findByBarcode(payload: { barcode: string }): Res<ArticleDTO | null>;
     searchByText(payload: { query: string }): Res<ArticleDTO[]>;
     findLowStock(): Res<ArticleDTO[]>;
+    uploadImage(payload: { articleId: string; sourcePath: string }): Res<{ imagePath: string }>;
+    removeImage(payload: { articleId: string }): Res<{ ok: true }>;
+    getImageDataUrl(payload: { articleId: string }): Res<{ dataUrl: string | null }>;
   };
   customers: {
     list(): Res<CustomerDTO[]>;
@@ -799,6 +802,7 @@ export interface ApiSurface {
   };
   system: {
     pickFile(payload?: { filters?: { name: string; extensions: string[] }[] }): Res<{ filePath: string | null }>;
+    pickImage(): Res<{ filePath: string | null }>;
     getMachineId(): Res<{ machineId: string }>;
     getVersion(): Res<{ version: string }>;
     getDbPath(): Res<{ dbPath: string }>;

@@ -6,9 +6,10 @@
  * Arma los handlers con `buildAllHandlers` sobre una DB temporal y los invoca
  * manualmente con payloads de prueba, verificando el contrato `{ ok, ... }`.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Buffer } from 'node:buffer';
 
 import { closeLocalDb, createRepositories, initLocalDb } from '@stockflow/db';
 
@@ -123,6 +124,46 @@ async function main(): Promise<void> {
 
   const list = await invoke<Array<{ id: string }>>(handlers, 'articles:list');
   check('articles:list incluye el artículo recién creado', list.ok && list.data.some((a) => a.id === created.data.id), JSON.stringify(list).slice(0, 200));
+
+  // ---------------------- articles: imagen (upload/get/remove)
+  // PNG 1x1 transparente válido.
+  const PNG_1x1 = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+    'base64',
+  );
+  const tmpPngPath = join(tmpDir, 'sample.png');
+  writeFileSync(tmpPngPath, PNG_1x1);
+  const upload = await invoke<{ imagePath: string }>(handlers, 'articles:uploadImage', {
+    articleId: created.data.id,
+    sourcePath: tmpPngPath,
+  });
+  check(
+    'articles:uploadImage copia y persiste imagePath',
+    upload.ok && upload.data.imagePath.endsWith('.png') && existsSync(join(tmpDir, upload.data.imagePath)),
+    JSON.stringify(upload),
+  );
+  const dataUrl = await invoke<{ dataUrl: string | null }>(handlers, 'articles:getImageDataUrl', {
+    articleId: created.data.id,
+  });
+  check(
+    'articles:getImageDataUrl devuelve data:image/...',
+    dataUrl.ok && !!dataUrl.data.dataUrl && dataUrl.data.dataUrl.startsWith('data:image/'),
+    dataUrl.ok ? `prefix=${dataUrl.data.dataUrl?.slice(0, 24)}` : JSON.stringify(dataUrl),
+  );
+  const removeImg = await invoke<{ ok: true }>(handlers, 'articles:removeImage', {
+    articleId: created.data.id,
+  });
+  const afterRemove = await invoke<{ imagePath: string | null } | null>(handlers, 'articles:get', {
+    id: created.data.id,
+  });
+  check(
+    'articles:removeImage borra archivo + setea imagePath=null',
+    removeImg.ok &&
+      afterRemove.ok &&
+      afterRemove.data?.imagePath == null &&
+      !existsSync(join(tmpDir, 'article-images', `${created.data.id}.png`)),
+    JSON.stringify({ removeImg, afterRemove }).slice(0, 200),
+  );
 
   // paymentMethods:list (seed: 4 medios)
   const pms = await invoke<Array<{ id: string; name: string; isPhysicalCash: boolean }>>(handlers, 'paymentMethods:list');
