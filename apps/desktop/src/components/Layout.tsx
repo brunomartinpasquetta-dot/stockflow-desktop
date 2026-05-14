@@ -14,6 +14,7 @@ import { useGlobalShortcuts } from '@/lib/useGlobalShortcuts'
 import { useMdiShortcuts } from '@/lib/useMdiShortcuts'
 import { useDeepLinkRouter } from '@/lib/useDeepLinkRouter'
 import { MenuBar } from '@/components/MenuBar'
+import { QuickAccessToolbar } from '@/components/QuickAccessToolbar'
 import { StatusBar } from '@/components/StatusBar'
 import { Desktop } from '@/components/Desktop'
 import { Taskbar } from '@/components/Taskbar'
@@ -42,6 +43,7 @@ function LayoutInner() {
         </div>
       )}
       <MenuBar />
+      <QuickAccessToolbar />
       <StatusBar />
       <Desktop />
       <Taskbar />

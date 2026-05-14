@@ -1,8 +1,14 @@
 /**
- * MenuBar horizontal con 7 grupos (P-MDI-LAYOUT).
+ * MenuBar horizontal con 8 grupos (P-MDI-TOOLBAR).
  *
- * Cada grupo es un DropdownMenu de shadcn. Items deshabilitados (no ocultos) si
- * el usuario no tiene permisos o el rol requerido.
+ * Refinamiento visual del MenuBar de P-MDI-LAYOUT. Grupos:
+ *   Archivo · Gestión · Operaciones · Cobros y Pagos · Precios ·
+ *   Consultas · Contabilidad · Ayuda
+ *
+ * Cada grupo es un DropdownMenu de shadcn. Items deshabilitados (no ocultos)
+ * cuando el usuario no tiene permisos o el rol requerido.
+ *
+ * Altura del bar: h-9 (más compacto).
  */
 import { useState } from 'react'
 import {
@@ -13,13 +19,17 @@ import {
   ChevronDown,
   CreditCard,
   FileSpreadsheet,
+  HardDrive,
   History,
   Info,
   Landmark,
   LogOut,
+  Network,
   Package,
   PackagePlus,
+  Power,
   Receipt,
+  Save,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -66,9 +76,10 @@ const GROUPS: MenuGroup[] = [
     items: [
       { pageKey: 'empresa', label: 'Mi Empresa', icon: Building2, roles: ['admin'], requires: 'manage_company' },
       { pageKey: 'configuracion', label: 'Configuración', icon: Settings, roles: ['admin'] },
+      { pageKey: 'configuracion-mp', label: 'Configuración MercadoPago', icon: CreditCard, roles: ['admin'], requires: 'manage_mp_qr' },
       { separator: true, label: '' },
       { action: 'logout', label: 'Cerrar sesión', icon: LogOut, shortcut: 'Ctrl+L' },
-      { action: 'exit', label: 'Salir', icon: LogOut, shortcut: 'F12' },
+      { action: 'exit', label: 'Salir', icon: Power, shortcut: 'Cmd+Q' },
     ],
   },
   {
@@ -82,18 +93,31 @@ const GROUPS: MenuGroup[] = [
       { separator: true, label: '' },
       { pageKey: 'medios-de-pago', label: 'Medios de Pago', icon: CreditCard, roles: ['admin', 'manager'], requires: 'manage_payment_methods' },
       { separator: true, label: '' },
-      { pageKey: 'precios-actualizar', label: 'Actualizar Precios', icon: Tag, requires: 'manage_prices' },
-      { pageKey: 'precios-historial', label: 'Historial de Precios', icon: Tags, requires: 'manage_prices' },
+      { pageKey: 'importar-stock', label: 'Importar Stock', icon: FileSpreadsheet, roles: ['admin'], requires: 'import_data' },
     ],
   },
   {
     name: 'Operaciones',
     items: [
-      { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F5', requires: 'manage_purchases' },
       { pageKey: 'ventas', label: 'Ventas', icon: Receipt, shortcut: 'F6', requires: 'create_sale' },
+      { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F5', requires: 'manage_purchases' },
       { pageKey: 'caja', label: 'Caja', icon: Wallet, shortcut: 'F7' },
+    ],
+  },
+  {
+    name: 'Cobros y Pagos',
+    items: [
+      { pageKey: 'cuentas-corrientes', label: 'Cuentas Corrientes — Clientes', icon: Landmark },
+      { pageKey: 'cuentas-corrientes-proveedores', label: 'Cuentas Corrientes — Proveedores', icon: Truck },
       { separator: true, label: '' },
-      { pageKey: 'importar-stock', label: 'Importar Stock', icon: FileSpreadsheet, roles: ['admin'], requires: 'import_data' },
+      { pageKey: 'configuracion-mp', label: 'MercadoPago QR (configuración)', icon: CreditCard, roles: ['admin'], requires: 'manage_mp_qr' },
+    ],
+  },
+  {
+    name: 'Precios',
+    items: [
+      { pageKey: 'precios-actualizar', label: 'Actualización Masiva', icon: Tag, requires: 'manage_prices' },
+      { pageKey: 'precios-historial', label: 'Historial de Precios', icon: Tags, requires: 'manage_prices' },
     ],
   },
   {
@@ -106,28 +130,23 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'generador-compras', label: 'Generador de Compras', icon: PackagePlus, requires: 'view_reports' },
       { pageKey: 'inventario-articulos', label: 'Inventario de Artículos', icon: Boxes, requires: 'view_reports' },
       { pageKey: 'ventas-vendedor', label: 'Ventas por Vendedor', icon: ArrowLeftRight, requires: 'view_reports' },
-      { separator: true, label: '' },
-      { pageKey: 'contabilidad', label: 'Contabilidad', icon: Calculator, shortcut: 'F10', requires: 'view_accounting' },
+    ],
+  },
+  {
+    name: 'Contabilidad',
+    items: [
+      { pageKey: 'contabilidad', label: 'Resumen', icon: Calculator, shortcut: 'F10', requires: 'view_accounting' },
       { pageKey: 'libro-iva-ventas', label: 'Libro IVA Ventas', icon: Calculator, requires: 'view_accounting' },
       { pageKey: 'libro-iva-compras', label: 'Libro IVA Compras', icon: Calculator, requires: 'view_accounting' },
     ],
   },
   {
-    name: 'Cuentas Corrientes',
+    name: 'Ayuda',
     items: [
-      { pageKey: 'cuentas-corrientes', label: 'Clientes', icon: Landmark },
-      { pageKey: 'cuentas-corrientes-proveedores', label: 'Proveedores', icon: Truck },
-    ],
-  },
-  {
-    name: 'Pagos',
-    items: [
-      { pageKey: 'configuracion-mp', label: 'MercadoPago QR', icon: CreditCard, roles: ['admin'], requires: 'manage_mp_qr' },
-    ],
-  },
-  {
-    name: 'Sistema',
-    items: [
+      { pageKey: 'configuracion', label: 'Hardware (Impresora, Balanza, Cajón)', icon: HardDrive, roles: ['admin'] },
+      { pageKey: 'configuracion', label: 'Backup', icon: Save, roles: ['admin'] },
+      { pageKey: 'configuracion', label: 'LAN Multi-caja', icon: Network, roles: ['admin'] },
+      { separator: true, label: '' },
       { pageKey: 'acerca-de', label: 'Acerca de', icon: Info },
     ],
   },
@@ -159,11 +178,11 @@ export function MenuBar() {
   }
 
   return (
-    <div className="flex h-12 shrink-0 items-center gap-1 border-b bg-background px-3">
+    <div className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-3">
       {/* Logo */}
       <div className="mr-3 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <Boxes className="h-4 w-4" />
+        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <Boxes className="h-3.5 w-3.5" />
         </div>
         <span className="text-sm font-semibold">StockFlow</span>
       </div>
@@ -188,14 +207,14 @@ export function MenuBar() {
                 <ChevronDown className="h-3 w-3 opacity-60" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[220px]">
+            <DropdownMenuContent align="start" className="min-w-[240px]">
               {g.items.map((it, idx) => {
                 if (it.separator) return <DropdownMenuSeparator key={`sep-${idx}`} />
                 const enabled = isEnabled(it)
                 const Icon = it.icon
                 return (
                   <DropdownMenuItem
-                    key={`${g.name}-${it.label}`}
+                    key={`${g.name}-${it.label}-${idx}`}
                     disabled={!enabled}
                     onSelect={(e) => {
                       if (!enabled) {
@@ -204,7 +223,10 @@ export function MenuBar() {
                       }
                       handleSelect(it)
                     }}
-                    className="data-[highlighted]:bg-blue-500/15"
+                    className={cn(
+                      'data-[highlighted]:bg-blue-500/15',
+                      !enabled && 'opacity-50 cursor-not-allowed',
+                    )}
                   >
                     {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
                     <span className="flex-1">{it.label}</span>
