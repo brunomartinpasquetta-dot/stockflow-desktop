@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte, max, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, lte, max, sql } from 'drizzle-orm';
 import {
   CreateSaleWithLinesSchema,
   type CreateSaleWithLinesInput,
@@ -347,6 +347,25 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         .where(inArray(sales.id, ids))
         .all();
       return new Map(rows.map((r) => [r.id, r.status]));
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Busca ventas por su `number` (cast a texto para LIKE), ordenadas por fecha
+   * desc, para la búsqueda global (P-BUSQUEDA).
+   */
+  async findByNumberText(query: string, limit = 8): Promise<Sale[]> {
+    try {
+      const term = `%${query.trim()}%`;
+      return this.db
+        .select()
+        .from(sales)
+        .where(like(sql`CAST(${sales.number} AS TEXT)`, term))
+        .orderBy(desc(sales.date))
+        .limit(limit)
+        .all();
     } catch (err) {
       return rethrowDbError(err);
     }

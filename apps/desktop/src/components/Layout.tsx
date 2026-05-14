@@ -29,7 +29,11 @@ import {
 import { api } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLicenseStatus } from '@/contexts/LicenseContext'
+import { CommandPalette } from '@/components/CommandPalette'
+import { GlobalSearchBar } from '@/components/GlobalSearchBar'
 import { LanStatusIndicator } from '@/components/LanStatusIndicator'
+import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext'
+import { useGlobalShortcuts } from '@/lib/useGlobalShortcuts'
 import { ROLE_LABELS, hasPermission, type PermissionAction } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -80,6 +84,15 @@ function isEditingTarget(): boolean {
 }
 
 export function Layout() {
+  return (
+    <CommandPaletteProvider>
+      <LayoutInner />
+    </CommandPaletteProvider>
+  )
+}
+
+function LayoutInner() {
+  useGlobalShortcuts()
   const navigate = useNavigate()
   const location = useLocation()
   const { currentUser, logout } = useAuth()
@@ -179,8 +192,10 @@ export function Layout() {
             ⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.
           </div>
         )}
-        <header className="flex h-12 shrink-0 items-center justify-between border-b bg-background px-4">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-background px-4">
           <div className="truncate text-sm font-medium">{companyName}</div>
+          <div className="flex-1" />
+          <GlobalSearchBar />
           <div className="flex items-center gap-3 text-sm">
             <LanStatusIndicator />
             <span className="text-muted-foreground">
@@ -197,6 +212,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <CommandPalette />
     </div>
   )
 }

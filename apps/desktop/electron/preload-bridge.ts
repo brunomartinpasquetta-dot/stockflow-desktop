@@ -51,6 +51,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'accounts',
   'supplierAccounts',
   'reports',
+  'search',
   'paymentMethods',
   'priceUpdate',
   'backup',
@@ -307,6 +308,9 @@ export function createApiBridge(
       listBalances: () => c<never>('accounts:listBalances'),
       listOpenByCustomer: (p) =>
         c<never>('accounts:listOpenByCustomer', p),
+    },
+    search: {
+      global: (p) => c<never>('search:global', p),
     },
     reports: {
       salesByDateRange: (p) => c<never>('reports:salesByDateRange', p),

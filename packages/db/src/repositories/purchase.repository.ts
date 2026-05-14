@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte, max, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, lte, max, or, sql } from 'drizzle-orm';
 import {
   CreatePurchaseWithLinesSchema,
   type CreatePurchaseWithLinesInput,
@@ -295,6 +295,30 @@ export class PurchaseRepository extends BaseRepository<
         .select()
         .from(purchases)
         .where(and(gte(purchases.date, from), lte(purchases.date, to)))
+        .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Busca compras por `supplier_invoice_number` o por `number` (cast a texto),
+   * ordenadas por fecha desc, para la búsqueda global (P-BUSQUEDA).
+   */
+  async findByText(query: string, limit = 8): Promise<Purchase[]> {
+    try {
+      const term = `%${query.trim()}%`;
+      return this.db
+        .select()
+        .from(purchases)
+        .where(
+          or(
+            like(purchases.supplierInvoiceNumber, term),
+            like(sql`CAST(${purchases.number} AS TEXT)`, term),
+          ),
+        )
+        .orderBy(desc(purchases.date))
+        .limit(limit)
         .all();
     } catch (err) {
       return rethrowDbError(err);

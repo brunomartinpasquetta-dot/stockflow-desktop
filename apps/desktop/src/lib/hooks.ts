@@ -2,11 +2,13 @@
  * Hooks de TanStack Query para las entidades CRUD. Las mutaciones invalidan la
  * query de su entidad. Todo el estado servidor vive acá (no en useState).
  */
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
 import type {
   ArticleDTO,
+  GlobalSearchResultDTO,
   CashRegisterDTO,
   CashReportDTO,
   HistoricalCashRegisterDTO,
@@ -197,6 +199,35 @@ export function useArticlePriceHistory(articleId: string | null | undefined, lim
     queryKey: ['articlePriceHistory', articleId, limit],
     queryFn: () => api.priceUpdate.getArticleHistory(articleId as string, limit),
     enabled: Boolean(articleId),
+  })
+}
+
+// --- Búsqueda global (P-BUSQUEDA) ---
+export function useDebouncedValue<T>(value: T, delayMs = 200): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(t)
+  }, [value, delayMs])
+  return debounced
+}
+
+const EMPTY_SEARCH: GlobalSearchResultDTO = {
+  articles: [],
+  customers: [],
+  suppliers: [],
+  sales: [],
+  purchases: [],
+}
+
+export function useGlobalSearch(query: string, debounceMs = 200) {
+  const debounced = useDebouncedValue(query.trim(), debounceMs)
+  return useQuery<GlobalSearchResultDTO>({
+    queryKey: ['globalSearch', debounced],
+    queryFn: () => (debounced.length === 0 ? Promise.resolve(EMPTY_SEARCH) : api.search.global({ query: debounced })),
+    enabled: true,
+    staleTime: 10_000,
+    placeholderData: (prev) => prev ?? EMPTY_SEARCH,
   })
 }
 

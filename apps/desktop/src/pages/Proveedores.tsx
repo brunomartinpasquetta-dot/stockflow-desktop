@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { toast } from 'sonner'
 
@@ -26,6 +27,22 @@ export function Proveedores() {
   const m = useSupplierMutations()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<SupplierDTO | null>(null)
+
+  // Deep-link: `?supplierId=<id>` abre el dialog de edición.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const id = searchParams.get('supplierId')
+    if (!id) return
+    const target = (suppliers.data ?? []).find((s) => s.id === id)
+    if (target) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEditing(target)
+      setFormOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete('supplierId')
+      setSearchParams(next, { replace: true })
+    }
+  }, [suppliers.data, searchParams, setSearchParams])
 
   const columns: Column<SupplierDTO>[] = [
     { key: 'code', header: 'Código' },

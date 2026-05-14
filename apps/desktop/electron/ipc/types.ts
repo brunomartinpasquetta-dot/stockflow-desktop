@@ -779,6 +779,31 @@ export interface PriceUpdateApplyResultDTO {
   entries: number;
 }
 
+/* ----------------------------------------------------------------------- */
+/* Búsqueda global (P-BUSQUEDA)                                             */
+/* ----------------------------------------------------------------------- */
+
+export type GlobalSearchCategoryDTO =
+  | 'articles'
+  | 'customers'
+  | 'suppliers'
+  | 'sales'
+  | 'purchases';
+
+export interface GlobalSearchPayloadDTO {
+  query: string;
+  limitPerCategory?: number;
+  categories?: GlobalSearchCategoryDTO[];
+}
+
+export interface GlobalSearchResultDTO {
+  articles: ArticleDTO[];
+  customers: CustomerDTO[];
+  suppliers: SupplierDTO[];
+  sales: SaleDTO[];
+  purchases: PurchaseDTO[];
+}
+
 /** Payload genérico para create/update de entidades simples (validado server-side por Zod). */
 export type EntityPayload = Record<string, unknown>;
 export interface IdPayload {
@@ -906,6 +931,9 @@ export interface ApiSurface {
     getTotalReceivables(): Res<{ total: string }>;
     listBalances(): Res<CustomerBalanceDTO[]>;
     listOpenByCustomer(payload: { customerId: string }): Res<AccountReceivableDTO[]>;
+  };
+  search: {
+    global(payload: GlobalSearchPayloadDTO): Res<GlobalSearchResultDTO>;
   };
   reports: {
     salesByDateRange(payload: DateRangeDTO & { sellerId?: string; customerId?: string }): Res<SalesReportDTO>;

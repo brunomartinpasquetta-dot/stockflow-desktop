@@ -42,6 +42,28 @@ export class CustomerRepository extends BaseRepository<Customer, NewCustomer> {
     }
   }
 
+  /** Variante con límite y email para la búsqueda global (P-BUSQUEDA). */
+  async findByText(query: string, limit = 8): Promise<Customer[]> {
+    try {
+      const term = `%${query.trim()}%`;
+      return this.db
+        .select()
+        .from(customers)
+        .where(
+          or(
+            like(customers.lastName, term),
+            like(customers.firstName, term),
+            like(customers.docNumber, term),
+            like(customers.email, term),
+          ),
+        )
+        .limit(limit)
+        .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async findByDocNumber(docNumber: string): Promise<Customer | null> {
     try {
       const row = this.db

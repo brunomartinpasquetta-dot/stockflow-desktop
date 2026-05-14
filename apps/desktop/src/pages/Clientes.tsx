@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { toast } from 'sonner'
 
@@ -70,6 +71,22 @@ export function Clientes() {
   const m = useCustomerMutations()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CustomerDTO | null>(null)
+
+  // Deep-link: `?customerId=<id>` abre el dialog de edición.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const id = searchParams.get('customerId')
+    if (!id) return
+    const target = (customers.data ?? []).find((c) => c.id === id)
+    if (target) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEditing(target)
+      setFormOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete('customerId')
+      setSearchParams(next, { replace: true })
+    }
+  }, [customers.data, searchParams, setSearchParams])
 
   const debtById = useMemo(() => {
     const map = new Map<string, string>()

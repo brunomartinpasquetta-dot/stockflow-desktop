@@ -52,6 +52,8 @@ import type {
   PurchaseLineDTO,
   ReceivePaymentInputDTO,
   ReceivePaymentResultDTO,
+  GlobalSearchCategoryDTO,
+  GlobalSearchResultDTO,
   SaleDTO,
   SaleLineDTO,
   SalePaymentDTO,
@@ -231,6 +233,10 @@ export const api = {
     getTotalReceivables: (): Promise<{ total: string }> => unwrap(sf().accounts.getTotalReceivables()),
     listBalances: (): Promise<CustomerBalanceDTO[]> => unwrap(sf().accounts.listBalances()),
     listOpenByCustomer: (customerId: string): Promise<AccountReceivableDTO[]> => unwrap(sf().accounts.listOpenByCustomer({ customerId })),
+  },
+  search: {
+    global: (payload: { query: string; limitPerCategory?: number; categories?: GlobalSearchCategoryDTO[] }): Promise<GlobalSearchResultDTO> =>
+      unwrap(sf().search.global(payload)),
   },
   system: {
     pickFile: (filters?: { name: string; extensions: string[] }[]): Promise<{ filePath: string | null }> =>

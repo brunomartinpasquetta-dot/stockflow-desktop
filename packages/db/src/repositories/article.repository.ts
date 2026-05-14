@@ -77,6 +77,33 @@ export class ArticleRepository extends BaseRepository<Article, NewArticle> {
     }
   }
 
+  /**
+   * Búsqueda multi-campo (descripción, marca o código de barras) con límite,
+   * usada por la búsqueda global (P-BUSQUEDA).
+   */
+  async findByText(query: string, limit = 8): Promise<Article[]> {
+    try {
+      const term = `%${query.trim()}%`;
+      return this.db
+        .select()
+        .from(articles)
+        .where(
+          and(
+            eq(articles.active, true),
+            or(
+              like(articles.barcode, term),
+              like(articles.description, term),
+              like(articles.brand, term),
+            ),
+          ),
+        )
+        .limit(limit)
+        .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async incrementStock(id: string, qty: string): Promise<void> {
     try {
       const res = this.db

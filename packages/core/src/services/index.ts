@@ -12,6 +12,7 @@ import { PriceUpdateService } from './priceUpdate.service';
 import { PurchasesService } from './purchases.service';
 import { ReportsService } from './reports.service';
 import { SalesService } from './sales.service';
+import { SearchService } from './search.service';
 import { SupplierAccountsService } from './supplierAccounts.service';
 
 export { AuthService, type LoginResult } from './auth.service';
@@ -86,6 +87,12 @@ export {
   type SellerReportRow,
   type TopArticleRow,
 } from './reports.service';
+export {
+  SearchService,
+  type GlobalSearchCategory,
+  type GlobalSearchOptions,
+  type GlobalSearchResult,
+} from './search.service';
 
 export interface Services {
   auth: AuthService;
@@ -99,6 +106,7 @@ export interface Services {
   paymentMethods: PaymentMethodService;
   priceUpdates: PriceUpdateService;
   reports: ReportsService;
+  search: SearchService;
 }
 
 /** Construye todos los servicios de dominio sobre un contexto dado. */
@@ -115,5 +123,6 @@ export function createServices(ctx: ServiceContext): Services {
     paymentMethods: new PaymentMethodService(ctx),
     priceUpdates: new PriceUpdateService(ctx),
     reports: new ReportsService(ctx),
+    search: new SearchService(ctx),
   };
 }

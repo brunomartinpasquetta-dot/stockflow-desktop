@@ -19,6 +19,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   ChevronDown,
@@ -197,6 +198,35 @@ export function Articulos() {
 
   const searchRef = useRef<HTMLInputElement | null>(null)
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // Deep-link desde el CommandPalette: `?articleId=<id>` / `?action=new`.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const articleId = searchParams.get('articleId')
+    const action = searchParams.get('action')
+    if (articleId && (articles.data ?? []).some((a) => a.id === articleId)) {
+      const target = (articles.data ?? []).find((a) => a.id === articleId)
+      if (target) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSelectedId(target.id)
+        setMode('view')
+        setForm(articleToForm(target))
+        setPendingImageSource(null)
+      }
+      const next = new URLSearchParams(searchParams)
+      next.delete('articleId')
+      setSearchParams(next, { replace: true })
+    } else if (action === 'new' && canEditArticles) {
+      setSelectedId(null)
+      setMode('create')
+      setForm(EMPTY_FORM)
+      setPendingImageSource(null)
+      const next = new URLSearchParams(searchParams)
+      next.delete('action')
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articles.data, searchParams])
 
   const familyName = useMemo(() => {
     const map = new Map<string, string>()

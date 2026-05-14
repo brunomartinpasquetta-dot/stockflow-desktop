@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, like, or } from 'drizzle-orm';
 import { CreateSupplierSchema, UpdateSupplierSchema } from '@stockflow/shared';
 
 import { rethrowDbError } from '../errors';
@@ -18,6 +18,27 @@ export class SupplierRepository extends BaseRepository<Supplier, NewSupplier> {
     try {
       const row = this.db.select().from(suppliers).where(eq(suppliers.code, code)).get();
       return row ?? null;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /** Búsqueda multi-campo (razón social, código o CUIT) para P-BUSQUEDA. */
+  async findByText(query: string, limit = 8): Promise<Supplier[]> {
+    try {
+      const term = `%${query.trim()}%`;
+      return this.db
+        .select()
+        .from(suppliers)
+        .where(
+          or(
+            like(suppliers.name, term),
+            like(suppliers.code, term),
+            like(suppliers.cuit, term),
+          ),
+        )
+        .limit(limit)
+        .all();
     } catch (err) {
       return rethrowDbError(err);
     }

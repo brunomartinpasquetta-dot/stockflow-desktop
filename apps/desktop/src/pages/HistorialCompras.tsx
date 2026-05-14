@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -162,6 +163,18 @@ export function HistorialCompras() {
   const [searchNumber, setSearchNumber] = useState('')
   const [page, setPage] = useState(0)
   const [detailId, setDetailId] = useState<string | null>(null)
+
+  // Deep-link: `?purchaseId=<id>` abre el detalle.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const id = searchParams.get('purchaseId')
+    if (!id) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDetailId(id)
+    const next = new URLSearchParams(searchParams)
+    next.delete('purchaseId')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const purchasesQuery = useQuery({
     queryKey: ['purchasesHistory', fromIso, toIso],

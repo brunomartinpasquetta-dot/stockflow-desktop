@@ -26,6 +26,7 @@ import { buildUpdaterHandlers } from './handlers/updater.handlers';
 import { buildPurchasesHandlers } from './handlers/purchases.handlers';
 import { buildReportsHandlers } from './handlers/reports.handlers';
 import { buildSalesHandlers } from './handlers/sales.handlers';
+import { buildSearchHandlers } from './handlers/search.handlers';
 import { buildSupplierAccountsHandlers } from './handlers/supplierAccounts.handlers';
 import { buildSuppliersHandlers } from './handlers/suppliers.handlers';
 import { buildSystemHandlers } from './handlers/system.handlers';
@@ -49,6 +50,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildPriceUpdateHandlers,
   buildAccountsHandlers,
   buildReportsHandlers,
+  buildSearchHandlers,
   buildSystemHandlers,
   buildLicenseHandlers,
   buildHardwareHandlers,

@@ -284,6 +284,20 @@ async function main(): Promise<void> {
   });
   check('priceUpdate:rollback', puRollback.ok && puRollback.data.entriesReverted === 1, JSON.stringify(puRollback));
 
+  // búsqueda global (P-BUSQUEDA): el artículo creado contiene "Producto IPC test".
+  const searchRes = await invoke<{ articles: Array<{ id: string }>; customers: Array<unknown>; suppliers: Array<unknown>; sales: Array<unknown>; purchases: Array<unknown> }>(
+    handlers,
+    'search:global',
+    { query: 'producto' },
+  );
+  check(
+    'search:global devuelve el artículo recién creado',
+    searchRes.ok && searchRes.data.articles.some((a) => a.id === created.data.id),
+    searchRes.ok ? `arts=${searchRes.data.articles.length}` : JSON.stringify(searchRes),
+  );
+  const searchEmpty = await invoke<{ articles: unknown[] }>(handlers, 'search:global', { query: '' });
+  check('search:global con query vacía → arrays vacíos', searchEmpty.ok && Array.isArray(searchEmpty.data.articles) && searchEmpty.data.articles.length === 0, JSON.stringify(searchEmpty));
+
   // logout → vuelve a UNAUTHENTICATED
   await invoke(handlers, 'auth:logout');
   const afterLogout = await invoke(handlers, 'articles:list');

@@ -568,6 +568,29 @@ async function main(): Promise<void> {
   check('applyRounding up_to_50(123.45) = 150', applyRounding(123.45, 'up_to_50') === 150);
   check('applyRounding up_to_100(123.45) = 200', applyRounding(123.45, 'up_to_100') === 200);
 
+  // ----------------------------------------------------- búsqueda global (P-BUSQUEDA)
+  console.log('\n[search]');
+  await repos.articles.create({ barcode: '7790000001000', description: 'Coca Cola 500ml', listPrice1: '300.0000', stock: '10.000' });
+  await repos.articles.create({ barcode: '7790000001001', description: 'Pepsi 500ml', listPrice1: '290.0000', stock: '10.000' });
+  await repos.articles.create({ barcode: '7790000001002', description: 'Sprite 500ml', listPrice1: '290.0000', stock: '10.000' });
+  await repos.customers.create({ lastName: 'PEREZ', firstName: 'Coca', category: 'CF' });
+
+  const sCoca = await admin.search.globalSearch({ query: 'coca' });
+  check(
+    'search: query "coca" devuelve 1 artículo y 1 cliente',
+    sCoca.articles.length === 1 && (sCoca.articles[0]?.description.includes('Coca') ?? false) && sCoca.customers.length === 1,
+    `arts=${sCoca.articles.length} cust=${sCoca.customers.length}`,
+  );
+
+  const sLimit = await admin.search.globalSearch({ query: '500', limitPerCategory: 2 });
+  check('search: limitPerCategory=2 respeta el límite', sLimit.articles.length <= 2, `arts=${sLimit.articles.length}`);
+
+  const sEmpty = await admin.search.globalSearch({ query: '' });
+  check('search: query vacía devuelve listas vacías', sEmpty.articles.length === 0 && sEmpty.customers.length === 0 && sEmpty.suppliers.length === 0 && sEmpty.sales.length === 0 && sEmpty.purchases.length === 0);
+
+  const sCats = await admin.search.globalSearch({ query: 'coca', categories: ['articles'] });
+  check('search: filtro por category sólo devuelve artículos', sCats.articles.length === 1 && sCats.customers.length === 0);
+
   closeLocalDb(db);
 }
 

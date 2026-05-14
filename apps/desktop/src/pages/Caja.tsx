@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Plus, Wallet } from 'lucide-react'
@@ -53,6 +54,16 @@ function CajaCerrada() {
   const { open } = useCashMutations()
   const canWrite = useCanWrite()
   const [amount, setAmount] = useState('0')
+  // Deep-link `?action=open`: marca el input para auto-foco (ya está autoFocus).
+  // Solo limpia el param.
+  const [searchParamsClosed, setSearchParamsClosed] = useSearchParams()
+  useEffect(() => {
+    if (searchParamsClosed.get('action') === 'open') {
+      const next = new URLSearchParams(searchParamsClosed)
+      next.delete('action')
+      setSearchParamsClosed(next, { replace: true })
+    }
+  }, [searchParamsClosed, setSearchParamsClosed])
 
   async function abrir(): Promise<void> {
     try {
@@ -137,6 +148,18 @@ function CajaAbierta({ registerId }: { registerId: string }) {
   const [closeOpen, setCloseOpen] = useState(false)
   const [closeAmount, setCloseAmount] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
+
+  // Deep-link `?action=close`: abrir el dialog de cierre al cargar.
+  const [searchParamsOpen, setSearchParamsOpen] = useSearchParams()
+  useEffect(() => {
+    if (searchParamsOpen.get('action') === 'close') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCloseOpen(true)
+      const next = new URLSearchParams(searchParamsOpen)
+      next.delete('action')
+      setSearchParamsOpen(next, { replace: true })
+    }
+  }, [searchParamsOpen, setSearchParamsOpen])
 
   const r = report.data
   const expected = r?.expectedCash ?? '0'
