@@ -18,6 +18,7 @@ import {
   BusinessRuleError,
   PermissionDeniedError,
   ValidationError,
+  applyRounding,
   createServiceContext,
   createServices,
   resolvePrice,
@@ -483,6 +484,89 @@ async function main(): Promise<void> {
   const scarceRow = lowStock.find((r) => r.article.id === scarce.id);
   check('getLowStockReport incluye el artículo escaso', scarceRow != null, `suggested=${scarceRow?.suggestedOrder}`);
   check('getLowStockReport sugiere ideal - stock', scarceRow?.suggestedOrder === '19.000', `suggested=${scarceRow?.suggestedOrder}`);
+
+  // ------------------------------------------------------- price updates
+  console.log('\n[price update]');
+  // Familia + 10 artículos.
+  const famF1 = await repos.families.create({ name: 'F1' });
+  const supS1 = await repos.suppliers.create({ code: 'S1', name: 'Proveedor S1' });
+  const puArts: Array<{ id: string }> = [];
+  for (let i = 0; i < 10; i++) {
+    puArts.push(
+      await repos.articles.create({
+        barcode: `PU-${i.toString().padStart(4, '0')}`,
+        description: `PU artículo ${i}`,
+        familyId: famF1.id,
+        supplierId: supS1.id,
+        costPrice: '100.0000',
+        listPrice1: '150.0000',
+        stock: '10.000',
+      }),
+    );
+  }
+
+  const previewPct = await admin.priceUpdates.previewUpdate({
+    filter: { scope: 'family', familyId: famF1.id, onlyActive: true },
+    rule: { type: 'percentage', value: '15', direction: 'increase', fields: ['listPrice1'] },
+  });
+  check(
+    'preview +15% listPrice1 (familia F1): 10 entries',
+    previewPct.articlesAffected === 10 && previewPct.entries.length === 10,
+    `aff=${previewPct.articlesAffected} entries=${previewPct.entries.length}`,
+  );
+  const firstNew = previewPct.entries[0]!.newValue;
+  check('preview +15%: 150 → 172.5', firstNew === '172.5000', `nv=${firstNew}`);
+
+  const applied = await admin.priceUpdates.applyUpdate({
+    filter: { scope: 'family', familyId: famF1.id, onlyActive: true },
+    rule: { type: 'percentage', value: '15', direction: 'increase', fields: ['listPrice1'] },
+    description: 'Aumento de prueba +15%',
+  });
+  check('applyUpdate: 10 artículos actualizados', applied.articlesAffected === 10 && applied.entries === 10);
+  const a0After = await repos.articles.findById(puArts[0]!.id);
+  check('applyUpdate: precio en DB actualizado', a0After?.listPrice1 === '172.5000', `lp1=${a0After?.listPrice1}`);
+
+  const batches = await admin.priceUpdates.listBatches({});
+  check('listBatches: incluye el batch recién creado', batches.some((b) => b.id === applied.batchId));
+
+  const rollback = await admin.priceUpdates.rollbackBatch(applied.batchId);
+  check('rollbackBatch: revierte 10 entries', rollback.entriesReverted === 10);
+  const a0Restored = await repos.articles.findById(puArts[0]!.id);
+  check('rollback: precio restaurado a 150', a0Restored?.listPrice1 === '150.0000', `lp1=${a0Restored?.listPrice1}`);
+  await expectThrows(
+    'rollback de un batch ya revertido → BusinessRuleError',
+    () => admin.priceUpdates.rollbackBatch(applied.batchId),
+    (e) => e instanceof BusinessRuleError,
+  );
+
+  // recalculate_from_cost + keepUtility: sube costo +10%, listPrice1 sube proporcionalmente.
+  // Cost 100 → 110; utility original = (150-100)/100 = 0.5 → newList = 110 * 1.5 = 165.
+  const previewKeep = await admin.priceUpdates.previewUpdate({
+    filter: { scope: 'family', familyId: famF1.id, onlyActive: true },
+    rule: {
+      type: 'percentage',
+      value: '10',
+      direction: 'increase',
+      fields: ['costPrice', 'listPrice1'],
+      keepUtility: true,
+    },
+  });
+  const previewKeepArt0 = previewKeep.entries.filter((e) => e.articleId === puArts[0]!.id);
+  const newCost = previewKeepArt0.find((e) => e.field === 'costPrice')?.newValue;
+  const newList = previewKeepArt0.find((e) => e.field === 'listPrice1')?.newValue;
+  check(
+    'preview keepUtility: cost 100→110, list 150→165',
+    newCost === '110.0000' && newList === '165.0000',
+    `cost=${newCost} list=${newList}`,
+  );
+
+  // Helper de redondeo (puro).
+  check('applyRounding nearest_99(123.45) = 199', applyRounding(123.45, 'nearest_99') === 199);
+  check('applyRounding nearest_99(50) = 99', applyRounding(50, 'nearest_99') === 99);
+  check('applyRounding nearest_99(250) = 299', applyRounding(250, 'nearest_99') === 299);
+  check('applyRounding up_to_10(123.45) = 130', applyRounding(123.45, 'up_to_10') === 130);
+  check('applyRounding up_to_50(123.45) = 150', applyRounding(123.45, 'up_to_50') === 150);
+  check('applyRounding up_to_100(123.45) = 200', applyRounding(123.45, 'up_to_100') === 200);
 
   closeLocalDb(db);
 }

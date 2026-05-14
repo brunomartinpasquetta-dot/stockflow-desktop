@@ -19,6 +19,9 @@ import type {
   EntityPayload,
   FamilyDTO,
   PaymentMethodDTO,
+  PriceUpdateBatchDTO,
+  PriceUpdateBatchDetailDTO,
+  PriceUpdateEntryWithBatchDTO,
   SupplierBalanceDTO,
   SupplierDTO,
   UserDTO,
@@ -171,6 +174,30 @@ export function useCashMutations() {
       onSuccess: invalidateCash,
     }),
   }
+}
+
+// --- Actualización de precios ---
+export function usePriceUpdateBatches(params: { from?: number; to?: number } = {}) {
+  return useQuery<PriceUpdateBatchDTO[]>({
+    queryKey: ['priceUpdateBatches', params.from ?? null, params.to ?? null],
+    queryFn: () => api.priceUpdate.listBatches(params.from, params.to),
+  })
+}
+
+export function usePriceUpdateBatchDetail(batchId: string | null | undefined) {
+  return useQuery<PriceUpdateBatchDetailDTO>({
+    queryKey: ['priceUpdateBatch', batchId],
+    queryFn: () => api.priceUpdate.getBatchDetail(batchId as string),
+    enabled: Boolean(batchId),
+  })
+}
+
+export function useArticlePriceHistory(articleId: string | null | undefined, limit = 10) {
+  return useQuery<PriceUpdateEntryWithBatchDTO[]>({
+    queryKey: ['articlePriceHistory', articleId, limit],
+    queryFn: () => api.priceUpdate.getArticleHistory(articleId as string, limit),
+    enabled: Boolean(articleId),
+  })
 }
 
 // --- Ventas ---

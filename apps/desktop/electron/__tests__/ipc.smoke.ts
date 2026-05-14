@@ -249,6 +249,41 @@ async function main(): Promise<void> {
   const notFound = await invoke(handlers, 'sales:get', { id: 'no-existe' });
   check('sales:get id inexistente → NOT_FOUND', !notFound.ok && notFound.code === 'NOT_FOUND', JSON.stringify(notFound));
 
+  // priceUpdate flow: preview → apply → rollback sobre el artículo creado.
+  const puPreview = await invoke<{ articlesAffected: number; entries: Array<{ field: string; newValue: string }> }>(
+    handlers,
+    'priceUpdate:preview',
+    {
+      filter: { scope: 'manual', articleIds: [created.data.id], onlyActive: true },
+      rule: { type: 'percentage', value: '10', direction: 'increase', fields: ['listPrice1'] },
+    },
+  );
+  check(
+    'priceUpdate:preview +10% listPrice1 sobre artículo seleccionado',
+    puPreview.ok && puPreview.data.articlesAffected === 1 && puPreview.data.entries[0]?.newValue === '550.0000',
+    puPreview.ok ? `nv=${puPreview.data.entries[0]?.newValue}` : JSON.stringify(puPreview),
+  );
+  const puApply = await invoke<{ batchId: string; articlesAffected: number; entries: number }>(
+    handlers,
+    'priceUpdate:apply',
+    {
+      filter: { scope: 'manual', articleIds: [created.data.id], onlyActive: true },
+      rule: { type: 'percentage', value: '10', direction: 'increase', fields: ['listPrice1'] },
+      description: 'Suba IPC',
+    },
+  );
+  check('priceUpdate:apply', puApply.ok && puApply.data.articlesAffected === 1 && puApply.data.entries === 1, JSON.stringify(puApply));
+  const articleAfterPu = await invoke<{ listPrice1: string } | null>(handlers, 'articles:get', { id: created.data.id });
+  check(
+    'priceUpdate:apply actualizó listPrice1 a 550.0000',
+    articleAfterPu.ok && articleAfterPu.data?.listPrice1 === '550.0000',
+    JSON.stringify(articleAfterPu),
+  );
+  const puRollback = await invoke<{ entriesReverted: number }>(handlers, 'priceUpdate:rollback', {
+    batchId: puApply.ok ? puApply.data.batchId : '',
+  });
+  check('priceUpdate:rollback', puRollback.ok && puRollback.data.entriesReverted === 1, JSON.stringify(puRollback));
+
   // logout → vuelve a UNAUTHENTICATED
   await invoke(handlers, 'auth:logout');
   const afterLogout = await invoke(handlers, 'articles:list');

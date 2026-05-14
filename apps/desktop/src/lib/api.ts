@@ -41,6 +41,13 @@ import type {
   PaySupplierInvoiceInputDTO,
   PaySupplierInvoiceResultDTO,
   PaymentMethodDTO,
+  PriceUpdateApplyResultDTO,
+  PriceUpdateBatchDTO,
+  PriceUpdateBatchDetailDTO,
+  PriceUpdateEntryWithBatchDTO,
+  PriceUpdateFilterDTO,
+  PriceUpdatePreviewResultDTO,
+  PriceUpdateRuleDTO,
   PurchaseDTO,
   PurchaseLineDTO,
   ReceivePaymentInputDTO,
@@ -203,6 +210,20 @@ export const api = {
     adjustStock: (articleId: string, newStock: string, reason: string): Promise<StockAdjustmentDTO> =>
       unwrap(sf().inventory.adjustStock({ articleId, newStock, reason })),
     getLowStockReport: (): Promise<LowStockEntryDTO[]> => unwrap(sf().inventory.getLowStockReport()),
+  },
+  priceUpdate: {
+    preview: (filter: PriceUpdateFilterDTO, rule: PriceUpdateRuleDTO): Promise<PriceUpdatePreviewResultDTO> =>
+      unwrap(sf().priceUpdate.preview({ filter, rule })),
+    apply: (filter: PriceUpdateFilterDTO, rule: PriceUpdateRuleDTO, description: string): Promise<PriceUpdateApplyResultDTO> =>
+      unwrap(sf().priceUpdate.apply({ filter, rule, description })),
+    listBatches: (from?: number, to?: number): Promise<PriceUpdateBatchDTO[]> =>
+      unwrap(sf().priceUpdate.listBatches({ from, to })),
+    getBatchDetail: (batchId: string): Promise<PriceUpdateBatchDetailDTO> =>
+      unwrap(sf().priceUpdate.getBatchDetail({ batchId })),
+    rollback: (batchId: string): Promise<{ entriesReverted: number }> =>
+      unwrap(sf().priceUpdate.rollback({ batchId })),
+    getArticleHistory: (articleId: string, limit?: number): Promise<PriceUpdateEntryWithBatchDTO[]> =>
+      unwrap(sf().priceUpdate.getArticleHistory({ articleId, limit })),
   },
   accounts: {
     receivePayment: (input: ReceivePaymentInputDTO): Promise<ReceivePaymentResultDTO> => unwrap(sf().accounts.receivePayment(input)),

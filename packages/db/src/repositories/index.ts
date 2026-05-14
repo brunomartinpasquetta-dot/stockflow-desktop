@@ -15,6 +15,7 @@ import { CustomerRepository } from './customer.repository';
 import { FamilyRepository } from './family.repository';
 import { PaymentRepository } from './payment.repository';
 import { PaymentMethodRepository } from './paymentMethod.repository';
+import { PriceUpdateRepository } from './priceUpdate.repository';
 import { PurchaseRepository } from './purchase.repository';
 import { PurchaseLineRepository } from './purchaseLine.repository';
 import { SaleRepository } from './sale.repository';
@@ -36,6 +37,11 @@ export { CustomerRepository, type CustomerWithBalance } from './customer.reposit
 export { FamilyRepository } from './family.repository';
 export { PaymentRepository } from './payment.repository';
 export { PaymentMethodRepository } from './paymentMethod.repository';
+export {
+  PriceUpdateRepository,
+  type PriceUpdateBatchWithUser,
+  type PriceUpdateEntryWithBatch,
+} from './priceUpdate.repository';
 export { PurchaseRepository, type PurchaseWithLines } from './purchase.repository';
 export { PurchaseLineRepository } from './purchaseLine.repository';
 export { SaleRepository, type SaleWithLines } from './sale.repository';
@@ -67,6 +73,7 @@ export interface Repositories {
   supplierAccountsPayable: SupplierAccountPayableRepository;
   supplierPayments: SupplierPaymentRepository;
   paymentMethods: PaymentMethodRepository;
+  priceUpdates: PriceUpdateRepository;
   /** Tabla `cards` heredada: queda en DB sin uso activo desde P07.2. */
   cards: CardRepository;
   company: CompanyRepository;
@@ -92,6 +99,7 @@ export function createRepositories(db: LocalDatabase): Repositories {
     supplierAccountsPayable: new SupplierAccountPayableRepository(db),
     supplierPayments: new SupplierPaymentRepository(db),
     paymentMethods: new PaymentMethodRepository(db),
+    priceUpdates: new PriceUpdateRepository(db),
     cards: new CardRepository(db),
     company: new CompanyRepository(db),
   };

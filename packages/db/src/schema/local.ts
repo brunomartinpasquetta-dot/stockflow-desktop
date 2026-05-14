@@ -760,6 +760,52 @@ export const supplierAccountsPayableRelations = relations(
   }),
 );
 
+/* ------------------------------------------------------------------ */
+/* priceUpdateBatches — lote de actualización masiva de precios        */
+/* ------------------------------------------------------------------ */
+export const priceUpdateBatches = sqliteTable('price_update_batches', {
+  id: pk(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id),
+  description: text('description').notNull(),
+  filterJson: text('filter_json').notNull(),
+  ruleJson: text('rule_json').notNull(),
+  articlesAffected: integer('articles_affected').notNull().default(0),
+  appliedAt: integer('applied_at').notNull(),
+  rolledBackAt: integer('rolled_back_at'),
+  createdAt: createdAtCol(),
+});
+
+/* ------------------------------------------------------------------ */
+/* priceUpdateEntries — entradas individuales (un campo de un artículo) */
+/* ------------------------------------------------------------------ */
+export const priceUpdateEntries = sqliteTable(
+  'price_update_entries',
+  {
+    id: pk(),
+    batchId: text('batch_id')
+      .notNull()
+      .references(() => priceUpdateBatches.id, { onDelete: 'cascade' }),
+    articleId: text('article_id')
+      .notNull()
+      .references(() => articles.id),
+    field: text('field').notNull(),
+    oldValue: text('old_value').notNull(),
+    newValue: text('new_value').notNull(),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    byBatch: index('idx_pu_batch').on(t.batchId),
+    byArticle: index('idx_pu_article').on(t.articleId),
+  }),
+);
+
+export type PriceUpdateBatch = typeof priceUpdateBatches.$inferSelect;
+export type NewPriceUpdateBatch = typeof priceUpdateBatches.$inferInsert;
+export type PriceUpdateEntry = typeof priceUpdateEntries.$inferSelect;
+export type NewPriceUpdateEntry = typeof priceUpdateEntries.$inferInsert;
+
 export const supplierPaymentsRelations = relations(supplierPayments, ({ one }) => ({
   account: one(supplierAccountsPayable, {
     fields: [supplierPayments.accountId],
@@ -835,6 +881,8 @@ export const localSchema = {
   payments,
   supplierAccountsPayable,
   supplierPayments,
+  priceUpdateBatches,
+  priceUpdateEntries,
   familiesRelations,
   suppliersRelations,
   articlesRelations,

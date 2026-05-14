@@ -54,6 +54,7 @@ export const PERMISSION_ACTIONS = [
   'manage_hardware',
   'manage_backup',
   'import_data',
+  'manage_prices',
 ] as const;
 
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];

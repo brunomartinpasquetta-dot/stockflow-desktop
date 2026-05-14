@@ -52,6 +52,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'supplierAccounts',
   'reports',
   'paymentMethods',
+  'priceUpdate',
   'backup',
   'import',
   'auth',
@@ -290,6 +291,14 @@ export function createApiBridge(
       checkStock: (p) => c<never>('inventory:checkStock', p),
       adjustStock: (p) => c<never>('inventory:adjustStock', p),
       getLowStockReport: () => c<never>('inventory:getLowStockReport'),
+    },
+    priceUpdate: {
+      preview: (p) => c<never>('priceUpdate:preview', p),
+      apply: (p) => c<never>('priceUpdate:apply', p),
+      listBatches: (p) => c<never>('priceUpdate:listBatches', p),
+      getBatchDetail: (p) => c<never>('priceUpdate:getBatchDetail', p),
+      rollback: (p) => c<never>('priceUpdate:rollback', p),
+      getArticleHistory: (p) => c<never>('priceUpdate:getArticleHistory', p),
     },
     accounts: {
       receivePayment: (p) => c<never>('accounts:receivePayment', p),

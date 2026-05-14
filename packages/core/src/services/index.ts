@@ -8,6 +8,7 @@ import { CashService } from './cash.service';
 import { CompanyService } from './company.service';
 import { InventoryService } from './inventory.service';
 import { PaymentMethodService } from './paymentMethod.service';
+import { PriceUpdateService } from './priceUpdate.service';
 import { PurchasesService } from './purchases.service';
 import { ReportsService } from './reports.service';
 import { SalesService } from './sales.service';
@@ -61,6 +62,23 @@ export {
   type SupplierStatementEntry,
 } from './supplierAccounts.service';
 export {
+  PriceUpdateService,
+  PRICE_FIELDS,
+  applyRounding,
+  computeNewValue,
+  type ApplyUpdateInput,
+  type ApplyUpdateResult,
+  type BatchDetail,
+  type PreviewEntry,
+  type PreviewResult,
+  type PriceField,
+  type PriceUpdateFilter,
+  type PriceUpdateRounding,
+  type PriceUpdateRule,
+  type PriceUpdateRuleType,
+  type RollbackResult,
+} from './priceUpdate.service';
+export {
   ReportsService,
   type FamilyInventoryRow,
   type PurchasesReport,
@@ -79,6 +97,7 @@ export interface Services {
   accountsReceivable: AccountsReceivableService;
   supplierAccounts: SupplierAccountsService;
   paymentMethods: PaymentMethodService;
+  priceUpdates: PriceUpdateService;
   reports: ReportsService;
 }
 
@@ -94,6 +113,7 @@ export function createServices(ctx: ServiceContext): Services {
     accountsReceivable: new AccountsReceivableService(ctx),
     supplierAccounts: new SupplierAccountsService(ctx),
     paymentMethods: new PaymentMethodService(ctx),
+    priceUpdates: new PriceUpdateService(ctx),
     reports: new ReportsService(ctx),
   };
 }

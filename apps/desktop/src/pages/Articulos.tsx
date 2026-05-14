@@ -54,6 +54,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePermission } from '@/contexts/AuthContext'
 import {
   useArticleMutations,
+  useArticlePriceHistory,
   useArticles,
   useCompany,
   useFamilies,
@@ -689,23 +690,28 @@ export function Articulos() {
             Seleccioná un artículo de la lista o presioná <kbd className="mx-1 rounded border bg-muted px-1">Nuevo</kbd>.
           </div>
         ) : (
-          <ArticuloForm
-            mode={mode}
-            form={form}
-            setField={setField}
-            families={families.data ?? []}
-            suppliers={suppliers.data ?? []}
-            inputsDisabled={inputsDisabled}
-            canEditArticles={canEditArticles}
-            onEdit={startEdit}
-            onSave={handleSave}
-            onCancel={cancelEdit}
-            saving={m.create.isPending || m.update.isPending}
-            articleId={selectedArticle?.id ?? null}
-            imagePath={selectedArticle?.imagePath ?? null}
-            pendingImageSource={pendingImageSource}
-            onPendingImageChange={setPendingImageSource}
-          />
+          <>
+            <ArticuloForm
+              mode={mode}
+              form={form}
+              setField={setField}
+              families={families.data ?? []}
+              suppliers={suppliers.data ?? []}
+              inputsDisabled={inputsDisabled}
+              canEditArticles={canEditArticles}
+              onEdit={startEdit}
+              onSave={handleSave}
+              onCancel={cancelEdit}
+              saving={m.create.isPending || m.update.isPending}
+              articleId={selectedArticle?.id ?? null}
+              imagePath={selectedArticle?.imagePath ?? null}
+              pendingImageSource={pendingImageSource}
+              onPendingImageChange={setPendingImageSource}
+            />
+            {mode === 'view' && selectedArticle && (
+              <ArticlePriceHistorySection articleId={selectedArticle.id} />
+            )}
+          </>
         )}
       </Card>
     </div>
@@ -1019,6 +1025,60 @@ function Field(props: {
     <div className={props.className}>
       <Label className="mb-1 block text-xs text-muted-foreground">{props.label}</Label>
       {props.children}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Historial de precios del artículo (últimos 10 cambios)              */
+/* ------------------------------------------------------------------ */
+
+const PRICE_FIELD_LABELS: Record<string, string> = {
+  costPrice: 'Costo',
+  listPrice1: 'Lista 1',
+  listPrice2: 'Lista 2',
+  listPrice3: 'Lista 3',
+  wholesalePrice: 'Mayorista',
+}
+
+function ArticlePriceHistorySection({ articleId }: { articleId: string }): React.ReactElement | null {
+  const history = useArticlePriceHistory(articleId, 10)
+  if (history.isLoading) return null
+  if (!history.data || history.data.length === 0) return null
+  return (
+    <div className="border-t p-3">
+      <div className="mb-2 text-sm font-medium">Últimos cambios de precio</div>
+      <div className="max-h-48 overflow-auto rounded border">
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-card">
+            <TableRow>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Campo</TableHead>
+              <TableHead className="text-right">Anterior</TableHead>
+              <TableHead className="text-right">Nuevo</TableHead>
+              <TableHead>Usuario</TableHead>
+              <TableHead>Lote</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {history.data.map((e) => (
+              <TableRow key={e.id}>
+                <TableCell className="text-xs">
+                  {new Date(e.appliedAt).toLocaleString('es-AR')}
+                </TableCell>
+                <TableCell>{PRICE_FIELD_LABELS[e.field] ?? e.field}</TableCell>
+                <TableCell className="text-right">{Number(e.oldValue).toFixed(2)}</TableCell>
+                <TableCell className="text-right">{Number(e.newValue).toFixed(2)}</TableCell>
+                <TableCell className="text-xs">{e.userName}</TableCell>
+                <TableCell className="text-xs">
+                  {e.batchDescription}
+                  {e.rolledBackAt != null && <span className="ml-1 text-amber-700">(revertido)</span>}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

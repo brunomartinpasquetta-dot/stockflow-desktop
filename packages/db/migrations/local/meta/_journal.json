@@ -29,6 +29,13 @@
       "when": 1778600000000,
       "tag": "0003_supplier_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1778700000000,
+      "tag": "0005_price_updates",
+      "breakpoints": true
     }
   ]
 }

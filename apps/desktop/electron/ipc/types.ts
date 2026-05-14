@@ -672,6 +672,113 @@ export interface LicenseStateDTO {
   lastError: string | null;
 }
 
+/* ----------------------------------------------------------------------- */
+/* Price updates (P-PRECIOS)                                                */
+/* ----------------------------------------------------------------------- */
+
+export type PriceFieldDTO =
+  | 'costPrice'
+  | 'listPrice1'
+  | 'listPrice2'
+  | 'listPrice3'
+  | 'wholesalePrice';
+
+export type PriceUpdateScopeDTO = 'all' | 'family' | 'supplier' | 'manual';
+export type PriceUpdateRuleTypeDTO =
+  | 'percentage'
+  | 'fixed_amount'
+  | 'set_value'
+  | 'recalculate_from_cost';
+export type PriceUpdateRoundingDTO =
+  | 'none'
+  | 'up_to_10'
+  | 'up_to_50'
+  | 'up_to_100'
+  | 'nearest_99';
+
+export interface PriceUpdateFilterDTO {
+  scope: PriceUpdateScopeDTO;
+  familyId?: string;
+  supplierId?: string;
+  articleIds?: string[];
+  minPrice?: string;
+  maxPrice?: string;
+  hasStock?: boolean;
+  onlyActive?: boolean;
+}
+
+export interface PriceUpdateRuleDTO {
+  type: PriceUpdateRuleTypeDTO;
+  value: string;
+  direction?: 'increase' | 'decrease';
+  fields: PriceFieldDTO[];
+  keepUtility?: boolean;
+  rounding?: PriceUpdateRoundingDTO;
+}
+
+export interface PriceUpdatePreviewEntryDTO {
+  articleId: string;
+  code: string;
+  description: string;
+  field: PriceFieldDTO;
+  oldValue: string;
+  newValue: string;
+}
+
+export interface PriceUpdatePreviewResultDTO {
+  entries: PriceUpdatePreviewEntryDTO[];
+  articlesAffected: number;
+  averageDeltaPct: number;
+}
+
+export interface PriceUpdateBatchDTO {
+  id: string;
+  userId: string;
+  userName: string;
+  description: string;
+  filterJson: string;
+  ruleJson: string;
+  articlesAffected: number;
+  appliedAt: number;
+  rolledBackAt: number | null;
+  createdAt: number;
+}
+
+export interface PriceUpdateEntryDTO {
+  id: string;
+  batchId: string;
+  articleId: string;
+  field: PriceFieldDTO;
+  oldValue: string;
+  newValue: string;
+  createdAt: number;
+}
+
+export interface PriceUpdateBatchDetailDTO {
+  batch: PriceUpdateBatchDTO;
+  entries: PriceUpdateEntryDTO[];
+}
+
+export interface PriceUpdateEntryWithBatchDTO {
+  id: string;
+  batchId: string;
+  articleId: string;
+  field: PriceFieldDTO;
+  oldValue: string;
+  newValue: string;
+  createdAt: number;
+  batchDescription: string;
+  appliedAt: number;
+  rolledBackAt: number | null;
+  userName: string;
+}
+
+export interface PriceUpdateApplyResultDTO {
+  batchId: string;
+  articlesAffected: number;
+  entries: number;
+}
+
 /** Payload genérico para create/update de entidades simples (validado server-side por Zod). */
 export type EntityPayload = Record<string, unknown>;
 export interface IdPayload {
@@ -784,6 +891,14 @@ export interface ApiSurface {
     checkStock(payload: { articleId: string; quantity: string }): Res<StockCheckDTO>;
     adjustStock(payload: { articleId: string; newStock: string; reason: string }): Res<StockAdjustmentDTO>;
     getLowStockReport(): Res<LowStockEntryDTO[]>;
+  };
+  priceUpdate: {
+    preview(payload: { filter: PriceUpdateFilterDTO; rule: PriceUpdateRuleDTO }): Res<PriceUpdatePreviewResultDTO>;
+    apply(payload: { filter: PriceUpdateFilterDTO; rule: PriceUpdateRuleDTO; description: string }): Res<PriceUpdateApplyResultDTO>;
+    listBatches(payload: { from?: number; to?: number }): Res<PriceUpdateBatchDTO[]>;
+    getBatchDetail(payload: { batchId: string }): Res<PriceUpdateBatchDetailDTO>;
+    rollback(payload: { batchId: string }): Res<{ entriesReverted: number }>;
+    getArticleHistory(payload: { articleId: string; limit?: number }): Res<PriceUpdateEntryWithBatchDTO[]>;
   };
   accounts: {
     receivePayment(payload: ReceivePaymentInputDTO): Res<ReceivePaymentResultDTO>;
