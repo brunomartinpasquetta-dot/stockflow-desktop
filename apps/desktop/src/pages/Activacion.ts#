@@ -1,0 +1,1 @@
+export default function Activacion() { return null; } Renombrar temporalmente la pantalla de activación

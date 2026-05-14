@@ -179,6 +179,18 @@ export class LicenseManager {
   /* ------------------------------------------------------------------ */
 
   getState(): LicenseState {
+    // En modo desarrollo, bypass: licencia 'pro' válida sin tocar license.dat.
+    // En producción (.app empaquetado) NODE_ENV no es 'development' → flujo normal.
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        status: 'active',
+        plan: 'pro',
+        expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+        licenseKey: 'SF-DEV0-DEV0-DEV0-DEV0',
+        tenantName: 'Desarrollo',
+        lastError: null,
+      };
+    }
     const jwt = this.readStoredJwt();
     if (!jwt) {
       return {

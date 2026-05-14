@@ -10,7 +10,7 @@ import { Login } from '@/pages/Login'
 import { Home } from '@/pages/Home'
 
 // Lazy-loaded por ruta: cada página queda en su propio chunk.
-const Activacion = lazy(() => import('@/pages/Activacion').then((m) => ({ default: m.Activacion })))
+const Activacion = lazy(() => import('@/pages/Activacion'))
 const Configuracion = lazy(() => import('@/pages/Configuracion').then((m) => ({ default: m.Configuracion })))
 const ImportarStock = lazy(() => import('@/pages/ImportarStock').then((m) => ({ default: m.ImportarStock })))
 const Articulos = lazy(() => import('@/pages/Articulos').then((m) => ({ default: m.Articulos })))
