@@ -20,6 +20,7 @@ import { buildFamiliesHandlers } from './handlers/families.handlers';
 import { buildInventoryHandlers } from './handlers/inventory.handlers';
 import { buildLanHandlers } from './handlers/lan.handlers';
 import { buildMpQrHandlers } from './handlers/mpQr.handlers';
+import { buildAccountingHandlers } from './handlers/accounting.handlers';
 import { buildLicenseHandlers } from './handlers/license.handlers';
 import { buildPaymentMethodsHandlers } from './handlers/paymentMethods.handlers';
 import { buildPriceUpdateHandlers } from './handlers/priceUpdate.handlers';
@@ -60,6 +61,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildLanHandlers,
   buildUpdaterHandlers,
   buildMpQrHandlers,
+  buildAccountingHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {

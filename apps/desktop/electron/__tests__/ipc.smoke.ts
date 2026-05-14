@@ -356,6 +356,40 @@ async function main(): Promise<void> {
     byVendor.ok ? `rows=${byVendor.data.rows.length} total=${byVendor.data.grandTotal}` : JSON.stringify(byVendor),
   );
 
+  // contabilidad (P-CONTABLE)
+  const acctSummary = await invoke<{
+    assets: { total: string }
+    sales: { count: number }
+    cmv: { calculatedFromCurrent: boolean }
+    grossResult: string
+    vatPosition: string
+  }>(handlers, 'accounting:getSummary', { from: 0, to: Date.now() + 86_400_000 });
+  check(
+    'accounting:getSummary devuelve resumen completo',
+    acctSummary.ok && typeof acctSummary.data.assets.total === 'string' && acctSummary.data.cmv.calculatedFromCurrent === true,
+    acctSummary.ok ? `sales=${acctSummary.data.sales.count} gross=${acctSummary.data.grossResult}` : JSON.stringify(acctSummary),
+  );
+  const acctVatSales = await invoke<Array<{ saleId: string; vat21: string }>>(
+    handlers,
+    'accounting:getVatBookSales',
+    { from: 0, to: Date.now() + 86_400_000 },
+  );
+  check(
+    'accounting:getVatBookSales responde array',
+    acctVatSales.ok && Array.isArray(acctVatSales.data),
+    acctVatSales.ok ? `len=${acctVatSales.data.length}` : JSON.stringify(acctVatSales),
+  );
+  const acctVatPurch = await invoke<Array<{ purchaseId: string }>>(
+    handlers,
+    'accounting:getVatBookPurchases',
+    { from: 0, to: Date.now() + 86_400_000 },
+  );
+  check(
+    'accounting:getVatBookPurchases responde array',
+    acctVatPurch.ok && Array.isArray(acctVatPurch.data),
+    acctVatPurch.ok ? `len=${acctVatPurch.data.length}` : JSON.stringify(acctVatPurch),
+  );
+
   // logout → vuelve a UNAUTHENTICATED
   await invoke(handlers, 'auth:logout');
   const afterLogout = await invoke(handlers, 'articles:list');

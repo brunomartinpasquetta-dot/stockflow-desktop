@@ -257,6 +257,32 @@ export function useSalesByVendorReport(input: { from: number; to: number; userId
   })
 }
 
+// --- Contabilidad (P-CONTABLE) ---
+export function useFinancialSummary(input: { from: number; to: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['accounting', 'summary', input.from, input.to],
+    queryFn: () => api.accounting.getSummary(input),
+    enabled,
+  })
+}
+export function useVatBookSales(
+  input: { from: number; to: number; type?: 'A' | 'B' | 'C' | 'X' | 'all' },
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['accounting', 'vatBookSales', input.from, input.to, input.type ?? 'all'],
+    queryFn: () => api.accounting.getVatBookSales(input),
+    enabled,
+  })
+}
+export function useVatBookPurchases(input: { from: number; to: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['accounting', 'vatBookPurchases', input.from, input.to],
+    queryFn: () => api.accounting.getVatBookPurchases(input),
+    enabled,
+  })
+}
+
 // --- Ventas ---
 export function useCreateSale(): UseMutationResult<CreateSaleResultDTO, Error, CreateSaleInputDTO> {
   const qc = useQueryClient()

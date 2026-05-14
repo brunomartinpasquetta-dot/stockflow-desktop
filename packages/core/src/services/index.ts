@@ -15,6 +15,7 @@ import { SalesService } from './sales.service';
 import { SearchService } from './search.service';
 import { SupplierAccountsService } from './supplierAccounts.service';
 import { MpQrService, type MpTokenStoreLike } from './mpQr.service';
+import { AccountingService } from './accounting.service';
 
 export { AuthService, type LoginResult } from './auth.service';
 export { CompanyService } from './company.service';
@@ -103,6 +104,12 @@ export {
   type MpWebhookContext,
 } from './mpQr.service';
 export * from '../lib/mpApi';
+export {
+  AccountingService,
+  type FinancialSummary,
+  type VatBookSaleRow,
+  type VatBookPurchaseRow,
+} from './accounting.service';
 
 export interface Services {
   auth: AuthService;
@@ -118,6 +125,7 @@ export interface Services {
   reports: ReportsService;
   search: SearchService;
   mpQr: MpQrService;
+  accounting: AccountingService;
 }
 
 export interface CreateServicesOptions {
@@ -147,5 +155,6 @@ export function createServices(ctx: ServiceContext, opts: CreateServicesOptions 
     reports: new ReportsService(ctx),
     search: new SearchService(ctx),
     mpQr: new MpQrService(ctx, mpTokenStore, opts.mpBaseUrl),
+    accounting: new AccountingService(ctx),
   };
 }

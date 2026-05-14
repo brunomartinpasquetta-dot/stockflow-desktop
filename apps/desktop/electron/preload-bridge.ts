@@ -58,6 +58,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'import',
   'auth',
   'mpQr',
+  'accounting',
 ]);
 
 export const LOCAL_GROUPS = new Set(['system', 'lan', 'updater', 'hardware', 'license']);
@@ -395,6 +396,11 @@ export function createApiBridge(
       getActiveOrder: (p) => c<never>('mpQr:getActiveOrder', p),
       listOrders: (p) => c<never>('mpQr:listOrders', p),
       linkOrderToSale: (p) => c<never>('mpQr:linkOrderToSale', p),
+    },
+    accounting: {
+      getSummary: (p) => c<never>('accounting:getSummary', p),
+      getVatBookSales: (p) => c<never>('accounting:getVatBookSales', p),
+      getVatBookPurchases: (p) => c<never>('accounting:getVatBookPurchases', p),
     },
     updater: {
       checkNow: () => c<never>('updater:checkNow'),

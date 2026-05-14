@@ -36,6 +36,9 @@ const ConfiguracionMercadoPago = lazy(() => import('@/pages/ConfiguracionMercado
 const GeneradorCompras = lazy(() => import('@/pages/GeneradorCompras').then((m) => ({ default: m.GeneradorCompras })))
 const InventarioArticulos = lazy(() => import('@/pages/InventarioArticulos').then((m) => ({ default: m.InventarioArticulos })))
 const VentasPorVendedor = lazy(() => import('@/pages/VentasPorVendedor').then((m) => ({ default: m.VentasPorVendedor })))
+const Contabilidad = lazy(() => import('@/pages/Contabilidad').then((m) => ({ default: m.Contabilidad })))
+const LibroIvaVentas = lazy(() => import('@/pages/LibroIvaVentas').then((m) => ({ default: m.LibroIvaVentas })))
+const LibroIvaCompras = lazy(() => import('@/pages/LibroIvaCompras').then((m) => ({ default: m.LibroIvaCompras })))
 
 function SuspenseOutlet() {
   return (
@@ -84,6 +87,9 @@ export const router = createHashRouter([
                       { path: '/consultas/ventas-vendedor', element: <VentasPorVendedor /> },
                       { path: '/precios/actualizar', element: <ActualizacionPrecios /> },
                       { path: '/precios/historial', element: <HistorialPrecios /> },
+                      { path: '/contabilidad', element: <Contabilidad /> },
+                      { path: '/contabilidad/libro-iva-ventas', element: <LibroIvaVentas /> },
+                      { path: '/contabilidad/libro-iva-compras', element: <LibroIvaCompras /> },
                     ],
                   },
                   {

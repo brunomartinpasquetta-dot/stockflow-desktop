@@ -630,6 +630,37 @@ async function main(): Promise<void> {
     void v1; void v3;
   }
 
+  // ----------------------------------------------------- contabilidad (P-CONTABLE)
+  console.log('\n[accounting]');
+  {
+    const summary = await admin.accounting.getFinancialSummary({ from: 0, to: Date.now() + 86_400_000 });
+    check('accounting.getFinancialSummary: tiene assets.total > 0', Number(summary.assets.total) >= 0, `total=${summary.assets.total}`);
+    check('accounting.getFinancialSummary: sales.count > 0', summary.sales.count > 0, `count=${summary.sales.count}`);
+    check('accounting.getFinancialSummary: purchases registradas', summary.purchases.count >= 1);
+    check('accounting.getFinancialSummary: cmv.calculatedFromCurrent', summary.cmv.calculatedFromCurrent === true);
+    // grossResult ≈ sales.total - cmv.total
+    const expectedGross = (Number(summary.sales.total) - Number(summary.cmv.total)).toFixed(4);
+    check('accounting.getFinancialSummary: grossResult = sales - cmv', summary.grossResult === expectedGross, `gross=${summary.grossResult} esperado=${expectedGross}`);
+    const expectedVatPos = (Number(summary.sales.vatAmount) - Number(summary.purchases.vatAmount)).toFixed(4);
+    check('accounting.getFinancialSummary: vatPosition = debito - credito', summary.vatPosition === expectedVatPos, `pos=${summary.vatPosition} esperado=${expectedVatPos}`);
+
+    const vatSales = await admin.accounting.getVatBookSales({ from: 0, to: Date.now() + 86_400_000 });
+    check('accounting.getVatBookSales: incluye filas (incluso anuladas)', vatSales.length >= 3, `len=${vatSales.length}`);
+    const hasVoided = vatSales.some((r) => r.status === 'voided');
+    check('accounting.getVatBookSales: incluye al menos una anulada', hasVoided);
+    const has21 = vatSales.some((r) => Number(r.vat21) > 0);
+    check('accounting.getVatBookSales: hay desglose de 21%', has21);
+
+    const vatPurch = await admin.accounting.getVatBookPurchases({ from: 0, to: Date.now() + 86_400_000 });
+    check('accounting.getVatBookPurchases: incluye filas', vatPurch.length >= 1, `len=${vatPurch.length}`);
+
+    await expectThrows(
+      'accounting.getFinancialSummary como seller → PermissionDeniedError',
+      () => seller.accounting.getFinancialSummary({ from: 0, to: Date.now() }),
+      (e) => e instanceof PermissionDeniedError,
+    );
+  }
+
   // ----------------------------------------------------- búsqueda global (P-BUSQUEDA)
   console.log('\n[search]');
   await repos.articles.create({ barcode: '7790000001000', description: 'Coca Cola 500ml', listPrice1: '300.0000', stock: '10.000' });

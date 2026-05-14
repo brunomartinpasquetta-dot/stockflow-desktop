@@ -75,7 +75,7 @@ const NAV: NavItem[] = [
   { label: 'Historial de precios', icon: Tags, path: '/precios/historial', requires: 'manage_prices' },
   { fkey: 'F8', label: 'Historial de Ventas', icon: BarChart3, path: '/ventas/historial' },
   { fkey: 'F9', label: 'Movimientos', icon: ArrowLeftRight },
-  { fkey: 'F10', label: 'Contabilidad', icon: Calculator },
+  { fkey: 'F10', label: 'Contabilidad', icon: Calculator, path: '/contabilidad', requires: 'view_accounting' },
   { label: 'Acerca de', icon: Info, path: '/acerca-de' },
   { fkey: 'F12', label: 'Salir', icon: LogOut, exit: true },
 ]

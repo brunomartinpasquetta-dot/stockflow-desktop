@@ -8,6 +8,8 @@ import { usePrint } from '@/contexts/PrintContext'
 import { CashCloseReport, type CashCloseReportData } from '@/print/CashCloseReport'
 import { HistoricalCashReport, type HistoricalCashReportData } from '@/print/HistoricalCashReport'
 import { SaleTicket, type SaleTicketData } from '@/print/SaleTicket'
+import { AccountingSummaryReport, type AccountingSummaryReportData } from '@/print/AccountingSummaryReport'
+import { VatBookReport, type VatBookReportData } from '@/print/VatBookReport'
 
 export function usePrintSaleTicket() {
   const { print } = usePrint()
@@ -26,6 +28,22 @@ export function usePrintHistoricalCashReport() {
   const { print } = usePrint()
   return useCallback(
     (data: HistoricalCashReportData) => print(createElement(HistoricalCashReport, { data })),
+    [print],
+  )
+}
+
+export function usePrintAccountingSummary() {
+  const { print } = usePrint()
+  return useCallback(
+    (data: AccountingSummaryReportData) => print(createElement(AccountingSummaryReport, { data })),
+    [print],
+  )
+}
+
+export function usePrintVatBook() {
+  const { print } = usePrint()
+  return useCallback(
+    (data: VatBookReportData) => print(createElement(VatBookReport, { data })),
     [print],
   )
 }

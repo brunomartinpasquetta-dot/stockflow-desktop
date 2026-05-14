@@ -246,6 +246,13 @@ export const api = {
     getSalesByVendor: (input: { from: number; to: number; userId?: string }) =>
       unwrap(sf().reports.getSalesByVendor(input)),
   },
+  accounting: {
+    getSummary: (input: { from: number; to: number }) => unwrap(sf().accounting.getSummary(input)),
+    getVatBookSales: (input: { from: number; to: number; type?: 'A' | 'B' | 'C' | 'X' | 'all' }) =>
+      unwrap(sf().accounting.getVatBookSales(input)),
+    getVatBookPurchases: (input: { from: number; to: number }) =>
+      unwrap(sf().accounting.getVatBookPurchases(input)),
+  },
   system: {
     pickFile: (filters?: { name: string; extensions: string[] }[]): Promise<{ filePath: string | null }> =>
       unwrap(sf().system.pickFile({ filters })),

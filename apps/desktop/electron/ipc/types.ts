@@ -706,6 +706,47 @@ export interface SalesByVendorReportDTO {
   vendorCount: number;
 }
 
+export interface FinancialSummaryDTO {
+  period: { from: number; to: number };
+  assets: { articlesValue: string; cashValue: string; total: string };
+  sales: { total: string; count: number; vatAmount: string };
+  purchases: { total: string; count: number; vatAmount: string };
+  cmv: { total: string; calculatedFromCurrent: boolean };
+  grossResult: string;
+  grossMarginPct: string;
+  vatPosition: string;
+}
+
+export interface VatBookSaleRowDTO {
+  saleId: string;
+  date: number;
+  type: 'A' | 'B' | 'C' | 'X';
+  number: number;
+  customerName: string;
+  customerCuit: string | null;
+  netAmount: string;
+  vat21: string;
+  vat105: string;
+  vat27: string;
+  total: string;
+  status: 'completed' | 'voided' | 'pending';
+}
+
+export interface VatBookPurchaseRowDTO {
+  purchaseId: string;
+  date: number;
+  type: 'A' | 'B' | 'C' | 'X';
+  supplierInvoiceNumber: string;
+  supplierName: string;
+  supplierCuit: string | null;
+  netAmount: string;
+  vat21: string;
+  vat105: string;
+  vat27: string;
+  total: string;
+  status: 'completed' | 'voided' | 'pending';
+}
+
 export interface AddMovementInputDTO {
   type: CashMovementType;
   description: string;
@@ -1148,6 +1189,11 @@ export interface ApiSurface {
     getActiveOrder(payload: { cashRegisterId: string }): Res<MpOrderDTO | null>;
     listOrders(payload: { from: number; to: number }): Res<MpOrderDTO[]>;
     linkOrderToSale(payload: { orderId: string; saleId: string }): Res<{ ok: true }>;
+  };
+  accounting: {
+    getSummary(payload: DateRangeDTO): Res<FinancialSummaryDTO>;
+    getVatBookSales(payload: DateRangeDTO & { type?: 'A' | 'B' | 'C' | 'X' | 'all' }): Res<VatBookSaleRowDTO[]>;
+    getVatBookPurchases(payload: DateRangeDTO): Res<VatBookPurchaseRowDTO[]>;
   };
   updater: {
     checkNow(): Res<{ status: string; version?: string }>;
