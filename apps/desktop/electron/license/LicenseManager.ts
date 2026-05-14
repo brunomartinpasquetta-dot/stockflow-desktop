@@ -137,6 +137,14 @@ export class LicenseManager {
     return path.join(this.userDataDir, 'license.dat');
   }
 
+  private masterFilePath(): string {
+    return path.join(this.userDataDir, 'license.master');
+  }
+
+  private hasMasterLicense(): boolean {
+    return existsSync(this.masterFilePath());
+  }
+
   private storeJwt(jwt: string): void {
     try {
       const safeStorage = loadSafeStorage();
@@ -191,6 +199,17 @@ export class LicenseManager {
         lastError: null,
       };
     }
+    // Master license del owner: file marker → licencia 'pro' indefinida sin cloud.
+    if (this.hasMasterLicense()) {
+      return {
+        status: 'active',
+        plan: 'pro',
+        expiresAt: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000,
+        licenseKey: 'SF-BRUN-OWNR-MSTR-2026',
+        tenantName: this.tenantName ?? 'Bruno Pasquetta — Master',
+        lastError: null,
+      };
+    }
     const jwt = this.readStoredJwt();
     if (!jwt) {
       return {
@@ -238,6 +257,17 @@ export class LicenseManager {
   }
 
   async activate(licenseKey: string): Promise<LicenseState> {
+    // Clave maestra del owner: licencia 'pro' válida indefinidamente, sin cloud.
+    // Persiste vía archivo marker (license.master) en userData.
+    if (licenseKey.trim().toUpperCase() === 'SF-BRUN-OWNR-MSTR-2026') {
+      try {
+        writeFileSync(this.masterFilePath(), `Master license — activada ${new Date().toISOString()}\n`);
+      } catch (err) {
+        console.error('[license] No se pudo persistir la master license:', err);
+      }
+      this.tenantName = 'Bruno Pasquetta — Master';
+      return this.getState();
+    }
     let res: Response;
     try {
       res = await fetch(`${this.apiUrl}/api/licenses/activate`, {

@@ -72,8 +72,15 @@ function removeCopied(copied) {
 
 function backup() {
   for (const dir of symlinkDirs) {
+    const bak = `${dir}.bak`;
+    if (existsSync(bak)) {
+      // Run previo abortado — el .bak es el original real, restauralo primero.
+      rmSync(dir, { recursive: true, force: true });
+      renameSync(bak, dir);
+      console.log(`  ↺ recovered leftover: ${dir}`);
+    }
     if (existsSync(dir)) {
-      renameSync(dir, `${dir}.bak`);
+      renameSync(dir, bak);
       console.log(`  ⏸ moved aside: ${dir}`);
     }
   }
