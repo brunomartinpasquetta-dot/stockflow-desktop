@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Loader2, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
+import { Loader2, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import {
@@ -22,6 +22,7 @@ import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/
 import type { SaleTicketData, SaleTicketLine, SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { WeightDialog } from '@/components/WeightDialog'
+import { CobroQrModal } from '@/components/CobroQrModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -145,6 +146,18 @@ function PDV() {
     queryKey: ['hardwarePrinterConfig'],
     queryFn: () => api.hardware.printer.getConfig(),
     staleTime: 30_000,
+  })
+  const currentCashQuery = useCurrentCash()
+  const currentCashRegisterId = currentCashQuery.data?.id ?? null
+  const mpConfigQuery = useQuery({
+    queryKey: ['mpQr', 'config'],
+    queryFn: () => api.mpQr.getConfig(),
+    staleTime: 60_000,
+  })
+  const mpPosDevicesQuery = useQuery({
+    queryKey: ['mpQr', 'posDevices'],
+    queryFn: () => api.mpQr.listPosDevices(),
+    staleTime: 60_000,
   })
 
   const priceMode: PriceMode = companyQuery.data?.priceMode ?? 'gross'
@@ -301,6 +314,33 @@ function PDV() {
   const overCredit = accountSale && creditLimitNum > 0 && Number(customerDebt) + totalNum > creditLimitNum
   const noMethods = !accountSale && activeMethods.length === 0
 
+  // --- MercadoPago QR ---
+  const mpConfigured = mpConfigQuery.data?.configured === true
+  const mpPosDeviceForCurrentCash = useMemo(() => {
+    const list = mpPosDevicesQuery.data ?? []
+    if (!currentCashRegisterId) return null
+    return list.find((d) => d.cashRegisterId === currentCashRegisterId && d.active) ?? null
+  }, [mpPosDevicesQuery.data, currentCashRegisterId])
+  const mpMethod = useMemo(() => {
+    const methods = activeMethods
+    return (
+      methods.find((m) => m.type === 'mp' && m.name.toLowerCase().includes('qr')) ??
+      methods.find((m) => m.type === 'mp') ??
+      null
+    )
+  }, [activeMethods])
+  const canCobrarQr =
+    canWrite &&
+    mpConfigured &&
+    mpPosDeviceForCurrentCash !== null &&
+    mpMethod !== null &&
+    cart.length > 0 &&
+    totalNum > 0 &&
+    !accountSale &&
+    !createSale.isPending &&
+    effectiveCustomerId != null
+  const [qrModalOpen, setQrModalOpen] = useState(false)
+
   const canConfirm =
     canWrite &&
     cart.length > 0 &&
@@ -411,6 +451,40 @@ function PDV() {
       void numberQuery.refetch()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
+    }
+  }
+
+  async function confirmarConQrAprobado(orderId: string, mpPaymentId: string | null): Promise<void> {
+    if (!effectiveCustomerId || !mpMethod) {
+      setQrModalOpen(false)
+      return
+    }
+    try {
+      const result = await createSale.mutateAsync({
+        type: voucherType,
+        customerId: effectiveCustomerId,
+        isAccountSale: false,
+        payments: [{ paymentMethodId: mpMethod.id, amount: totalNum.toFixed(4) }],
+        discount: parseCurrencyInput(globalDiscount),
+        notes: mpPaymentId ? `MP Payment ID: ${mpPaymentId}` : null,
+        lines: cart.map((l) => ({
+          articleId: l.article.id,
+          quantity: parseCurrencyInput(l.quantity),
+          unitPrice: parseCurrencyInput(l.unitPrice),
+          discount: parseCurrencyInput(l.discount),
+          vatRate: l.article.vatRate,
+        })),
+      })
+      await api.mpQr.linkOrderToSale(orderId, result.sale.id).catch(() => {})
+      toast.success(
+        `Venta ${result.sale.type} #${result.sale.number} cobrada con MercadoPago QR — ${formatCurrency(result.sale.total)}`,
+      )
+      clearSale()
+      void numberQuery.refetch()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
+    } finally {
+      setQrModalOpen(false)
     }
   }
 
@@ -667,6 +741,15 @@ function PDV() {
 
         {/* confirmar */}
         <div className="flex flex-col justify-end gap-2">
+          {canCobrarQr && (
+            <Button
+              className="h-11 bg-sky-500 text-white hover:bg-sky-600"
+              onClick={() => setQrModalOpen(true)}
+            >
+              <QrCode className="mr-2 h-5 w-5" />
+              Cobrar con QR MercadoPago — {formatCurrency(totals.total)}
+            </Button>
+          )}
           <Button
             variant="success"
             className="h-14 text-lg"
@@ -694,6 +777,17 @@ function PDV() {
           if (pendingWeightArticle) addArticleWithQty(pendingWeightArticle, weightKg)
         }}
       />
+      {qrModalOpen && currentCashRegisterId && (
+        <CobroQrModal
+          open={qrModalOpen}
+          amount={totals.total}
+          cashRegisterId={currentCashRegisterId}
+          description={`Venta ${voucherType} #${numberQuery.data?.number ?? '?'}`}
+          onApproved={(orderId, mpPaymentId) => void confirmarConQrAprobado(orderId, mpPaymentId)}
+          onCancelled={() => setQrModalOpen(false)}
+          onClose={() => setQrModalOpen(false)}
+        />
+      )}
     </div>
   )
 }
