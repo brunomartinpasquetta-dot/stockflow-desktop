@@ -5,7 +5,9 @@
  * pre-cargadas.
  */
 import { useMemo, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
+
+import { useWindowNav } from '@/lib/useWindowNav'
 import * as XLSX from 'xlsx'
 import { FileSpreadsheet, PackagePlus, Printer, ShoppingCart } from 'lucide-react'
 
@@ -28,7 +30,7 @@ function todayIso(): string {
 
 export function GeneradorCompras() {
   const canView = usePermission('view_reports')
-  const navigate = useNavigate()
+  const openInWindow = useWindowNav()
   const suppliersQuery = useSuppliers()
   const familiesQuery = useFamilies()
 
@@ -86,7 +88,7 @@ export function GeneradorCompras() {
         unitPrice: c.row.lastCost,
       }))
     if (lines.length === 0) return
-    navigate('/compras', { state: { prefilledLines: lines, from: 'lowStock' } })
+    openInWindow('compras', { extras: { prefilledLines: lines, from: 'lowStock' } })
   }
 
   function exportarExcel(): void {

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
+
+import { useWindowSelf } from '@/contexts/WindowManagerContext'
+import { useWindowNav } from '@/lib/useWindowNav'
 import { toast } from 'sonner'
 import { Loader2, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
@@ -112,7 +115,8 @@ function SupplierPicker({
 export function Compras() {
   const { currentUser } = useAuth()
   const canWrite = useCanWrite()
-  const navigate = useNavigate()
+  const openInWindow = useWindowNav()
+  const windowSelf = useWindowSelf()
   const articlesQuery = useArticles()
   const suppliersQuery = useSuppliers()
   const paymentMethodsQuery = usePaymentMethods()
@@ -153,9 +157,13 @@ export function Compras() {
   const prefillAppliedRef = useRef(false)
   useEffect(() => {
     if (prefillAppliedRef.current) return
-    const st = location.state as
+    const fromExtras = windowSelf?.extras as
+      | { prefilledLines?: Array<{ articleId: string; quantity: string; unitPrice?: string }>; from?: string }
+      | undefined
+    const fromState = location.state as
       | { prefilledLines?: Array<{ articleId: string; quantity: string; unitPrice?: string }>; from?: string }
       | null
+    const st = fromExtras ?? fromState
     if (!st || !Array.isArray(st.prefilledLines) || st.prefilledLines.length === 0) return
     if (allArticles.length === 0) return // esperar a que carguen los artículos
     prefillAppliedRef.current = true
@@ -186,7 +194,7 @@ export function Compras() {
     }
     // Limpiar el state de la ruta para que un refresco no reaplique.
     window.history.replaceState({}, '')
-  }, [location.state, allArticles])
+  }, [location.state, allArticles, windowSelf?.extras])
 
   const totals = calculateSaleTotals(
     cart.map((l) => ({ quantity: l.quantity, unitPrice: l.costPrice, vatRate: l.vatRate })),
@@ -354,7 +362,7 @@ export function Compras() {
             <Badge variant={priceMode === 'gross' ? 'outline' : 'warning'}>
               Modo: Precios {priceMode === 'gross' ? 'con IVA incluido' : 'netos + IVA'}
             </Badge>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/compras/historial')}>
+            <Button variant="ghost" size="sm" onClick={() => openInWindow('historial-compras')}>
               Ver historial
             </Button>
           </div>

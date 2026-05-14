@@ -8,7 +8,7 @@
  * Requiere permiso `manage_prices` (admin / manager) y `useCanWrite()`.
  */
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useWindowNav } from '@/lib/useWindowNav'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -68,7 +68,7 @@ const ROUNDING_OPTIONS: Array<{ value: PriceUpdateRoundingDTO; label: string }> 
 ]
 
 export function ActualizacionPrecios() {
-  const navigate = useNavigate()
+  const openInWindow = useWindowNav()
   const canWrite = useCanWrite()
   const canManage = usePermission('manage_prices')
   const canApply = canWrite && canManage
@@ -195,7 +195,7 @@ export function ActualizacionPrecios() {
         {
           action: {
             label: 'Ver historial',
-            onClick: () => navigate('/precios/historial'),
+            onClick: () => openInWindow('precios-historial'),
           },
         },
       )
