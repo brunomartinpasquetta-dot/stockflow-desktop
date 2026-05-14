@@ -591,6 +591,96 @@ async function main(): Promise<void> {
   const sCats = await admin.search.globalSearch({ query: 'coca', categories: ['articles'] });
   check('search: filtro por category sólo devuelve artículos', sCats.articles.length === 1 && sCats.customers.length === 0);
 
+  // ----------------------------------------------------- MercadoPago QR
+  console.log('\n[mp qr]');
+  // Mock global fetch para que el cliente MP responda determinísticamente.
+  const originalFetch = globalThis.fetch;
+  type MockState = { paymentStatus: string };
+  const mock: MockState = { paymentStatus: 'pending' };
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = (init?.method ?? 'GET').toUpperCase();
+    const json = (body: unknown, status = 200): Response =>
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    if (url.endsWith('/users/me')) return json({ id: '12345', nickname: 'TEST' });
+    if (url.includes('/users/12345/stores') && method === 'POST') return json({ id: 'STORE-X' });
+    if (url.endsWith('/pos') && method === 'POST') return json({ id: 'POS-1', external_id: 'CAJA-XYZ' });
+    if (url.includes('/instore/qr/seller/collectors/') && method === 'GET') {
+      return json({ qr_template_url: 'data:image/png;base64,AAAA' });
+    }
+    if (url.includes('/instore/orders/qr/') && method === 'PUT') return json({});
+    if (url.includes('/instore/orders/qr/') && method === 'DELETE') return json({});
+    if (url.includes('/v1/payments/search')) {
+      if (mock.paymentStatus === 'pending') return json({ results: [] });
+      return json({ results: [{ id: 9999, status: mock.paymentStatus, external_reference: extractExternalRef(url) }] });
+    }
+    if (url.includes('/v1/payments/9999')) {
+      return json({ id: 9999, status: mock.paymentStatus, external_reference: lastExternalRef });
+    }
+    return json({}, 404);
+  }) as typeof fetch;
+
+  let lastExternalRef = '';
+  function extractExternalRef(url: string): string {
+    const m = /external_reference=([^&]+)/.exec(url);
+    return m ? decodeURIComponent(m[1] ?? '') : lastExternalRef;
+  }
+
+  try {
+    // Setup
+    const setupRes = await admin.mpQr.setupCompany({ mpUserId: '12345', accessToken: 'TEST-TOKEN' });
+    check('mpQr.setupCompany devuelve storeId', setupRes.configured && setupRes.storeId === 'STORE-X');
+    const cfg = await admin.mpQr.getConfig();
+    check('mpQr.getConfig configurado', cfg.configured === true && cfg.mpUserId === '12345');
+
+    // Crear POS device para reg2 (caja abierta)
+    const dev = await admin.mpQr.createPosDevice({ cashRegisterId: reg2.id });
+    check('mpQr.createPosDevice crea device', dev.cashRegisterId === reg2.id && dev.mpPosId === 'POS-1');
+
+    // Crear orden
+    const order = await admin.mpQr.createOrder({
+      cashRegisterId: reg2.id,
+      amount: '500.00',
+      description: 'Venta test MP',
+    });
+    lastExternalRef = order.externalReference;
+    check('mpQr.createOrder pending con expiresAt > now', order.status === 'pending' && order.expiresAt > Date.now());
+
+    // verifyPayment con pago aún pending → no cambia.
+    const v1 = await admin.mpQr.verifyPayment(order.id);
+    check('mpQr.verifyPayment sigue pending si MP no aprobó', v1.status === 'pending');
+
+    // verifyPayment con pago aprobado.
+    mock.paymentStatus = 'approved';
+    const v2 = await admin.mpQr.verifyPayment(order.id);
+    check('mpQr.verifyPayment marca approved', v2.status === 'approved' && v2.mpPaymentId === '9999');
+
+    // handleWebhook idempotente: la segunda vez no procesa.
+    const wh1 = await admin.mpQr.handleWebhook({ type: 'payment', data: { id: '9999' } });
+    check('mpQr.handleWebhook segundo evento sobre orden ya approved → processed:false', wh1.processed === false);
+
+    // expireStaleOrders: crear una orden, forzar expiración, expirar.
+    mock.paymentStatus = 'pending';
+    const order2 = await admin.mpQr.createOrder({
+      cashRegisterId: reg2.id,
+      amount: '100.00',
+      description: 'A expirar',
+    });
+    // Hack: actualizar expiresAt en DB directamente.
+    db.$client.prepare('UPDATE mp_orders SET expires_at = ? WHERE id = ?').run(Date.now() - 1000, order2.id);
+    const exp = await admin.mpQr.expireStaleOrders();
+    check('mpQr.expireStaleOrders expira al menos 1', exp.expired >= 1);
+    const order2Fresh = await admin.mpQr.getOrder(order2.id);
+    check('orden expirada queda en status=expired', order2Fresh?.status === 'expired');
+
+    // linkOrderToSale
+    await admin.mpQr.linkOrderToSale(order.id, accSale1.sale.id);
+    const linked = await admin.mpQr.getOrder(order.id);
+    check('mpQr.linkOrderToSale persiste saleId', linked?.saleId === accSale1.sale.id);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
   closeLocalDb(db);
 }
 

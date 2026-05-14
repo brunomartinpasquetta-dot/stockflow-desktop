@@ -36,6 +36,13 @@
       "when": 1778700000000,
       "tag": "0005_price_updates",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1778800000000,
+      "tag": "0006_mp_qr",
+      "breakpoints": true
     }
   ]
 }

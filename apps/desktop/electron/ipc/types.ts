@@ -804,6 +804,65 @@ export interface GlobalSearchResultDTO {
   purchases: PurchaseDTO[];
 }
 
+/* ----------------------------------------------------------------------- */
+/* MercadoPago QR                                                            */
+/* ----------------------------------------------------------------------- */
+
+export type MpOrderStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+
+export interface MpConfigStatusDTO {
+  configured: boolean;
+  mpUserId?: string;
+  storeId?: string | null;
+  webhookSecret?: string;
+}
+
+export interface MpSetupInputDTO {
+  mpUserId: string;
+  accessToken: string;
+}
+
+export interface MpTestConnectionDTO {
+  ok: boolean;
+  mpUserId?: string;
+  error?: string;
+}
+
+export interface MpPosDeviceDTO {
+  id: string;
+  cashRegisterId: string;
+  externalPosId: string;
+  mpPosId: string;
+  qrUrl: string;
+  qrImageBase64: string | null;
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MpCreateOrderInputDTO {
+  cashRegisterId: string;
+  amount: string;
+  description: string;
+  externalReference?: string;
+}
+
+export interface MpOrderDTO {
+  id: string;
+  mpPosDeviceId: string;
+  saleId: string | null;
+  externalReference: string;
+  amount: string;
+  description: string;
+  status: MpOrderStatus;
+  mpPaymentId: string | null;
+  mpMerchantOrderId: string | null;
+  expiresAt: number;
+  paidAt: number | null;
+  createdAt: number;
+  createdBy: string;
+}
+
 /** Payload genérico para create/update de entidades simples (validado server-side por Zod). */
 export type EntityPayload = Record<string, unknown>;
 export interface IdPayload {
@@ -1006,6 +1065,20 @@ export interface ApiSurface {
     scanNetwork(): Res<{ supported: boolean; results: { ip: string; port: number; name?: string }[] }>;
     getConnectedClients(): Res<{ ip: string; lastSeen: number }[]>;
     applyAndRestart(): Res<{ ok: true }>;
+  };
+  mpQr: {
+    getConfig(): Res<MpConfigStatusDTO>;
+    setupCompany(payload: MpSetupInputDTO): Res<{ configured: true; storeId: string }>;
+    testConnection(): Res<MpTestConnectionDTO>;
+    listPosDevices(): Res<MpPosDeviceDTO[]>;
+    createPosDevice(payload: { cashRegisterId: string }): Res<MpPosDeviceDTO>;
+    getQrForCashRegister(payload: { cashRegisterId: string }): Res<{ qrUrl: string; qrImageBase64: string | null } | null>;
+    createOrder(payload: MpCreateOrderInputDTO): Res<MpOrderDTO>;
+    cancelOrder(payload: { orderId: string }): Res<MpOrderDTO>;
+    verifyPayment(payload: { orderId: string }): Res<MpOrderDTO>;
+    getActiveOrder(payload: { cashRegisterId: string }): Res<MpOrderDTO | null>;
+    listOrders(payload: { from: number; to: number }): Res<MpOrderDTO[]>;
+    linkOrderToSale(payload: { orderId: string; saleId: string }): Res<{ ok: true }>;
   };
   updater: {
     checkNow(): Res<{ status: string; version?: string }>;

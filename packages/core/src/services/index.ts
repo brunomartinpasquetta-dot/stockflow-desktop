@@ -14,6 +14,7 @@ import { ReportsService } from './reports.service';
 import { SalesService } from './sales.service';
 import { SearchService } from './search.service';
 import { SupplierAccountsService } from './supplierAccounts.service';
+import { MpQrService, type MpTokenStoreLike } from './mpQr.service';
 
 export { AuthService, type LoginResult } from './auth.service';
 export { CompanyService } from './company.service';
@@ -93,6 +94,15 @@ export {
   type GlobalSearchOptions,
   type GlobalSearchResult,
 } from './search.service';
+export {
+  MpQrService,
+  type MpTokenStoreLike,
+  type MpConfigStatus,
+  type MpSetupInput,
+  type MpCreateOrderInput,
+  type MpWebhookContext,
+} from './mpQr.service';
+export * from '../lib/mpApi';
 
 export interface Services {
   auth: AuthService;
@@ -107,10 +117,22 @@ export interface Services {
   priceUpdates: PriceUpdateService;
   reports: ReportsService;
   search: SearchService;
+  mpQr: MpQrService;
+}
+
+export interface CreateServicesOptions {
+  /** Token store para cifrar/descifrar credenciales MercadoPago. */
+  mpTokenStore?: MpTokenStoreLike;
+  /** Override del baseUrl de MercadoPago (sólo para tests). */
+  mpBaseUrl?: string;
 }
 
 /** Construye todos los servicios de dominio sobre un contexto dado. */
-export function createServices(ctx: ServiceContext): Services {
+export function createServices(ctx: ServiceContext, opts: CreateServicesOptions = {}): Services {
+  const mpTokenStore: MpTokenStoreLike = opts.mpTokenStore ?? {
+    encrypt: (s) => `plain:${s}`,
+    decrypt: (s) => (s.startsWith('plain:') ? s.slice('plain:'.length) : s),
+  };
   return {
     auth: new AuthService(ctx.repos),
     company: new CompanyService(ctx),
@@ -124,5 +146,6 @@ export function createServices(ctx: ServiceContext): Services {
     priceUpdates: new PriceUpdateService(ctx),
     reports: new ReportsService(ctx),
     search: new SearchService(ctx),
+    mpQr: new MpQrService(ctx, mpTokenStore, opts.mpBaseUrl),
   };
 }

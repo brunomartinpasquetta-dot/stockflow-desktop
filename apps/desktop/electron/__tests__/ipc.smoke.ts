@@ -298,6 +298,32 @@ async function main(): Promise<void> {
   const searchEmpty = await invoke<{ articles: unknown[] }>(handlers, 'search:global', { query: '' });
   check('search:global con query vacía → arrays vacíos', searchEmpty.ok && Array.isArray(searchEmpty.data.articles) && searchEmpty.data.articles.length === 0, JSON.stringify(searchEmpty));
 
+  // MercadoPago QR: getConfig antes de setup → configured:false; setup con fetch mockeado.
+  const mpCfg1 = await invoke<{ configured: boolean }>(handlers, 'mpQr:getConfig');
+  check('mpQr:getConfig sin setup → configured:false', mpCfg1.ok && mpCfg1.data.configured === false, JSON.stringify(mpCfg1));
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const method = (init?.method ?? 'GET').toUpperCase();
+    const json = (body: unknown, status = 200): Response =>
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    if (url.endsWith('/users/me')) return json({ id: '12345' });
+    if (url.includes('/users/12345/stores') && method === 'POST') return json({ id: 'STORE-Z' });
+    return json({}, 404);
+  }) as typeof fetch;
+  try {
+    const mpSetup = await invoke<{ configured: true; storeId: string }>(handlers, 'mpQr:setupCompany', {
+      mpUserId: '12345',
+      accessToken: 'TEST',
+    });
+    check('mpQr:setupCompany OK', mpSetup.ok && mpSetup.data.configured === true && mpSetup.data.storeId === 'STORE-Z', JSON.stringify(mpSetup));
+    const mpCfg2 = await invoke<{ configured: boolean }>(handlers, 'mpQr:getConfig');
+    check('mpQr:getConfig post-setup → configured:true', mpCfg2.ok && mpCfg2.data.configured === true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
   // logout → vuelve a UNAUTHENTICATED
   await invoke(handlers, 'auth:logout');
   const afterLogout = await invoke(handlers, 'articles:list');

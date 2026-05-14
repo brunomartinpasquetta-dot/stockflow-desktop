@@ -32,6 +32,7 @@ const AcercaDe = lazy(() => import('@/pages/AcercaDe').then((m) => ({ default: m
 const Bienvenida = lazy(() => import('@/pages/Bienvenida').then((m) => ({ default: m.Bienvenida })))
 const ActualizacionPrecios = lazy(() => import('@/pages/ActualizacionPrecios').then((m) => ({ default: m.ActualizacionPrecios })))
 const HistorialPrecios = lazy(() => import('@/pages/HistorialPrecios').then((m) => ({ default: m.HistorialPrecios })))
+const ConfiguracionMercadoPago = lazy(() => import('@/pages/ConfiguracionMercadoPago').then((m) => ({ default: m.ConfiguracionMercadoPago })))
 
 function SuspenseOutlet() {
   return (
@@ -85,6 +86,7 @@ export const router = createHashRouter([
                       { path: '/usuarios', element: <Usuarios /> },
                       { path: '/empresa', element: <Empresa /> },
                       { path: '/configuracion', element: <Configuracion /> },
+                      { path: '/configuracion/mercadopago', element: <ConfiguracionMercadoPago /> },
                       { path: '/importar-stock', element: <ImportarStock /> },
                     ],
                   },

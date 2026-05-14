@@ -56,4 +56,10 @@ export type {
   NewSupplierAccountPayable,
   SupplierPayment,
   NewSupplierPayment,
+  MpConfig,
+  NewMpConfig,
+  MpPosDevice,
+  NewMpPosDevice,
+  MpOrder,
+  NewMpOrder,
 } from '@stockflow/db';

@@ -61,6 +61,7 @@ const NAV: NavItem[] = [
   { fkey: 'F4', label: 'Usuarios', icon: ShieldCheck, path: '/usuarios', adminOnly: true },
   { label: 'Mi Empresa', icon: Building2, path: '/empresa', adminOnly: true },
   { label: 'Configuración', icon: Settings, path: '/configuracion', adminOnly: true },
+  { label: 'MercadoPago QR', icon: CreditCard, path: '/configuracion/mercadopago', adminOnly: true },
   { label: 'Importar stock', icon: FileSpreadsheet, path: '/importar-stock', adminOnly: true },
   { fkey: 'F5', label: 'Compras', icon: ShoppingCart, path: '/compras' },
   { fkey: 'F6', label: 'Ventas', icon: Receipt, path: '/ventas' },

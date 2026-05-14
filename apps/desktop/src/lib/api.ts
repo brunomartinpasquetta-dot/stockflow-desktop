@@ -315,6 +315,20 @@ export const api = {
       }
     },
   },
+  mpQr: {
+    getConfig: () => unwrap(sf().mpQr.getConfig()),
+    setupCompany: (payload: import('@/types/api').MpSetupInputDTO) => unwrap(sf().mpQr.setupCompany(payload)),
+    testConnection: () => unwrap(sf().mpQr.testConnection()),
+    listPosDevices: () => unwrap(sf().mpQr.listPosDevices()),
+    createPosDevice: (cashRegisterId: string) => unwrap(sf().mpQr.createPosDevice({ cashRegisterId })),
+    getQrForCashRegister: (cashRegisterId: string) => unwrap(sf().mpQr.getQrForCashRegister({ cashRegisterId })),
+    createOrder: (payload: import('@/types/api').MpCreateOrderInputDTO) => unwrap(sf().mpQr.createOrder(payload)),
+    cancelOrder: (orderId: string) => unwrap(sf().mpQr.cancelOrder({ orderId })),
+    verifyPayment: (orderId: string) => unwrap(sf().mpQr.verifyPayment({ orderId })),
+    getActiveOrder: (cashRegisterId: string) => unwrap(sf().mpQr.getActiveOrder({ cashRegisterId })),
+    listOrders: (from: number, to: number) => unwrap(sf().mpQr.listOrders({ from, to })),
+    linkOrderToSale: (orderId: string, saleId: string) => unwrap(sf().mpQr.linkOrderToSale({ orderId, saleId })),
+  },
   updater: {
     checkNow: () => unwrap(sf().updater.checkNow()),
     quitAndInstall: () => unwrap(sf().updater.quitAndInstall()),

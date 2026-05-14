@@ -761,6 +761,79 @@ export const supplierAccountsPayableRelations = relations(
 );
 
 /* ------------------------------------------------------------------ */
+/* mp_config — configuración de la integración MercadoPago QR          */
+/* ------------------------------------------------------------------ */
+export const mpConfig = sqliteTable('mp_config', {
+  id: text('id').primaryKey(),
+  companyId: text('company_id').references(() => companies.id),
+  mpUserId: text('mp_user_id').notNull(),
+  /** Access token cifrado (safeStorage Electron / AES-GCM fallback / "plain:" en tests). */
+  accessTokenEncrypted: text('access_token_encrypted').notNull(),
+  webhookSecret: text('webhook_secret').notNull(),
+  storeId: text('store_id'),
+  webhookUrlConfigured: integer('webhook_url_configured').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/* ------------------------------------------------------------------ */
+/* mp_pos_devices — asociación caja ↔ POS MercadoPago + QR              */
+/* ------------------------------------------------------------------ */
+export const mpPosDevices = sqliteTable('mp_pos_devices', {
+  id: text('id').primaryKey(),
+  cashRegisterId: text('cash_register_id')
+    .notNull()
+    .references(() => cashRegisters.id)
+    .unique(),
+  externalPosId: text('external_pos_id').notNull().unique(),
+  mpPosId: text('mp_pos_id').notNull(),
+  qrUrl: text('qr_url').notNull(),
+  qrImageBase64: text('qr_image_base64'),
+  active: integer('active').notNull().default(1),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/* ------------------------------------------------------------------ */
+/* mp_orders — órdenes de cobro QR (PUT order)                          */
+/* ------------------------------------------------------------------ */
+export const mpOrders = sqliteTable(
+  'mp_orders',
+  {
+    id: text('id').primaryKey(),
+    mpPosDeviceId: text('mp_pos_device_id')
+      .notNull()
+      .references(() => mpPosDevices.id),
+    saleId: text('sale_id').references(() => sales.id),
+    externalReference: text('external_reference').notNull().unique(),
+    amount: text('amount').notNull(),
+    description: text('description').notNull(),
+    /** pending | approved | rejected | cancelled | expired */
+    status: text('status').notNull(),
+    mpPaymentId: text('mp_payment_id').unique(),
+    mpMerchantOrderId: text('mp_merchant_order_id'),
+    expiresAt: integer('expires_at').notNull(),
+    paidAt: integer('paid_at'),
+    createdAt: integer('created_at').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => ({
+    byStatus: index('idx_mp_orders_status').on(t.status),
+    byExpires: index('idx_mp_orders_expires').on(t.expiresAt),
+    byExternalRef: index('idx_mp_orders_external_ref').on(t.externalReference),
+  }),
+);
+
+export type MpConfig = typeof mpConfig.$inferSelect;
+export type NewMpConfig = typeof mpConfig.$inferInsert;
+export type MpPosDevice = typeof mpPosDevices.$inferSelect;
+export type NewMpPosDevice = typeof mpPosDevices.$inferInsert;
+export type MpOrder = typeof mpOrders.$inferSelect;
+export type NewMpOrder = typeof mpOrders.$inferInsert;
+
+/* ------------------------------------------------------------------ */
 /* priceUpdateBatches — lote de actualización masiva de precios        */
 /* ------------------------------------------------------------------ */
 export const priceUpdateBatches = sqliteTable('price_update_batches', {
@@ -883,6 +956,9 @@ export const localSchema = {
   supplierPayments,
   priceUpdateBatches,
   priceUpdateEntries,
+  mpConfig,
+  mpPosDevices,
+  mpOrders,
   familiesRelations,
   suppliersRelations,
   articlesRelations,

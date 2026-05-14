@@ -57,6 +57,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'backup',
   'import',
   'auth',
+  'mpQr',
 ]);
 
 export const LOCAL_GROUPS = new Set(['system', 'lan', 'updater', 'hardware', 'license']);
@@ -377,6 +378,20 @@ export function createApiBridge(
       scanNetwork: () => c<never>('lan:scanNetwork'),
       getConnectedClients: () => c<never>('lan:getConnectedClients'),
       applyAndRestart: () => c<never>('lan:applyAndRestart'),
+    },
+    mpQr: {
+      getConfig: () => c<never>('mpQr:getConfig'),
+      setupCompany: (p) => c<never>('mpQr:setupCompany', p),
+      testConnection: () => c<never>('mpQr:testConnection'),
+      listPosDevices: () => c<never>('mpQr:listPosDevices'),
+      createPosDevice: (p) => c<never>('mpQr:createPosDevice', p),
+      getQrForCashRegister: (p) => c<never>('mpQr:getQrForCashRegister', p),
+      createOrder: (p) => c<never>('mpQr:createOrder', p),
+      cancelOrder: (p) => c<never>('mpQr:cancelOrder', p),
+      verifyPayment: (p) => c<never>('mpQr:verifyPayment', p),
+      getActiveOrder: (p) => c<never>('mpQr:getActiveOrder', p),
+      listOrders: (p) => c<never>('mpQr:listOrders', p),
+      linkOrderToSale: (p) => c<never>('mpQr:linkOrderToSale', p),
     },
     updater: {
       checkNow: () => c<never>('updater:checkNow'),

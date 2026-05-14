@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@stockflow/db": "workspace:*",
-    "@stockflow/shared": "workspace:*"
+    "@stockflow/shared": "workspace:*",
+    "drizzle-orm": "^0.36.4"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

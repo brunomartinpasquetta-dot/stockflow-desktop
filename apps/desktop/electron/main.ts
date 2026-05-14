@@ -15,6 +15,8 @@ import { LanServer } from './lan/LanServer';
 import { DEFAULT_LAN_PORT } from './lan/types';
 import { LicenseManager } from './license/LicenseManager';
 import { setupLogger } from './logger';
+import { MpTokenStore } from './secure/MpTokenStore';
+import { MpQrService, createServiceContext } from '@stockflow/core';
 import { setupAutoUpdater, type UpdaterController } from './updater';
 
 const HEARTBEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -93,6 +95,7 @@ function bootstrap(): { lanArgs: string[] } {
     appVersion: app.getVersion(),
   });
   const importService = new ExcelImportService();
+  const mpTokenStore = new MpTokenStore(machineId);
 
   // Updater (no-op en dev / sin empaquetar)
   updaterController = setupAutoUpdater({
@@ -124,6 +127,7 @@ function bootstrap(): { lanArgs: string[] } {
     hardware: hardwareManager,
     backup: backupService,
     importService,
+    mpTokenStore,
     emit: (channel: string, payload: unknown) => {
       mainWindow?.webContents.send(channel, payload);
     },
@@ -136,6 +140,25 @@ function bootstrap(): { lanArgs: string[] } {
 
   const channels = registerIpcHandlers(ipcMain, deps);
   console.info(`[main] StockFlow listo — DB: ${dbPath} — ${channels.length} canales IPC registrados`);
+
+  // Cron: expirar órdenes MP vencidas cada 60s. Usa un admin como currentUser.
+  setInterval(() => {
+    void (async () => {
+      try {
+        if (!dbHandle) return;
+        const admin = await dbHandle.repos.users.findByUsername('admin').catch(() => null);
+        if (!admin) return;
+        const { passwordHash: _ph, ...safe } = admin as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number };
+        void _ph;
+        const ctx = createServiceContext(dbHandle.db, safe, null);
+        const mpSvc = new MpQrService(ctx, mpTokenStore);
+        const res = await mpSvc.expireStaleOrders();
+        if (res.expired > 0) console.info(`[mp] expiradas ${res.expired} órdenes pendientes`);
+      } catch (e) {
+        console.error('[mp] expire cron falló:', e);
+      }
+    })();
+  }, 60_000);
 
   if (lanCfg.mode === 'server' && lanCfg.token) {
     const handlers = buildAllHandlers(deps);

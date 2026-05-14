@@ -2,7 +2,7 @@
  * Infraestructura común de los handlers IPC: dependencias inyectadas, tipo de
  * handler y middlewares `withSession` / `unguarded`.
  */
-import type { ServiceContext } from '@stockflow/core';
+import type { MpTokenStoreLike, ServiceContext } from '@stockflow/core';
 import type { LocalDatabase, Repositories } from '@stockflow/db';
 
 import type { BackupService } from '../backup/BackupService';
@@ -34,6 +34,8 @@ export interface HandlerDeps {
     getAutoCheck: () => boolean;
     setAutoCheck: (v: boolean) => void;
   };
+  /** Token store seguro para credenciales MercadoPago. */
+  mpTokenStore?: MpTokenStoreLike;
   /** Extras LAN (server-side): inyectados por main.ts cuando hay LanServer. */
   lanExtras?: {
     getConnectedClients?: () => { ip: string; lastSeen: number }[];
