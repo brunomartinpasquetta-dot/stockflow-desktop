@@ -640,6 +640,72 @@ export interface TopArticleRowDTO {
   amount: string;
 }
 
+export interface LowStockReportRowDTO {
+  articleId: string;
+  barcode: string;
+  description: string;
+  currentStock: string;
+  threshold: string;
+  suggestedQty: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  familyId: string | null;
+  familyName: string | null;
+  lastCost: string;
+}
+
+export interface InventoryArticleRowDTO {
+  articleId: string;
+  barcode: string;
+  description: string;
+  stock: string;
+  costPrice: string;
+  listPrice1: string;
+  costValue: string;
+  saleValue: string;
+}
+
+export interface InventoryFamilyRowDTO {
+  familyId: string | null;
+  familyName: string;
+  articles: InventoryArticleRowDTO[];
+  totals: { costValue: string; saleValue: string; articles: number };
+}
+
+export interface InventorySupplierGroupDTO {
+  supplierId: string | null;
+  supplierName: string;
+  families: InventoryFamilyRowDTO[];
+  totals: { costValue: string; saleValue: string; articles: number };
+}
+
+export interface InventoryReportDTO {
+  groups: InventorySupplierGroupDTO[];
+  grandTotal: {
+    costValue: string;
+    saleValue: string;
+    articles: number;
+    marginAmount: string;
+    marginPct: string;
+  };
+}
+
+export interface VendorRankingRowDTO {
+  userId: string;
+  userName: string;
+  salesCount: number;
+  totalAmount: string;
+  averageTicket: string;
+  percentageOfTotal: string;
+}
+
+export interface SalesByVendorReportDTO {
+  rows: VendorRankingRowDTO[];
+  grandTotal: string;
+  totalSales: number;
+  vendorCount: number;
+}
+
 export interface AddMovementInputDTO {
   type: CashMovementType;
   description: string;
@@ -1001,6 +1067,9 @@ export interface ApiSurface {
     inventoryByFamily(): Res<FamilyInventoryRowDTO[]>;
     topArticles(payload: DateRangeDTO & { limit?: number }): Res<TopArticleRowDTO[]>;
     cashRegisterReport(payload: { registerId: string }): Res<CashReportDTO>;
+    getLowStock(payload: { supplierId?: string; familyId?: string; criteria?: 'min' | 'ideal' }): Res<LowStockReportRowDTO[]>;
+    getInventory(payload: { supplierId?: string; familyId?: string; includeZeroStock?: boolean }): Res<InventoryReportDTO>;
+    getSalesByVendor(payload: DateRangeDTO & { userId?: string }): Res<SalesByVendorReportDTO>;
   };
   system: {
     pickFile(payload?: { filters?: { name: string; extensions: string[] }[] }): Res<{ filePath: string | null }>;

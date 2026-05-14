@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Loader2, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
@@ -147,6 +147,46 @@ export function Compras() {
   useEffect(() => {
     barcodeRef.current?.focus()
   }, [])
+
+  // Prefill desde "Generador de compras" (P-CONSULTAS).
+  const location = useLocation()
+  const prefillAppliedRef = useRef(false)
+  useEffect(() => {
+    if (prefillAppliedRef.current) return
+    const st = location.state as
+      | { prefilledLines?: Array<{ articleId: string; quantity: string; unitPrice?: string }>; from?: string }
+      | null
+    if (!st || !Array.isArray(st.prefilledLines) || st.prefilledLines.length === 0) return
+    if (allArticles.length === 0) return // esperar a que carguen los artículos
+    prefillAppliedRef.current = true
+    const byId = new Map(allArticles.map((a) => [a.id, a]))
+    const lines: CompraLine[] = []
+    const supplierIds = new Set<string | null>()
+    for (const p of st.prefilledLines) {
+      const art = byId.get(p.articleId)
+      if (!art) continue
+      lines.push({
+        article: art,
+        quantity: String(Number(p.quantity)),
+        costPrice: p.unitPrice ?? art.costPrice,
+        vatRate: art.vatRate,
+        newSalePrice: '',
+      })
+      supplierIds.add(art.supplierId ?? null)
+    }
+    if (lines.length === 0) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCart(lines)
+    // Si todos los artículos comparten proveedor → preseleccionar.
+    const uniqueSuppliers = [...supplierIds].filter((s): s is string => s != null)
+    if (supplierIds.size === 1 && uniqueSuppliers.length === 1) {
+      setSupplierId(uniqueSuppliers[0]!)
+    } else {
+      toast.warning('Hay artículos de varios proveedores — armá una orden por proveedor')
+    }
+    // Limpiar el state de la ruta para que un refresco no reaplique.
+    window.history.replaceState({}, '')
+  }, [location.state, allArticles])
 
   const totals = calculateSaleTotals(
     cart.map((l) => ({ quantity: l.quantity, unitPrice: l.costPrice, vatRate: l.vatRate })),

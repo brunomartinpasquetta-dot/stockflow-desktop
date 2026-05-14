@@ -2,7 +2,7 @@
  * Servicio de reportes consolidados (sólo lectura). Requiere permiso `view_reports`.
  */
 import type { Purchase, Sale } from '@stockflow/shared';
-import { mulDecimal, sumDecimals } from '@stockflow/shared';
+import { decimalString, mulDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -47,6 +47,73 @@ export interface TopArticleRow {
   description: string;
   quantity: string;
   amount: string;
+}
+
+export interface LowStockEntry {
+  articleId: string;
+  barcode: string;
+  description: string;
+  currentStock: string;
+  threshold: string;
+  suggestedQty: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  familyId: string | null;
+  familyName: string | null;
+  lastCost: string;
+}
+
+export interface InventoryArticleRow {
+  articleId: string;
+  barcode: string;
+  description: string;
+  stock: string;
+  costPrice: string;
+  listPrice1: string;
+  costValue: string;
+  saleValue: string;
+}
+
+export interface InventoryFamilyGroup {
+  familyId: string | null;
+  familyName: string;
+  articles: InventoryArticleRow[];
+  totals: { costValue: string; saleValue: string; articles: number };
+}
+
+export interface InventorySupplierGroup {
+  supplierId: string | null;
+  supplierName: string;
+  families: InventoryFamilyGroup[];
+  totals: { costValue: string; saleValue: string; articles: number };
+}
+
+export interface InventoryReport {
+  groups: InventorySupplierGroup[];
+  grandTotal: {
+    costValue: string;
+    saleValue: string;
+    articles: number;
+    marginAmount: string;
+    marginPct: string;
+  };
+}
+
+export interface VendorRankingRow {
+  userId: string;
+  userName: string;
+  salesCount: number;
+  totalAmount: string;
+  averageTicket: string;
+  /** "12.34" — porcentaje del total general. */
+  percentageOfTotal: string;
+}
+
+export interface SalesByVendorReport {
+  rows: VendorRankingRow[];
+  grandTotal: string;
+  totalSales: number;
+  vendorCount: number;
 }
 
 function groupAccumulate<T extends string>(
@@ -191,5 +258,219 @@ export class ReportsService {
   async cashRegisterReport(registerId: string): Promise<CashReport> {
     this.requireReports();
     return new CashService(this.ctx).getCashReport(registerId);
+  }
+
+  async getLowStockArticles(
+    input: { supplierId?: string; familyId?: string; criteria?: 'min' | 'ideal' },
+    _ctx?: ServiceContext,
+  ): Promise<LowStockEntry[]> {
+    this.requireReports();
+    const criteria = input.criteria ?? 'min';
+    const [articles, suppliers, families] = await Promise.all([
+      this.ctx.repos.articles.findAll(),
+      this.ctx.repos.suppliers.findAll(),
+      this.ctx.repos.families.findAll(),
+    ]);
+    const supplierName = new Map(suppliers.map((s) => [s.id, s.name]));
+    const familyName = new Map(families.map((f) => [f.id, f.name]));
+
+    const rows: LowStockEntry[] = [];
+    for (const a of articles) {
+      if (!a.active) continue;
+      if (input.supplierId && a.supplierId !== input.supplierId) continue;
+      if (input.familyId && a.familyId !== input.familyId) continue;
+      const min = Number(a.minStock ?? '0');
+      const ideal = Number(a.idealStock ?? '0');
+      const stock = Number(a.stock ?? '0');
+      let threshold: number;
+      if (criteria === 'min') {
+        if (!(min > 0) || !(stock < min)) continue;
+        threshold = min;
+      } else {
+        if (!(ideal > 0) || !(stock < ideal)) continue;
+        threshold = ideal;
+      }
+      const suggested = ideal > 0 ? Math.max(0, ideal - stock) : Math.max(0, min - stock);
+      rows.push({
+        articleId: a.id,
+        barcode: a.barcode,
+        description: a.description,
+        currentStock: decimalString(a.stock, 3),
+        threshold: decimalString(threshold, 3),
+        suggestedQty: decimalString(suggested, 3),
+        supplierId: a.supplierId ?? null,
+        supplierName: a.supplierId ? (supplierName.get(a.supplierId) ?? null) : null,
+        familyId: a.familyId ?? null,
+        familyName: a.familyId ? (familyName.get(a.familyId) ?? null) : null,
+        lastCost: a.costPrice,
+      });
+    }
+
+    rows.sort((a, b) => {
+      const sa = (a.supplierName ?? 'zzzz').localeCompare(b.supplierName ?? 'zzzz', 'es');
+      if (sa !== 0) return sa;
+      const fa = (a.familyName ?? 'zzzz').localeCompare(b.familyName ?? 'zzzz', 'es');
+      if (fa !== 0) return fa;
+      return a.description.localeCompare(b.description, 'es');
+    });
+    return rows;
+  }
+
+  async getInventoryReport(
+    input: { supplierId?: string; familyId?: string; includeZeroStock?: boolean },
+    _ctx?: ServiceContext,
+  ): Promise<InventoryReport> {
+    this.requireReports();
+    const includeZero = input.includeZeroStock === true;
+    const [articles, suppliers, families] = await Promise.all([
+      this.ctx.repos.articles.findAll(),
+      this.ctx.repos.suppliers.findAll(),
+      this.ctx.repos.families.findAll(),
+    ]);
+    const supplierName = new Map(suppliers.map((s) => [s.id, s.name]));
+    const familyName = new Map(families.map((f) => [f.id, f.name]));
+
+    // sup → fam → rows
+    const map = new Map<string, Map<string, InventoryArticleRow[]>>();
+    const NULL_KEY = '__none__';
+    for (const a of articles) {
+      if (!a.active) continue;
+      if (input.supplierId && a.supplierId !== input.supplierId) continue;
+      if (input.familyId && a.familyId !== input.familyId) continue;
+      if (!includeZero && Number(a.stock) <= 0) continue;
+      const sKey = a.supplierId ?? NULL_KEY;
+      const fKey = a.familyId ?? NULL_KEY;
+      let bySup = map.get(sKey);
+      if (!bySup) {
+        bySup = new Map();
+        map.set(sKey, bySup);
+      }
+      let arr = bySup.get(fKey);
+      if (!arr) {
+        arr = [];
+        bySup.set(fKey, arr);
+      }
+      const costValue = mulDecimal(a.stock, a.costPrice, 4);
+      const saleValue = mulDecimal(a.stock, a.listPrice1, 4);
+      arr.push({
+        articleId: a.id,
+        barcode: a.barcode,
+        description: a.description,
+        stock: decimalString(a.stock, 3),
+        costPrice: a.costPrice,
+        listPrice1: a.listPrice1,
+        costValue,
+        saleValue,
+      });
+    }
+
+    const groups: InventorySupplierGroup[] = [];
+    let grandCost = '0.0000';
+    let grandSale = '0.0000';
+    let grandArticles = 0;
+
+    const supplierKeys = [...map.keys()].sort((a, b) => {
+      const na = a === NULL_KEY ? 'Sin proveedor' : (supplierName.get(a) ?? a);
+      const nb = b === NULL_KEY ? 'Sin proveedor' : (supplierName.get(b) ?? b);
+      return na.localeCompare(nb, 'es');
+    });
+    for (const sKey of supplierKeys) {
+      const bySup = map.get(sKey)!;
+      const famGroups: InventoryFamilyGroup[] = [];
+      let supCost = '0.0000';
+      let supSale = '0.0000';
+      let supArts = 0;
+      const familyKeys = [...bySup.keys()].sort((a, b) => {
+        const na = a === NULL_KEY ? 'Sin familia' : (familyName.get(a) ?? a);
+        const nb = b === NULL_KEY ? 'Sin familia' : (familyName.get(b) ?? b);
+        return na.localeCompare(nb, 'es');
+      });
+      for (const fKey of familyKeys) {
+        const arts = bySup.get(fKey)!;
+        arts.sort((x, y) => x.description.localeCompare(y.description, 'es'));
+        const cost = sumDecimals(arts.map((r) => r.costValue));
+        const sale = sumDecimals(arts.map((r) => r.saleValue));
+        famGroups.push({
+          familyId: fKey === NULL_KEY ? null : fKey,
+          familyName: fKey === NULL_KEY ? 'Sin familia' : (familyName.get(fKey) ?? fKey),
+          articles: arts,
+          totals: { costValue: cost, saleValue: sale, articles: arts.length },
+        });
+        supCost = sumDecimals([supCost, cost]);
+        supSale = sumDecimals([supSale, sale]);
+        supArts += arts.length;
+      }
+      groups.push({
+        supplierId: sKey === NULL_KEY ? null : sKey,
+        supplierName: sKey === NULL_KEY ? 'Sin proveedor' : (supplierName.get(sKey) ?? sKey),
+        families: famGroups,
+        totals: { costValue: supCost, saleValue: supSale, articles: supArts },
+      });
+      grandCost = sumDecimals([grandCost, supCost]);
+      grandSale = sumDecimals([grandSale, supSale]);
+      grandArticles += supArts;
+    }
+
+    const marginAmount = subDecimal(grandSale, grandCost);
+    const marginPct = Number(grandCost) > 0
+      ? ((Number(marginAmount) / Number(grandCost)) * 100).toFixed(2)
+      : '0.00';
+    return {
+      groups,
+      grandTotal: {
+        costValue: grandCost,
+        saleValue: grandSale,
+        articles: grandArticles,
+        marginAmount,
+        marginPct,
+      },
+    };
+  }
+
+  async getSalesByVendor(
+    input: { from: number; to: number; userId?: string },
+    _ctx?: ServiceContext,
+  ): Promise<SalesByVendorReport> {
+    this.requireReports();
+    let sales = (await this.ctx.repos.sales.findByDateRange(input.from, input.to)).filter(
+      (s) => s.status !== 'voided',
+    );
+    if (input.userId) sales = sales.filter((s) => s.sellerId === input.userId);
+
+    const users = await this.ctx.repos.users.findAll();
+    const nameById = new Map(users.map((u) => [u.id, u.fullName]));
+
+    const byId = new Map<string, { count: number; total: string }>();
+    for (const s of sales) {
+      const bucket = byId.get(s.sellerId) ?? { count: 0, total: '0.0000' };
+      bucket.count += 1;
+      bucket.total = sumDecimals([bucket.total, s.total]);
+      byId.set(s.sellerId, bucket);
+    }
+
+    const grandTotalNum = [...byId.values()].reduce((a, b) => a + Number(b.total), 0);
+    const grandTotal = grandTotalNum.toFixed(4);
+    const totalSales = [...byId.values()].reduce((a, b) => a + b.count, 0);
+
+    const rows: VendorRankingRow[] = [...byId.entries()].map(([userId, b]) => {
+      const avg = b.count > 0 ? (Number(b.total) / b.count).toFixed(4) : '0.0000';
+      const pct = grandTotalNum > 0 ? ((Number(b.total) / grandTotalNum) * 100).toFixed(2) : '0.00';
+      return {
+        userId,
+        userName: nameById.get(userId) ?? userId,
+        salesCount: b.count,
+        totalAmount: b.total,
+        averageTicket: avg,
+        percentageOfTotal: pct,
+      };
+    });
+    rows.sort((a, b) => Number(b.totalAmount) - Number(a.totalAmount));
+
+    return {
+      rows,
+      grandTotal,
+      totalSales,
+      vendorCount: rows.length,
+    };
   }
 }

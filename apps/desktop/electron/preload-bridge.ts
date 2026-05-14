@@ -321,6 +321,9 @@ export function createApiBridge(
       inventoryByFamily: () => c<never>('reports:inventoryByFamily'),
       topArticles: (p) => c<never>('reports:topArticles', p),
       cashRegisterReport: (p) => c<never>('reports:cashRegisterReport', p),
+      getLowStock: (p) => c<never>('reports:getLowStock', p),
+      getInventory: (p) => c<never>('reports:getInventory', p),
+      getSalesByVendor: (p) => c<never>('reports:getSalesByVendor', p),
     },
     system: {
       pickFile: (p) => c<never>('system:pickFile', p),

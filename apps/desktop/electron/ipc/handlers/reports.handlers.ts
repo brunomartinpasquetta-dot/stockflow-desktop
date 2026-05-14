@@ -4,7 +4,10 @@ import { type HandlerDeps, type HandlerMap, withSession } from '../handler-conte
 import type {
   CashReportDTO,
   FamilyInventoryRowDTO,
+  InventoryReportDTO,
+  LowStockReportRowDTO,
   PurchasesReportDTO,
+  SalesByVendorReportDTO,
   SalesReportDTO,
   SellerReportRowDTO,
   TopArticleRowDTO,
@@ -48,6 +51,25 @@ export function buildReportsHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: { registerId: string }, ctx): Promise<CashReportDTO> =>
         new ReportsService(ctx).cashRegisterReport(payload.registerId),
+    ),
+    'reports:getLowStock': withSession(
+      deps,
+      (
+        payload: { supplierId?: string; familyId?: string; criteria?: 'min' | 'ideal' },
+        ctx,
+      ): Promise<LowStockReportRowDTO[]> => new ReportsService(ctx).getLowStockArticles(payload ?? {}, ctx),
+    ),
+    'reports:getInventory': withSession(
+      deps,
+      (
+        payload: { supplierId?: string; familyId?: string; includeZeroStock?: boolean },
+        ctx,
+      ): Promise<InventoryReportDTO> => new ReportsService(ctx).getInventoryReport(payload ?? {}, ctx),
+    ),
+    'reports:getSalesByVendor': withSession(
+      deps,
+      (payload: { from: number; to: number; userId?: string }, ctx): Promise<SalesByVendorReportDTO> =>
+        new ReportsService(ctx).getSalesByVendor(payload, ctx),
     ),
   };
 }

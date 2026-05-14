@@ -324,6 +324,38 @@ async function main(): Promise<void> {
     globalThis.fetch = originalFetch;
   }
 
+  // reports v2 (P-CONSULTAS): getLowStock / getInventory / getSalesByVendor
+  const lowStockReport = await invoke<Array<{ articleId: string; suggestedQty: string }>>(
+    handlers,
+    'reports:getLowStock',
+    { criteria: 'min' },
+  );
+  check(
+    'reports:getLowStock responde array',
+    lowStockReport.ok && Array.isArray(lowStockReport.data),
+    lowStockReport.ok ? `len=${lowStockReport.data.length}` : JSON.stringify(lowStockReport),
+  );
+  const invReport = await invoke<{ groups: unknown[]; grandTotal: { articles: number } }>(
+    handlers,
+    'reports:getInventory',
+    {},
+  );
+  check(
+    'reports:getInventory responde con groups + grandTotal',
+    invReport.ok && Array.isArray(invReport.data.groups) && typeof invReport.data.grandTotal.articles === 'number',
+    invReport.ok ? `arts=${invReport.data.grandTotal.articles}` : JSON.stringify(invReport),
+  );
+  const byVendor = await invoke<{ rows: unknown[]; grandTotal: string; totalSales: number; vendorCount: number }>(
+    handlers,
+    'reports:getSalesByVendor',
+    { from: 0, to: Date.now() + 86_400_000 },
+  );
+  check(
+    'reports:getSalesByVendor responde con rows + grandTotal',
+    byVendor.ok && Array.isArray(byVendor.data.rows) && typeof byVendor.data.grandTotal === 'string' && byVendor.data.totalSales >= 1,
+    byVendor.ok ? `rows=${byVendor.data.rows.length} total=${byVendor.data.grandTotal}` : JSON.stringify(byVendor),
+  );
+
   // logout → vuelve a UNAUTHENTICATED
   await invoke(handlers, 'auth:logout');
   const afterLogout = await invoke(handlers, 'articles:list');

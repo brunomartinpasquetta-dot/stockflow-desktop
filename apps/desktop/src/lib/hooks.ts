@@ -9,6 +9,9 @@ import { api } from '@/lib/api'
 import type {
   ArticleDTO,
   GlobalSearchResultDTO,
+  InventoryReportDTO,
+  LowStockReportRowDTO,
+  SalesByVendorReportDTO,
   CashRegisterDTO,
   CashReportDTO,
   HistoricalCashRegisterDTO,
@@ -228,6 +231,29 @@ export function useGlobalSearch(query: string, debounceMs = 200) {
     enabled: true,
     staleTime: 10_000,
     placeholderData: (prev) => prev ?? EMPTY_SEARCH,
+  })
+}
+
+// --- Reportes (P-CONSULTAS) ---
+export function useLowStockReport(input: { supplierId?: string; familyId?: string; criteria?: 'min' | 'ideal' }, enabled = true) {
+  return useQuery<LowStockReportRowDTO[]>({
+    queryKey: ['reports', 'lowStock', input.supplierId ?? '', input.familyId ?? '', input.criteria ?? 'min'],
+    queryFn: () => api.reports.getLowStock(input),
+    enabled,
+  })
+}
+export function useInventoryReport(input: { supplierId?: string; familyId?: string; includeZeroStock?: boolean }, enabled = true) {
+  return useQuery<InventoryReportDTO>({
+    queryKey: ['reports', 'inventory', input.supplierId ?? '', input.familyId ?? '', input.includeZeroStock ? '1' : '0'],
+    queryFn: () => api.reports.getInventory(input),
+    enabled,
+  })
+}
+export function useSalesByVendorReport(input: { from: number; to: number; userId?: string }, enabled = true) {
+  return useQuery<SalesByVendorReportDTO>({
+    queryKey: ['reports', 'salesByVendor', input.from, input.to, input.userId ?? ''],
+    queryFn: () => api.reports.getSalesByVendor(input),
+    enabled,
   })
 }
 

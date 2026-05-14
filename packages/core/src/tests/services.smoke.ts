@@ -568,6 +568,68 @@ async function main(): Promise<void> {
   check('applyRounding up_to_50(123.45) = 150', applyRounding(123.45, 'up_to_50') === 150);
   check('applyRounding up_to_100(123.45) = 200', applyRounding(123.45, 'up_to_100') === 200);
 
+  // ----------------------------------------------------- reports v2 (P-CONSULTAS)
+  console.log('\n[reports v2]');
+  {
+    const supA = await repos.suppliers.create({ code: 'V2-A', name: 'Proveedor V2 A' });
+    const supB = await repos.suppliers.create({ code: 'V2-B', name: 'Proveedor V2 B' });
+    const famA = await repos.families.create({ name: 'V2-FamA' });
+    const famB = await repos.families.create({ name: 'V2-FamB' });
+    const a1 = await repos.articles.create({ barcode: 'V2-001', description: 'V2 art bajo min', listPrice1: '200.0000', costPrice: '100.0000', stock: '2.000', minStock: '10.000', idealStock: '30.000', supplierId: supA.id, familyId: famA.id });
+    const a2 = await repos.articles.create({ barcode: 'V2-002', description: 'V2 art OK', listPrice1: '300.0000', costPrice: '150.0000', stock: '50.000', minStock: '10.000', idealStock: '20.000', supplierId: supA.id, familyId: famA.id });
+    const a3 = await repos.articles.create({ barcode: 'V2-003', description: 'V2 art bajo ideal', listPrice1: '500.0000', costPrice: '200.0000', stock: '8.000', minStock: '5.000', idealStock: '20.000', supplierId: supB.id, familyId: famB.id });
+    const a4 = await repos.articles.create({ barcode: 'V2-004', description: 'V2 art sin min', listPrice1: '100.0000', costPrice: '50.0000', stock: '0.000', minStock: '0.000', idealStock: '0.000', supplierId: supB.id, familyId: famB.id });
+    const a5 = await repos.articles.create({ barcode: 'V2-005', description: 'V2 art bajo min B', listPrice1: '600.0000', costPrice: '400.0000', stock: '1.000', minStock: '5.000', idealStock: '15.000', supplierId: supB.id, familyId: famB.id });
+    void a2; void a4;
+
+    const low = await admin.reports.getLowStockArticles({ criteria: 'min' }, adminCtx);
+    const lowIds = low.map((r) => r.articleId);
+    check('getLowStockArticles(min): incluye a1 y a5', lowIds.includes(a1.id) && lowIds.includes(a5.id), `ids=${lowIds.join(',')}`);
+    check('getLowStockArticles(min): excluye a2 (stock>min) y a4 (min=0)', !lowIds.includes(a2.id) && !lowIds.includes(a4.id));
+    const a1Row = low.find((r) => r.articleId === a1.id)!;
+    check('getLowStockArticles: suggestedQty = ideal - stock (30-2 = 28)', Number(a1Row.suggestedQty) === 28, `s=${a1Row.suggestedQty}`);
+
+    const lowIdeal = await admin.reports.getLowStockArticles({ criteria: 'ideal' }, adminCtx);
+    check('getLowStockArticles(ideal): incluye a3 (stock<ideal)', lowIdeal.some((r) => r.articleId === a3.id));
+
+    const lowBySup = await admin.reports.getLowStockArticles({ supplierId: supA.id, criteria: 'min' }, adminCtx);
+    check('getLowStockArticles filtrado por supplier A: sólo proveedor A', lowBySup.every((r) => r.supplierId === supA.id) && lowBySup.length >= 1);
+
+    const inv = await admin.reports.getInventoryReport({}, adminCtx);
+    check('getInventoryReport devuelve groups', inv.groups.length >= 2, `groups=${inv.groups.length}`);
+    check('getInventoryReport: grandTotal.articles >= 4', inv.grandTotal.articles >= 4);
+    const gA = inv.groups.find((g) => g.supplierId === supA.id);
+    check('getInventoryReport: group supA con totales > 0', gA != null && Number(gA.totals.costValue) > 0);
+    check(
+      'getInventoryReport: marginAmount = saleValue - costValue',
+      Number(inv.grandTotal.marginAmount).toFixed(4) === (Number(inv.grandTotal.saleValue) - Number(inv.grandTotal.costValue)).toFixed(4),
+    );
+
+    // Crear 2 sellers extra y varias ventas (1 anulada).
+    const sellerA = await repos.users.create({ username: 'v2sellerA', password: '1234', fullName: 'V2 Seller A', role: 'seller' });
+    const sellerB = await repos.users.create({ username: 'v2sellerB', password: '1234', fullName: 'V2 Seller B', role: 'seller' });
+    const sellerACtx = createServiceContext(db, sellerA);
+    const sellerBCtx = createServiceContext(db, sellerB);
+    const sA = createServices(sellerACtx);
+    const sB = createServices(sellerBCtx);
+    // reg2 (admin) sigue abierta; los sellers pueden registrar ventas ahí.
+    const v1 = await sA.sales.createSale({ type: 'B', customerId: cf.id, payments: [{ paymentMethodId: PM_CASH, amount: '600.0000' }], lines: [{ articleId: a2.id, quantity: '2.000', unitPrice: '300.0000' }] });
+    const v2 = await sA.sales.createSale({ type: 'B', customerId: cf.id, payments: [{ paymentMethodId: PM_CASH, amount: '300.0000' }], lines: [{ articleId: a2.id, quantity: '1.000', unitPrice: '300.0000' }] });
+    const v3 = await sB.sales.createSale({ type: 'B', customerId: cf.id, payments: [{ paymentMethodId: PM_CASH, amount: '500.0000' }], lines: [{ articleId: a3.id, quantity: '1.000', unitPrice: '500.0000' }] });
+    // Anular v2 → no debe contar.
+    await admin.sales.voidSale(v2.sale.id);
+
+    const byVendor = await admin.reports.getSalesByVendor({ from: 0, to: Date.now() + 86_400_000 }, adminCtx);
+    const rowA = byVendor.rows.find((r) => r.userId === sellerA.id);
+    const rowB = byVendor.rows.find((r) => r.userId === sellerB.id);
+    check('getSalesByVendor: sellerA registrada', rowA != null && rowA.salesCount === 1, JSON.stringify(rowA));
+    check('getSalesByVendor: sellerB registrada', rowB != null && rowB.salesCount === 1);
+    check('getSalesByVendor: total sellerA = 600 (v2 anulada NO cuenta)', rowA != null && Number(rowA.totalAmount) === 600, `total=${rowA?.totalAmount}`);
+    const sumPct = byVendor.rows.reduce((a, b) => a + Number(b.percentageOfTotal), 0);
+    check('getSalesByVendor: % suma ~100', Math.abs(sumPct - 100) < 0.5, `sum=${sumPct.toFixed(2)}`);
+    void v1; void v3;
+  }
+
   // ----------------------------------------------------- búsqueda global (P-BUSQUEDA)
   console.log('\n[search]');
   await repos.articles.create({ barcode: '7790000001000', description: 'Coca Cola 500ml', listPrice1: '300.0000', stock: '10.000' });

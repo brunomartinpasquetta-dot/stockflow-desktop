@@ -238,6 +238,14 @@ export const api = {
     global: (payload: { query: string; limitPerCategory?: number; categories?: GlobalSearchCategoryDTO[] }): Promise<GlobalSearchResultDTO> =>
       unwrap(sf().search.global(payload)),
   },
+  reports: {
+    getLowStock: (input: { supplierId?: string; familyId?: string; criteria?: 'min' | 'ideal' }) =>
+      unwrap(sf().reports.getLowStock(input)),
+    getInventory: (input: { supplierId?: string; familyId?: string; includeZeroStock?: boolean }) =>
+      unwrap(sf().reports.getInventory(input)),
+    getSalesByVendor: (input: { from: number; to: number; userId?: string }) =>
+      unwrap(sf().reports.getSalesByVendor(input)),
+  },
   system: {
     pickFile: (filters?: { name: string; extensions: string[] }[]): Promise<{ filePath: string | null }> =>
       unwrap(sf().system.pickFile({ filters })),

@@ -33,6 +33,9 @@ const Bienvenida = lazy(() => import('@/pages/Bienvenida').then((m) => ({ defaul
 const ActualizacionPrecios = lazy(() => import('@/pages/ActualizacionPrecios').then((m) => ({ default: m.ActualizacionPrecios })))
 const HistorialPrecios = lazy(() => import('@/pages/HistorialPrecios').then((m) => ({ default: m.HistorialPrecios })))
 const ConfiguracionMercadoPago = lazy(() => import('@/pages/ConfiguracionMercadoPago').then((m) => ({ default: m.ConfiguracionMercadoPago })))
+const GeneradorCompras = lazy(() => import('@/pages/GeneradorCompras').then((m) => ({ default: m.GeneradorCompras })))
+const InventarioArticulos = lazy(() => import('@/pages/InventarioArticulos').then((m) => ({ default: m.InventarioArticulos })))
+const VentasPorVendedor = lazy(() => import('@/pages/VentasPorVendedor').then((m) => ({ default: m.VentasPorVendedor })))
 
 function SuspenseOutlet() {
   return (
@@ -76,6 +79,9 @@ export const router = createHashRouter([
                     children: [
                       { path: '/medios-de-pago', element: <MediosDePago /> },
                       { path: '/consultas/caja', element: <HistorialCajas /> },
+                      { path: '/consultas/generador-compras', element: <GeneradorCompras /> },
+                      { path: '/consultas/inventario', element: <InventarioArticulos /> },
+                      { path: '/consultas/ventas-vendedor', element: <VentasPorVendedor /> },
                       { path: '/precios/actualizar', element: <ActualizacionPrecios /> },
                       { path: '/precios/historial', element: <HistorialPrecios /> },
                     ],
