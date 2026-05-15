@@ -42,7 +42,7 @@ export function AcercaDe() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
       <img
-        src="/branding/logo-full.svg"
+        src={`${import.meta.env.BASE_URL}branding/logo-full.svg`}
         alt="StockFlow"
         className="mx-auto mb-4 h-auto w-[280px]"
       />

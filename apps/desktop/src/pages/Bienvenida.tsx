@@ -103,7 +103,7 @@ export function Bienvenida() {
       <div className="w-full max-w-2xl">
         <div className="mb-6 flex flex-col items-center gap-2">
           <img
-            src="/branding/logo-full.svg"
+            src={`${import.meta.env.BASE_URL}branding/logo-full.svg`}
             alt="StockFlow"
             className="mx-auto mb-4 h-auto w-[280px]"
           />

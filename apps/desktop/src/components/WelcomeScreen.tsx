@@ -28,7 +28,7 @@ export function WelcomeScreen() {
   return (
     <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-background to-muted/30 px-8 py-12">
       <img
-        src="/branding/logo-tagline.svg"
+        src={`${import.meta.env.BASE_URL}branding/logo-tagline.svg`}
         alt="StockFlow"
         className="h-auto w-[400px]"
       />

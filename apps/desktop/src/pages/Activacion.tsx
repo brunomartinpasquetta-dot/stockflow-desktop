@@ -52,7 +52,7 @@ export function Activacion() {
       <Card className="w-full max-w-md">
         <CardHeader className="items-center gap-2 pt-6 text-center">
           <img
-            src="/branding/logo-full.svg"
+            src={`${import.meta.env.BASE_URL}branding/logo-full.svg`}
             alt="StockFlow"
             className="mx-auto h-auto w-[280px]"
           />

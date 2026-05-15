@@ -49,7 +49,7 @@ export function Login() {
       <Card className="w-full max-w-sm">
         <CardContent className="flex flex-col gap-3 pt-6">
           <img
-            src="/branding/logo-full.svg"
+            src={`${import.meta.env.BASE_URL}branding/logo-full.svg`}
             alt="StockFlow"
             className="mx-auto mb-6 h-auto w-[300px]"
           />
