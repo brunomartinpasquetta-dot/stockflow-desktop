@@ -470,8 +470,14 @@ function PDV() {
         try {
           await api.hardware.printer.printSaleTicket(hwTicket)
           printedViaHardware = true
-        } catch {
-          toast.warning('Impresora no disponible — usá "Imprimir" para imprimir desde pantalla')
+        } catch (e) {
+          if (e instanceof Error && e.message.includes('A4_BROWSER_PRINT_REQUIRED')) {
+            // Modo A4: el renderer imprime vía window.print (template HTML del usePrint).
+            printSaleTicket(ticketData)
+            printedViaHardware = true
+          } else {
+            toast.warning('Impresora no disponible — usá "Imprimir" para imprimir desde pantalla')
+          }
         }
         if (printerCfg.autoOpenDrawer && !result.sale.isAccountSale) {
           const cashMethodId = activeMethods.find((m) => m.type === 'cash')?.id
@@ -652,6 +658,7 @@ function PDV() {
             <thead className="sticky top-0 bg-muted">
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-2 py-1.5">Producto</th>
+                <th className="w-32 px-2 py-1.5">Marca</th>
                 <th className="w-24 px-2 py-1.5 text-right">Cantidad</th>
                 <th className="w-28 px-2 py-1.5 text-right">{priceMode === 'gross' ? 'P. unit. (c/IVA)' : 'P. unit. (neto)'}</th>
                 <th className="w-24 px-2 py-1.5 text-right">Desc.</th>
@@ -662,7 +669,7 @@ function PDV() {
             <tbody>
               {cart.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                     Carrito vacío — escaneá o buscá un producto para empezar.
                   </td>
                 </tr>
@@ -678,6 +685,7 @@ function PDV() {
                           {overStock && <span className="ml-2 text-destructive">Stock: {formatNumber(l.article.stock, 3)}</span>}
                         </div>
                       </td>
+                      <td className="px-2 py-1 text-sm text-muted-foreground">{l.article.brand ?? ''}</td>
                       <td className="px-2 py-1">
                         <Input
                           className="h-8 text-right tabular-nums"

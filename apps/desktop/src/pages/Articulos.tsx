@@ -43,6 +43,9 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { SelectWithQuickCreate } from '@/components/SelectWithQuickCreate'
+import { QuickCreateSupplierDialog } from '@/components/QuickCreateSupplierDialog'
+import { QuickCreateFamilyDialog } from '@/components/QuickCreateFamilyDialog'
 import {
   Table,
   TableBody,
@@ -196,6 +199,8 @@ export function Articulos() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   // Imagen que el usuario eligió en `create` y todavía no se subió.
   const [pendingImageSource, setPendingImageSource] = useState<string | null>(null)
+  // Quick-create dialogs para proveedor / familia
+  const [quickCreate, setQuickCreate] = useState<'supplier' | 'family' | null>(null)
 
   const searchRef = useRef<HTMLInputElement | null>(null)
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
@@ -640,6 +645,7 @@ export function Articulos() {
                 >
                   Detalle{sortIcon('description')}
                 </TableHead>
+                <TableHead>Marca</TableHead>
                 <TableHead
                   className="cursor-pointer select-none"
                   onClick={() => toggleSort('familyId')}
@@ -663,13 +669,13 @@ export function Articulos() {
             <TableBody>
               {articles.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     Cargando artículos…
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     {articles.data && articles.data.length > 0
                       ? 'Sin resultados para la búsqueda actual'
                       : 'No hay artículos cargados'}
@@ -694,6 +700,7 @@ export function Articulos() {
                     >
                       <TableCell className="font-mono text-xs">{a.barcode}</TableCell>
                       <TableCell>{a.description}</TableCell>
+                      <TableCell>{a.brand ?? ''}</TableCell>
                       <TableCell>
                         {a.familyId ? (familyName.get(a.familyId) ?? '—') : '—'}
                       </TableCell>
@@ -738,6 +745,8 @@ export function Articulos() {
               imagePath={selectedArticle?.imagePath ?? null}
               pendingImageSource={pendingImageSource}
               onPendingImageChange={setPendingImageSource}
+              onQuickCreateSupplier={() => setQuickCreate('supplier')}
+              onQuickCreateFamily={() => setQuickCreate('family')}
             />
             {mode === 'view' && selectedArticle && (
               <ArticlePriceHistorySection articleId={selectedArticle.id} />
@@ -745,6 +754,23 @@ export function Articulos() {
           </>
         )}
       </Card>
+
+      <QuickCreateSupplierDialog
+        open={quickCreate === 'supplier'}
+        onClose={() => setQuickCreate(null)}
+        onCreated={(id) => {
+          setForm((f) => ({ ...f, supplierId: id }))
+          setQuickCreate(null)
+        }}
+      />
+      <QuickCreateFamilyDialog
+        open={quickCreate === 'family'}
+        onClose={() => setQuickCreate(null)}
+        onCreated={(id) => {
+          setForm((f) => ({ ...f, familyId: id }))
+          setQuickCreate(null)
+        }}
+      />
     </div>
   )
 }
@@ -769,6 +795,8 @@ interface ArticuloFormProps {
   imagePath: string | null
   pendingImageSource: string | null
   onPendingImageChange: (path: string | null) => void
+  onQuickCreateSupplier: () => void
+  onQuickCreateFamily: () => void
 }
 
 function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
@@ -788,12 +816,14 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
     imagePath,
     pendingImageSource,
     onPendingImageChange,
+    onQuickCreateSupplier,
+    onQuickCreateFamily,
   } = props
 
   return (
-    <div className="flex h-full flex-col overflow-auto p-3">
+    <div className="flex h-full flex-col p-3">
       {/* Cabecera del panel */}
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex shrink-0 items-center justify-between">
         <div className="text-sm font-medium">
           {mode === 'view' && 'Detalle del artículo'}
           {mode === 'edit' && 'Editando artículo'}
@@ -806,22 +836,11 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
               Modificar
             </Button>
           )}
-          {(mode === 'edit' || mode === 'create') && (
-            <>
-              <Button size="sm" variant="outline" onClick={onCancel} disabled={saving}>
-                <X className="mr-1 h-4 w-4" />
-                Cancelar
-              </Button>
-              <Button size="sm" onClick={onSave} disabled={saving}>
-                Guardar
-              </Button>
-            </>
-          )}
         </div>
       </div>
 
       {/* Grid del formulario */}
-      <div className="grid grid-cols-12 gap-3">
+      <div className="grid min-h-0 flex-1 grid-cols-12 gap-3 overflow-auto">
         {/* Fila 1: id */}
         <Field className="col-span-3" label="Código">
           <Input
@@ -838,42 +857,33 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
           />
         </Field>
         <Field className="col-span-3" label="Familia">
-          <Select
-            value={form.familyId}
-            onChange={(e) => setField('familyId', e.target.value)}
+          <SelectWithQuickCreate
+            value={form.familyId || null}
+            onChange={(id) => setField('familyId', id)}
+            options={families.map((f) => ({ id: f.id, label: f.name }))}
+            onCreate={onQuickCreateFamily}
             disabled={inputsDisabled}
-          >
-            <option value="">—</option>
-            {families.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </Select>
+          />
         </Field>
 
         {/* Fila 2: clasificación */}
-        <Field className="col-span-4" label="Proveedor">
-          <Select
-            value={form.supplierId}
-            onChange={(e) => setField('supplierId', e.target.value)}
+        <Field className="col-span-3" label="Proveedor">
+          <SelectWithQuickCreate
+            value={form.supplierId || null}
+            onChange={(id) => setField('supplierId', id)}
+            options={suppliers.map((s) => ({ id: s.id, label: `${s.code} — ${s.name}` }))}
+            onCreate={onQuickCreateSupplier}
             disabled={inputsDisabled}
-          >
-            <option value="">—</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
-              </option>
-            ))}
-          </Select>
+          />
         </Field>
-        <Field className="col-span-4" label="Marca">
+        <Field className="col-span-3" label="Marca">
           <Input
             value={form.brand}
             onChange={(e) => setField('brand', e.target.value)}
             disabled={inputsDisabled}
           />
         </Field>
+        <div className="col-span-2" />
         <Field className="col-span-2" label="IVA">
           <Select
             value={form.vatRate}
@@ -916,7 +926,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Util %">
+        <Field className="col-span-2" label="Utilidad">
           <ReadonlyValue>{utilPct(form.listPrice1, form.costPrice)}</ReadonlyValue>
         </Field>
         <div className="col-span-4" />
@@ -929,7 +939,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Util %">
+        <Field className="col-span-2" label="Utilidad">
           <ReadonlyValue>{utilPct(form.listPrice2, form.costPrice)}</ReadonlyValue>
         </Field>
         <Field className="col-span-3" label="P. Lista 3">
@@ -939,7 +949,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Util %">
+        <Field className="col-span-2" label="Utilidad">
           <ReadonlyValue>{utilPct(form.listPrice3, form.costPrice)}</ReadonlyValue>
         </Field>
         <div className="col-span-2" />
@@ -952,7 +962,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Util %">
+        <Field className="col-span-2" label="Utilidad">
           <ReadonlyValue>{utilPct(form.wholesalePrice, form.costPrice)}</ReadonlyValue>
         </Field>
         <Field className="col-span-3" label="Cant. mín. mayorista">
@@ -1029,6 +1039,18 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
           />
         </div>
       </div>
+
+      {(mode === 'edit' || mode === 'create') && (
+        <div className="mt-3 flex shrink-0 items-center justify-start gap-2 border-t pt-3">
+          <Button variant="outline" onClick={onCancel} disabled={saving}>
+            <X className="mr-1 h-4 w-4" />
+            Cancelar
+          </Button>
+          <Button onClick={onSave} disabled={saving}>
+            Guardar
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -23,9 +23,8 @@ import {
 import type {
   BackupConfigDTO,
   BackupEntryDTO,
+  PaperFormatDTO,
   PrinterConfigDTO,
-  PrinterKindDTO,
-  PrinterWidthDTO,
   ScaleConfigDTO,
   ScaleProtocolDTO,
 } from '@/types/api'
@@ -43,26 +42,90 @@ function formatDate(ts: number): string {
 }
 
 /* ----------------------- IMPRESORA ----------------------- */
+/**
+ * Identifica el formato sugerido en base al nombre/producto detectado.
+ *  - ESC/POS térmicas conocidas → 80mm.
+ *  - Impresoras de oficina → A4.
+ */
+function suggestPaperFormat(label: string): PaperFormatDTO {
+  const upper = label.toUpperCase()
+  if (/HP|BROTHER|CANON|INKJET|LASERJET|OFFICEJET|DESKJET/.test(upper)) return 'A4'
+  if (/TM-T|RPT|BEMATECH|ESC\/POS|EPSON TM|XPRINTER|3NSTAR/.test(upper)) return '80mm'
+  return '80mm'
+}
+
+interface PrinterOption {
+  value: string // 'usb:vid:pid' | 'network:ip:port' | 'file:/path'
+  label: string
+  paperHint: PaperFormatDTO
+}
+
+function buildPrinterOptions(
+  usb: { vendorId: number; productId: number; manufacturer?: string; product?: string }[],
+  currentNetwork: string | null,
+): PrinterOption[] {
+  const out: PrinterOption[] = []
+  // USB detectadas
+  for (const d of usb) {
+    const vid = d.vendorId.toString(16).padStart(4, '0')
+    const pid = d.productId.toString(16).padStart(4, '0')
+    const label = `${d.manufacturer ?? ''} ${d.product ?? ''}`.trim() || `USB ${vid}:${pid}`
+    out.push({
+      value: `usb:${vid}:${pid}`,
+      label: `${label} (USB)`,
+      paperHint: suggestPaperFormat(label),
+    })
+  }
+  // Red guardada
+  if (currentNetwork) {
+    out.push({
+      value: `network:${currentNetwork}`,
+      label: `${currentNetwork} (Red)`,
+      paperHint: '80mm',
+    })
+  }
+  // Archivo (testing) siempre disponible
+  out.push({ value: 'file:/tmp/stockflow-printer.bin', label: 'Archivo (para testing)', paperHint: '80mm' })
+  return out
+}
+
+function parsePrinterValue(value: string): { kind: 'usb' | 'network' | 'file'; iface: string } | null {
+  if (value.startsWith('usb:')) return { kind: 'usb', iface: value.slice(4) }
+  if (value.startsWith('network:')) return { kind: 'network', iface: value.slice(8) }
+  if (value.startsWith('file:')) return { kind: 'file', iface: value.slice(5) }
+  return null
+}
+
+function currentValueFromConfig(cfg: PrinterConfigDTO | null): string {
+  if (!cfg) return ''
+  if (cfg.kind === 'usb') return `usb:${cfg.interface}`
+  if (cfg.kind === 'network') return `network:${cfg.interface}`
+  return `file:${cfg.interface}`
+}
+
 function PrinterSection() {
   const qc = useQueryClient()
   const cfgQuery = useQuery({ queryKey: ['hardware', 'printer', 'config'], queryFn: () => api.hardware.printer.getConfig() })
   const usbQuery = useQuery({ queryKey: ['hardware', 'usb'], queryFn: () => api.hardware.listUsbDevices() })
 
-  const [kind, setKind] = useState<PrinterKindDTO>('usb')
-  const [iface, setIface] = useState('')
-  const [width, setWidth] = useState<PrinterWidthDTO>(80)
+  const [selected, setSelected] = useState<string>('')
+  const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('80mm')
+  const [networkIp, setNetworkIp] = useState<string>('')
   const [autoOpen, setAutoOpen] = useState(true)
   const [seeded, setSeeded] = useState<PrinterConfigDTO | null | undefined>(undefined)
 
   if (seeded !== cfgQuery.data) {
     setSeeded(cfgQuery.data)
     if (cfgQuery.data) {
-      setKind(cfgQuery.data.kind)
-      setIface(cfgQuery.data.interface)
-      setWidth(cfgQuery.data.width)
+      setSelected(currentValueFromConfig(cfgQuery.data))
+      const fmt: PaperFormatDTO = cfgQuery.data.paperFormat ?? (cfgQuery.data.width === 58 ? '58mm' : '80mm')
+      setPaperFormat(fmt)
       setAutoOpen(cfgQuery.data.autoOpenDrawer)
+      if (cfgQuery.data.kind === 'network') setNetworkIp(cfgQuery.data.interface)
     }
   }
+
+  const options = buildPrinterOptions(usbQuery.data ?? [], networkIp || null)
 
   const saveMut = useMutation({
     mutationFn: (cfg: PrinterConfigDTO) => api.hardware.printer.setConfig(cfg),
@@ -76,7 +139,15 @@ function PrinterSection() {
   const testMut = useMutation({
     mutationFn: () => api.hardware.printer.test(),
     onSuccess: () => toast.success('Prueba enviada'),
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo imprimir la prueba'),
+    onError: (err) => {
+      if (err instanceof Error && err.message.includes('A4_BROWSER_PRINT_REQUIRED')) {
+        // Imprimir desde el browser un placeholder.
+        window.print()
+        toast.info('Impresión A4 enviada al diálogo del sistema')
+        return
+      }
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo imprimir la prueba')
+    },
   })
 
   const drawerMut = useMutation({
@@ -85,17 +156,26 @@ function PrinterSection() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo abrir el cajón'),
   })
 
+  function onSelect(value: string): void {
+    setSelected(value)
+    const opt = options.find((o) => o.value === value)
+    if (opt) setPaperFormat(opt.paperHint)
+  }
+
   function onSave(): void {
-    if (!iface.trim()) {
-      toast.error('Debés ingresar la interfaz de la impresora')
+    const parsed = parsePrinterValue(selected)
+    if (!parsed) {
+      toast.error('Elegí una impresora')
       return
     }
+    const width: 58 | 80 = paperFormat === '58mm' ? 58 : 80
     saveMut.mutate({
-      kind,
-      interface: iface.trim(),
+      kind: parsed.kind,
+      interface: parsed.iface,
       width,
       characterSet: 'PC858_EURO',
       autoOpenDrawer: autoOpen,
+      paperFormat,
     })
   }
 
@@ -103,47 +183,61 @@ function PrinterSection() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Printer className="h-4 w-4" /> Impresora térmica
+          <Printer className="h-4 w-4" /> Impresora
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1">
-          <Label>Tipo de conexión</Label>
+        <div className="col-span-2 flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <Label>Impresora</Label>
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline"
+              onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'usb'] })}
+            >
+              <RefreshCw className="mr-1 inline h-3 w-3" /> refrescar
+            </button>
+          </div>
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={kind}
-            onChange={(e) => setKind(e.target.value as PrinterKindDTO)}
+            value={selected}
+            onChange={(e) => onSelect(e.target.value)}
           >
-            <option value="usb">USB</option>
-            <option value="network">Red (Ethernet/WiFi)</option>
-            <option value="file">Archivo (debug)</option>
+            <option value="">— seleccioná una impresora —</option>
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
           </select>
         </div>
+
+        <div className="col-span-2 flex flex-col gap-1">
+          <Label>Impresora de Red (IP:puerto, opcional)</Label>
+          <Input
+            value={networkIp}
+            onChange={(e) => setNetworkIp(e.target.value)}
+            placeholder="192.168.1.50:9100"
+          />
+          <p className="text-xs text-muted-foreground">
+            Si tu impresora está en la red, ingresá IP:puerto y aparecerá en la lista de arriba.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-1">
           <Label>Ancho de papel</Label>
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={width}
-            onChange={(e) => setWidth(Number(e.target.value) as PrinterWidthDTO)}
+            value={paperFormat}
+            onChange={(e) => setPaperFormat(e.target.value as PaperFormatDTO)}
           >
-            <option value={58}>58 mm (32 columnas)</option>
-            <option value={80}>80 mm (48 columnas)</option>
+            <option value="58mm">58 mm (térmica)</option>
+            <option value="80mm">80 mm (térmica)</option>
+            <option value="A4">A4 (oficina)</option>
           </select>
         </div>
-        <div className="col-span-2 flex flex-col gap-1">
-          <Label htmlFor="iface">
-            Interfaz{' '}
-            <span className="text-xs text-muted-foreground">
-              {kind === 'usb' && '(formato "vendorId:productId" en hex, ej. 04b8:0202)'}
-              {kind === 'network' && '(formato "ip:port", típicamente 9100)'}
-              {kind === 'file' && '(ruta absoluta a archivo)'}
-            </span>
-          </Label>
-          <Input id="iface" value={iface} onChange={(e) => setIface(e.target.value)} placeholder={kind === 'usb' ? '04b8:0202' : kind === 'network' ? '192.168.1.50:9100' : '/tmp/printer.bin'} />
-        </div>
+
         <label className="col-span-2 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={autoOpen} onChange={(e) => setAutoOpen(e.target.checked)} />
-          Abrir cajón monedero automáticamente al cobrar en efectivo
+          Abrir cajón monedero automáticamente al confirmar venta efectivo
         </label>
 
         <div className="col-span-2 flex flex-wrap gap-2">
@@ -160,33 +254,11 @@ function PrinterSection() {
           </Button>
         </div>
 
-        <div className="col-span-2 mt-2">
-          <div className="mb-1 flex items-center gap-2">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Dispositivos USB detectados</Label>
-            <button
-              type="button"
-              className="text-xs text-primary hover:underline"
-              onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'usb'] })}
-            >
-              <RefreshCw className="inline h-3 w-3" /> refrescar
-            </button>
-          </div>
-          {usbQuery.data && usbQuery.data.length > 0 ? (
-            <ul className="text-xs text-muted-foreground">
-              {usbQuery.data.map((d, i) => (
-                <li key={i} className="font-mono">
-                  {d.vendorId.toString(16).padStart(4, '0')}:{d.productId.toString(16).padStart(4, '0')}
-                  {d.manufacturer ? ` — ${d.manufacturer}` : ''}
-                  {d.product ? ` ${d.product}` : ''}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No se detectaron dispositivos USB (puede requerir permisos / drivers).
-            </p>
-          )}
-        </div>
+        {paperFormat === 'A4' && (
+          <p className="col-span-2 text-xs text-muted-foreground">
+            En modo A4, los tickets se imprimen vía diálogo del sistema (browser print).
+          </p>
+        )}
       </CardContent>
     </Card>
   )

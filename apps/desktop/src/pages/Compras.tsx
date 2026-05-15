@@ -22,6 +22,7 @@ import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -148,6 +149,27 @@ export function Compras() {
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
   const [today] = useState(() => formatDate(Date.now()))
+  // Pago mono-medio (default) + toggle a mixto.
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
+  const [mixedMode, setMixedMode] = useState(false)
+
+  // Inicializar / corregir el medio de pago mono-medio default (efectivo).
+  if (
+    activeMethods.length > 0 &&
+    (!selectedMethodId || !activeMethods.some((m) => m.id === selectedMethodId))
+  ) {
+    const fallback =
+      activeMethods.find((m) => m.type === 'cash') ??
+      activeMethods.find((m) => m.isPhysicalCash) ??
+      activeMethods[0]
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedMethodId(fallback?.id ?? null)
+  }
+
+  const selectedMethod = useMemo(
+    () => activeMethods.find((m) => m.id === selectedMethodId) ?? null,
+    [activeMethods, selectedMethodId],
+  )
 
   useEffect(() => {
     barcodeRef.current?.focus()
@@ -240,6 +262,7 @@ export function Compras() {
     setIsAccountPurchase(false)
     setInvoiceNumber('')
     setDateIso(todayIso())
+    setMixedMode(false)
     split.reset()
     barcodeRef.current?.focus()
   }
@@ -269,14 +292,19 @@ export function Compras() {
   }
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      api.purchases.create({
+    mutationFn: () => {
+      const monoPayments =
+        !isAccountPurchase && !mixedMode && selectedMethod
+          ? [{ paymentMethodId: selectedMethod.id, amount: totalNum.toFixed(4) }]
+          : null
+      const paymentsToSend = isAccountPurchase ? [] : (monoPayments ?? split.payments)
+      return api.purchases.create({
         type: voucherType,
         supplierId: supplierId!,
         supplierInvoiceNumber: invoiceNumber.trim() || null,
         date: isoToTs(dateIso),
         isAccountPurchase,
-        payments: isAccountPurchase ? [] : split.payments,
+        payments: paymentsToSend,
         updatePrices,
         discount: parseCurrencyInput(globalDiscount),
         notes: null,
@@ -287,7 +315,8 @@ export function Compras() {
           salePrice: updatePrices && l.newSalePrice.trim() !== '' ? parseCurrencyInput(l.newSalePrice) : undefined,
           vatRate: l.vatRate,
         })),
-      }),
+      })
+    },
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ['articles'] })
       void qc.invalidateQueries({ queryKey: ['cash'] })
@@ -306,9 +335,13 @@ export function Compras() {
     supplierId != null &&
     !createMutation.isPending &&
     !noCash &&
-    (isAccountPurchase ? true : split.isComplete && activeMethods.length > 0)
+    (isAccountPurchase
+      ? true
+      : mixedMode
+        ? split.isComplete && activeMethods.length > 0
+        : selectedMethod != null)
 
-  // F2 = confirmar (fase de captura para ganarle al handler de F-keys del Layout)
+  // F2 = confirmar; F4 cicla medio; F12 toggle mixto.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.repeat) return
@@ -316,6 +349,20 @@ export function Compras() {
         e.preventDefault()
         e.stopPropagation()
         if (canConfirm) createMutation.mutate()
+        return
+      }
+      if (e.key === 'F4' && !mixedMode && !isAccountPurchase && activeMethods.length > 1) {
+        e.preventDefault()
+        e.stopPropagation()
+        const idx = activeMethods.findIndex((m) => m.id === selectedMethodId)
+        const next = activeMethods[(idx + 1) % activeMethods.length]
+        if (next) setSelectedMethodId(next.id)
+        return
+      }
+      if (e.key === 'F12' && !isAccountPurchase && activeMethods.length > 1) {
+        e.preventDefault()
+        e.stopPropagation()
+        setMixedMode((m) => !m)
       }
     }
     window.addEventListener('keydown', onKeyDown, { capture: true })
@@ -342,7 +389,7 @@ export function Compras() {
           </Select>
         </div>
         <div className="flex flex-col gap-1">
-          <Label>N° del proveedor</Label>
+          <Label>Número de Factura</Label>
           <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="0001-00012345" />
         </div>
         <div className="flex flex-col gap-1">
@@ -408,6 +455,7 @@ export function Compras() {
             <thead className="sticky top-0 bg-muted">
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-2 py-1.5">Producto</th>
+                <th className="w-32 px-2 py-1.5">Marca</th>
                 <th className="w-24 px-2 py-1.5 text-right">Cantidad</th>
                 <th className="w-28 px-2 py-1.5 text-right">{priceMode === 'gross' ? 'Costo (c/IVA)' : 'Costo (neto)'}</th>
                 <th className="w-20 px-2 py-1.5 text-right">IVA</th>
@@ -419,7 +467,7 @@ export function Compras() {
             <tbody>
               {cart.length === 0 ? (
                 <tr>
-                  <td colSpan={updatePrices ? 7 : 6} className="py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={updatePrices ? 8 : 7} className="py-10 text-center text-sm text-muted-foreground">
                     Sin líneas — escaneá o buscá un producto para empezar.
                   </td>
                 </tr>
@@ -430,6 +478,7 @@ export function Compras() {
                       <div className="font-medium">{l.article.description}</div>
                       <div className="font-mono text-xs text-muted-foreground">{l.article.barcode}</div>
                     </td>
+                    <td className="px-2 py-1 text-sm text-muted-foreground">{l.article.brand ?? ''}</td>
                     <td className="px-2 py-1">
                       <Input className="h-8 text-right tabular-nums" inputMode="decimal" value={l.quantity}
                         onChange={(e) => setLine(i, 'quantity', e.target.value)} onBlur={() => setLine(i, 'quantity', parseCurrencyInput(l.quantity))} />
@@ -509,15 +558,54 @@ export function Compras() {
             <p className="text-xs text-destructive">No hay caja abierta. Abrí la caja (F7) o registrá la compra a cuenta del proveedor.</p>
           ) : noMethods ? (
             <p className="text-xs text-destructive">No hay medios de pago configurados.</p>
+          ) : mixedMode ? (
+            <>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Pago mixto</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => { setMixedMode(false); split.reset() }}
+                >
+                  Volver a pago único
+                </Button>
+              </div>
+              <PaymentSplitInput methods={activeMethods} split={split} />
+            </>
           ) : (
-            <PaymentSplitInput methods={activeMethods} split={split} />
+            <>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="compra-method">Forma de pago</Label>
+                <PaymentMethodSelect
+                  id="compra-method"
+                  methods={activeMethods}
+                  value={selectedMethodId}
+                  onChange={setSelectedMethodId}
+                />
+              </div>
+              {activeMethods.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setMixedMode(true)}
+                >
+                  Pago mixto (F12)
+                </Button>
+              )}
+            </>
           )}
         </div>
 
         <div className="flex flex-col justify-end gap-2">
           <Button variant="success" className="h-14 text-lg" disabled={!canConfirm} onClick={() => createMutation.mutate()}>
             {createMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
-            Confirmar compra (F2) — {formatCurrency(totals.total)}
+            {isAccountPurchase
+              ? `Confirmar compra a cuenta (F2) — ${formatCurrency(totals.total)}`
+              : `Pagar (F2) — ${formatCurrency(totals.total)}`}
           </Button>
           {cart.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearCompra} disabled={createMutation.isPending}>

@@ -75,6 +75,15 @@ export class PrinterService {
     return this.cfg;
   }
 
+  /**
+   * Si la impresora está configurada con `paperFormat: 'A4'`, no podemos
+   * mandar ESC/POS — el caller (renderer) tiene que usar `window.print()`.
+   * Devuelve `true` cuando el caller debe encargarse.
+   */
+  isA4(): boolean {
+    return this.cfg.paperFormat === 'A4';
+  }
+
   async connect(): Promise<boolean> {
     // Sin estado persistente: la conexión la abrimos por print.
     if (this.cfg.kind === 'file') return true;
@@ -185,6 +194,10 @@ export class PrinterService {
   }
 
   async printSaleTicket(sale: SaleTicketData): Promise<void> {
+    if (this.isA4()) {
+      // El renderer debe imprimir vía browser print (window.print()).
+      throw new Error('A4_BROWSER_PRINT_REQUIRED');
+    }
     const cols = this.cols;
     const parts: Buffer[] = [];
     const push = (s: string) => parts.push(Buffer.from(s, 'latin1'));
@@ -238,6 +251,9 @@ export class PrinterService {
   }
 
   async printCashCloseReport(report: CashCloseReportData): Promise<void> {
+    if (this.isA4()) {
+      throw new Error('A4_BROWSER_PRINT_REQUIRED');
+    }
     const cols = this.cols;
     const parts: Buffer[] = [];
     const push = (s: string) => parts.push(Buffer.from(s, 'latin1'));
@@ -275,6 +291,9 @@ export class PrinterService {
   }
 
   async testPrint(): Promise<void> {
+    if (this.isA4()) {
+      throw new Error('A4_BROWSER_PRINT_REQUIRED');
+    }
     const cols = this.cols;
     const parts: Buffer[] = [];
     const push = (s: string) => parts.push(Buffer.from(s, 'latin1'));

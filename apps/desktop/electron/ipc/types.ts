@@ -1237,6 +1237,7 @@ export interface LanSetModeInputDTO {
 
 export type PrinterKindDTO = 'usb' | 'network' | 'file';
 export type PrinterWidthDTO = 58 | 80;
+export type PaperFormatDTO = '58mm' | '80mm' | 'A4';
 
 export interface PrinterConfigDTO {
   kind: PrinterKindDTO;
@@ -1244,6 +1245,8 @@ export interface PrinterConfigDTO {
   width: PrinterWidthDTO;
   characterSet: string;
   autoOpenDrawer: boolean;
+  /** Formato lógico del papel; si falta, se infiere de `width`. */
+  paperFormat?: PaperFormatDTO;
 }
 
 export type ScaleProtocolDTO = 'kretz' | 'systel' | 'magris' | 'generic';

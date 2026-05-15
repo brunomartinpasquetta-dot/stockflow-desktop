@@ -5,6 +5,7 @@
 
 export type PrinterKind = 'usb' | 'network' | 'file';
 export type PrinterWidth = 58 | 80;
+export type PaperFormat = '58mm' | '80mm' | 'A4';
 
 export interface PrinterConfig {
   kind: PrinterKind;
@@ -13,6 +14,8 @@ export interface PrinterConfig {
   width: PrinterWidth;
   characterSet: string;
   autoOpenDrawer: boolean;
+  /** Formato lógico del papel; si falta, se infiere de `width`. */
+  paperFormat?: PaperFormat;
 }
 
 export type ScaleProtocol = 'kretz' | 'systel' | 'magris' | 'generic';
