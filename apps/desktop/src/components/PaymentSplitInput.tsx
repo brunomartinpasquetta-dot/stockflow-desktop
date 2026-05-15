@@ -3,9 +3,9 @@
  * (restante / completo / excede) + atajo "Todo en Efectivo". El estado vive en
  * `usePaymentSplit`. La suma debe ser exactamente igual al total — no hay vuelto.
  */
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, parseCurrencyInput } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
+import { formatCurrency } from '@/lib/format'
 import type { PaymentSplit } from '@/lib/usePaymentSplit'
 import type { PaymentMethodDTO } from '@/types/api'
 
@@ -24,16 +24,11 @@ export function PaymentSplitInput({
       {methods.map((m) => (
         <div key={m.id} className="flex items-center justify-between gap-2">
           <span className="truncate text-muted-foreground">{m.name}</span>
-          <Input
+          <CurrencyInput
             className="h-8 w-32 text-right tabular-nums"
-            inputMode="decimal"
             placeholder="0,00"
             value={split.amounts[m.id] ?? ''}
-            onChange={(e) => split.setAmount(m.id, e.target.value)}
-            onBlur={() => {
-              const v = split.amounts[m.id]
-              if (v && v.trim() !== '') split.setAmount(m.id, parseCurrencyInput(v))
-            }}
+            onChange={(v) => split.setAmount(m.id, v)}
           />
         </div>
       ))}

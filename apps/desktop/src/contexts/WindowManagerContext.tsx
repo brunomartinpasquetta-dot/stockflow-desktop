@@ -73,10 +73,17 @@ const Z_MAX = 49 // bajo z-50 de Dialog/Dropdown shadcn
 
 function defaultSizeFor(pageKey: string): { width: number; height: number } {
   const def = WINDOWS[pageKey]
-  if (def?.defaultSize) return def.defaultSize
+  const minW = def?.minWidth ?? 600
+  const minH = def?.minHeight ?? 400
+  if (def?.defaultSize) {
+    return {
+      width: Math.max(minW, def.defaultSize.width),
+      height: Math.max(minH, def.defaultSize.height),
+    }
+  }
   const w = Math.min(1100, typeof window !== 'undefined' ? window.innerWidth - 200 : 1100)
   const h = Math.min(700, typeof window !== 'undefined' ? window.innerHeight - 200 : 700)
-  return { width: Math.max(600, w), height: Math.max(400, h) }
+  return { width: Math.max(minW, w), height: Math.max(minH, h) }
 }
 
 function cascadeOffset(n: number): { x: number; y: number } {

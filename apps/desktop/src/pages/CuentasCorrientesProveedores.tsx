@@ -10,8 +10,8 @@ import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -70,13 +70,11 @@ function PagoDialog({
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="pago-monto">Monto a pagar</Label>
-            <Input
+            <CurrencyInput
               id="pago-monto"
               autoFocus
-              inputMode="decimal"
               value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-              onBlur={() => monto && setMonto(parseCurrencyInput(monto))}
+              onChange={setMonto}
             />
             {overBalance && <span className="text-xs text-destructive">No puede superar el saldo del comprobante.</span>}
           </div>

@@ -18,6 +18,9 @@ export interface WindowDef {
   roles?: Role[]
   fKey?: number
   defaultSize?: { width: number; height: number }
+  /** Mínimo absoluto de ancho/alto que respeta el WindowManager al hacer resize. */
+  minWidth?: number
+  minHeight?: number
 }
 
 export const WINDOWS: Record<string, WindowDef> = {
@@ -29,6 +32,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     fKey: 1,
     requires: 'view_articles',
     defaultSize: { width: 1200, height: 760 },
+    minWidth: 1000,
+    minHeight: 600,
   },
   proveedores: {
     pageKey: 'proveedores',
@@ -61,6 +66,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     component: lazy(() => import('@/pages/Compras').then((m) => ({ default: m.Compras }))),
     fKey: 5,
     requires: 'manage_purchases',
+    minWidth: 1100,
+    minHeight: 700,
   },
   ventas: {
     pageKey: 'ventas',
@@ -69,6 +76,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     component: lazy(() => import('@/pages/Ventas').then((m) => ({ default: m.Ventas }))),
     fKey: 6,
     requires: 'create_sale',
+    minWidth: 1100,
+    minHeight: 700,
   },
   caja: {
     pageKey: 'caja',
@@ -76,6 +85,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     iconName: 'Wallet',
     component: lazy(() => import('@/pages/Caja').then((m) => ({ default: m.Caja }))),
     fKey: 7,
+    minWidth: 800,
+    minHeight: 500,
   },
   'historial-ventas': {
     pageKey: 'historial-ventas',
@@ -83,12 +94,16 @@ export const WINDOWS: Record<string, WindowDef> = {
     iconName: 'BarChart3',
     component: lazy(() => import('@/pages/HistorialVentas').then((m) => ({ default: m.HistorialVentas }))),
     fKey: 8,
+    minWidth: 1000,
+    minHeight: 600,
   },
   'historial-compras': {
     pageKey: 'historial-compras',
     title: 'Historial de Compras',
     iconName: 'History',
     component: lazy(() => import('@/pages/HistorialCompras').then((m) => ({ default: m.HistorialCompras }))),
+    minWidth: 1000,
+    minHeight: 600,
   },
   'historial-cajas': {
     pageKey: 'historial-cajas',
@@ -97,6 +112,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     component: lazy(() => import('@/pages/HistorialCajas').then((m) => ({ default: m.HistorialCajas }))),
     fKey: 9,
     requires: 'view_reports',
+    minWidth: 1000,
+    minHeight: 600,
   },
   contabilidad: {
     pageKey: 'contabilidad',
@@ -105,6 +122,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     component: lazy(() => import('@/pages/Contabilidad').then((m) => ({ default: m.Contabilidad }))),
     fKey: 10,
     requires: 'view_accounting',
+    minWidth: 1100,
+    minHeight: 600,
   },
   'libro-iva-ventas': {
     pageKey: 'libro-iva-ventas',
@@ -112,6 +131,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     iconName: 'Calculator',
     component: lazy(() => import('@/pages/LibroIvaVentas').then((m) => ({ default: m.LibroIvaVentas }))),
     requires: 'view_accounting',
+    minWidth: 1100,
+    minHeight: 600,
   },
   'libro-iva-compras': {
     pageKey: 'libro-iva-compras',
@@ -119,6 +140,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     iconName: 'Calculator',
     component: lazy(() => import('@/pages/LibroIvaCompras').then((m) => ({ default: m.LibroIvaCompras }))),
     requires: 'view_accounting',
+    minWidth: 1100,
+    minHeight: 600,
   },
   familias: {
     pageKey: 'familias',
@@ -160,6 +183,8 @@ export const WINDOWS: Record<string, WindowDef> = {
     iconName: 'Settings',
     component: lazy(() => import('@/pages/Configuracion').then((m) => ({ default: m.Configuracion }))),
     roles: ['admin'],
+    minWidth: 900,
+    minHeight: 550,
   },
   'configuracion-mp': {
     pageKey: 'configuracion-mp',

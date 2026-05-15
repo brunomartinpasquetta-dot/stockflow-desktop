@@ -39,6 +39,7 @@ import {
 import { api } from '@/lib/api'
 import { useArticles, useFamilies, useSuppliers } from '@/lib/hooks'
 import { formatCurrency } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePermission } from '@/contexts/AuthContext'
 import type {
@@ -416,12 +417,16 @@ export function ActualizacionPrecios() {
                   <Label className="mb-1 block text-xs text-muted-foreground">
                     {ruleType === 'percentage' ? 'Porcentaje (%)' : 'Monto ($)'}
                   </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={ruleValue}
-                    onChange={(e) => setRuleValue(e.target.value)}
-                  />
+                  {ruleType === 'fixed_amount' ? (
+                    <CurrencyInput value={ruleValue} onChange={setRuleValue} />
+                  ) : (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={ruleValue}
+                      onChange={(e) => setRuleValue(e.target.value)}
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -429,12 +434,7 @@ export function ActualizacionPrecios() {
             {ruleType === 'set_value' && (
               <div className="max-w-xs">
                 <Label className="mb-1 block text-xs text-muted-foreground">Nuevo valor ($)</Label>
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={ruleValue}
-                  onChange={(e) => setRuleValue(e.target.value)}
-                />
+                <CurrencyInput value={ruleValue} onChange={setRuleValue} />
               </div>
             )}
 

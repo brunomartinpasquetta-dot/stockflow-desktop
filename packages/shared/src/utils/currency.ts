@@ -1,16 +1,14 @@
 /**
- * Helpers de formato del renderer Electron.
+ * Utilidades de formato monetario es-AR.
  *
- * Las primitivas monetarias replican el contrato de
- * `@stockflow/shared/utils/currency` para no romper renderer + desktop ↔
- * shared/cloud. Mantenemos esta copia local en `apps/desktop/src` para
- * que el tsconfig del renderer (`erasableSyntaxOnly`, `verbatimModuleSyntax`)
- * no tenga que crawlear las re-exports `export type ... from '@stockflow/db'`.
+ * Convenciones:
+ *  - DB / canónico: string decimal con punto (`"1234.56"`).
+ *  - Display: `$1.234,56` (puntos miles, coma decimal).
+ *  - Input crudo del usuario: acepta tanto `"1.234,56"` como `"1234,56"` o `"1234.56"`.
  *
- * Si necesitás tocar la fórmula, sincronizá ambos lados.
+ * Se usa desde @stockflow/desktop (renderer Electron) y @stockflow/cloud.
+ * No depende de Node ni de Electron — sólo `Intl` y `Number`.
  */
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 
 function toNumber(value: string | number | null | undefined): number {
   if (value == null) return 0
@@ -19,7 +17,7 @@ function toNumber(value: string | number | null | undefined): number {
 }
 
 /**
- * Formatea un importe a string es-AR para mostrar (`"$1.234,56"`).
+ * Formatea un importe a string es-AR para mostrar.
  *
  *  formatCurrency('1234.56')                       // "$1.234,56"
  *  formatCurrency(1234.56, { showSymbol: false })  // "1.234,56"
@@ -38,18 +36,10 @@ export function formatCurrency(
   return showSymbol ? `$${formatted}` : formatted
 }
 
-/** "1.234,567" (decimales fijos, sin símbolo de moneda) */
-export function formatNumber(value: string | number | null | undefined, decimals = 2): string {
-  return new Intl.NumberFormat('es-AR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(toNumber(value))
-}
-
 /**
  * Convierte un importe ingresado por el usuario (es-AR: "1.234,56", "1234,56",
  * "1234", o formato "programador" "1234.56") a la cadena canónica para guardar
- * en la DB ("1234.56").
+ * en la DB ("1234.56"). Siempre devuelve string con `.` decimal o `"0"`.
  */
 export function parseCurrencyInput(input: string | number | null | undefined): string {
   if (input == null) return '0'
@@ -67,7 +57,7 @@ export function parseCurrencyInput(input: string | number | null | undefined): s
   return Number.isFinite(n) ? String(n) : '0'
 }
 
-/** Versión numérica útil para cálculos derivados en vivo. */
+/** Versión numérica; útil para calcular en vivo. */
 export function parseCurrencyToNumber(input: string | number | null | undefined): number {
   return Number(parseCurrencyInput(input))
 }
@@ -82,20 +72,4 @@ export function toInputString(value: string | number | null | undefined): string
   const num = typeof value === 'string' ? Number(value) : value
   if (!Number.isFinite(num)) return ''
   return String(num).replace('.', ',')
-}
-
-function toDate(date: number | Date): Date {
-  return date instanceof Date ? date : new Date(date)
-}
-
-/** "dd/MM/yyyy" */
-export function formatDate(date: number | Date | null | undefined): string {
-  if (date == null) return ''
-  return format(toDate(date), 'dd/MM/yyyy', { locale: es })
-}
-
-/** "dd/MM/yyyy HH:mm" */
-export function formatDateTime(date: number | Date | null | undefined): string {
-  if (date == null) return ''
-  return format(toDate(date), 'dd/MM/yyyy HH:mm', { locale: es })
 }

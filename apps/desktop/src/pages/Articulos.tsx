@@ -63,6 +63,7 @@ import {
 } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatCurrency, formatNumber } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ArticleDTO, FamilyDTO, SupplierDTO, Unit } from '@/types/api'
 
@@ -902,20 +903,16 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
 
         {/* Fila 3: costo + Lista 1 */}
         <Field className="col-span-3" label="P. Costo">
-          <Input
-            type="number"
-            step="0.0001"
+          <CurrencyInput
             value={form.costPrice}
-            onChange={(e) => setField('costPrice', e.target.value)}
+            onChange={(v) => setField('costPrice', v)}
             disabled={inputsDisabled}
           />
         </Field>
         <Field className="col-span-3" label="P. Venta (Lista 1)">
-          <Input
-            type="number"
-            step="0.0001"
+          <CurrencyInput
             value={form.listPrice1}
-            onChange={(e) => setField('listPrice1', e.target.value)}
+            onChange={(v) => setField('listPrice1', v)}
             disabled={inputsDisabled}
           />
         </Field>
@@ -926,11 +923,9 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
 
         {/* Fila 4: Lista 2 + Lista 3 */}
         <Field className="col-span-3" label="P. Lista 2">
-          <Input
-            type="number"
-            step="0.0001"
+          <CurrencyInput
             value={form.listPrice2}
-            onChange={(e) => setField('listPrice2', e.target.value)}
+            onChange={(v) => setField('listPrice2', v)}
             disabled={inputsDisabled}
           />
         </Field>
@@ -938,11 +933,9 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
           <ReadonlyValue>{utilPct(form.listPrice2, form.costPrice)}</ReadonlyValue>
         </Field>
         <Field className="col-span-3" label="P. Lista 3">
-          <Input
-            type="number"
-            step="0.0001"
+          <CurrencyInput
             value={form.listPrice3}
-            onChange={(e) => setField('listPrice3', e.target.value)}
+            onChange={(v) => setField('listPrice3', v)}
             disabled={inputsDisabled}
           />
         </Field>
@@ -953,11 +946,9 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
 
         {/* Fila 5: mayorista */}
         <Field className="col-span-3" label="P. Mayor">
-          <Input
-            type="number"
-            step="0.0001"
+          <CurrencyInput
             value={form.wholesalePrice}
-            onChange={(e) => setField('wholesalePrice', e.target.value)}
+            onChange={(v) => setField('wholesalePrice', v)}
             disabled={inputsDisabled}
           />
         </Field>

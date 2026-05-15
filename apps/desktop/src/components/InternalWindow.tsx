@@ -23,8 +23,8 @@ import { WINDOWS } from '@/windows/registry'
 import { WindowIcon } from '@/windows/WindowIcon'
 
 const HEADER_HEIGHT = 36
-const MIN_WIDTH = 400
-const MIN_HEIGHT = 300
+const DEFAULT_MIN_WIDTH = 400
+const DEFAULT_MIN_HEIGHT = 300
 
 type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
@@ -121,8 +121,10 @@ export function InternalWindow({ window: win }: { window: InternalWindowState })
       const desktopH = Math.max(100, globalThis.window.innerHeight - chrome.top - chrome.bottom)
       const maxW = vw - 80
       const maxH = desktopH
-      w = Math.max(MIN_WIDTH, Math.min(maxW, w))
-      h = Math.max(MIN_HEIGHT, Math.min(maxH, h))
+      const minW = def?.minWidth ?? DEFAULT_MIN_WIDTH
+      const minH = def?.minHeight ?? DEFAULT_MIN_HEIGHT
+      w = Math.max(minW, Math.min(maxW, w))
+      h = Math.max(minH, Math.min(maxH, h))
       if (r.dir.includes('w')) x = r.startPosX + (r.startW - w)
       if (r.dir.includes('n')) y = r.startPosY + (r.startH - h)
       wm.resizeWindow(win.id, { width: w, height: h })

@@ -19,6 +19,7 @@ import { usePrintSaleTicket } from '@/lib/usePrint'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import type { SaleTicketData, SaleTicketLine, SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
@@ -687,21 +688,17 @@ function PDV() {
                         />
                       </td>
                       <td className="px-2 py-1">
-                        <Input
+                        <CurrencyInput
                           className="h-8 text-right tabular-nums"
-                          inputMode="decimal"
                           value={l.unitPrice}
-                          onChange={(e) => setLinePrice(i, e.target.value)}
-                          onBlur={() => setLinePrice(i, parseCurrencyInput(l.unitPrice))}
+                          onChange={(v) => setLinePrice(i, v)}
                         />
                       </td>
                       <td className="px-2 py-1">
-                        <Input
+                        <CurrencyInput
                           className="h-8 text-right tabular-nums"
-                          inputMode="decimal"
                           value={l.discount}
-                          onChange={(e) => setLineDiscount(i, e.target.value)}
-                          onBlur={() => setLineDiscount(i, parseCurrencyInput(l.discount))}
+                          onChange={(v) => setLineDiscount(i, v)}
                         />
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums font-medium">
@@ -736,12 +733,10 @@ function PDV() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Descuento</span>
-            <Input
+            <CurrencyInput
               className="h-7 w-28 text-right tabular-nums"
-              inputMode="decimal"
               value={globalDiscount}
-              onChange={(e) => setGlobalDiscount(e.target.value)}
-              onBlur={() => setGlobalDiscount(parseCurrencyInput(globalDiscount))}
+              onChange={setGlobalDiscount}
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">

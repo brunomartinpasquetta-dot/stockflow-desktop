@@ -19,6 +19,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { Button } from '@/components/ui/button'
@@ -434,8 +435,8 @@ export function Compras() {
                         onChange={(e) => setLine(i, 'quantity', e.target.value)} onBlur={() => setLine(i, 'quantity', parseCurrencyInput(l.quantity))} />
                     </td>
                     <td className="px-2 py-1">
-                      <Input className="h-8 text-right tabular-nums" inputMode="decimal" value={l.costPrice}
-                        onChange={(e) => setLine(i, 'costPrice', e.target.value)} onBlur={() => setLine(i, 'costPrice', parseCurrencyInput(l.costPrice))} />
+                      <CurrencyInput className="h-8 text-right tabular-nums" value={l.costPrice}
+                        onChange={(v) => setLine(i, 'costPrice', v)} />
                     </td>
                     <td className="px-2 py-1">
                       <Select className="h-8" value={l.vatRate} onChange={(e) => setLine(i, 'vatRate', e.target.value)}>
@@ -444,8 +445,8 @@ export function Compras() {
                     </td>
                     {updatePrices && (
                       <td className="px-2 py-1">
-                        <Input className="h-8 text-right tabular-nums" inputMode="decimal" placeholder="(sin cambio)" value={l.newSalePrice}
-                          onChange={(e) => setLine(i, 'newSalePrice', e.target.value)} onBlur={() => l.newSalePrice && setLine(i, 'newSalePrice', parseCurrencyInput(l.newSalePrice))} />
+                        <CurrencyInput className="h-8 text-right tabular-nums" placeholder="(sin cambio)" value={l.newSalePrice}
+                          onChange={(v) => setLine(i, 'newSalePrice', v)} />
                       </td>
                     )}
                     <td className="px-2 py-1 text-right tabular-nums font-medium">
@@ -482,8 +483,8 @@ export function Compras() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Descuento</span>
-            <Input className="h-7 w-28 text-right tabular-nums" inputMode="decimal" value={globalDiscount}
-              onChange={(e) => setGlobalDiscount(e.target.value)} onBlur={() => setGlobalDiscount(parseCurrencyInput(globalDiscount))} />
+            <CurrencyInput className="h-7 w-28 text-right tabular-nums" value={globalDiscount}
+              onChange={setGlobalDiscount} />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{priceMode === 'gross' ? 'IVA contenido' : 'IVA'}</span>

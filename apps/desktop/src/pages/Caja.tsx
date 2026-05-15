@@ -10,6 +10,7 @@ import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePrintCashClose } from '@/lib/usePrint'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -89,13 +90,11 @@ function CajaCerrada() {
           </p>
           <div className="flex flex-col gap-1">
             <Label htmlFor="apertura">Monto inicial</Label>
-            <Input
+            <CurrencyInput
               id="apertura"
               autoFocus
-              inputMode="decimal"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              onBlur={() => setAmount(parseCurrencyInput(amount))}
+              onChange={setAmount}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void abrir()
               }}
@@ -436,12 +435,10 @@ function CajaAbierta({ registerId }: { registerId: string }) {
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="mov-amount">Monto</Label>
-              <Input
+              <CurrencyInput
                 id="mov-amount"
-                inputMode="decimal"
                 value={movAmount}
-                onChange={(e) => setMovAmount(e.target.value)}
-                onBlur={() => setMovAmount(parseCurrencyInput(movAmount))}
+                onChange={setMovAmount}
               />
             </div>
           </div>
@@ -480,13 +477,11 @@ function CajaAbierta({ registerId }: { registerId: string }) {
             )}
             <div className="flex flex-col gap-1">
               <Label htmlFor="close-amount">Efectivo real contado</Label>
-              <Input
+              <CurrencyInput
                 id="close-amount"
                 autoFocus
-                inputMode="decimal"
                 value={closeAmount}
-                onChange={(e) => setCloseAmount(e.target.value)}
-                onBlur={() => closeAmount && setCloseAmount(parseCurrencyInput(closeAmount))}
+                onChange={setCloseAmount}
               />
               <span className="text-xs text-muted-foreground">Sólo se compara contra el efectivo; los demás medios se concilian aparte.</span>
             </div>
