@@ -9,6 +9,7 @@ import type {
   SaleTicketData,
   ScaleConfig,
   SerialPortInfo,
+  SystemPrinterInfo,
   UsbDeviceInfo,
   WeightReading,
 } from '../../hardware/types';
@@ -23,6 +24,10 @@ export function buildHardwareHandlers(deps: HandlerDeps): HandlerMap {
     'hardware:printer:list-serial': unguarded(
       deps,
       async (): Promise<SerialPortInfo[]> => deps.hardware.listSerialPorts(),
+    ),
+    'hardware:printer:list-system': unguarded(
+      deps,
+      async (): Promise<SystemPrinterInfo[]> => deps.hardware.listSystemPrinters(),
     ),
     'hardware:printer:get-config': unguarded(deps, async (): Promise<PrinterConfig | null> => {
       return deps.hardware.getConfig().printer;

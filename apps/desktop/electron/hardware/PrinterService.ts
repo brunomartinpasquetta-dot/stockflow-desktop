@@ -7,6 +7,9 @@
  *  - 'file'    → append al archivo (útil para tests y debugging).
  *  - 'network' → TCP socket al `ip:port` (típicamente 9100).
  *  - 'usb'     → bulk transfer al endpoint OUT del device, vía paquete `usb`.
+ *  - 'system'  → bytes RAW al spooler del SO (CUPS / Windows print spooler)
+ *                via `lp -o raw` en macOS/Linux o `@thiagoelg/node-printer`
+ *                (opcional, lazy require) en Windows.
  *
  * Si la dep nativa (`usb`) falla al cargar, los métodos degradan a `Error` con
  * `cause`. El caller (renderer) lo convierte en un toast warning y cae a
@@ -20,6 +23,7 @@ import type {
   PrinterConfig,
   PrinterWidth,
   SaleTicketData,
+  SystemPrinterInfo,
 } from './types';
 
 // ESC/POS bytes
@@ -104,6 +108,10 @@ export class PrinterService {
         return false;
       }
     }
+    if (this.cfg.kind === 'system') {
+      // No abrimos canal persistente; el spooler maneja la cola.
+      return true;
+    }
     return false;
   }
 
@@ -179,7 +187,138 @@ export class PrinterService {
       } catch (err) {
         throw new Error('No se pudo enviar a la impresora USB', { cause: err });
       }
+      return;
     }
+    if (this.cfg.kind === 'system') {
+      await PrinterService.sendRawToSystemPrinter(this.cfg.interface, data);
+      return;
+    }
+  }
+
+  /**
+   * Envía bytes RAW (ESC/POS) a una impresora ya configurada en el SO.
+   *  - macOS/Linux: `lp -d <name> -o raw <tmpFile>` (CUPS).
+   *  - Windows: opcionalmente vía `@thiagoelg/node-printer` (lazy require);
+   *    si no está instalada, lanza error legible.
+   */
+  static async sendRawToSystemPrinter(printerName: string, data: Buffer): Promise<void> {
+    if (!printerName || !printerName.trim()) {
+      throw new Error('Nombre de impresora del sistema vacío');
+    }
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      const { execFile } = await import('node:child_process');
+      const { writeFile: writeTmp, unlink } = await import('node:fs/promises');
+      const { tmpdir } = await import('node:os');
+      const { join } = await import('node:path');
+      const tmpFile = join(tmpdir(), `stockflow-print-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.bin`);
+      await writeTmp(tmpFile, data);
+      await new Promise<void>((resolve, reject) => {
+        execFile('lp', ['-d', printerName, '-o', 'raw', tmpFile], (err) => {
+          unlink(tmpFile).catch(() => { /* ignore */ });
+          if (err) reject(new Error(`No se pudo enviar a la impresora del sistema "${printerName}": ${err.message}`, { cause: err }));
+          else resolve();
+        });
+      });
+      return;
+    }
+    if (process.platform === 'win32') {
+      try {
+        // Dep opcional — sólo se carga si el usuario la instaló manualmente.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const printerMod: any = await (
+          new Function('return import("@thiagoelg/node-printer").catch(() => null)') as () => Promise<unknown>
+        )();
+        const printer = printerMod?.default ?? printerMod;
+        if (printer && typeof printer.printDirect === 'function') {
+          await new Promise<void>((resolve, reject) => {
+            printer.printDirect({
+              data,
+              printer: printerName,
+              type: 'RAW',
+              success: () => resolve(),
+              error: (err: Error) => reject(err),
+            });
+          });
+          return;
+        }
+      } catch (err) {
+        throw new Error('Falló la impresión RAW en Windows', { cause: err });
+      }
+      throw new Error('Impresión RAW en Windows requiere instalar la dependencia opcional @thiagoelg/node-printer');
+    }
+    throw new Error(`Plataforma no soportada para impresión del sistema: ${process.platform}`);
+  }
+
+  /**
+   * Enumera impresoras instaladas en el SO.
+   *  - macOS/Linux: `lpstat -p -d`.
+   *  - Windows: PowerShell `Get-Printer` (fallback a `wmic` legacy).
+   */
+  static async listSystemPrinters(): Promise<SystemPrinterInfo[]> {
+    const { execFile } = await import('node:child_process');
+    function run(cmd: string, args: string[]): Promise<string> {
+      return new Promise((resolve) => {
+        execFile(cmd, args, { timeout: 5000 }, (err, stdout) => {
+          if (err) resolve('');
+          else resolve(stdout || '');
+        });
+      });
+    }
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      const out = await run('lpstat', ['-p', '-d']);
+      if (!out) return [];
+      const printers: SystemPrinterInfo[] = [];
+      let defaultName: string | null = null;
+      for (const lineRaw of out.split('\n')) {
+        const line = lineRaw.trim();
+        const m = line.match(/^printer\s+(\S+)/i);
+        if (m && m[1]) printers.push({ name: m[1] });
+        const d = line.match(/system default destination:\s*(\S+)/i);
+        if (d && d[1]) defaultName = d[1];
+      }
+      if (defaultName) {
+        for (const p of printers) if (p.name === defaultName) p.isDefault = true;
+      }
+      return printers;
+    }
+    if (process.platform === 'win32') {
+      // Intento 1: PowerShell Get-Printer (JSON)
+      const ps = await run('powershell.exe', [
+        '-NoProfile',
+        '-Command',
+        'Get-Printer | Select-Object Name,Default | ConvertTo-Json -Compress',
+      ]);
+      if (ps) {
+        try {
+          const parsed = JSON.parse(ps) as
+            | { Name: string; Default?: boolean }
+            | { Name: string; Default?: boolean }[];
+          const arr = Array.isArray(parsed) ? parsed : [parsed];
+          return arr
+            .filter((p) => p && typeof p.Name === 'string')
+            .map((p) => ({ name: p.Name, isDefault: Boolean(p.Default) }));
+        } catch {
+          // sigue al fallback
+        }
+      }
+      // Fallback: wmic
+      const wmic = await run('wmic', ['printer', 'get', 'Name,Default', '/format:csv']);
+      if (!wmic) return [];
+      const lines = wmic.split('\n').map((l) => l.trim()).filter(Boolean);
+      const out: SystemPrinterInfo[] = [];
+      for (const line of lines) {
+        // CSV: Node,Default,Name
+        const cols = line.split(',');
+        if (cols.length < 3) continue;
+        if (/^node$/i.test(cols[0] ?? '')) continue;
+        const isDefault = /true/i.test(cols[1] ?? '');
+        const name = cols[2];
+        if (!name) continue;
+        out.push({ name, isDefault });
+      }
+      return out;
+    }
+    return [];
   }
 
   /** Permite construir un comprobante completo en memoria y enviarlo de una. */

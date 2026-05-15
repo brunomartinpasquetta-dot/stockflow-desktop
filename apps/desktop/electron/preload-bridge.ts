@@ -352,6 +352,7 @@ export function createApiBridge(
           c<never>('hardware:printer:print-sale-ticket', p),
         printCashClose: (p) =>
           c<never>('hardware:printer:print-cash-close', p),
+        listSystem: () => c<never>('hardware:printer:list-system'),
       },
       cashDrawer: {
         open: () => c<never>('hardware:cash-drawer:open'),

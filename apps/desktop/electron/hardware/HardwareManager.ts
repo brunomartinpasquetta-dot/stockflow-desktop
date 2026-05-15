@@ -13,6 +13,7 @@ import type {
   PrinterConfig,
   ScaleConfig,
   SerialPortInfo,
+  SystemPrinterInfo,
   UsbDeviceInfo,
   WeightReading,
 } from './types';
@@ -144,5 +145,13 @@ export class HardwareManager {
 
   async listSerialPorts(): Promise<SerialPortInfo[]> {
     return ScaleService.listPorts();
+  }
+
+  async listSystemPrinters(): Promise<SystemPrinterInfo[]> {
+    try {
+      return await PrinterService.listSystemPrinters();
+    } catch {
+      return [];
+    }
   }
 }

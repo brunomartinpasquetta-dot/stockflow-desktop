@@ -1272,6 +1272,7 @@ export interface ApiSurface {
       test(): Res<{ ok: true }>;
       printSaleTicket(payload: SaleTicketDataDTO): Res<{ ok: true }>;
       printCashClose(payload: CashCloseReportDataDTO): Res<{ ok: true }>;
+      listSystem(): Res<SystemPrinterDTO[]>;
     };
     cashDrawer: {
       open(): Res<{ ok: true }>;
@@ -1371,7 +1372,12 @@ export interface LanSetModeInputDTO {
 /* DTOs de hardware / backup / import (replican electron/hardware/types.ts) */
 /* ----------------------------------------------------------------------- */
 
-export type PrinterKindDTO = 'usb' | 'network' | 'file';
+export type PrinterKindDTO = 'usb' | 'network' | 'file' | 'system';
+
+export interface SystemPrinterDTO {
+  name: string;
+  isDefault?: boolean;
+}
 export type PrinterWidthDTO = 58 | 80;
 export type PaperFormatDTO = '58mm' | '80mm' | 'A4';
 

@@ -25,8 +25,10 @@ import type {
   BackupEntryDTO,
   PaperFormatDTO,
   PrinterConfigDTO,
+  PrinterKindDTO,
   ScaleConfigDTO,
   ScaleProtocolDTO,
+  SystemPrinterDTO,
 } from '@/types/api'
 
 function formatBytes(n: number): string {
@@ -54,78 +56,71 @@ function suggestPaperFormat(label: string): PaperFormatDTO {
   return '80mm'
 }
 
-interface PrinterOption {
-  value: string // 'usb:vid:pid' | 'network:ip:port' | 'file:/path'
+interface UsbOption {
+  value: string // 'vid:pid' (hex)
   label: string
   paperHint: PaperFormatDTO
 }
 
-function buildPrinterOptions(
+function buildUsbOptions(
   usb: { vendorId: number; productId: number; manufacturer?: string; product?: string }[],
-  currentNetwork: string | null,
-): PrinterOption[] {
-  const out: PrinterOption[] = []
-  // USB detectadas
+): UsbOption[] {
+  const out: UsbOption[] = []
   for (const d of usb) {
     const vid = d.vendorId.toString(16).padStart(4, '0')
     const pid = d.productId.toString(16).padStart(4, '0')
     const label = `${d.manufacturer ?? ''} ${d.product ?? ''}`.trim() || `USB ${vid}:${pid}`
     out.push({
-      value: `usb:${vid}:${pid}`,
-      label: `${label} (USB)`,
+      value: `${vid}:${pid}`,
+      label: `${label} (${vid}:${pid})`,
       paperHint: suggestPaperFormat(label),
     })
   }
-  // Red guardada
-  if (currentNetwork) {
-    out.push({
-      value: `network:${currentNetwork}`,
-      label: `${currentNetwork} (Red)`,
-      paperHint: '80mm',
-    })
-  }
-  // Archivo (testing) siempre disponible
-  out.push({ value: 'file:/tmp/stockflow-printer.bin', label: 'Archivo (para testing)', paperHint: '80mm' })
   return out
-}
-
-function parsePrinterValue(value: string): { kind: 'usb' | 'network' | 'file'; iface: string } | null {
-  if (value.startsWith('usb:')) return { kind: 'usb', iface: value.slice(4) }
-  if (value.startsWith('network:')) return { kind: 'network', iface: value.slice(8) }
-  if (value.startsWith('file:')) return { kind: 'file', iface: value.slice(5) }
-  return null
-}
-
-function currentValueFromConfig(cfg: PrinterConfigDTO | null): string {
-  if (!cfg) return ''
-  if (cfg.kind === 'usb') return `usb:${cfg.interface}`
-  if (cfg.kind === 'network') return `network:${cfg.interface}`
-  return `file:${cfg.interface}`
 }
 
 function PrinterSection() {
   const qc = useQueryClient()
   const cfgQuery = useQuery({ queryKey: ['hardware', 'printer', 'config'], queryFn: () => api.hardware.printer.getConfig() })
   const usbQuery = useQuery({ queryKey: ['hardware', 'usb'], queryFn: () => api.hardware.listUsbDevices() })
+  const systemQuery = useQuery({
+    queryKey: ['hardware', 'printer', 'system'],
+    queryFn: () => api.hardware.printer.listSystem(),
+  })
 
-  const [selected, setSelected] = useState<string>('')
-  const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('80mm')
+  // Modo de conexión (default 'system' = recomendado).
+  const [kind, setKind] = useState<PrinterKindDTO>('system')
+  const [systemName, setSystemName] = useState<string>('')
+  const [usbValue, setUsbValue] = useState<string>('')
   const [networkIp, setNetworkIp] = useState<string>('')
+  const [filePath, setFilePath] = useState<string>('/tmp/stockflow-printer.bin')
+  const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('80mm')
   const [autoOpen, setAutoOpen] = useState(true)
   const [seeded, setSeeded] = useState<PrinterConfigDTO | null | undefined>(undefined)
 
+  // Sembrar formulario desde la config persistida (sin migrar automáticamente).
   if (seeded !== cfgQuery.data) {
     setSeeded(cfgQuery.data)
     if (cfgQuery.data) {
-      setSelected(currentValueFromConfig(cfgQuery.data))
+      setKind(cfgQuery.data.kind)
+      setAutoOpen(cfgQuery.data.autoOpenDrawer)
       const fmt: PaperFormatDTO = cfgQuery.data.paperFormat ?? (cfgQuery.data.width === 58 ? '58mm' : '80mm')
       setPaperFormat(fmt)
-      setAutoOpen(cfgQuery.data.autoOpenDrawer)
+      if (cfgQuery.data.kind === 'system') setSystemName(cfgQuery.data.interface)
+      if (cfgQuery.data.kind === 'usb') setUsbValue(cfgQuery.data.interface)
       if (cfgQuery.data.kind === 'network') setNetworkIp(cfgQuery.data.interface)
+      if (cfgQuery.data.kind === 'file') setFilePath(cfgQuery.data.interface)
     }
   }
 
-  const options = buildPrinterOptions(usbQuery.data ?? [], networkIp || null)
+  // Default a la impresora del SO marcada como default si todavía no se eligió ninguna.
+  const systemPrinters: SystemPrinterDTO[] = systemQuery.data ?? []
+  if (kind === 'system' && !systemName && systemPrinters.length > 0) {
+    const def = systemPrinters.find((p) => p.isDefault) ?? systemPrinters[0]
+    if (def) setSystemName(def.name)
+  }
+
+  const usbOptions = buildUsbOptions(usbQuery.data ?? [])
 
   const saveMut = useMutation({
     mutationFn: (cfg: PrinterConfigDTO) => api.hardware.printer.setConfig(cfg),
@@ -141,7 +136,6 @@ function PrinterSection() {
     onSuccess: () => toast.success('Prueba enviada'),
     onError: (err) => {
       if (err instanceof Error && err.message.includes('A4_BROWSER_PRINT_REQUIRED')) {
-        // Imprimir desde el browser un placeholder.
         window.print()
         toast.info('Impresión A4 enviada al diálogo del sistema')
         return
@@ -156,22 +150,44 @@ function PrinterSection() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo abrir el cajón'),
   })
 
-  function onSelect(value: string): void {
-    setSelected(value)
-    const opt = options.find((o) => o.value === value)
+  function onUsbSelect(value: string): void {
+    setUsbValue(value)
+    const opt = usbOptions.find((o) => o.value === value)
     if (opt) setPaperFormat(opt.paperHint)
   }
 
   function onSave(): void {
-    const parsed = parsePrinterValue(selected)
-    if (!parsed) {
-      toast.error('Elegí una impresora')
-      return
+    let iface: string
+    if (kind === 'system') {
+      if (!systemName.trim()) {
+        toast.error('Elegí una impresora del sistema')
+        return
+      }
+      iface = systemName.trim()
+    } else if (kind === 'usb') {
+      if (!usbValue.trim()) {
+        toast.error('Elegí un dispositivo USB')
+        return
+      }
+      iface = usbValue.trim()
+    } else if (kind === 'network') {
+      if (!networkIp.trim()) {
+        toast.error('Ingresá IP:puerto')
+        return
+      }
+      iface = networkIp.trim()
+    } else {
+      if (!filePath.trim()) {
+        toast.error('Ingresá una ruta de archivo')
+        return
+      }
+      iface = filePath.trim()
     }
+
     const width: 58 | 80 = paperFormat === '58mm' ? 58 : 80
     saveMut.mutate({
-      kind: parsed.kind,
-      interface: parsed.iface,
+      kind,
+      interface: iface,
       width,
       characterSet: 'PC858_EURO',
       autoOpenDrawer: autoOpen,
@@ -188,39 +204,106 @@ function PrinterSection() {
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
         <div className="col-span-2 flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <Label>Impresora</Label>
-            <button
-              type="button"
-              className="text-xs text-primary hover:underline"
-              onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'usb'] })}
-            >
-              <RefreshCw className="mr-1 inline h-3 w-3" /> refrescar
-            </button>
-          </div>
+          <Label>Modo de conexión</Label>
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={selected}
-            onChange={(e) => onSelect(e.target.value)}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as PrinterKindDTO)}
           >
-            <option value="">— seleccioná una impresora —</option>
-            {options.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
+            <option value="system">Impresora del sistema (recomendado)</option>
+            <option value="usb">USB directo (avanzado)</option>
+            <option value="network">Red (IP:puerto)</option>
+            <option value="file">Archivo (testing)</option>
           </select>
-        </div>
-
-        <div className="col-span-2 flex flex-col gap-1">
-          <Label>Impresora de Red (IP:puerto, opcional)</Label>
-          <Input
-            value={networkIp}
-            onChange={(e) => setNetworkIp(e.target.value)}
-            placeholder="192.168.1.50:9100"
-          />
           <p className="text-xs text-muted-foreground">
-            Si tu impresora está en la red, ingresá IP:puerto y aparecerá en la lista de arriba.
+            "Impresora del sistema" usa la cola de impresión del sistema operativo (CUPS en
+            macOS/Linux, spooler en Windows). Es el modo más confiable.
           </p>
         </div>
+
+        {kind === 'system' && (
+          <div className="col-span-2 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <Label>Impresora del sistema</Label>
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'printer', 'system'] })}
+              >
+                <RefreshCw className="mr-1 inline h-3 w-3" /> refrescar
+              </button>
+            </div>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={systemName}
+              onChange={(e) => setSystemName(e.target.value)}
+            >
+              <option value="">— seleccioná una impresora —</option>
+              {systemPrinters.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}{p.isDefault ? ' (predeterminada)' : ''}
+                </option>
+              ))}
+            </select>
+            {systemPrinters.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No se detectaron impresoras instaladas en el sistema. Configurala primero desde
+                Preferencias del sistema → Impresoras y luego refrescá.
+              </p>
+            )}
+          </div>
+        )}
+
+        {kind === 'usb' && (
+          <div className="col-span-2 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <Label>Dispositivo USB (VID:PID)</Label>
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'usb'] })}
+              >
+                <RefreshCw className="mr-1 inline h-3 w-3" /> refrescar
+              </button>
+            </div>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={usbValue}
+              onChange={(e) => onUsbSelect(e.target.value)}
+            >
+              <option value="">— seleccioná un dispositivo —</option>
+              {usbOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Modo avanzado: requiere permisos USB y no funciona con todas las impresoras en macOS.
+              Si tenés problemas, usá "Impresora del sistema".
+            </p>
+          </div>
+        )}
+
+        {kind === 'network' && (
+          <div className="col-span-2 flex flex-col gap-1">
+            <Label>Impresora de red (IP:puerto)</Label>
+            <Input
+              value={networkIp}
+              onChange={(e) => setNetworkIp(e.target.value)}
+              placeholder="192.168.1.50:9100"
+            />
+          </div>
+        )}
+
+        {kind === 'file' && (
+          <div className="col-span-2 flex flex-col gap-1">
+            <Label>Ruta de archivo (testing)</Label>
+            <Input
+              value={filePath}
+              onChange={(e) => setFilePath(e.target.value)}
+              placeholder="/tmp/stockflow-printer.bin"
+            />
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <Label>Ancho de papel</Label>

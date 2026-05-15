@@ -3,13 +3,18 @@
  * cajón monedero). Autocontenido: no importa nada de @stockflow/*.
  */
 
-export type PrinterKind = 'usb' | 'network' | 'file';
+export type PrinterKind = 'usb' | 'network' | 'file' | 'system';
 export type PrinterWidth = 58 | 80;
 export type PaperFormat = '58mm' | '80mm' | 'A4';
 
 export interface PrinterConfig {
   kind: PrinterKind;
-  /** usb: 'vendorId:productId'; network: 'ip:port'; file: ruta absoluta */
+  /**
+   * usb: 'vendorId:productId';
+   * network: 'ip:port';
+   * file: ruta absoluta;
+   * system: nombre exacto de la impresora del SO (CUPS / spooler).
+   */
   interface: string;
   width: PrinterWidth;
   characterSet: string;
@@ -53,6 +58,11 @@ export interface UsbDeviceInfo {
   manufacturer?: string;
   product?: string;
   serialNumber?: string;
+}
+
+export interface SystemPrinterInfo {
+  name: string;
+  isDefault?: boolean;
 }
 
 export interface SerialPortInfo {

@@ -311,6 +311,7 @@ export const api = {
       test: (): Promise<{ ok: true }> => unwrap(sf().hardware.printer.test()),
       printSaleTicket: (data: SaleTicketDataDTO): Promise<{ ok: true }> => unwrap(sf().hardware.printer.printSaleTicket(data)),
       printCashClose: (data: CashCloseReportDataDTO): Promise<{ ok: true }> => unwrap(sf().hardware.printer.printCashClose(data)),
+      listSystem: (): Promise<import('@/types/api').SystemPrinterDTO[]> => unwrap(sf().hardware.printer.listSystem()),
     },
     cashDrawer: {
       open: (): Promise<{ ok: true }> => unwrap(sf().hardware.cashDrawer.open()),
