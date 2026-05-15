@@ -29,6 +29,7 @@ export type PermissionAction =
   | 'manage_prices'
   | 'manage_mp_qr'
   | 'view_accounting'
+  | 'manage_cash_general'
 
 const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_users',
@@ -55,6 +56,7 @@ const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_prices',
   'manage_mp_qr',
   'view_accounting',
+  'manage_cash_general',
 ]
 
 const MANAGER_DENIED = new Set<PermissionAction>(['manage_users', 'manage_company', 'adjust_stock'])

@@ -254,6 +254,26 @@ function CajaAbierta({ registerId }: { registerId: string }) {
           ? undefined
           : { action: { label: 'Imprimir reporte', onClick: () => printCashClose(reportData) } },
       )
+      // Oferta opcional: transferir el saldo contado a Caja General.
+      if (Number(amt) > 0) {
+        toast(
+          `¿Transferir ${formatCurrency(amt)} a Caja General?`,
+          {
+            duration: 12_000,
+            action: {
+              label: 'Transferir',
+              onClick: () => {
+                void api.cashGeneral
+                  .transferFromDaily({ cashRegisterId: registerId, amount: amt })
+                  .then(() => toast.success('Saldo transferido a Caja General'))
+                  .catch((err) =>
+                    toast.error(err instanceof Error ? err.message : 'No se pudo transferir a Caja General'),
+                  )
+              },
+            },
+          },
+        )
+      }
       setCloseAmount('')
       setCloseNotes('')
     } catch (err) {

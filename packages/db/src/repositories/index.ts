@@ -8,6 +8,7 @@ import { AccountsReceivableRepository } from './accountsReceivable.repository';
 import { ArticleRepository } from './article.repository';
 import { BaseRepository } from './base.repository';
 import { CardRepository } from './card.repository';
+import { CashGeneralRepository } from './cashGeneral.repository';
 import { CashMovementRepository } from './cashMovement.repository';
 import { CashRegisterRepository } from './cashRegister.repository';
 import { CompanyRepository } from './company.repository';
@@ -30,6 +31,13 @@ export { BaseRepository };
 export { AccountsReceivableRepository } from './accountsReceivable.repository';
 export { ArticleRepository } from './article.repository';
 export { CardRepository } from './card.repository';
+export {
+  CashGeneralRepository,
+  type AddCashGeneralMovementInput,
+  type CashGeneralCategory,
+  type CashGeneralMovementType,
+  type ListMovementsFilter as CashGeneralListMovementsFilter,
+} from './cashGeneral.repository';
 export { CashMovementRepository } from './cashMovement.repository';
 export { CashRegisterRepository } from './cashRegister.repository';
 export { CompanyRepository } from './company.repository';
@@ -68,6 +76,7 @@ export interface Repositories {
   purchaseLines: PurchaseLineRepository;
   cashRegisters: CashRegisterRepository;
   cashMovements: CashMovementRepository;
+  cashGeneral: CashGeneralRepository;
   accountsReceivable: AccountsReceivableRepository;
   payments: PaymentRepository;
   supplierAccountsPayable: SupplierAccountPayableRepository;
@@ -94,6 +103,7 @@ export function createRepositories(db: LocalDatabase): Repositories {
     purchaseLines: new PurchaseLineRepository(db),
     cashRegisters: new CashRegisterRepository(db),
     cashMovements: new CashMovementRepository(db),
+    cashGeneral: new CashGeneralRepository(db),
     accountsReceivable: new AccountsReceivableRepository(db),
     payments: new PaymentRepository(db),
     supplierAccountsPayable: new SupplierAccountPayableRepository(db),

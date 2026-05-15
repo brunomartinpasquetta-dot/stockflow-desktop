@@ -889,6 +889,122 @@ export interface PriceUpdateApplyResultDTO {
 }
 
 /* ----------------------------------------------------------------------- */
+/* Caja General (P-FIX-FASE3)                                               */
+/* ----------------------------------------------------------------------- */
+
+export type CashGeneralMovementTypeDTO = 'income' | 'expense' | 'transfer_from_daily';
+export type CashGeneralCategoryDTO = 'deposit' | 'withdrawal' | 'service' | 'salary' | 'other';
+
+export interface CashGeneralMovementDTO {
+  id: string;
+  type: CashGeneralMovementTypeDTO;
+  amount: string;
+  description: string;
+  category: CashGeneralCategoryDTO | null;
+  createdBy: string;
+  referenceId: string | null;
+  balanceAfter: string;
+  createdAt: number;
+}
+
+export interface ListCashGeneralMovementsInputDTO {
+  from?: number;
+  to?: number;
+  type?: CashGeneralMovementTypeDTO;
+  category?: CashGeneralCategoryDTO;
+  limit?: number;
+}
+
+export interface AddCashGeneralMovementInputDTO {
+  amount: string;
+  description: string;
+  category?: CashGeneralCategoryDTO;
+}
+
+export interface TransferFromDailyInputDTO {
+  cashRegisterId: string;
+  amount: string;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Analytics (P-FIX-FASE3)                                                  */
+/* ----------------------------------------------------------------------- */
+
+export interface AnalyticsTopProductRowDTO {
+  articleId: string;
+  code: string;
+  description: string;
+  brand: string | null;
+  quantity: string;
+  revenue: string;
+  marginPct: string;
+}
+
+export interface AnalyticsPaymentMethodRankRowDTO {
+  paymentMethodId: string;
+  name: string;
+  totalAmount: string;
+  salesCount: number;
+  percentageOfTotal: string;
+}
+
+export interface AnalyticsCustomerRankRowDTO {
+  customerId: string;
+  fullName: string;
+  salesCount: number;
+  totalAmount: string;
+}
+
+export interface AnalyticsSupplierRankRowDTO {
+  supplierId: string;
+  supplierName: string;
+  purchasesCount: number;
+  totalAmount: string;
+}
+
+export interface AnalyticsSalesTrendRowDTO {
+  bucket: string;
+  count: number;
+  total: string;
+}
+
+export interface AnalyticsAverageTicketDTO {
+  avg: string;
+  min: string;
+  max: string;
+  count: number;
+}
+
+export interface AnalyticsSalesByHourRowDTO {
+  hour: number;
+  count: number;
+  total: string;
+}
+
+export interface AnalyticsSalesByDayOfWeekRowDTO {
+  dayOfWeek: number;
+  count: number;
+  total: string;
+}
+
+export interface AnalyticsMarginRowDTO {
+  familyId: string | null;
+  familyName: string;
+  revenue: string;
+  cost: string;
+  margin: string;
+  marginPct: string;
+}
+
+export interface AnalyticsStockRotationRowDTO {
+  articleId: string;
+  description: string;
+  quantitySold: string;
+  currentStock: string;
+  rotation: string;
+}
+
+/* ----------------------------------------------------------------------- */
 /* Búsqueda global (P-BUSQUEDA)                                             */
 /* ----------------------------------------------------------------------- */
 
@@ -1084,6 +1200,26 @@ export interface ApiSurface {
     checkStock(payload: { articleId: string; quantity: string }): Res<StockCheckDTO>;
     adjustStock(payload: { articleId: string; newStock: string; reason: string }): Res<StockAdjustmentDTO>;
     getLowStockReport(): Res<LowStockEntryDTO[]>;
+  };
+  cashGeneral: {
+    getBalance(): Res<{ balance: string }>;
+    listMovements(payload: ListCashGeneralMovementsInputDTO): Res<CashGeneralMovementDTO[]>;
+    addIncome(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;
+    addExpense(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;
+    transferFromDaily(payload: TransferFromDailyInputDTO): Res<CashGeneralMovementDTO>;
+  };
+  analytics: {
+    getTopSellingProducts(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsTopProductRowDTO[]>;
+    getBottomSellingProducts(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsTopProductRowDTO[]>;
+    getPaymentMethodsRanking(payload: DateRangeDTO): Res<AnalyticsPaymentMethodRankRowDTO[]>;
+    getTopCustomers(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsCustomerRankRowDTO[]>;
+    getTopSuppliers(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsSupplierRankRowDTO[]>;
+    getSalesTrend(payload: DateRangeDTO & { granularity: 'daily' | 'weekly' | 'monthly' }): Res<AnalyticsSalesTrendRowDTO[]>;
+    getAverageTicket(payload: DateRangeDTO): Res<AnalyticsAverageTicketDTO>;
+    getSalesByHour(payload: DateRangeDTO): Res<AnalyticsSalesByHourRowDTO[]>;
+    getSalesByDayOfWeek(payload: DateRangeDTO): Res<AnalyticsSalesByDayOfWeekRowDTO[]>;
+    getMarginByCategory(payload: DateRangeDTO): Res<AnalyticsMarginRowDTO[]>;
+    getStockRotation(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsStockRotationRowDTO[]>;
   };
   priceUpdate: {
     preview(payload: { filter: PriceUpdateFilterDTO; rule: PriceUpdateRuleDTO }): Res<PriceUpdatePreviewResultDTO>;

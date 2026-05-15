@@ -879,6 +879,44 @@ export type NewPriceUpdateBatch = typeof priceUpdateBatches.$inferInsert;
 export type PriceUpdateEntry = typeof priceUpdateEntries.$inferSelect;
 export type NewPriceUpdateEntry = typeof priceUpdateEntries.$inferInsert;
 
+/* ------------------------------------------------------------------ */
+/* cashGeneral — saldo histórico global (caja general / caja fuerte)   */
+/* ------------------------------------------------------------------ */
+export const cashGeneral = sqliteTable('cash_general', {
+  id: text('id').primaryKey(),
+  currentBalance: text('current_balance').notNull().default('0'),
+  lastUpdate: integer('last_update').notNull(),
+  createdAt: integer('created_at').notNull(),
+});
+
+export const cashGeneralMovements = sqliteTable(
+  'cash_general_movements',
+  {
+    id: text('id').primaryKey(),
+    /** 'income' | 'expense' | 'transfer_from_daily' */
+    type: text('type').notNull(),
+    amount: text('amount').notNull(),
+    description: text('description').notNull(),
+    /** 'deposit' | 'withdrawal' | 'service' | 'salary' | 'other' (nullable) */
+    category: text('category'),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => users.id),
+    referenceId: text('reference_id'),
+    balanceAfter: text('balance_after').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    byDate: index('idx_cgm_date').on(t.createdAt),
+    byType: index('idx_cgm_type').on(t.type),
+  }),
+);
+
+export type CashGeneral = typeof cashGeneral.$inferSelect;
+export type NewCashGeneral = typeof cashGeneral.$inferInsert;
+export type CashGeneralMovement = typeof cashGeneralMovements.$inferSelect;
+export type NewCashGeneralMovement = typeof cashGeneralMovements.$inferInsert;
+
 export const supplierPaymentsRelations = relations(supplierPayments, ({ one }) => ({
   account: one(supplierAccountsPayable, {
     fields: [supplierPayments.accountId],
@@ -956,6 +994,8 @@ export const localSchema = {
   supplierPayments,
   priceUpdateBatches,
   priceUpdateEntries,
+  cashGeneral,
+  cashGeneralMovements,
   mpConfig,
   mpPosDevices,
   mpOrders,

@@ -1,17 +1,16 @@
 /**
- * Actualización masiva de precios — wizard de 3 pasos.
+ * Actualización masiva de precios — pantalla única con filtros + selección
+ * múltiple + regla multi-campo + vista previa (P-FIX-FASE3).
  *
- *   Paso 1: filtros (alcance + filtros adicionales)
- *   Paso 2: regla (tipo + campos + redondeo + descripción)
- *   Paso 3: vista previa + confirmar
+ * Reemplaza el wizard anterior. Mantiene el backend (priceUpdate.service +
+ * priceUpdate.repository) intacto; sólo cambia la UX a "una sola pantalla".
  *
  * Requiere permiso `manage_prices` (admin / manager) y `useCanWrite()`.
  */
+import * as React from 'react'
 import { useMemo, useState } from 'react'
-import { useWindowNav } from '@/lib/useWindowNav'
-import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, Search, Tag } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -19,15 +18,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -36,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { FormShell } from '@/components/ui/form-shell'
 import { api } from '@/lib/api'
 import { useArticles, useFamilies, useSuppliers } from '@/lib/hooks'
 import { formatCurrency } from '@/lib/format'
@@ -43,21 +40,20 @@ import { CurrencyInput } from '@/components/ui/currency-input'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePermission } from '@/contexts/AuthContext'
 import type {
+  ArticleDTO,
   PriceFieldDTO,
   PriceUpdateFilterDTO,
+  PriceUpdatePreviewEntryDTO,
   PriceUpdateRoundingDTO,
   PriceUpdateRuleDTO,
-  PriceUpdateRuleTypeDTO,
 } from '@/types/api'
-
-type Step = 'filter' | 'rule' | 'preview'
 
 const FIELD_LABELS: Record<PriceFieldDTO, string> = {
   costPrice: 'Costo',
-  listPrice1: 'Lista 1',
-  listPrice2: 'Lista 2',
-  listPrice3: 'Lista 3',
-  wholesalePrice: 'Mayorista',
+  listPrice1: 'Venta (L1)',
+  listPrice2: 'L2',
+  listPrice3: 'L3',
+  wholesalePrice: 'Mayor',
 }
 
 const ROUNDING_OPTIONS: Array<{ value: PriceUpdateRoundingDTO; label: string }> = [
@@ -68,102 +64,120 @@ const ROUNDING_OPTIONS: Array<{ value: PriceUpdateRoundingDTO; label: string }> 
   { value: 'nearest_99', label: 'Terminado en 99' },
 ]
 
+type RuleMode = 'percentage' | 'fixed_amount' | 'set_value'
+
+/** Wrapper minimalista alrededor de <input type="checkbox"> con API compatible. */
+function Checkbox({
+  checked,
+  onCheckedChange,
+}: {
+  checked: boolean | 'indeterminate'
+  onCheckedChange: (checked: boolean) => void
+}): React.ReactElement {
+  const ref = React.useRef<HTMLInputElement>(null)
+  React.useEffect(() => {
+    if (ref.current) ref.current.indeterminate = checked === 'indeterminate'
+  }, [checked])
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="h-4 w-4 rounded border-input"
+      checked={checked === true}
+      onChange={(e) => onCheckedChange(e.target.checked)}
+    />
+  )
+}
+
 export function ActualizacionPrecios() {
-  const openInWindow = useWindowNav()
   const canWrite = useCanWrite()
   const canManage = usePermission('manage_prices')
   const canApply = canWrite && canManage
 
-  const [step, setStep] = useState<Step>('filter')
+  // Filtros
+  const [search, setSearch] = useState('')
+  const [familyIds, setFamilyIds] = useState<Set<string>>(new Set())
+  const [supplierIds, setSupplierIds] = useState<Set<string>>(new Set())
+  const [onlyStock, setOnlyStock] = useState(false)
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
 
-  // Filtro
-  const [filter, setFilter] = useState<PriceUpdateFilterDTO>({
-    scope: 'all',
-    onlyActive: true,
-  })
-  const [manualSearch, setManualSearch] = useState('')
-  const [manualSelected, setManualSelected] = useState<Set<string>>(new Set())
+  // Selección
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   // Regla
-  const [ruleType, setRuleType] = useState<PriceUpdateRuleTypeDTO>('percentage')
-  const [ruleValue, setRuleValue] = useState('10')
-  const [direction, setDirection] = useState<'increase' | 'decrease'>('increase')
   const [fields, setFields] = useState<PriceFieldDTO[]>(['listPrice1'])
-  const [keepUtility, setKeepUtility] = useState(false)
+  const [mode, setMode] = useState<RuleMode>('percentage')
+  const [direction, setDirection] = useState<'increase' | 'decrease'>('increase')
+  const [value, setValue] = useState('10')
   const [rounding, setRounding] = useState<PriceUpdateRoundingDTO>('none')
-  const [description, setDescription] = useState('')
 
-  // Preview
-  const [previewPage, setPreviewPage] = useState(0)
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  // Preview / aplicar
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewEntries, setPreviewEntries] = useState<PriceUpdatePreviewEntryDTO[]>([])
   const [applying, setApplying] = useState(false)
 
-  const families = useFamilies()
-  const suppliers = useSuppliers()
-  const articles = useArticles()
+  const familiesQ = useFamilies()
+  const suppliersQ = useSuppliers()
+  const articlesQ = useArticles()
 
-  const effectiveFilter = useMemo<PriceUpdateFilterDTO>(() => {
-    if (filter.scope === 'manual') {
-      return { ...filter, articleIds: Array.from(manualSelected) }
-    }
-    return filter
-  }, [filter, manualSelected])
-
-  // Contador en vivo: usa preview con regla mínima.
-  const countQuery = useQuery({
-    queryKey: [
-      'priceUpdateCount',
-      JSON.stringify(effectiveFilter),
-    ],
-    queryFn: () =>
-      api.priceUpdate.preview(effectiveFilter, {
-        type: 'percentage',
-        value: '0',
-        direction: 'increase',
-        fields: ['listPrice1'],
-      }),
-    enabled:
-      filter.scope !== 'manual' || manualSelected.size > 0,
-    staleTime: 200,
-  })
-
-  const rule: PriceUpdateRuleDTO = useMemo(
-    () => ({
-      type: ruleType,
-      value: ruleValue || '0',
-      direction,
-      fields,
-      keepUtility,
-      rounding,
-    }),
-    [ruleType, ruleValue, direction, fields, keepUtility, rounding],
+  const familyNameById = useMemo(
+    () => new Map((familiesQ.data ?? []).map((f) => [f.id, f.name])),
+    [familiesQ.data],
   )
+  const filtered = useMemo<ArticleDTO[]>(() => {
+    const all = articlesQ.data ?? []
+    const term = search.trim().toLowerCase()
+    const min = minPrice ? Number(minPrice) : null
+    const max = maxPrice ? Number(maxPrice) : null
+    return all.filter((a) => {
+      if (!a.active) return false
+      if (familyIds.size > 0 && (!a.familyId || !familyIds.has(a.familyId))) return false
+      if (supplierIds.size > 0 && (!a.supplierId || !supplierIds.has(a.supplierId))) return false
+      if (onlyStock && Number(a.stock) <= 0) return false
+      if (min != null && Number(a.listPrice1) < min) return false
+      if (max != null && Number(a.listPrice1) > max) return false
+      if (term) {
+        const hay = `${a.barcode} ${a.description} ${a.brand ?? ''}`.toLowerCase()
+        if (!hay.includes(term)) return false
+      }
+      return true
+    })
+  }, [articlesQ.data, search, familyIds, supplierIds, onlyStock, minPrice, maxPrice])
 
-  const previewQuery = useQuery({
-    queryKey: ['priceUpdatePreview', JSON.stringify(effectiveFilter), JSON.stringify(rule)],
-    queryFn: () => api.priceUpdate.preview(effectiveFilter, rule),
-    enabled: step === 'preview',
-  })
+  const allSelected = filtered.length > 0 && filtered.every((a) => selected.has(a.id))
+  const someSelected = filtered.some((a) => selected.has(a.id)) && !allSelected
 
-  const articlesFiltered = useMemo(() => {
-    const q = manualSearch.trim().toLowerCase()
-    const base = articles.data ?? []
-    const filtered = q
-      ? base.filter(
-          (a) =>
-            a.barcode.toLowerCase().includes(q) ||
-            a.description.toLowerCase().includes(q),
-        )
-      : base
-    return filtered.slice(0, 50)
-  }, [articles.data, manualSearch])
-
-  function toggleField(f: PriceFieldDTO): void {
-    setFields((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))
+  function toggleSelectAll(checked: boolean): void {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (checked) {
+        for (const a of filtered) next.add(a.id)
+      } else {
+        for (const a of filtered) next.delete(a.id)
+      }
+      return next
+    })
   }
 
-  function toggleManual(id: string): void {
-    setManualSelected((prev) => {
+  function toggleOne(id: string, checked: boolean): void {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  function toggleField(field: PriceFieldDTO): void {
+    setFields((prev) =>
+      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field],
+    )
+  }
+
+  function toggleFamily(id: string): void {
+    setFamilyIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -171,501 +185,424 @@ export function ActualizacionPrecios() {
     })
   }
 
-  function canContinueFromFilter(): boolean {
-    const cnt = countQuery.data?.articlesAffected ?? 0
-    return cnt > 0
+  function toggleSupplier(id: string): void {
+    setSupplierIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
-  function canContinueFromRule(): boolean {
-    if (fields.length === 0) return false
-    if (!description.trim()) return false
-    if (ruleType !== 'recalculate_from_cost') {
-      const n = Number(ruleValue)
-      if (!Number.isFinite(n)) return false
-      if (ruleType === 'set_value' && n < 0) return false
+  function clearFilters(): void {
+    setSearch('')
+    setFamilyIds(new Set())
+    setSupplierIds(new Set())
+    setOnlyStock(false)
+    setMinPrice('')
+    setMaxPrice('')
+  }
+
+  function buildPayload(): { filter: PriceUpdateFilterDTO; rule: PriceUpdateRuleDTO; description: string } | null {
+    if (selected.size === 0) {
+      toast.error('Seleccioná al menos un artículo')
+      return null
     }
-    return true
+    if (fields.length === 0) {
+      toast.error('Elegí al menos un campo')
+      return null
+    }
+    const n = Number(value)
+    if (!Number.isFinite(n) || n === 0) {
+      toast.error('El valor debe ser distinto de cero')
+      return null
+    }
+
+    const filter: PriceUpdateFilterDTO = {
+      scope: 'manual',
+      articleIds: Array.from(selected),
+      onlyActive: true,
+    }
+    const rule: PriceUpdateRuleDTO = {
+      type: mode,
+      value,
+      fields,
+      rounding,
+      ...(mode !== 'set_value' ? { direction } : {}),
+    }
+    const fieldLabels = fields.map((f) => FIELD_LABELS[f]).join(', ')
+    let modeLabel: string
+    if (mode === 'percentage') modeLabel = `${direction === 'increase' ? '+' : '-'}${value}%`
+    else if (mode === 'fixed_amount') modeLabel = `${direction === 'increase' ? '+' : '-'}$${value}`
+    else modeLabel = `=$${value}`
+    const description = `${modeLabel} en ${fieldLabels} (${selected.size} artículos)`
+    return { filter, rule, description }
   }
 
-  async function handleApply(): Promise<void> {
+  async function abrirPreview(): Promise<void> {
+    const payload = buildPayload()
+    if (!payload) return
+    setPreviewLoading(true)
+    setPreviewOpen(true)
+    try {
+      const res = await api.priceUpdate.preview(payload.filter, payload.rule)
+      setPreviewEntries(res.entries)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error generando vista previa')
+      setPreviewOpen(false)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  async function aplicar(): Promise<void> {
+    const payload = buildPayload()
+    if (!payload) return
     setApplying(true)
     try {
-      const result = await api.priceUpdate.apply(effectiveFilter, rule, description.trim())
-      toast.success(
-        `Actualizados ${result.articlesAffected} artículos (${result.entries} cambios).`,
-        {
-          action: {
-            label: 'Ver historial',
-            onClick: () => openInWindow('precios-historial'),
-          },
-        },
-      )
-      // Reset
-      setStep('filter')
-      setManualSelected(new Set())
-      setDescription('')
-      setConfirmOpen(false)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo aplicar la actualización')
+      const res = await api.priceUpdate.apply(payload.filter, payload.rule, payload.description)
+      toast.success(`Aplicado: ${res.articlesAffected} artículos modificados (${res.entries} cambios)`)
+      setPreviewOpen(false)
+      setPreviewEntries([])
+      setSelected(new Set())
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al aplicar la actualización')
     } finally {
       setApplying(false)
     }
   }
 
-  // ---------- Render por paso ----------
   return (
-    <div className="flex h-full flex-col gap-3">
-      <div className="flex items-center gap-2 border-b pb-2">
-        <StepDot label="1. Filtros" active={step === 'filter'} done={step !== 'filter'} />
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <StepDot label="2. Regla" active={step === 'rule'} done={step === 'preview'} />
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <StepDot label="3. Vista previa" active={step === 'preview'} done={false} />
-      </div>
-
-      {step === 'filter' && (
-        <Card className="flex-1 overflow-auto p-4">
-          <div className="mb-3 text-base font-medium">Filtros — ¿a qué artículos aplica?</div>
-          <div className="space-y-3">
-            <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">Alcance</Label>
-              <div className="flex flex-wrap gap-2">
-                {(['all', 'family', 'supplier', 'manual'] as const).map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={filter.scope === s ? 'default' : 'outline'}
-                    onClick={() => setFilter({ ...filter, scope: s })}
-                  >
-                    {s === 'all'
-                      ? 'Todos'
-                      : s === 'family'
-                        ? 'Por familia'
-                        : s === 'supplier'
-                          ? 'Por proveedor'
-                          : 'Manual'}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {filter.scope === 'family' && (
-              <div className="max-w-md">
-                <Label className="mb-1 block text-xs text-muted-foreground">Familia</Label>
-                <Select
-                  value={filter.familyId ?? ''}
-                  onChange={(e) => setFilter({ ...filter, familyId: e.target.value || undefined })}
-                >
-                  <option value="">— Elegí una —</option>
-                  {(families.data ?? []).map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            )}
-
-            {filter.scope === 'supplier' && (
-              <div className="max-w-md">
-                <Label className="mb-1 block text-xs text-muted-foreground">Proveedor</Label>
-                <Select
-                  value={filter.supplierId ?? ''}
-                  onChange={(e) => setFilter({ ...filter, supplierId: e.target.value || undefined })}
-                >
-                  <option value="">— Elegí uno —</option>
-                  {(suppliers.data ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.code} — {s.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            )}
-
-            {filter.scope === 'manual' && (
-              <div className="rounded border p-2">
-                <Input
-                  placeholder="Buscar artículo por código o descripción…"
-                  value={manualSearch}
-                  onChange={(e) => setManualSearch(e.target.value)}
-                  className="mb-2"
-                />
-                <div className="max-h-56 overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-8" />
-                        <TableHead>Código</TableHead>
-                        <TableHead>Descripción</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {articlesFiltered.map((a) => (
-                        <TableRow key={a.id} onClick={() => toggleManual(a.id)} className="cursor-pointer">
-                          <TableCell>
-                            <input
-                              type="checkbox"
-                              checked={manualSelected.has(a.id)}
-                              onChange={() => toggleManual(a.id)}
-                            />
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{a.barcode}</TableCell>
-                          <TableCell>{a.description}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Seleccionados: {manualSelected.size}
-                </div>
-              </div>
-            )}
-
-            <details className="rounded border p-2">
-              <summary className="cursor-pointer text-sm">Filtros adicionales</summary>
-              <div className="mt-2 grid grid-cols-3 gap-3">
-                <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">Precio mínimo (Lista 1)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={filter.minPrice ?? ''}
-                    onChange={(e) => setFilter({ ...filter, minPrice: e.target.value || undefined })}
-                  />
-                </div>
-                <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">Precio máximo (Lista 1)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={filter.maxPrice ?? ''}
-                    onChange={(e) => setFilter({ ...filter, maxPrice: e.target.value || undefined })}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={!!filter.hasStock}
-                      onChange={(e) => setFilter({ ...filter, hasStock: e.target.checked })}
-                    />
-                    Sólo con stock
-                  </label>
-                </div>
-              </div>
-            </details>
-
-            <div className="rounded bg-muted/40 p-2 text-sm">
-              <span className="font-medium">{countQuery.data?.articlesAffected ?? 0}</span>{' '}
-              artículo(s) coinciden con el filtro.
-            </div>
+    <FormShell
+      title={
+        <div className="flex items-center gap-2">
+          <Tag className="h-5 w-5" />
+          <span>Actualización de Precios</span>
+        </div>
+      }
+      headerActions={
+        <div className="flex flex-1 items-center gap-2">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por código, descripción o marca…"
+              className="pl-8"
+            />
           </div>
-        </Card>
-      )}
-
-      {step === 'rule' && (
-        <Card className="flex-1 overflow-auto p-4">
-          <div className="mb-3 text-base font-medium">Regla — ¿cómo se actualizan los precios?</div>
-          <div className="space-y-3">
-            <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">Tipo de regla</Label>
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ['percentage', 'Porcentaje'],
-                    ['fixed_amount', 'Monto fijo'],
-                    ['set_value', 'Valor absoluto'],
-                    ['recalculate_from_cost', 'Recalcular según costo'],
-                  ] as Array<[PriceUpdateRuleTypeDTO, string]>
-                ).map(([v, l]) => (
-                  <Button
-                    key={v}
-                    size="sm"
-                    variant={ruleType === v ? 'default' : 'outline'}
-                    onClick={() => setRuleType(v)}
-                  >
-                    {l}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {(ruleType === 'percentage' || ruleType === 'fixed_amount') && (
-              <div className="flex gap-3">
+          <details className="relative">
+            <summary className="list-none cursor-pointer rounded-md border bg-background px-3 py-2 text-sm select-none">
+              Filtros{(familyIds.size + supplierIds.size + (onlyStock ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0)) > 0
+                ? ` (${familyIds.size + supplierIds.size + (onlyStock ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0)})`
+                : ''}
+            </summary>
+            <div className="absolute right-0 top-full z-30 mt-1 w-[420px] rounded-md border bg-background p-3 shadow-lg">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="mb-1 block text-xs text-muted-foreground">Dirección</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={direction === 'increase' ? 'default' : 'outline'}
-                      onClick={() => setDirection('increase')}
-                    >
-                      Aumentar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={direction === 'decrease' ? 'default' : 'outline'}
-                      onClick={() => setDirection('decrease')}
-                    >
-                      Bajar
-                    </Button>
+                  <Label className="text-xs">Familias</Label>
+                  <div className="max-h-32 overflow-auto rounded border p-1 text-xs">
+                    {(familiesQ.data ?? []).map((f) => (
+                      <label key={f.id} className="flex items-center gap-1 py-0.5">
+                        <Checkbox checked={familyIds.has(f.id)} onCheckedChange={() => toggleFamily(f.id)} />
+                        <span>{f.name}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
-                <div className="flex-1 max-w-xs">
-                  <Label className="mb-1 block text-xs text-muted-foreground">
-                    {ruleType === 'percentage' ? 'Porcentaje (%)' : 'Monto ($)'}
-                  </Label>
-                  {ruleType === 'fixed_amount' ? (
-                    <CurrencyInput value={ruleValue} onChange={setRuleValue} />
-                  ) : (
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={ruleValue}
-                      onChange={(e) => setRuleValue(e.target.value)}
-                    />
-                  )}
+                <div>
+                  <Label className="text-xs">Proveedores</Label>
+                  <div className="max-h-32 overflow-auto rounded border p-1 text-xs">
+                    {(suppliersQ.data ?? []).map((s) => (
+                      <label key={s.id} className="flex items-center gap-1 py-0.5">
+                        <Checkbox checked={supplierIds.has(s.id)} onCheckedChange={() => toggleSupplier(s.id)} />
+                        <span>{s.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <Checkbox checked={onlyStock} onCheckedChange={(c) => setOnlyStock(!!c)} />
+                  Sólo con stock
+                </label>
+                <div />
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Precio min</Label>
+                  <CurrencyInput value={minPrice} onChange={setMinPrice} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Precio max</Label>
+                  <CurrencyInput value={maxPrice} onChange={setMaxPrice} />
                 </div>
               </div>
-            )}
-
-            {ruleType === 'set_value' && (
-              <div className="max-w-xs">
-                <Label className="mb-1 block text-xs text-muted-foreground">Nuevo valor ($)</Label>
-                <CurrencyInput value={ruleValue} onChange={setRuleValue} />
-              </div>
-            )}
-
-            <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">Campos a actualizar</Label>
-              <div className="flex flex-wrap gap-3">
-                {(Object.keys(FIELD_LABELS) as PriceFieldDTO[]).map((f) => (
-                  <label key={f} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={fields.includes(f)}
-                      onChange={() => toggleField(f)}
-                    />
-                    {FIELD_LABELS[f]}
-                  </label>
-                ))}
+              <div className="mt-3 flex justify-end">
+                <Button variant="ghost" size="sm" onClick={clearFilters}>Limpiar filtros</Button>
               </div>
             </div>
-
-            {fields.includes('costPrice') && fields.some((f) => f !== 'costPrice') && (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={keepUtility}
-                  onChange={(e) => setKeepUtility(e.target.checked)}
-                />
-                Mantener % de utilidad al cambiar el costo (recalcula las listas)
-              </label>
-            )}
-
-            <div className="max-w-xs">
-              <Label className="mb-1 block text-xs text-muted-foreground">Redondeo</Label>
-              <Select
-                value={rounding}
-                onChange={(e) => setRounding(e.target.value as PriceUpdateRoundingDTO)}
-              >
-                {ROUNDING_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">
-                Descripción (obligatoria)
-              </Label>
-              <textarea
-                rows={2}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={`Ej.: Aumento general ${new Date().toLocaleDateString('es-AR')}`}
-              />
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {step === 'preview' && (
-        <PreviewStep
-          previewQuery={previewQuery}
-          page={previewPage}
-          setPage={setPreviewPage}
-          onConfirm={() => setConfirmOpen(true)}
-        />
-      )}
-
-      {/* Navegación */}
-      <div className="flex items-center justify-between border-t pt-2">
-        <Button
-          variant="outline"
-          onClick={() => {
-            if (step === 'preview') setStep('rule')
-            else if (step === 'rule') setStep('filter')
-          }}
-          disabled={step === 'filter'}
-        >
-          <ChevronLeft className="mr-1 h-4 w-4" />
-          Volver
-        </Button>
-        <div className="flex gap-2">
-          {step !== 'preview' && (
-            <Button
-              onClick={() => {
-                if (step === 'filter') {
-                  if (!canContinueFromFilter()) {
-                    toast.warning('Ningún artículo coincide con el filtro')
-                    return
-                  }
-                  setStep('rule')
-                } else {
-                  if (!canContinueFromRule()) {
-                    toast.warning('Completá los datos de la regla (campos + descripción)')
-                    return
-                  }
-                  setStep('preview')
-                }
-              }}
-            >
-              Continuar
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          )}
+          </details>
         </div>
-      </div>
-
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Aplicar la actualización?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se actualizarán {previewQuery.data?.articlesAffected ?? 0} artículo(s) y{' '}
-              {previewQuery.data?.entries.length ?? 0} campo(s). Podés revertirla desde el
-              historial.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={applying}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleApply} disabled={applying || !canApply}>
-              {applying ? 'Aplicando…' : 'Confirmar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  )
-}
-
-function StepDot(props: { label: string; active: boolean; done: boolean }) {
-  return (
-    <div
-      className={`rounded px-2 py-1 text-xs ${
-        props.active
-          ? 'bg-primary text-primary-foreground font-medium'
-          : props.done
-            ? 'bg-muted text-muted-foreground'
-            : 'text-muted-foreground'
-      }`}
+      }
+      bodyClassName="py-0"
+      footer={
+        selected.size > 0 && (
+          <RuleFooter
+            selectedCount={selected.size}
+            fields={fields}
+            toggleField={toggleField}
+            mode={mode}
+            setMode={setMode}
+            direction={direction}
+            setDirection={setDirection}
+            value={value}
+            setValue={setValue}
+            rounding={rounding}
+            setRounding={setRounding}
+            canApply={canApply}
+            onPreview={() => void abrirPreview()}
+            onApply={() => void aplicar()}
+            applying={applying}
+          />
+        )
+      }
     >
-      {props.label}
+      <Card className="flex h-full flex-col">
+        <div className="flex shrink-0 items-center justify-between border-b px-3 py-2 text-sm">
+          <label className="flex items-center gap-2">
+            <Checkbox
+              checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+              onCheckedChange={(c) => toggleSelectAll(!!c)}
+            />
+            <span>Seleccionar todos los filtrados</span>
+          </label>
+          <span className="text-xs text-muted-foreground">
+            {filtered.length} artículo(s) filtrado(s) — {selected.size} seleccionado(s)
+          </span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background">
+              <TableRow>
+                <TableHead className="w-8" />
+                <TableHead>Código</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Marca</TableHead>
+                <TableHead>Familia</TableHead>
+                <TableHead className="text-right">Costo</TableHead>
+                <TableHead className="text-right">Venta (L1)</TableHead>
+                <TableHead className="text-right">L2</TableHead>
+                <TableHead className="text-right">L3</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {articlesQ.isLoading ? (
+                <TableRow><TableCell colSpan={9} className="py-6 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : filtered.length === 0 ? (
+                <TableRow><TableCell colSpan={9} className="py-6 text-center text-muted-foreground">No hay artículos que coincidan con los filtros.</TableCell></TableRow>
+              ) : filtered.map((a) => (
+                <TableRow key={a.id} className={selected.has(a.id) ? 'bg-primary/5' : undefined}>
+                  <TableCell>
+                    <Checkbox checked={selected.has(a.id)} onCheckedChange={(c) => toggleOne(a.id, !!c)} />
+                  </TableCell>
+                  <TableCell className="text-xs">{a.barcode}</TableCell>
+                  <TableCell className="text-xs">{a.description}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{a.brand ?? '—'}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{a.familyId ? familyNameById.get(a.familyId) ?? '—' : '—'}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{formatCurrency(a.costPrice)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{formatCurrency(a.listPrice1)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{formatCurrency(a.listPrice2)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{formatCurrency(a.listPrice3)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      <PreviewDialog
+        open={previewOpen}
+        loading={previewLoading}
+        entries={previewEntries}
+        applying={applying}
+        canApply={canApply}
+        onClose={() => setPreviewOpen(false)}
+        onApply={() => void aplicar()}
+      />
+    </FormShell>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+
+function RuleFooter(props: {
+  selectedCount: number
+  fields: PriceFieldDTO[]
+  toggleField: (f: PriceFieldDTO) => void
+  mode: RuleMode
+  setMode: (m: RuleMode) => void
+  direction: 'increase' | 'decrease'
+  setDirection: (d: 'increase' | 'decrease') => void
+  value: string
+  setValue: (v: string) => void
+  rounding: PriceUpdateRoundingDTO
+  setRounding: (r: PriceUpdateRoundingDTO) => void
+  canApply: boolean
+  onPreview: () => void
+  onApply: () => void
+  applying: boolean
+}): React.ReactElement {
+  const allFields: PriceFieldDTO[] = ['costPrice', 'listPrice1', 'listPrice2', 'listPrice3', 'wholesalePrice']
+  const showDirection = props.mode !== 'set_value'
+  const isCurrency = props.mode === 'fixed_amount' || props.mode === 'set_value'
+
+  return (
+    <div className="flex w-full flex-col gap-2 px-1 py-1">
+      <div className="text-xs font-medium text-muted-foreground">
+        Aplicar a {props.selectedCount} artículos seleccionados:
+      </div>
+      <div className="grid grid-cols-[auto_1fr] items-center gap-2 text-sm">
+        <span className="font-medium">Campo:</span>
+        <div className="flex flex-wrap gap-3">
+          {allFields.map((f) => (
+            <label key={f} className="flex items-center gap-1">
+              <Checkbox checked={props.fields.includes(f)} onCheckedChange={() => props.toggleField(f)} />
+              <span>{FIELD_LABELS[f]}</span>
+            </label>
+          ))}
+        </div>
+        <span className="font-medium">Modo:</span>
+        <div className="flex flex-wrap gap-3">
+          {(['percentage', 'fixed_amount', 'set_value'] as RuleMode[]).map((m) => (
+            <label key={m} className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="rule-mode"
+                checked={props.mode === m}
+                onChange={() => props.setMode(m)}
+              />
+              <span>
+                {m === 'percentage' ? 'Porcentaje' : m === 'fixed_amount' ? 'Monto fijo' : 'Valor absoluto'}
+              </span>
+            </label>
+          ))}
+        </div>
+        {showDirection && (
+          <>
+            <span className="font-medium">Dirección:</span>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  name="rule-direction"
+                  checked={props.direction === 'increase'}
+                  onChange={() => props.setDirection('increase')}
+                />
+                <span>⬆ Subir</span>
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  name="rule-direction"
+                  checked={props.direction === 'decrease'}
+                  onChange={() => props.setDirection('decrease')}
+                />
+                <span>⬇ Bajar</span>
+              </label>
+            </div>
+          </>
+        )}
+        <span className="font-medium">Valor:</span>
+        <div className="flex items-center gap-2">
+          {isCurrency ? (
+            <CurrencyInput value={props.value} onChange={props.setValue} className="w-40" />
+          ) : (
+            <Input
+              type="number"
+              value={props.value}
+              onChange={(e) => props.setValue(e.target.value)}
+              className="w-40"
+            />
+          )}
+          {props.mode === 'percentage' && <span className="text-sm text-muted-foreground">%</span>}
+        </div>
+        <span className="font-medium">Redondeo:</span>
+        <Select value={props.rounding} onChange={(e) => props.setRounding(e.target.value as PriceUpdateRoundingDTO)}>
+          {ROUNDING_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </Select>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={props.onPreview} disabled={props.applying}>
+          Vista previa
+        </Button>
+        <Button onClick={props.onApply} disabled={!props.canApply || props.applying}>
+          {props.applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar cambios'}
+        </Button>
+      </div>
     </div>
   )
 }
 
-const PAGE_SIZE = 50
-
-function PreviewStep(props: {
-  previewQuery: ReturnType<typeof useQuery<import('@/types/api').PriceUpdatePreviewResultDTO>>
-  page: number
-  setPage: (p: number) => void
-  onConfirm: () => void
-}) {
-  const { previewQuery, page, setPage, onConfirm } = props
-  if (previewQuery.isLoading)
-    return <Card className="flex-1 p-4 text-sm text-muted-foreground">Calculando…</Card>
-  if (previewQuery.error || !previewQuery.data)
-    return <Card className="flex-1 p-4 text-sm text-destructive">
-      {previewQuery.error instanceof Error ? previewQuery.error.message : 'Error al calcular la vista previa'}
-    </Card>
-  const { entries, articlesAffected, averageDeltaPct } = previewQuery.data
-  const totalPages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages - 1)
-  const slice = entries.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
+function PreviewDialog(props: {
+  open: boolean
+  loading: boolean
+  entries: PriceUpdatePreviewEntryDTO[]
+  applying: boolean
+  canApply: boolean
+  onClose: () => void
+  onApply: () => void
+}): React.ReactElement | null {
+  if (!props.open) return null
   return (
-    <Card className="flex flex-1 flex-col overflow-hidden">
-      <div className="border-b p-3 text-sm">
-        Se actualizarán <span className="font-medium">{articlesAffected}</span> artículo(s) en{' '}
-        <span className="font-medium">{entries.length}</span> campo(s). Δ promedio:{' '}
-        <span className={averageDeltaPct >= 0 ? 'text-emerald-700' : 'text-red-700'}>
-          {averageDeltaPct.toFixed(2)}%
-        </span>
-      </div>
-      <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-card">
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead>Campo</TableHead>
-              <TableHead className="text-right">Anterior</TableHead>
-              <TableHead className="text-right">Nuevo</TableHead>
-              <TableHead className="text-right">Δ</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {slice.map((e) => {
-              const oldN = Number(e.oldValue)
-              const newN = Number(e.newValue)
-              const delta = newN - oldN
-              return (
-                <TableRow key={`${e.articleId}-${e.field}`}>
-                  <TableCell className="font-mono text-xs">{e.code}</TableCell>
-                  <TableCell>{e.description}</TableCell>
-                  <TableCell>{FIELD_LABELS[e.field]}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(e.oldValue)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(e.newValue)}</TableCell>
-                  <TableCell
-                    className={`text-right ${delta >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
-                  >
-                    {delta >= 0 ? '+' : ''}
-                    {formatCurrency(String(delta))}
-                  </TableCell>
+    <Dialog open onOpenChange={(o) => { if (!o) props.onClose() }}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Vista previa de cambios ({props.entries.length})</DialogTitle>
+        </DialogHeader>
+        {props.loading ? (
+          <div className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div>
+        ) : (
+          <div className="max-h-96 overflow-auto rounded-md border">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background">
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Campo</TableHead>
+                  <TableHead className="text-right">Actual</TableHead>
+                  <TableHead className="text-right">Nuevo</TableHead>
+                  <TableHead className="text-right">Diferencia</TableHead>
                 </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex items-center justify-between border-t p-2 text-xs">
-        <div>
-          Página {safePage + 1} de {totalPages}
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
-            Anterior
+              </TableHeader>
+              <TableBody>
+                {props.entries.map((e, i) => {
+                  const oldN = Number(e.oldValue)
+                  const newN = Number(e.newValue)
+                  const diff = newN - oldN
+                  return (
+                    <TableRow key={`${e.articleId}-${e.field}-${i}`}>
+                      <TableCell className="text-xs">{e.code}</TableCell>
+                      <TableCell className="text-xs">{e.description}</TableCell>
+                      <TableCell className="text-xs">{FIELD_LABELS[e.field]}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">{formatCurrency(e.oldValue)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs font-medium">{formatCurrency(e.newValue)}</TableCell>
+                      <TableCell className={`text-right tabular-nums text-xs ${diff >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={props.onClose} disabled={props.applying}>Volver</Button>
+          <Button onClick={props.onApply} disabled={!props.canApply || props.applying || props.entries.length === 0}>
+            {props.applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar'}
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={safePage >= totalPages - 1}
-            onClick={() => setPage(safePage + 1)}
-          >
-            Siguiente
-          </Button>
-          <Button size="sm" onClick={onConfirm} className="ml-3">
-            Confirmar actualización
-          </Button>
-        </div>
-      </div>
-    </Card>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

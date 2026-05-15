@@ -14,6 +14,7 @@ import { BRANDING } from "@/assets/branding"
 import { useState } from 'react'
 import {
   ArrowLeftRight,
+  BarChart3,
   Boxes,
   Building2,
   Calculator,
@@ -136,6 +137,7 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'generador-compras', label: 'Generador de Compras', icon: PackagePlus, requires: 'view_reports' },
       { pageKey: 'inventario-articulos', label: 'Inventario de Artículos', icon: Boxes, requires: 'view_reports' },
       { pageKey: 'ventas-vendedor', label: 'Ventas por Vendedor', icon: ArrowLeftRight, requires: 'view_reports' },
+      { pageKey: 'estadisticas', label: 'Estadísticas', icon: BarChart3, requires: 'view_reports' },
     ],
   },
   {

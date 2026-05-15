@@ -774,6 +774,52 @@ async function main(): Promise<void> {
     globalThis.fetch = originalFetch;
   }
 
+  // ----------------------------------------------------- cash general
+  console.log('\n[cash general]');
+  {
+    const balance0 = await admin.cashGeneral.getBalance();
+    check('cashGeneral.getBalance inicial = 0', Number(balance0) === 0, `balance=${balance0}`);
+    const income = await admin.cashGeneral.addIncome({ amount: '100', description: 'Aporte de socio' });
+    check('cashGeneral.addIncome 100 → balanceAfter 100', Number(income.balanceAfter) === 100, `balance=${income.balanceAfter}`);
+    const expense = await admin.cashGeneral.addExpense({ amount: '30', description: 'Pago servicios', category: 'service' });
+    check('cashGeneral.addExpense 30 → balanceAfter 70', Number(expense.balanceAfter) === 70, `balance=${expense.balanceAfter}`);
+    const balanceN = await admin.cashGeneral.getBalance();
+    check('cashGeneral.getBalance final = 70', Number(balanceN) === 70, `balance=${balanceN}`);
+    const movs = await admin.cashGeneral.listMovements({});
+    check('cashGeneral.listMovements devuelve 2 movimientos', movs.length === 2, `len=${movs.length}`);
+  }
+
+  // ----------------------------------------------------- analytics
+  console.log('\n[analytics]');
+  {
+    const from = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const to = Date.now() + 24 * 60 * 60 * 1000;
+    const top = await admin.analytics.getTopSellingProducts({ from, to, limit: 5 });
+    check('analytics.getTopSellingProducts devuelve filas', Array.isArray(top), `len=${top.length}`);
+    check(
+      'analytics.getTopSellingProducts shape: articleId+revenue+marginPct',
+      top.length === 0 || ('articleId' in top[0]! && 'revenue' in top[0]! && 'marginPct' in top[0]!),
+    );
+    const pm = await admin.analytics.getPaymentMethodsRanking({ from, to });
+    check('analytics.getPaymentMethodsRanking shape', Array.isArray(pm));
+    check(
+      'analytics.getPaymentMethodsRanking percentageOfTotal presente',
+      pm.length === 0 || 'percentageOfTotal' in pm[0]!,
+    );
+    const avg = await admin.analytics.getAverageTicket({ from, to });
+    check('analytics.getAverageTicket shape', 'avg' in avg && 'count' in avg, JSON.stringify(avg));
+    const trend = await admin.analytics.getSalesTrend({ from, to, granularity: 'daily' });
+    check('analytics.getSalesTrend shape', Array.isArray(trend));
+    const byHour = await admin.analytics.getSalesByHour({ from, to });
+    check('analytics.getSalesByHour shape', Array.isArray(byHour));
+    const byDow = await admin.analytics.getSalesByDayOfWeek({ from, to });
+    check('analytics.getSalesByDayOfWeek shape', Array.isArray(byDow));
+    const margin = await admin.analytics.getMarginByCategory({ from, to });
+    check('analytics.getMarginByCategory shape', Array.isArray(margin));
+    const rot = await admin.analytics.getStockRotation({ from, to, limit: 5 });
+    check('analytics.getStockRotation shape', Array.isArray(rot));
+  }
+
   closeLocalDb(db);
 }
 

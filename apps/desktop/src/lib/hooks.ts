@@ -283,6 +283,139 @@ export function useVatBookPurchases(input: { from: number; to: number }, enabled
   })
 }
 
+// --- Caja General (P-FIX-FASE3) ---
+export function useCashGeneralBalance() {
+  return useQuery<{ balance: string }>({
+    queryKey: ['cashGeneral', 'balance'],
+    queryFn: api.cashGeneral.getBalance,
+  })
+}
+
+export function useCashGeneralMovements(
+  params: import('@/types/api').ListCashGeneralMovementsInputDTO = {},
+) {
+  return useQuery({
+    queryKey: [
+      'cashGeneral',
+      'movements',
+      params.from ?? null,
+      params.to ?? null,
+      params.type ?? null,
+      params.category ?? null,
+      params.limit ?? null,
+    ],
+    queryFn: () => api.cashGeneral.listMovements(params),
+  })
+}
+
+export function useCashGeneralMutations() {
+  const qc = useQueryClient()
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ['cashGeneral'] })
+  }
+  return {
+    addIncome: useMutation({
+      mutationFn: (input: import('@/types/api').AddCashGeneralMovementInputDTO) =>
+        api.cashGeneral.addIncome(input),
+      onSuccess: invalidate,
+    }),
+    addExpense: useMutation({
+      mutationFn: (input: import('@/types/api').AddCashGeneralMovementInputDTO) =>
+        api.cashGeneral.addExpense(input),
+      onSuccess: invalidate,
+    }),
+    transferFromDaily: useMutation({
+      mutationFn: (input: import('@/types/api').TransferFromDailyInputDTO) =>
+        api.cashGeneral.transferFromDaily(input),
+      onSuccess: invalidate,
+    }),
+  }
+}
+
+// --- Analytics (P-FIX-FASE3) ---
+type DR = { from: number; to: number }
+
+export function useTopProducts(input: DR & { limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'topProducts', input.from, input.to, input.limit ?? 10],
+    queryFn: () => api.analytics.getTopSellingProducts(input),
+    enabled,
+  })
+}
+export function useBottomProducts(input: DR & { limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'bottomProducts', input.from, input.to, input.limit ?? 10],
+    queryFn: () => api.analytics.getBottomSellingProducts(input),
+    enabled,
+  })
+}
+export function usePaymentMethodsRanking(input: DR, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'paymentMethodsRanking', input.from, input.to],
+    queryFn: () => api.analytics.getPaymentMethodsRanking(input),
+    enabled,
+  })
+}
+export function useTopCustomers(input: DR & { limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'topCustomers', input.from, input.to, input.limit ?? 10],
+    queryFn: () => api.analytics.getTopCustomers(input),
+    enabled,
+  })
+}
+export function useTopSuppliers(input: DR & { limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'topSuppliers', input.from, input.to, input.limit ?? 10],
+    queryFn: () => api.analytics.getTopSuppliers(input),
+    enabled,
+  })
+}
+export function useSalesTrend(
+  input: DR & { granularity: 'daily' | 'weekly' | 'monthly' },
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['analytics', 'salesTrend', input.from, input.to, input.granularity],
+    queryFn: () => api.analytics.getSalesTrend(input),
+    enabled,
+  })
+}
+export function useAverageTicket(input: DR, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'averageTicket', input.from, input.to],
+    queryFn: () => api.analytics.getAverageTicket(input),
+    enabled,
+  })
+}
+export function useSalesByHour(input: DR, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'salesByHour', input.from, input.to],
+    queryFn: () => api.analytics.getSalesByHour(input),
+    enabled,
+  })
+}
+export function useSalesByDayOfWeek(input: DR, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'salesByDayOfWeek', input.from, input.to],
+    queryFn: () => api.analytics.getSalesByDayOfWeek(input),
+    enabled,
+  })
+}
+export function useMarginByCategory(input: DR, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'marginByCategory', input.from, input.to],
+    queryFn: () => api.analytics.getMarginByCategory(input),
+    enabled,
+  })
+}
+export function useStockRotation(input: DR & { limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'stockRotation', input.from, input.to, input.limit ?? 20],
+    queryFn: () => api.analytics.getStockRotation(input),
+    enabled,
+  })
+}
+
 // --- Ventas ---
 export function useCreateSale(): UseMutationResult<CreateSaleResultDTO, Error, CreateSaleInputDTO> {
   const qc = useQueryClient()

@@ -38,6 +38,8 @@ const EXPECTED_TABLES = [
   'mp_config',
   'mp_pos_devices',
   'mp_orders',
+  'cash_general',
+  'cash_general_movements',
 ];
 
 let failures = 0;

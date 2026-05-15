@@ -237,6 +237,15 @@ export const WINDOWS: Record<string, WindowDef> = {
     component: lazy(() => import('@/pages/VentasPorVendedor').then((m) => ({ default: m.VentasPorVendedor }))),
     requires: 'view_reports',
   },
+  estadisticas: {
+    pageKey: 'estadisticas',
+    title: 'Estadísticas',
+    iconName: 'BarChart3',
+    component: lazy(() => import('@/pages/Estadisticas').then((m) => ({ default: m.Estadisticas }))),
+    requires: 'view_reports',
+    minWidth: 1200,
+    minHeight: 700,
+  },
   'acerca-de': {
     pageKey: 'acerca-de',
     title: 'Acerca de StockFlow',
@@ -260,6 +269,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/consultas/generador-compras': 'generador-compras',
   '/consultas/inventario': 'inventario-articulos',
   '/consultas/ventas-vendedor': 'ventas-vendedor',
+  '/consultas/estadisticas': 'estadisticas',
   '/precios/actualizar': 'precios-actualizar',
   '/precios/historial': 'precios-historial',
   '/contabilidad': 'contabilidad',

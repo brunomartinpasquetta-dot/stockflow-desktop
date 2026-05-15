@@ -49,7 +49,7 @@ const BUTTONS: QuickButton[] = [
   { pageKey: 'caja', label: 'Caja', fKey: 'F7', Icon: Wallet },
   { pageKey: 'historial-ventas', label: 'Historial Ventas', fKey: 'F8', Icon: History },
   { pageKey: 'cuentas-corrientes', label: 'Ctas. Cte.', Icon: BookUser },
-  { pageKey: 'ventas-vendedor', label: 'Estadísticas', Icon: BarChart3 },
+  { pageKey: 'estadisticas', label: 'Estadísticas', Icon: BarChart3 },
   { pageKey: 'contabilidad', label: 'Contabilidad', fKey: 'F10', Icon: Calculator },
 ]
 

@@ -59,6 +59,8 @@ export const LAN_ROUTED_GROUPS = new Set([
   'auth',
   'mpQr',
   'accounting',
+  'cashGeneral',
+  'analytics',
 ]);
 
 export const LOCAL_GROUPS = new Set(['system', 'lan', 'updater', 'hardware', 'license']);
@@ -401,6 +403,26 @@ export function createApiBridge(
       getSummary: (p) => c<never>('accounting:getSummary', p),
       getVatBookSales: (p) => c<never>('accounting:getVatBookSales', p),
       getVatBookPurchases: (p) => c<never>('accounting:getVatBookPurchases', p),
+    },
+    cashGeneral: {
+      getBalance: () => c<never>('cashGeneral:getBalance'),
+      listMovements: (p) => c<never>('cashGeneral:listMovements', p),
+      addIncome: (p) => c<never>('cashGeneral:addIncome', p),
+      addExpense: (p) => c<never>('cashGeneral:addExpense', p),
+      transferFromDaily: (p) => c<never>('cashGeneral:transferFromDaily', p),
+    },
+    analytics: {
+      getTopSellingProducts: (p) => c<never>('analytics:getTopSellingProducts', p),
+      getBottomSellingProducts: (p) => c<never>('analytics:getBottomSellingProducts', p),
+      getPaymentMethodsRanking: (p) => c<never>('analytics:getPaymentMethodsRanking', p),
+      getTopCustomers: (p) => c<never>('analytics:getTopCustomers', p),
+      getTopSuppliers: (p) => c<never>('analytics:getTopSuppliers', p),
+      getSalesTrend: (p) => c<never>('analytics:getSalesTrend', p),
+      getAverageTicket: (p) => c<never>('analytics:getAverageTicket', p),
+      getSalesByHour: (p) => c<never>('analytics:getSalesByHour', p),
+      getSalesByDayOfWeek: (p) => c<never>('analytics:getSalesByDayOfWeek', p),
+      getMarginByCategory: (p) => c<never>('analytics:getMarginByCategory', p),
+      getStockRotation: (p) => c<never>('analytics:getStockRotation', p),
     },
     updater: {
       checkNow: () => c<never>('updater:checkNow'),

@@ -253,6 +253,42 @@ export const api = {
     getVatBookPurchases: (input: { from: number; to: number }) =>
       unwrap(sf().accounting.getVatBookPurchases(input)),
   },
+  cashGeneral: {
+    getBalance: () => unwrap(sf().cashGeneral.getBalance()),
+    listMovements: (input: import('@/types/api').ListCashGeneralMovementsInputDTO = {}) =>
+      unwrap(sf().cashGeneral.listMovements(input)),
+    addIncome: (input: import('@/types/api').AddCashGeneralMovementInputDTO) =>
+      unwrap(sf().cashGeneral.addIncome(input)),
+    addExpense: (input: import('@/types/api').AddCashGeneralMovementInputDTO) =>
+      unwrap(sf().cashGeneral.addExpense(input)),
+    transferFromDaily: (input: import('@/types/api').TransferFromDailyInputDTO) =>
+      unwrap(sf().cashGeneral.transferFromDaily(input)),
+  },
+  analytics: {
+    getTopSellingProducts: (input: { from: number; to: number; limit?: number }) =>
+      unwrap(sf().analytics.getTopSellingProducts(input)),
+    getBottomSellingProducts: (input: { from: number; to: number; limit?: number }) =>
+      unwrap(sf().analytics.getBottomSellingProducts(input)),
+    getPaymentMethodsRanking: (input: { from: number; to: number }) =>
+      unwrap(sf().analytics.getPaymentMethodsRanking(input)),
+    getTopCustomers: (input: { from: number; to: number; limit?: number }) =>
+      unwrap(sf().analytics.getTopCustomers(input)),
+    getTopSuppliers: (input: { from: number; to: number; limit?: number }) =>
+      unwrap(sf().analytics.getTopSuppliers(input)),
+    getSalesTrend: (
+      input: { from: number; to: number; granularity: 'daily' | 'weekly' | 'monthly' },
+    ) => unwrap(sf().analytics.getSalesTrend(input)),
+    getAverageTicket: (input: { from: number; to: number }) =>
+      unwrap(sf().analytics.getAverageTicket(input)),
+    getSalesByHour: (input: { from: number; to: number }) =>
+      unwrap(sf().analytics.getSalesByHour(input)),
+    getSalesByDayOfWeek: (input: { from: number; to: number }) =>
+      unwrap(sf().analytics.getSalesByDayOfWeek(input)),
+    getMarginByCategory: (input: { from: number; to: number }) =>
+      unwrap(sf().analytics.getMarginByCategory(input)),
+    getStockRotation: (input: { from: number; to: number; limit?: number }) =>
+      unwrap(sf().analytics.getStockRotation(input)),
+  },
   system: {
     pickFile: (filters?: { name: string; extensions: string[] }[]): Promise<{ filePath: string | null }> =>
       unwrap(sf().system.pickFile({ filters })),

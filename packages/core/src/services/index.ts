@@ -5,6 +5,7 @@ import type { ServiceContext } from '../context';
 import { AccountsReceivableService } from './accountsReceivable.service';
 import { AuthService } from './auth.service';
 import { CashService } from './cash.service';
+import { CashGeneralService } from './cashGeneral.service';
 import { CompanyService } from './company.service';
 import { InventoryService } from './inventory.service';
 import { PaymentMethodService } from './paymentMethod.service';
@@ -16,6 +17,7 @@ import { SearchService } from './search.service';
 import { SupplierAccountsService } from './supplierAccounts.service';
 import { MpQrService, type MpTokenStoreLike } from './mpQr.service';
 import { AccountingService } from './accounting.service';
+import { AnalyticsService } from './analytics.service';
 
 export { AuthService, type LoginResult } from './auth.service';
 export { CompanyService } from './company.service';
@@ -110,6 +112,26 @@ export {
   type VatBookSaleRow,
   type VatBookPurchaseRow,
 } from './accounting.service';
+export {
+  CashGeneralService,
+  type CashGeneralMovementDTO,
+  type ListCashGeneralMovementsInput,
+  type AddIncomeOrExpenseInput,
+  type TransferFromDailyInput,
+} from './cashGeneral.service';
+export {
+  AnalyticsService,
+  type TopProductRow,
+  type PaymentMethodRankRow,
+  type CustomerRankRow,
+  type SupplierRankRow,
+  type SalesTrendRow,
+  type AverageTicketResult,
+  type SalesByHourRow,
+  type SalesByDayOfWeekRow,
+  type MarginRow,
+  type StockRotationRow,
+} from './analytics.service';
 
 export interface Services {
   auth: AuthService;
@@ -117,6 +139,8 @@ export interface Services {
   sales: SalesService;
   purchases: PurchasesService;
   cash: CashService;
+  cashGeneral: CashGeneralService;
+  analytics: AnalyticsService;
   inventory: InventoryService;
   accountsReceivable: AccountsReceivableService;
   supplierAccounts: SupplierAccountsService;
@@ -147,6 +171,8 @@ export function createServices(ctx: ServiceContext, opts: CreateServicesOptions 
     sales: new SalesService(ctx),
     purchases: new PurchasesService(ctx),
     cash: new CashService(ctx),
+    cashGeneral: new CashGeneralService(ctx),
+    analytics: new AnalyticsService(ctx),
     inventory: new InventoryService(ctx),
     accountsReceivable: new AccountsReceivableService(ctx),
     supplierAccounts: new SupplierAccountsService(ctx),
