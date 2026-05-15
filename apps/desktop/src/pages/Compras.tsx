@@ -371,7 +371,7 @@ export function Compras() {
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="grid grid-cols-4 gap-3 rounded-lg border bg-card p-3">
+      <div className="grid shrink-0 grid-cols-4 gap-3 rounded-lg border bg-card p-3">
         <div className="col-span-2 flex flex-col gap-1">
           <Label>Proveedor</Label>
           <Button variant="outline" className="justify-between" onClick={() => setSupplierPickerOpen(true)}>
@@ -381,31 +381,25 @@ export function Compras() {
           {selectedSupplier?.cuit && <span className="text-xs text-muted-foreground">CUIT: {selectedSupplier.cuit}</span>}
         </div>
         <div className="flex flex-col gap-1">
-          <Label>Comprobante recibido</Label>
+          <Label>Comprobante</Label>
           <Select value={voucherType} onChange={(e) => setVoucherType(e.target.value as VoucherType)}>
             {VOUCHER_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </Select>
         </div>
-        <div className="flex flex-col gap-1">
-          <Label>Número de Factura</Label>
-          <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="0001-00012345" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label>Fecha del comprobante</Label>
-          <Input type="date" value={dateIso} onChange={(e) => setDateIso(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label>N° interno</Label>
-          <Input readOnly value={numberQuery.data?.number ?? '—'} className="bg-muted tabular-nums" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label>Cargado</Label>
-          <Input readOnly value={today} className="bg-muted" />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <Label>N° Factura</Label>
+            <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="0001-00012345" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Fecha</Label>
+            <Input type="date" value={dateIso} onChange={(e) => setDateIso(e.target.value)} />
+          </div>
         </div>
         <div className="col-span-4 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Usuario: {currentUser?.fullName}</span>
+          <span>Usuario: {currentUser?.fullName} · N° interno {numberQuery.data?.number ?? '—'} · {today}</span>
           <div className="flex items-center gap-2">
             <Badge variant={priceMode === 'gross' ? 'outline' : 'warning'}>
               Modo: Precios {priceMode === 'gross' ? 'con IVA incluido' : 'netos + IVA'}
@@ -524,7 +518,7 @@ export function Compras() {
         </label>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 rounded-lg border bg-card p-3">
+      <div className="grid shrink-0 grid-cols-3 gap-3 rounded-lg border bg-card p-3">
         <div className="flex flex-col gap-1 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">{priceMode === 'gross' ? 'Subtotal (con IVA)' : 'Subtotal neto'}</span>

@@ -42,6 +42,13 @@ const DRAWER_KICK = Buffer.from([ESC, 0x70, 0x00, 0x19, 0xfa]); // pin 2, 25ms, 
 
 const CODEPAGE_PC858 = Buffer.from([ESC, 0x74, 0x13]); // page 19 = PC858 Euro
 
+// Paths absolutos de binarios del sistema. Electron en producción NO hereda
+// el PATH del shell del usuario en macOS, por lo que `execFile('lpstat', …)`
+// falla silenciosamente con ENOENT. Resolver a path absoluto fuerza el lookup
+// correcto en /usr/bin (CUPS estándar en macOS y la mayoría de distros Linux).
+const LPSTAT_PATH = process.platform === 'darwin' || process.platform === 'linux' ? '/usr/bin/lpstat' : 'lpstat';
+const LP_PATH = process.platform === 'darwin' || process.platform === 'linux' ? '/usr/bin/lp' : 'lp';
+
 function widthCols(w: PrinterWidth): number {
   return w === 80 ? 48 : 32;
 }
@@ -213,7 +220,7 @@ export class PrinterService {
       const tmpFile = join(tmpdir(), `stockflow-print-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.bin`);
       await writeTmp(tmpFile, data);
       await new Promise<void>((resolve, reject) => {
-        execFile('lp', ['-d', printerName, '-o', 'raw', tmpFile], (err) => {
+        execFile(LP_PATH, ['-d', printerName, '-o', 'raw', tmpFile], (err) => {
           unlink(tmpFile).catch(() => { /* ignore */ });
           if (err) reject(new Error(`No se pudo enviar a la impresora del sistema "${printerName}": ${err.message}`, { cause: err }));
           else resolve();
@@ -265,7 +272,7 @@ export class PrinterService {
       });
     }
     if (process.platform === 'darwin' || process.platform === 'linux') {
-      const out = await run('lpstat', ['-p', '-d']);
+      const out = await run(LPSTAT_PATH, ['-p', '-d']);
       if (!out) return [];
       const printers: SystemPrinterInfo[] = [];
       let defaultName: string | null = null;
@@ -444,9 +451,20 @@ export class PrinterService {
     push('ABCDEFGHIJKLMNOPQRSTUVWXYZ\n');
     push('abcdefghijklmnopqrstuvwxyz\n');
     push('0 1 2 3 4 5 6 7 8 9\n');
-    push('Acentos: ñ á é í ó ú ¿ ¡ €\n');
+    push('Acentos: á é í ó ú ñ Ñ ¿ ¡ €\n');
     push(`Ancho: ${cols} columnas (${this.cfg.width}mm)\n`);
     push(`${'-'.repeat(cols)}\n`);
+    parts.push(ALIGN_LEFT);
+    push(`${leftRight('Producto Ñoqui', '$ 1.234,56', cols)}\n`);
+    push(`${leftRight('IVA 21%', '$    259,26', cols)}\n`);
+    parts.push(BOLD_ON);
+    push(`${leftRight('TOTAL', '$ 1.493,82', cols)}\n`);
+    parts.push(BOLD_OFF);
+    push(`${'-'.repeat(cols)}\n`);
+    parts.push(ALIGN_CENTER);
+    push('Centrado\n');
+    parts.push(ALIGN_LEFT);
+    push('Izquierda\n');
     push(`${formatDateTime(Date.now())}\n`);
     parts.push(LF, LF, LF, CUT);
     await this.sendAll(parts);
