@@ -68,7 +68,7 @@ export function QuickAccessToolbar() {
   }
 
   return (
-    <div className="flex h-20 shrink-0 items-center gap-2 overflow-x-auto border-b bg-card px-3 md:overflow-x-visible">
+    <div data-chrome="toolbar" className="flex h-20 shrink-0 items-center gap-2 overflow-x-auto border-b bg-card px-3 md:overflow-x-visible">
       {BUTTONS.map((btn) => {
         const enabled = isEnabled(btn.pageKey)
         const active = focusedKey === btn.pageKey

@@ -21,6 +21,7 @@ import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/li
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
 import type { SaleTicketData, SaleTicketLine, SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import { WeightDialog } from '@/components/WeightDialog'
 import { CobroQrModal } from '@/components/CobroQrModal'
 import { Button } from '@/components/ui/button'
@@ -187,10 +188,27 @@ function PDV() {
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
+  // Medio de pago seleccionado en modo mono-medio (default: efectivo).
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
+  // Modo mixto explícito (toggle "Pago Mixto"): expone el split N-filas.
+  const [mixedMode, setMixedMode] = useState(false)
 
   useEffect(() => {
     barcodeRef.current?.focus()
   }, [])
+
+  // Inicializar / corregir el medio de pago mono-medio default (efectivo físico).
+  // Pattern de "derivar estado de props" recomendado por React: setState durante render.
+  if (
+    activeMethods.length > 0 &&
+    (!selectedMethodId || !activeMethods.some((m) => m.id === selectedMethodId))
+  ) {
+    const fallback =
+      activeMethods.find((m) => m.type === 'cash') ??
+      activeMethods.find((m) => m.isPhysicalCash) ??
+      activeMethods[0]
+    setSelectedMethodId(fallback?.id ?? null)
+  }
 
   const totals = calculateSaleTotals(
     cart.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, discount: l.discount, vatRate: l.article.vatRate })),
@@ -265,6 +283,7 @@ function PDV() {
     setCart([])
     setGlobalDiscount('0')
     setIsAccountSale(false)
+    setMixedMode(false)
     split.reset()
     barcodeRef.current?.focus()
   }
@@ -341,13 +360,22 @@ function PDV() {
     effectiveCustomerId != null
   const [qrModalOpen, setQrModalOpen] = useState(false)
 
+  const selectedMethod = useMemo(
+    () => activeMethods.find((m) => m.id === selectedMethodId) ?? null,
+    [activeMethods, selectedMethodId],
+  )
+
   const canConfirm =
     canWrite &&
     cart.length > 0 &&
     totalNum > 0 &&
     effectiveCustomerId != null &&
     !createSale.isPending &&
-    (accountSale ? accountEligible && !overCredit : split.isComplete && activeMethods.length > 0)
+    (accountSale
+      ? accountEligible && !overCredit
+      : mixedMode
+        ? split.isComplete && activeMethods.length > 0
+        : selectedMethod != null)
 
   function buildTicket(result: CreateSaleResultDTO): SaleTicketData {
     const customer = selectedCustomer
@@ -378,12 +406,22 @@ function PDV() {
 
   async function confirmar(): Promise<void> {
     if (!effectiveCustomerId || !canConfirm) return
+    // Si el modo mono-medio elige MercadoPago QR, derivar al modal de cobro QR.
+    if (!accountSale && !mixedMode && selectedMethod?.type === 'mp' && canCobrarQr) {
+      setQrModalOpen(true)
+      return
+    }
+    const monoPayments =
+      !accountSale && !mixedMode && selectedMethod
+        ? [{ paymentMethodId: selectedMethod.id, amount: totalNum.toFixed(4) }]
+        : null
+    const paymentsToSend = accountSale ? [] : (monoPayments ?? split.payments)
     try {
       const result = await createSale.mutateAsync({
         type: voucherType,
         customerId: effectiveCustomerId,
         isAccountSale: accountSale,
-        payments: accountSale ? [] : split.payments,
+        payments: paymentsToSend,
         discount: parseCurrencyInput(globalDiscount),
         notes: null,
         lines: cart.map((l) => ({
@@ -497,6 +535,20 @@ function PDV() {
         e.preventDefault()
         e.stopPropagation()
         if (canConfirm) void confirmar()
+        return
+      }
+      if (e.key === 'F4' && !mixedMode && !accountSale && activeMethods.length > 1) {
+        e.preventDefault()
+        e.stopPropagation()
+        const idx = activeMethods.findIndex((m) => m.id === selectedMethodId)
+        const next = activeMethods[(idx + 1) % activeMethods.length]
+        if (next) setSelectedMethodId(next.id)
+        return
+      }
+      if (e.key === 'F12' && !accountSale && activeMethods.length > 1) {
+        e.preventDefault()
+        e.stopPropagation()
+        setMixedMode((m) => !m)
         return
       }
       if (e.key === 'Escape' && barcode.trim() === '' && cart.length > 0) {
@@ -734,8 +786,50 @@ function PDV() {
                 Configurar medios de pago
               </Link>
             </p>
+          ) : mixedMode ? (
+            <>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Pago mixto
+                </Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => {
+                    setMixedMode(false)
+                    split.reset()
+                  }}
+                >
+                  Volver a pago único
+                </Button>
+              </div>
+              <PaymentSplitInput methods={activeMethods} split={split} />
+            </>
           ) : (
-            <PaymentSplitInput methods={activeMethods} split={split} />
+            <>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="pdv-method">Forma de pago</Label>
+                <PaymentMethodSelect
+                  id="pdv-method"
+                  methods={activeMethods}
+                  value={selectedMethodId}
+                  onChange={setSelectedMethodId}
+                />
+              </div>
+              {activeMethods.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setMixedMode(true)}
+                >
+                  Pago mixto (F12)
+                </Button>
+              )}
+            </>
           )}
         </div>
 

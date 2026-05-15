@@ -38,7 +38,7 @@ function LayoutInner() {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {licenseStatus === 'readOnly' && (
-        <div className="shrink-0 bg-destructive px-4 py-1.5 text-center text-xs font-medium text-destructive-foreground">
+        <div data-chrome="readonly-banner" className="shrink-0 bg-destructive px-4 py-1.5 text-center text-xs font-medium text-destructive-foreground">
           ⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.
         </div>
       )}

@@ -776,6 +776,8 @@ export interface LicenseStateDTO {
   expiresAt: number | null;
   licenseKey: string | null;
   tenantName: string | null;
+  /** ID del tenant según JWT (`tid`); `'OWNER'` en master/dev; `null` si no hay licencia. */
+  tenantId: string | null;
   lastError: string | null;
 }
 

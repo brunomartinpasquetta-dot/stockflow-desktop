@@ -35,7 +35,7 @@ export function StatusBar() {
   const mm = String(now.getMinutes()).padStart(2, '0')
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-3 border-b bg-background px-3 text-sm">
+    <div data-chrome="statusbar" className="flex h-10 shrink-0 items-center gap-3 border-b bg-background px-3 text-sm">
       <div className="max-w-md flex-1">
         <GlobalSearchBar />
       </div>

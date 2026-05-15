@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Loader2, Printer, History } from 'lucide-react'
 
+import { api } from '@/lib/api'
 import { useHistoricalCashRegisters, useHistoricalCashReport, useCompany, useUsers } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { usePrintHistoricalCashReport, usePrintCashCloseReport } from '@/lib/usePrint'
@@ -66,11 +69,40 @@ function HistoricalCashReportDialog({
   const reportQuery = useHistoricalCashReport(cashRegisterId)
   const companyQuery = useCompany()
   const printCashClose = usePrintCashCloseReport()
+  const printerConfigQuery = useQuery({
+    queryKey: ['hardwarePrinterConfig'],
+    queryFn: () => api.hardware.printer.getConfig(),
+    staleTime: 30_000,
+  })
 
   const r = reportQuery.data
 
-  function handlePrint(): void {
+  async function handlePrint(): Promise<void> {
     if (!r || !companyQuery.data) return
+    const printerCfg = printerConfigQuery.data ?? null
+    if (printerCfg) {
+      try {
+        const breakdownArr = r.byPaymentMethod ?? []
+        await api.hardware.printer.printCashClose({
+          company: { name: companyQuery.data.name },
+          registerNumber: r.register.number,
+          openDate: r.register.openDate,
+          closeDate: r.register.closeDate ?? Date.now(),
+          openingAmount: r.openingAmount,
+          salesCount: r.salesCount,
+          salesTotal: r.salesTotal,
+          paymentBreakdown: breakdownArr.map((b) => ({ method: b.name, amount: b.net })),
+          incomeMovements: r.incomeTotal,
+          expenseMovements: r.expenseTotal,
+          expectedClosing: r.expectedCash,
+          declaredClosing: r.closingAmount ?? '0',
+          difference: r.difference ?? '0',
+        })
+        return
+      } catch {
+        toast.warning('Impresora térmica no disponible — usando impresión desde pantalla')
+      }
+    }
     printCashClose({ company: companyQuery.data, report: r, closedBy: closedByName })
   }
 
@@ -159,7 +191,7 @@ function HistoricalCashReportDialog({
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cerrar</Button>
-          <Button onClick={handlePrint} disabled={!r}>
+          <Button onClick={() => void handlePrint()} disabled={!r}>
             <Printer className="h-4 w-4" />
             Imprimir
           </Button>

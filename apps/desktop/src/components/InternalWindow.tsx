@@ -13,6 +13,7 @@ import { Maximize2, Minus, Square, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { PageSpinner } from '@/components/PageSpinner'
+import { useChromeBounds } from '@/lib/useChromeBounds'
 import {
   WindowSelfProvider,
   useWindowManager,
@@ -24,8 +25,6 @@ import { WindowIcon } from '@/windows/WindowIcon'
 const HEADER_HEIGHT = 36
 const MIN_WIDTH = 400
 const MIN_HEIGHT = 300
-const TOP_RESERVED = 88 // MenuBar (48) + StatusBar (40)
-const BOTTOM_RESERVED = 40 // Taskbar
 
 type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
@@ -36,22 +35,29 @@ export function InternalWindow({ window: win }: { window: InternalWindowState })
   const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null)
   const resizeRef = useRef<{ dir: ResizeDir; startX: number; startY: number; startW: number; startH: number; startPosX: number; startPosY: number } | null>(null)
 
+  const chrome = useChromeBounds()
   const isMax = win.state === 'maximized'
   const isMin = win.state === 'minimized'
   const isFocused = wm.focusedId === win.id
 
+  /**
+   * El contenedor `<Desktop>` está debajo de la chrome y arriba de la Taskbar,
+   * por lo que su altura útil = `viewport - chrome.top - chrome.bottom`. Las
+   * ventanas son `position: absolute` dentro de Desktop, así que `position.y`
+   * arranca en `0` (no en `chrome.top`).
+   */
   const clampPosition = useCallback((x: number, y: number, w: number) => {
     const vw = globalThis.window.innerWidth
-    const vh = globalThis.window.innerHeight
+    const desktopH = Math.max(100, globalThis.window.innerHeight - chrome.top - chrome.bottom)
     const minX = -Math.max(0, w - 120)
     const maxX = vw - 80
-    const minY = TOP_RESERVED
-    const maxY = vh - BOTTOM_RESERVED - HEADER_HEIGHT
+    const minY = 0
+    const maxY = Math.max(0, desktopH - HEADER_HEIGHT)
     return {
       x: Math.min(Math.max(minX, x), maxX),
       y: Math.min(Math.max(minY, y), maxY),
     }
-  }, [])
+  }, [chrome.top, chrome.bottom])
 
   // --- DRAG -----------------------------------------------------------------
   const onHeaderMouseDown = useCallback((e: React.MouseEvent) => {
@@ -112,9 +118,9 @@ export function InternalWindow({ window: win }: { window: InternalWindowState })
         y = r.startPosY + dy
       }
       const vw = globalThis.window.innerWidth
-      const vh = globalThis.window.innerHeight
+      const desktopH = Math.max(100, globalThis.window.innerHeight - chrome.top - chrome.bottom)
       const maxW = vw - 80
-      const maxH = vh - TOP_RESERVED - BOTTOM_RESERVED
+      const maxH = desktopH
       w = Math.max(MIN_WIDTH, Math.min(maxW, w))
       h = Math.max(MIN_HEIGHT, Math.min(maxH, h))
       if (r.dir.includes('w')) x = r.startPosX + (r.startW - w)
@@ -129,7 +135,7 @@ export function InternalWindow({ window: win }: { window: InternalWindowState })
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
-  }, [isMax, win.id, win.position.x, win.position.y, win.size.width, win.size.height, wm])
+  }, [isMax, win.id, win.position.x, win.position.y, win.size.width, win.size.height, wm, chrome.top, chrome.bottom])
 
   // Asegurar foco al click en cualquier parte del frame.
   const onFrameMouseDown = useCallback(() => {
@@ -149,9 +155,9 @@ export function InternalWindow({ window: win }: { window: InternalWindowState })
   const style: CSSProperties = isMax
     ? {
         left: 0,
-        top: TOP_RESERVED,
+        top: 0,
         width: '100%',
-        height: `calc(100vh - ${TOP_RESERVED + BOTTOM_RESERVED}px)`,
+        height: '100%',
         zIndex: win.zIndex,
         display: isMin ? 'none' : 'flex',
       }

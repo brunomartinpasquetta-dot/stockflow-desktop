@@ -13,10 +13,10 @@ import { cn } from '@/lib/utils'
 export function Taskbar() {
   const wm = useWindowManager()
   if (wm.windows.length === 0) {
-    return <div className="h-10 shrink-0 border-t bg-muted/40" />
+    return <div data-chrome="taskbar" className="h-10 shrink-0 border-t bg-muted/40" />
   }
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-t bg-muted/40 px-2">
+    <div data-chrome="taskbar" className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-t bg-muted/40 px-2">
       {wm.windows
         .slice()
         .sort((a, b) => a.openedAt - b.openedAt)

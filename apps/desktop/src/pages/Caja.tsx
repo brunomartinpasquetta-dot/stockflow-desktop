@@ -127,6 +127,11 @@ function CajaAbierta({ registerId }: { registerId: string }) {
   const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
   const paymentMethodsQuery = usePaymentMethods()
   const printCashClose = usePrintCashClose()
+  const printerConfigQuery = useQuery({
+    queryKey: ['hardwarePrinterConfig'],
+    queryFn: () => api.hardware.printer.getConfig(),
+    staleTime: 30_000,
+  })
 
   const activeMethods = useMemo(() => (paymentMethodsQuery.data ?? []).filter((m) => m.active), [paymentMethodsQuery.data])
   const methodNameById = useMemo(
@@ -206,16 +211,49 @@ function CajaAbierta({ registerId }: { registerId: string }) {
       })
       setCloseOpen(false)
       const diff = result.report.difference ?? '0'
+      const company = companyQuery.data ?? {
+        id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, priceMode: 'gross' as const, createdAt: 0, updatedAt: 0,
+      }
       const reportData = {
-        company: companyQuery.data ?? {
-          id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, priceMode: 'gross', createdAt: 0, updatedAt: 0,
-        },
+        company,
         report: result.report,
         closedBy: currentUser?.fullName ?? '—',
       }
+
+      // Si hay impresora térmica configurada → imprimir vía ESC/POS y dejar el
+      // fallback de "Imprimir desde pantalla" para el caso de fallar.
+      const printerCfg = printerConfigQuery.data ?? null
+      let printedViaHardware = false
+      if (printerCfg) {
+        const r = result.report
+        const breakdownArr = r.byPaymentMethod ?? []
+        try {
+          await api.hardware.printer.printCashClose({
+            company: { name: company.name },
+            registerNumber: r.register.number,
+            openDate: r.register.openDate,
+            closeDate: r.register.closeDate ?? Date.now(),
+            openingAmount: r.openingAmount,
+            salesCount: r.salesCount,
+            salesTotal: r.salesTotal,
+            paymentBreakdown: breakdownArr.map((b) => ({ method: b.name, amount: b.net })),
+            incomeMovements: r.incomeTotal,
+            expenseMovements: r.expenseTotal,
+            expectedClosing: r.expectedCash,
+            declaredClosing: amt,
+            difference: diff,
+          })
+          printedViaHardware = true
+        } catch {
+          toast.warning('Impresora no disponible — usá "Imprimir reporte" para imprimir desde pantalla')
+        }
+      }
+
       toast.success(
         `Caja cerrada — esperado ${formatCurrency(result.report.expectedCash)}, contado ${formatCurrency(amt)}, diferencia ${formatCurrency(diff)}`,
-        { action: { label: 'Imprimir reporte', onClick: () => printCashClose(reportData) } },
+        printedViaHardware
+          ? undefined
+          : { action: { label: 'Imprimir reporte', onClick: () => printCashClose(reportData) } },
       )
       setCloseAmount('')
       setCloseNotes('')

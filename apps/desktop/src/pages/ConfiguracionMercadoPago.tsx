@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Loader2, QrCode, CheckCircle2, AlertCircle } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
+import { useLicense } from '@/contexts/LicenseContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,8 +57,12 @@ export function ConfiguracionMercadoPago() {
   })
 
   const config = configQuery.data
-  const tenantId = 'TU_TENANT_ID'
-  const webhookUrl = `https://api.stockflow.com.ar/api/mp/webhook/${tenantId}`
+  const { state: licenseState } = useLicense()
+  const licenseActive = licenseState?.status === 'active'
+  const tenantId = licenseActive ? licenseState?.tenantId ?? 'OWNER' : null
+  const webhookUrl = tenantId
+    ? `https://api.stockflow.com.ar/api/mp/webhook/${tenantId}`
+    : null
 
   return (
     <div className="space-y-4 p-4">
@@ -92,7 +97,26 @@ export function ConfiguracionMercadoPago() {
                 </Button>
               </div>
               <div className="break-all">
-                URL del webhook (pegar en panel MP): <code className="bg-muted px-1 rounded">{webhookUrl}</code>
+                URL del webhook (pegar en panel MP):{' '}
+                {webhookUrl ? (
+                  <>
+                    <code className="bg-muted px-1 rounded">{webhookUrl}</code>{' '}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(webhookUrl)
+                        toast.success('Copiado')
+                      }}
+                    >
+                      Copiar
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-amber-600">
+                    Activá tu licencia primero para obtener el endpoint del webhook.
+                  </span>
+                )}
               </div>
               <Button onClick={() => testMutation.mutate()} disabled={testMutation.isPending}>
                 {testMutation.isPending && <Loader2 className="mr-2 animate-spin" size={14} />}

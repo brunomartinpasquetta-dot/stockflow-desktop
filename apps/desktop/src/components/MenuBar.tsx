@@ -64,6 +64,8 @@ interface MenuItem {
   roles?: Role[]
   separator?: boolean
   action?: 'logout' | 'exit'
+  /** Tab inicial cuando la página soporte tabs (ej. Configuración). */
+  initialTab?: string
 }
 
 interface MenuGroup {
@@ -76,7 +78,10 @@ const GROUPS: MenuGroup[] = [
     name: 'Archivo',
     items: [
       { pageKey: 'empresa', label: 'Mi Empresa', icon: Building2, roles: ['admin'], requires: 'manage_company' },
-      { pageKey: 'configuracion', label: 'Configuración', icon: Settings, roles: ['admin'] },
+      { pageKey: 'configuracion', label: 'Configuración General', icon: Settings, roles: ['admin'] },
+      { pageKey: 'configuracion', label: 'Configuración Hardware', icon: HardDrive, roles: ['admin'], initialTab: 'hardware' },
+      { pageKey: 'configuracion', label: 'Configuración LAN', icon: Network, roles: ['admin'], initialTab: 'lan' },
+      { pageKey: 'configuracion', label: 'Backup / Restaurar', icon: Save, roles: ['admin'], initialTab: 'backup' },
       { pageKey: 'configuracion-mp', label: 'Configuración MercadoPago', icon: CreditCard, roles: ['admin'], requires: 'manage_mp_qr' },
       { separator: true, label: '' },
       { action: 'logout', label: 'Cerrar sesión', icon: LogOut, shortcut: 'Ctrl+L' },
@@ -144,10 +149,6 @@ const GROUPS: MenuGroup[] = [
   {
     name: 'Ayuda',
     items: [
-      { pageKey: 'configuracion', label: 'Hardware (Impresora, Balanza, Cajón)', icon: HardDrive, roles: ['admin'] },
-      { pageKey: 'configuracion', label: 'Backup', icon: Save, roles: ['admin'] },
-      { pageKey: 'configuracion', label: 'LAN Multi-caja', icon: Network, roles: ['admin'] },
-      { separator: true, label: '' },
       { pageKey: 'acerca-de', label: 'Acerca de', icon: Info },
     ],
   },
@@ -175,11 +176,16 @@ export function MenuBar() {
       window.close()
       return
     }
-    if (item.pageKey) wm.openWindow({ pageKey: item.pageKey })
+    if (item.pageKey) {
+      wm.openWindow({
+        pageKey: item.pageKey,
+        ...(item.initialTab ? { extras: { initialTab: item.initialTab } } : {}),
+      })
+    }
   }
 
   return (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-3">
+    <div data-chrome="menubar" className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-3">
       {/* Logo */}
       <div className="mr-3 flex items-center gap-2">
         <img src={BRANDING.iconSvg} alt="StockFlow" className="h-7 w-7" />

@@ -762,11 +762,36 @@ function GeneralSection() {
   )
 }
 
+import { useWindowSelf } from '@/contexts/WindowManagerContext'
+
+const VALID_TABS = ['hardware', 'backup', 'lan', 'updates', 'general'] as const
+type TabValue = (typeof VALID_TABS)[number]
+
+function readInitialTab(extras: unknown): TabValue | null {
+  if (extras && typeof extras === 'object' && 'initialTab' in extras) {
+    const v = (extras as { initialTab?: unknown }).initialTab
+    if (typeof v === 'string' && (VALID_TABS as readonly string[]).includes(v)) return v as TabValue
+  }
+  return null
+}
+
 export function Configuracion() {
+  const self = useWindowSelf()
+  const initial = readInitialTab(self?.extras) ?? 'hardware'
+  const [tab, setTab] = useState<TabValue>(initial)
+  // Pattern "derivar estado de prop que cambia": guardamos el extras visto y si
+  // cambia (re-open con otro initialTab) actualizamos el tab durante render.
+  const [lastExtras, setLastExtras] = useState<unknown>(self?.extras)
+  if (self?.extras !== lastExtras) {
+    setLastExtras(self?.extras)
+    const next = readInitialTab(self?.extras)
+    if (next && next !== tab) setTab(next)
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
       <h1 className="text-lg font-semibold">Configuración</h1>
-      <Tabs defaultValue="hardware" className="flex flex-col gap-3">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)} className="flex flex-col gap-3">
         <TabsList>
           <TabsTrigger value="hardware">Hardware</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>

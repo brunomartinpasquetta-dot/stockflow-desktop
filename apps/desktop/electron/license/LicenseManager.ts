@@ -196,6 +196,7 @@ export class LicenseManager {
         expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
         licenseKey: 'SF-DEV0-DEV0-DEV0-DEV0',
         tenantName: 'Desarrollo',
+        tenantId: 'OWNER',
         lastError: null,
       };
     }
@@ -207,6 +208,7 @@ export class LicenseManager {
         expiresAt: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000,
         licenseKey: 'SF-BRUN-OWNR-MSTR-2026',
         tenantName: this.tenantName ?? 'Bruno Pasquetta — Master',
+        tenantId: 'OWNER',
         lastError: null,
       };
     }
@@ -218,6 +220,7 @@ export class LicenseManager {
         expiresAt: null,
         licenseKey: null,
         tenantName: null,
+        tenantId: null,
         lastError: 'No hay licencia válida',
       };
     }
@@ -231,6 +234,7 @@ export class LicenseManager {
         expiresAt: payload?.exp != null ? payload.exp * 1000 : null,
         licenseKey: payload?.lk ?? null,
         tenantName: this.tenantName,
+        tenantId: payload?.tid ?? null,
         lastError: expired ? 'La licencia expiró. Volvé a conectarte para renovarla.' : 'No hay licencia válida',
       };
     }
@@ -240,6 +244,7 @@ export class LicenseManager {
       expiresAt: payload.exp * 1000,
       licenseKey: payload.lk,
       tenantName: this.tenantName,
+      tenantId: payload.tid,
       lastError: null,
     };
   }
@@ -295,6 +300,7 @@ export class LicenseManager {
         expiresAt: null,
         licenseKey: null,
         tenantName: null,
+        tenantId: null,
         lastError: this.translateActivateError(res.status, serverMsg),
       };
     }
@@ -309,6 +315,7 @@ export class LicenseManager {
         expiresAt: null,
         licenseKey: null,
         tenantName: null,
+        tenantId: null,
         lastError: 'Respuesta inválida del servidor de licencias.',
       };
     }
