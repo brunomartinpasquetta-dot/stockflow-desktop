@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BRANDING } from '@/assets/branding'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -52,7 +53,7 @@ export function Activacion() {
       <Card className="w-full max-w-md">
         <CardHeader className="items-center gap-2 pt-6 text-center">
           <img
-            src={`${import.meta.env.BASE_URL}branding/logo-full.svg`}
+            src={BRANDING.logoFull}
             alt="StockFlow"
             className="mx-auto h-auto w-[280px]"
           />

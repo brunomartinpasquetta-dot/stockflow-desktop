@@ -5,6 +5,7 @@
  * Los accesos rápidos viven en QuickAccessToolbar (chrome superior), por eso
  * acá no hay cards.
  */
+import { BRANDING } from "@/assets/branding"
 import { useEffect, useState } from 'react'
 
 import { api } from '@/lib/api'
@@ -28,7 +29,7 @@ export function WelcomeScreen() {
   return (
     <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-background to-muted/30 px-8 py-12">
       <img
-        src={`${import.meta.env.BASE_URL}branding/logo-tagline.svg`}
+        src={BRANDING.logoTagline}
         alt="StockFlow"
         className="h-auto w-[400px]"
       />

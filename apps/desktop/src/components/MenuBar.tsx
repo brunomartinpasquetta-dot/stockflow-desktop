@@ -10,6 +10,7 @@
  *
  * Altura del bar: h-9 (más compacto).
  */
+import { BRANDING } from "@/assets/branding"
 import { useState } from 'react'
 import {
   ArrowLeftRight,
@@ -181,7 +182,7 @@ export function MenuBar() {
     <div className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-3">
       {/* Logo */}
       <div className="mr-3 flex items-center gap-2">
-        <img src={`${import.meta.env.BASE_URL}branding/icon.svg`} alt="StockFlow" className="h-7 w-7" />
+        <img src={BRANDING.iconSvg} alt="StockFlow" className="h-7 w-7" />
         <span className="text-sm font-semibold">StockFlow</span>
       </div>
 

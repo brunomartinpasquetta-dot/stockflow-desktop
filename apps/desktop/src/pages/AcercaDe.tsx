@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BRANDING } from '@/assets/branding'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -42,7 +43,7 @@ export function AcercaDe() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
       <img
-        src={`${import.meta.env.BASE_URL}branding/logo-full.svg`}
+        src={BRANDING.logoFull}
         alt="StockFlow"
         className="mx-auto mb-4 h-auto w-[280px]"
       />

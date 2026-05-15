@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BRANDING } from '@/assets/branding'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -49,7 +50,7 @@ export function Login() {
       <Card className="w-full max-w-sm">
         <CardContent className="flex flex-col gap-3 pt-6">
           <img
-            src={`${import.meta.env.BASE_URL}branding/logo-full.svg`}
+            src={BRANDING.logoFull}
             alt="StockFlow"
             className="mx-auto mb-6 h-auto w-[300px]"
           />
