@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 2048 512" width="2048" height="512">
+  <defs>
+    
+  </defs>
+  <image x="40" y="40" width="432" height="432" style="filter: brightness(0);"></image>
+  <text x="520" y="330" font-family="&#39;Plus Jakarta Sans&#39;, sans-serif" font-size="280" letter-spacing="-8" fill="#1a1a1a" font-weight="800">Stock</text>
+  <text x="1148" y="330" font-family="&#39;Plus Jakarta Sans&#39;, sans-serif" font-size="280" letter-spacing="-8" fill="#444444" font-weight="600">Flow</text>
+</svg>

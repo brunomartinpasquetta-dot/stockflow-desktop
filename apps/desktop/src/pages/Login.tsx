@@ -5,14 +5,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Boxes, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { api, ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Ingresá el usuario').max(50),
@@ -47,13 +47,12 @@ export function Login() {
   return (
     <div className="flex h-full items-center justify-center bg-secondary/40 p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader className="items-center gap-2 pt-6 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Boxes className="h-7 w-7" />
-          </div>
-          <CardTitle className="text-lg">StockFlow</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-3 pt-6">
+          <img
+            src="/branding/logo-full.svg"
+            alt="StockFlow"
+            className="mx-auto mb-6 h-auto w-[300px]"
+          />
           <div className="flex flex-col gap-1">
             <Label htmlFor="login-user">Usuario</Label>
             <Input

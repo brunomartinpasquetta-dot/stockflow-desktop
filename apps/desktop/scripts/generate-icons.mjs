@@ -1,18 +1,17 @@
 /**
  * Genera los assets binarios para el packaging (electron-builder) a partir de
- * `build/icon.svg`. Idempotente: borralos cuando quieras y volvé a correrlo.
+ * `build/icon.png` (1024x1024) — fuente autoritativa del branding oficial.
+ * Si el PNG no existe, cae al SVG. Idempotente.
  *
  *   pnpm --filter @stockflow/desktop run generate:icons
  *
  * Salidas (todas en `build/`):
- *   - icon.png            (1024x1024)
+ *   - icon.png            (1024x1024) — preservado si ya existe en alta resolución
  *   - icon.icns           (macOS, multi-tamaño)
  *   - icon.ico            (Windows, multi-tamaño)
  *   - dmg-background.png  (540x380, fondo del .dmg)
- *   - installerHeader.bmp (150x57,  NSIS)
- *   - installerSidebar.bmp (164x314, NSIS)
  */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -22,12 +21,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const buildDir = resolve(here, '..', 'build');
 mkdirSync(buildDir, { recursive: true });
 
+const pngPath = join(buildDir, 'icon.png');
 const svgPath = join(buildDir, 'icon.svg');
-const svg = readFileSync(svgPath);
-
-async function renderPng(size) {
-  return await sharp(svg, { density: 384 }).resize(size, size).png().toBuffer();
-}
 
 async function writeFile(name, buf) {
   const target = join(buildDir, name);
@@ -35,10 +30,18 @@ async function writeFile(name, buf) {
   console.log(`  ✓ ${name} (${(buf.length / 1024).toFixed(1)} KB)`);
 }
 
-console.log('Generando íconos desde build/icon.svg...');
+console.log('Generando íconos para packaging...');
 
-// 1) PNG master 1024 — usado por linux + base de los otros formatos.
-const png1024 = await renderPng(1024);
+// 1) PNG master 1024 — preferimos el icon.png oficial si pesa razonable (>50KB),
+// caso contrario lo renderizamos desde el SVG.
+let png1024;
+if (existsSync(pngPath) && statSync(pngPath).size > 50 * 1024) {
+  console.log(`  · usando build/icon.png existente (${(statSync(pngPath).size / 1024).toFixed(1)} KB) como fuente`);
+  png1024 = await sharp(pngPath).resize(1024, 1024).png().toBuffer();
+} else {
+  const svg = readFileSync(svgPath);
+  png1024 = await sharp(svg, { density: 384 }).resize(1024, 1024).png().toBuffer();
+}
 await writeFile('icon.png', png1024);
 
 // 2) ICNS macOS (multi-resolución).

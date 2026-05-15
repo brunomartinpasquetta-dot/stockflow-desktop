@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Boxes, KeyRound, Loader2 } from 'lucide-react'
+import { KeyRound, Loader2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useLicenseStatus } from '@/contexts/LicenseContext'
@@ -51,10 +51,12 @@ export function Activacion() {
     <div className="flex h-full items-center justify-center bg-secondary/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center gap-2 pt-6 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Boxes className="h-7 w-7" />
-          </div>
-          <CardTitle className="text-lg">Activá tu licencia de StockFlow</CardTitle>
+          <img
+            src="/branding/logo-full.svg"
+            alt="StockFlow"
+            className="mx-auto h-auto w-[280px]"
+          />
+          <CardTitle className="text-lg">Activá tu licencia</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {status === 'revoked' && (

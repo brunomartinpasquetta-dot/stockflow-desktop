@@ -181,9 +181,7 @@ export function MenuBar() {
     <div className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-3">
       {/* Logo */}
       <div className="mr-3 flex items-center gap-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <Boxes className="h-3.5 w-3.5" />
-        </div>
+        <img src="/branding/icon.svg" alt="StockFlow" className="h-7 w-7" />
         <span className="text-sm font-semibold">StockFlow</span>
       </div>
 
