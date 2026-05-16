@@ -14,6 +14,7 @@ import { useGlobalShortcuts } from '@/lib/useGlobalShortcuts'
 import { useMdiShortcuts } from '@/lib/useMdiShortcuts'
 import { useDeepLinkRouter } from '@/lib/useDeepLinkRouter'
 import { MenuBar } from '@/components/MenuBar'
+import { OutdatedBanner } from '@/components/OutdatedBanner'
 import { QuickAccessToolbar } from '@/components/QuickAccessToolbar'
 import { StatusBar } from '@/components/StatusBar'
 import { Desktop } from '@/components/Desktop'
@@ -42,6 +43,7 @@ function LayoutInner() {
           ⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.
         </div>
       )}
+      <OutdatedBanner />
       <MenuBar />
       <QuickAccessToolbar />
       <StatusBar />

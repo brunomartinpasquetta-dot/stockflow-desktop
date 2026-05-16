@@ -85,6 +85,7 @@ function PrinterSection() {
   const [systemName, setSystemName] = useState<string>('')
   const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('58mm')
   const [autoOpen, setAutoOpen] = useState(true)
+  const [silentPrint, setSilentPrint] = useState(false)
   const [seeded, setSeeded] = useState<PrinterConfigDTO | null | undefined>(undefined)
   const [testing, setTesting] = useState(false)
 
@@ -93,6 +94,7 @@ function PrinterSection() {
     setSeeded(cfgQuery.data)
     if (cfgQuery.data) {
       setAutoOpen(cfgQuery.data.autoOpenDrawer)
+      setSilentPrint(cfgQuery.data.silentPrint === true)
       const fmt: PaperFormatDTO =
         cfgQuery.data.paperFormat ?? (cfgQuery.data.width === 58 ? '58mm' : '80mm')
       setPaperFormat(fmt)
@@ -147,6 +149,7 @@ function PrinterSection() {
       characterSet: 'PC858_EURO',
       autoOpenDrawer: autoOpen,
       paperFormat,
+      silentPrint: silentPrint && paperFormat !== 'A4',
     })
   }
 
@@ -215,6 +218,24 @@ function PrinterSection() {
           Abrir cajón monedero automáticamente al confirmar venta efectivo
         </label>
 
+        <label className="col-span-2 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={silentPrint}
+            onChange={(e) => setSilentPrint(e.target.checked)}
+            disabled={paperFormat === 'A4'}
+          />
+          <span className="flex flex-col">
+            <span>Impresión silenciosa (sin diálogo del sistema)</span>
+            <span className="text-xs text-muted-foreground">
+              Manda el ticket directo a la impresora seleccionada arriba. Probá primero la impresión
+              con diálogo para asegurarte de que la impresora esté lista; después activá este modo.
+              Sólo aplica a tickets térmicos (58/80 mm).
+            </span>
+          </span>
+        </label>
+
         <div className="col-span-2 flex flex-wrap gap-2">
           <Button onClick={onSave} disabled={saveMut.isPending}>
             {saveMut.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
@@ -230,8 +251,9 @@ function PrinterSection() {
         </div>
 
         <p className="col-span-2 text-xs text-muted-foreground">
-          La impresión usa el diálogo del sistema operativo. Para imprimir en silencio (sin
-          diálogo), próximamente vamos a agregar un modo "kiosko" en versiones siguientes.
+          La impresión usa la cola del sistema operativo. Si activás "Impresión silenciosa", los
+          tickets salen directo sin diálogo (modo POS); si no, se abre el diálogo nativo para
+          confirmar.
         </p>
       </CardContent>
     </Card>

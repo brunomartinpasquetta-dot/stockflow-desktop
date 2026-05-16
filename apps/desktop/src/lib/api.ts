@@ -296,6 +296,11 @@ export const api = {
     getInfo: (): Promise<SystemInfoDTO> => unwrap(sf().system.getInfo()),
     getVersion: (): Promise<{ version: string }> => unwrap(sf().system.getVersion()),
     getDbPath: (): Promise<{ dbPath: string }> => unwrap(sf().system.getDbPath()),
+    openExternal: (url: string): Promise<{ ok: true }> => unwrap(sf().system.openExternal({ url })),
+  },
+  print: {
+    silent: (payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Promise<{ ok: true }> =>
+      unwrap(sf().print.silent(payload)),
   },
   license: {
     getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),
@@ -388,5 +393,8 @@ export const api = {
     setAutoCheck: (autoCheck: boolean) => unwrap(sf().updater.setAutoCheck({ autoCheck })),
     onAvailable: (cb: (info: { version: string }) => void) => sf().updater.onAvailable(cb),
     onDownloaded: (cb: (info: { version: string }) => void) => sf().updater.onDownloaded(cb),
+    onOutdated: (
+      cb: (info: { currentVersion: string; latestVersion: string; downloadUrl: string }) => void,
+    ) => sf().updater.onOutdated(cb),
   },
 }

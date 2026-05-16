@@ -1257,6 +1257,11 @@ export interface ApiSurface {
     getVersion(): Res<{ version: string }>;
     getDbPath(): Res<{ dbPath: string }>;
     getInfo(): Res<SystemInfoDTO>;
+    openExternal(payload: { url: string }): Res<{ ok: true }>;
+  };
+  print: {
+    /** Imprime HTML inline en una BrowserWindow oculta usando webContents.print silencioso. */
+    silent(payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Res<{ ok: true }>;
   };
   license: {
     getState(): Res<LicenseStateDTO>;
@@ -1341,6 +1346,8 @@ export interface ApiSurface {
     setAutoCheck(payload: { autoCheck: boolean }): Res<{ ok: true }>;
     onAvailable(cb: (info: { version: string }) => void): () => void;
     onDownloaded(cb: (info: { version: string }) => void): () => void;
+    /** Detección manual: hay una versión más nueva en GitHub Releases que la instalada. */
+    onOutdated(cb: (info: { currentVersion: string; latestVersion: string; downloadUrl: string }) => void): () => void;
   };
 }
 
@@ -1389,6 +1396,8 @@ export interface PrinterConfigDTO {
   autoOpenDrawer: boolean;
   /** Formato lógico del papel; si falta, se infiere de `width`. */
   paperFormat?: PaperFormatDTO;
+  /** Impresión silenciosa (sin dialog del SO). Default false. */
+  silentPrint?: boolean;
 }
 
 export type ScaleProtocolDTO = 'kretz' | 'systel' | 'magris' | 'generic';

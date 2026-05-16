@@ -63,7 +63,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'analytics',
 ]);
 
-export const LOCAL_GROUPS = new Set(['system', 'lan', 'updater', 'hardware', 'license']);
+export const LOCAL_GROUPS = new Set(['system', 'lan', 'updater', 'hardware', 'license', 'print']);
 
 interface LanState {
   sessionToken: string | null;
@@ -335,6 +335,10 @@ export function createApiBridge(
       getVersion: () => c<never>('system:getVersion'),
       getDbPath: () => c<never>('system:getDbPath'),
       getInfo: () => c<never>('system:getInfo'),
+      openExternal: (p) => c<never>('system:openExternal', p),
+    },
+    print: {
+      silent: (p) => c<never>('print:silent', p),
     },
     license: {
       getState: () => c<never>('license:getState'),
@@ -432,6 +436,7 @@ export function createApiBridge(
       setAutoCheck: (p) => c<never>('updater:setAutoCheck', p),
       onAvailable: (cb) => on('updater:available', (p) => cb(p as never)),
       onDownloaded: (cb) => on('updater:downloaded', (p) => cb(p as never)),
+      onOutdated: (cb) => on('updater:outdated', (p) => cb(p as never)),
     },
   };
 }

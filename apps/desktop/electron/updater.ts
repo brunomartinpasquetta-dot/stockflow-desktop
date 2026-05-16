@@ -6,6 +6,12 @@
  * - Emite eventos `updater:available` y `updater:downloaded` al renderer
  *   para mostrar un dialog/toast.
  * - Persiste el toggle "verificar automáticamente" en `{userData}/updater.json`.
+ *
+ * Detección manual (v0.1.13): en macOS sin firma, Squirrel.Mac no puede
+ * reemplazar el `.app` y el auto-update falla silenciosamente. Para que el
+ * usuario sepa que está atrasado, contrastamos la versión instalada contra
+ * GitHub Releases al iniciar; si hay una más nueva, emitimos `updater:outdated`
+ * con el link directo al `.dmg`.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -35,6 +41,92 @@ function readPrefs(userDataDir: string): UpdaterPrefs {
 function writePrefs(userDataDir: string, prefs: UpdaterPrefs): void {
   const fp = path.join(userDataDir, FILE_NAME);
   writeFileSync(fp, JSON.stringify(prefs, null, 2), 'utf8');
+}
+
+const GITHUB_LATEST_URL =
+  'https://api.github.com/repos/brunomartinpasquetta-dot/stockflow-desktop/releases/latest';
+
+interface GithubAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+interface RemoteRelease {
+  latestVersion: string;
+  downloadUrl: string;
+}
+
+/** Compara dos versiones SemVer simples (X.Y.Z). Devuelve positivo si a > b. */
+export function compareVersions(a: string, b: string): number {
+  const pa = a.replace(/^v/, '').split('.').map((n) => Number(n) || 0);
+  const pb = b.replace(/^v/, '').split('.').map((n) => Number(n) || 0);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * Consulta GitHub Releases por la última versión publicada. Devuelve `null`
+ * si la red falla o la respuesta no tiene `tag_name`. Elige el asset `.dmg`
+ * para la arquitectura del proceso actual cuando está disponible.
+ */
+export async function checkRemoteVersion(): Promise<RemoteRelease | null> {
+  try {
+    const res = await fetch(GITHUB_LATEST_URL, {
+      headers: { 'user-agent': 'stockflow-desktop-updater' },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      tag_name?: string;
+      html_url?: string;
+      assets?: GithubAsset[];
+    };
+    const tag = data.tag_name?.replace(/^v/, '');
+    if (!tag) return null;
+    const arch = process.arch; // 'arm64' | 'x64'
+    const assets = data.assets ?? [];
+    const archAsset =
+      assets.find((a) => a.name.endsWith(`-${arch}.dmg`)) ??
+      (arch === 'x64'
+        ? assets.find((a) => a.name.endsWith('.dmg') && !a.name.includes('arm64'))
+        : undefined);
+    const fallback = assets.find((a) => a.name.endsWith('.dmg'));
+    const downloadUrl =
+      archAsset?.browser_download_url ?? fallback?.browser_download_url ?? data.html_url ?? '';
+    return { latestVersion: tag, downloadUrl };
+  } catch {
+    return null;
+  }
+}
+
+export interface OutdatedInfo {
+  currentVersion: string;
+  latestVersion: string;
+  downloadUrl: string;
+}
+
+/**
+ * Compara la versión instalada con la última publicada en GitHub Releases.
+ * Si la remota es mayor, llama `onOutdated` (típicamente para emitir un evento
+ * al renderer). No-op si la app no está empaquetada o si falla la red.
+ */
+export async function checkForOutdatedVersion(opts: {
+  appVersion: string;
+  isPackaged: boolean;
+  onOutdated: (info: OutdatedInfo) => void;
+}): Promise<void> {
+  if (!opts.isPackaged) return;
+  const remote = await checkRemoteVersion();
+  if (!remote) return;
+  if (compareVersions(remote.latestVersion, opts.appVersion) > 0) {
+    opts.onOutdated({
+      currentVersion: opts.appVersion,
+      latestVersion: remote.latestVersion,
+      downloadUrl: remote.downloadUrl,
+    });
+  }
 }
 
 export interface UpdaterController {

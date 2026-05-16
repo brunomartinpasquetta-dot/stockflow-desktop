@@ -9,38 +9,54 @@ import { createElement, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
-import { printNode, widthFromPaperFormat, type PrintWidth } from '@/lib/printService'
+import { printNode, widthFromPaperFormat, type PrintOptions, type PrintWidth } from '@/lib/printService'
 import { CashCloseReport, type CashCloseReportData } from '@/print/CashCloseReport'
 import { HistoricalCashReport, type HistoricalCashReportData } from '@/print/HistoricalCashReport'
 import { SaleTicket, type SaleTicketData } from '@/print/SaleTicket'
 import { AccountingSummaryReport, type AccountingSummaryReportData } from '@/print/AccountingSummaryReport'
 import { VatBookReport, type VatBookReportData } from '@/print/VatBookReport'
 
-function usePaperWidth(): PrintWidth {
+/**
+ * Devuelve la config de impresora (ancho lógico + opciones de impresión
+ * silenciosa). El hook lee la config persistida; si todavía no cargó, devuelve
+ * defaults seguros (58mm, con dialog).
+ */
+function usePrintConfig(): { width: PrintWidth; opts: PrintOptions } {
   const cfgQuery = useQuery({
     queryKey: ['hardware', 'printer', 'config'],
     queryFn: () => api.hardware.printer.getConfig(),
     staleTime: 30_000,
   })
-  return widthFromPaperFormat(cfgQuery.data?.paperFormat)
+  const cfg = cfgQuery.data
+  const width = widthFromPaperFormat(cfg?.paperFormat)
+  // Impresión silenciosa: requiere kind:'system' (que el `interface` sea el
+  // nombre de impresora del SO) + flag activo + papel térmico (58/80).
+  const canSilent =
+    !!cfg && cfg.kind === 'system' && cfg.silentPrint === true && (width === '58' || width === '80')
+  const opts: PrintOptions = {
+    width,
+    silent: canSilent,
+    deviceName: canSilent ? cfg.interface : undefined,
+  }
+  return { width, opts }
 }
 
 export function usePrintSaleTicket() {
-  const width = usePaperWidth()
+  const { opts } = usePrintConfig()
   return useCallback(
-    (data: SaleTicketData) => printNode(createElement(SaleTicket, { data }), width),
-    [width],
+    (data: SaleTicketData) => printNode(createElement(SaleTicket, { data }), opts),
+    [opts],
   )
 }
 
 export function usePrintCashClose() {
-  const width = usePaperWidth()
+  const { opts } = usePrintConfig()
   // Los reportes de cierre son extensos: si la impresora es térmica
   // (58/80) igualmente se imprime, pero por defecto preferimos A4 si está
   // configurado. Respeta el ancho elegido por el usuario.
   return useCallback(
-    (data: CashCloseReportData) => printNode(createElement(CashCloseReport, { data }), width),
-    [width],
+    (data: CashCloseReportData) => printNode(createElement(CashCloseReport, { data }), opts),
+    [opts],
   )
 }
 
@@ -48,11 +64,11 @@ export function usePrintCashClose() {
 export const usePrintCashCloseReport = usePrintCashClose
 
 export function usePrintHistoricalCashReport() {
-  const width = usePaperWidth()
+  const { opts } = usePrintConfig()
   return useCallback(
     (data: HistoricalCashReportData) =>
-      printNode(createElement(HistoricalCashReport, { data }), width),
-    [width],
+      printNode(createElement(HistoricalCashReport, { data }), opts),
+    [opts],
   )
 }
 

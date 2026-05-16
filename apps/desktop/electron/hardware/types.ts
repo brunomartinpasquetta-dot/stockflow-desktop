@@ -21,6 +21,12 @@ export interface PrinterConfig {
   autoOpenDrawer: boolean;
   /** Formato lógico del papel; si falta, se infiere de `width`. */
   paperFormat?: PaperFormat;
+  /**
+   * Impresión silenciosa: bypassa el dialog del SO usando un BrowserWindow oculto
+   * + `webContents.print({ silent:true, deviceName })`. Requiere `kind:'system'`
+   * y un `interface` (nombre de impresora del SO) válido. Default false.
+   */
+  silentPrint?: boolean;
 }
 
 export type ScaleProtocol = 'kretz' | 'systel' | 'magris' | 'generic';

@@ -17,7 +17,7 @@ import { LicenseManager } from './license/LicenseManager';
 import { setupLogger } from './logger';
 import { MpTokenStore } from './secure/MpTokenStore';
 import { MpQrService, createServiceContext } from '@stockflow/core';
-import { setupAutoUpdater, type UpdaterController } from './updater';
+import { checkForOutdatedVersion, setupAutoUpdater, type UpdaterController } from './updater';
 
 const HEARTBEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
@@ -220,6 +220,19 @@ if (!app.requestSingleInstanceLock()) {
         mainWindow?.webContents.send(channel, payload);
       });
       mainWindow?.once('ready-to-show', () => startLicenseHeartbeat());
+      // 10 segundos después de mostrar la ventana, chequear si la versión instalada
+      // quedó atrás respecto a GitHub Releases (Squirrel.Mac falla sin firma).
+      mainWindow?.once('ready-to-show', () => {
+        setTimeout(() => {
+          void checkForOutdatedVersion({
+            appVersion: app.getVersion(),
+            isPackaged: app.isPackaged,
+            onOutdated: (info) => {
+              mainWindow?.webContents.send('updater:outdated', info);
+            },
+          });
+        }, 10_000);
+      });
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow(lanArgs);
       });

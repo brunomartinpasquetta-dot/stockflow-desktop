@@ -56,5 +56,17 @@ export function buildSystemHandlers(deps: HandlerDeps): HandlerMap {
       dbPath: deps.dbPath,
       platform: os.platform(),
     })),
+    'system:openExternal': unguarded(
+      deps,
+      async (payload: { url: string }): Promise<{ ok: true }> => {
+        const url = payload?.url ?? '';
+        if (!/^https?:\/\//.test(url)) {
+          throw new Error('URL inválida (sólo http/https)');
+        }
+        const { shell } = await import('electron');
+        await shell.openExternal(url);
+        return { ok: true };
+      },
+    ),
   };
 }
