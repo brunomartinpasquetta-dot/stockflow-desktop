@@ -265,28 +265,31 @@ export class PrinterService {
     const { execFile } = await import('node:child_process');
     function run(cmd: string, args: string[]): Promise<string> {
       return new Promise((resolve) => {
-        execFile(cmd, args, { timeout: 5000 }, (err, stdout) => {
+        // LANG=C fuerza output en inglés y locale-independent para parseo estable.
+        const env = { ...process.env, LANG: 'C', LC_ALL: 'C', PATH: '/usr/bin:/usr/local/bin:/usr/sbin:/sbin' };
+        execFile(cmd, args, { timeout: 5000, env }, (err, stdout) => {
           if (err) resolve('');
           else resolve(stdout || '');
         });
       });
     }
     if (process.platform === 'darwin' || process.platform === 'linux') {
-      const out = await run(LPSTAT_PATH, ['-p', '-d']);
-      if (!out) return [];
-      const printers: SystemPrinterInfo[] = [];
+      // -e devuelve solo nombres, una por línea, sin texto descriptivo localizado.
+      const namesOut = await run(LPSTAT_PATH, ['-e']);
+      const names = namesOut.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+      if (names.length === 0) return [];
+      // Default destination: con LANG=C dice "system default destination: NAME".
+      // Como fallback, parseamos cualquier "destination" o "omisión" o "por omisión".
       let defaultName: string | null = null;
-      for (const lineRaw of out.split('\n')) {
-        const line = lineRaw.trim();
-        const m = line.match(/^printer\s+(\S+)/i);
-        if (m && m[1]) printers.push({ name: m[1] });
-        const d = line.match(/system default destination:\s*(\S+)/i);
-        if (d && d[1]) defaultName = d[1];
+      const defOut = await run(LPSTAT_PATH, ['-d']);
+      if (defOut) {
+        const m = defOut.match(/(?:destination|destino[^:]*):\s*(\S+)/i);
+        if (m && m[1]) defaultName = m[1];
       }
-      if (defaultName) {
-        for (const p of printers) if (p.name === defaultName) p.isDefault = true;
-      }
-      return printers;
+      return names.map((name) => ({
+        name,
+        isDefault: name === defaultName,
+      }));
     }
     if (process.platform === 'win32') {
       // Intento 1: PowerShell Get-Printer (JSON)
