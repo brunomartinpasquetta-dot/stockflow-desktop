@@ -219,40 +219,25 @@ function CajaAbierta({ registerId }: { registerId: string }) {
         closedBy: currentUser?.fullName ?? '—',
       }
 
-      // Si hay impresora térmica configurada → imprimir vía ESC/POS y dejar el
-      // fallback de "Imprimir desde pantalla" para el caso de fallar.
+      // Impresión vía window.print() + driver del SO (patrón canónico).
+      // Si hay impresora configurada, imprimimos automáticamente; si no, el
+      // toast ofrece el botón "Imprimir reporte" como fallback.
       const printerCfg = printerConfigQuery.data ?? null
-      let printedViaHardware = false
+      let printed = false
       if (printerCfg) {
-        const r = result.report
-        const breakdownArr = r.byPaymentMethod ?? []
         try {
-          await api.hardware.printer.printCashClose({
-            company: { name: company.name },
-            registerNumber: r.register.number,
-            openDate: r.register.openDate,
-            closeDate: r.register.closeDate ?? Date.now(),
-            openingAmount: r.openingAmount,
-            salesCount: r.salesCount,
-            salesTotal: r.salesTotal,
-            paymentBreakdown: breakdownArr.map((b) => ({ method: b.name, amount: b.net })),
-            incomeMovements: r.incomeTotal,
-            expenseMovements: r.expenseTotal,
-            expectedClosing: r.expectedCash,
-            declaredClosing: amt,
-            difference: diff,
-          })
-          printedViaHardware = true
+          await printCashClose(reportData)
+          printed = true
         } catch {
-          toast.warning('Impresora no disponible — usá "Imprimir reporte" para imprimir desde pantalla')
+          toast.warning('No se pudo imprimir el reporte — usá "Imprimir reporte" para reintentar')
         }
       }
 
       toast.success(
         `Caja cerrada — esperado ${formatCurrency(result.report.expectedCash)}, contado ${formatCurrency(amt)}, diferencia ${formatCurrency(diff)}`,
-        printedViaHardware
+        printed
           ? undefined
-          : { action: { label: 'Imprimir reporte', onClick: () => printCashClose(reportData) } },
+          : { action: { label: 'Imprimir reporte', onClick: () => void printCashClose(reportData) } },
       )
       // Oferta opcional: transferir el saldo contado a Caja General.
       if (Number(amt) > 0) {

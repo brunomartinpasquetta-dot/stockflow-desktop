@@ -1,4 +1,11 @@
 /**
+ * @deprecated Desde v0.1.12 StockFlow imprime vía `window.print()` + driver
+ * del SO (ver `src/lib/printService.ts`). Este servicio se mantiene sólo
+ * para `listSystemPrinters()` (poblar el select de impresoras) y
+ * `openCashDrawer()` (pulso al cajón monedero). Los métodos
+ * `printSaleTicket`/`printCashClose`/`test` siguen funcionando pero ya no
+ * son invocados desde el renderer.
+ *
  * Servicio de impresora térmica ESC/POS.
  *
  * Implementación pragmática: armamos los bytes ESC/POS a mano (sin depender de

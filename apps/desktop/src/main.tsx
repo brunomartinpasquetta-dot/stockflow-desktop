@@ -7,7 +7,6 @@ import { Toaster } from 'sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { LanProvider } from '@/contexts/LanContext'
 import { LicenseProvider } from '@/contexts/LicenseContext'
-import { PrintProvider } from '@/contexts/PrintContext'
 import { queryClient } from '@/lib/queryClient'
 import { router } from '@/router'
 import './index.css'
@@ -19,14 +18,12 @@ createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={300}>
-        <PrintProvider>
-          <LanProvider>
-            <LicenseProvider>
-              <RouterProvider router={router} />
-              <Toaster position="top-right" richColors closeButton />
-            </LicenseProvider>
-          </LanProvider>
-        </PrintProvider>
+        <LanProvider>
+          <LicenseProvider>
+            <RouterProvider router={router} />
+            <Toaster position="top-right" richColors closeButton />
+          </LicenseProvider>
+        </LanProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </StrictMode>,

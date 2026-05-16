@@ -33,7 +33,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQuery } from '@tanstack/react-query'
-import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, PriceMode, SaleTicketDataDTO, VoucherType } from '@/types/api'
+import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, PriceMode, VoucherType } from '@/types/api'
 
 interface CartLine {
   article: ArticleDTO
@@ -435,53 +435,19 @@ function PDV() {
       })
       const ticketData = buildTicket(result)
       const printerCfg = printerConfigQuery.data ?? null
-      let printedViaHardware = false
-      if (printerCfg) {
-        const company = companyQuery.data ?? FALLBACK_COMPANY
-        const hwTicket: SaleTicketDataDTO = {
-          number: result.sale.number,
-          voucherType: result.sale.type,
-          createdAt: result.sale.createdAt,
-          company: {
-            name: company.name,
-            cuit: company.cuit,
-            address: company.address,
-            phone: company.phone,
-            ingBrutos: company.ingBrutos,
-          },
-          customer: ticketData.customerName
-            ? { name: ticketData.customerName, docNumber: ticketData.customerDoc }
-            : null,
-          lines: result.lines.map((l) => ({
-            description: ticketData.lines.find((tl) => tl.unitPrice === l.unitPrice && tl.quantity === l.quantity)?.description ?? '—',
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            total: l.lineTotal,
-          })),
-          subtotal: totals.subtotal,
-          vatTotal: totals.vatAmount,
-          total: result.sale.total,
-          payments: result.payments.map((p) => ({
-            method: methodNameById.get(p.paymentMethodId) ?? 'Medio de pago',
-            amount: p.amount,
-          })),
-          accountSale: result.sale.isAccountSale,
-        }
+      let printed = false
+      if (printerCfg && AUTO_PRINT_TICKET) {
         try {
-          await api.hardware.printer.printSaleTicket(hwTicket)
-          printedViaHardware = true
-        } catch (e) {
-          if (e instanceof Error && e.message.includes('A4_BROWSER_PRINT_REQUIRED')) {
-            // Modo A4: el renderer imprime vía window.print (template HTML del usePrint).
-            printSaleTicket(ticketData)
-            printedViaHardware = true
-          } else {
-            toast.warning('Impresora no disponible — usá "Imprimir" para imprimir desde pantalla')
-          }
+          await printSaleTicket(ticketData)
+          printed = true
+        } catch {
+          toast.warning('No se pudo imprimir el ticket — usá "Imprimir" para reintentar')
         }
         if (printerCfg.autoOpenDrawer && !result.sale.isAccountSale) {
           const cashMethodId = activeMethods.find((m) => m.type === 'cash')?.id
-          const hasCash = cashMethodId != null && result.payments.some((p) => p.paymentMethodId === cashMethodId && Number(p.amount) > 0)
+          const hasCash =
+            cashMethodId != null &&
+            result.payments.some((p) => p.paymentMethodId === cashMethodId && Number(p.amount) > 0)
           if (hasCash) {
             api.hardware.cashDrawer.open().catch(() => {})
           }
@@ -489,9 +455,8 @@ function PDV() {
       }
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} registrada — Total ${formatCurrency(result.sale.total)}`,
-        printedViaHardware ? undefined : { action: { label: 'Imprimir', onClick: () => printSaleTicket(ticketData) } },
+        printed ? undefined : { action: { label: 'Imprimir', onClick: () => void printSaleTicket(ticketData) } },
       )
-      if (!printedViaHardware && AUTO_PRINT_TICKET) printSaleTicket(ticketData)
       clearSale()
       void numberQuery.refetch()
     } catch (err) {

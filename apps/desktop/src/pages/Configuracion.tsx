@@ -20,12 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { printNode, widthFromPaperFormat } from '@/lib/printService'
 import type {
   BackupConfigDTO,
   BackupEntryDTO,
   PaperFormatDTO,
   PrinterConfigDTO,
-  PrinterKindDTO,
   ScaleConfigDTO,
   ScaleProtocolDTO,
   SystemPrinterDTO,
@@ -45,82 +45,67 @@ function formatDate(ts: number): string {
 
 /* ----------------------- IMPRESORA ----------------------- */
 /**
- * Identifica el formato sugerido en base al nombre/producto detectado.
- *  - ESC/POS térmicas conocidas → 80mm.
- *  - Impresoras de oficina → A4.
+ * Componente de prueba — se imprime con `printNode` para verificar
+ * que la impresora elegida en el SO procese correctamente acentos,
+ * separadores y el ancho del papel.
  */
-function suggestPaperFormat(label: string): PaperFormatDTO {
-  const upper = label.toUpperCase()
-  if (/HP|BROTHER|CANON|INKJET|LASERJET|OFFICEJET|DESKJET/.test(upper)) return 'A4'
-  if (/TM-T|RPT|BEMATECH|ESC\/POS|EPSON TM|XPRINTER|3NSTAR/.test(upper)) return '80mm'
-  return '80mm'
-}
-
-interface UsbOption {
-  value: string // 'vid:pid' (hex)
-  label: string
-  paperHint: PaperFormatDTO
-}
-
-function buildUsbOptions(
-  usb: { vendorId: number; productId: number; manufacturer?: string; product?: string }[],
-): UsbOption[] {
-  const out: UsbOption[] = []
-  for (const d of usb) {
-    const vid = d.vendorId.toString(16).padStart(4, '0')
-    const pid = d.productId.toString(16).padStart(4, '0')
-    const label = `${d.manufacturer ?? ''} ${d.product ?? ''}`.trim() || `USB ${vid}:${pid}`
-    out.push({
-      value: `${vid}:${pid}`,
-      label: `${label} (${vid}:${pid})`,
-      paperHint: suggestPaperFormat(label),
-    })
-  }
-  return out
+function TestTicket({ paperFormat }: { paperFormat: PaperFormatDTO }) {
+  const now = new Date()
+  const fecha = now.toLocaleDateString('es-AR')
+  const hora = now.toLocaleTimeString('es-AR')
+  const sep = paperFormat === '80mm' ? '='.repeat(48) : '='.repeat(32)
+  return (
+    <div>
+      <div className="ticket-center ticket-double-height">STOCKFLOW</div>
+      <div className="ticket-center">Test de impresión</div>
+      <div className="ticket-sep">{sep}</div>
+      <div>Fecha: {fecha}</div>
+      <div>Hora: {hora}</div>
+      <div className="ticket-sep">{sep}</div>
+      <div>Acentos: á é í ó ú ñ Ñ</div>
+      <div>Moneda: $ 1.234,56</div>
+      <div className="ticket-sep">{sep}</div>
+      <div className="ticket-center ticket-bold">¡Funciona!</div>
+      <div className="ticket-spacer" />
+    </div>
+  )
 }
 
 function PrinterSection() {
   const qc = useQueryClient()
-  const cfgQuery = useQuery({ queryKey: ['hardware', 'printer', 'config'], queryFn: () => api.hardware.printer.getConfig() })
-  const usbQuery = useQuery({ queryKey: ['hardware', 'usb'], queryFn: () => api.hardware.listUsbDevices() })
+  const cfgQuery = useQuery({
+    queryKey: ['hardware', 'printer', 'config'],
+    queryFn: () => api.hardware.printer.getConfig(),
+  })
   const systemQuery = useQuery({
     queryKey: ['hardware', 'printer', 'system'],
     queryFn: () => api.hardware.printer.listSystem(),
   })
 
-  // Modo de conexión (default 'system' = recomendado).
-  const [kind, setKind] = useState<PrinterKindDTO>('system')
   const [systemName, setSystemName] = useState<string>('')
-  const [usbValue, setUsbValue] = useState<string>('')
-  const [networkIp, setNetworkIp] = useState<string>('')
-  const [filePath, setFilePath] = useState<string>('/tmp/stockflow-printer.bin')
-  const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('80mm')
+  const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('58mm')
   const [autoOpen, setAutoOpen] = useState(true)
   const [seeded, setSeeded] = useState<PrinterConfigDTO | null | undefined>(undefined)
+  const [testing, setTesting] = useState(false)
 
-  // Sembrar formulario desde la config persistida (sin migrar automáticamente).
+  // Sembrar formulario desde la config persistida.
   if (seeded !== cfgQuery.data) {
     setSeeded(cfgQuery.data)
     if (cfgQuery.data) {
-      setKind(cfgQuery.data.kind)
       setAutoOpen(cfgQuery.data.autoOpenDrawer)
-      const fmt: PaperFormatDTO = cfgQuery.data.paperFormat ?? (cfgQuery.data.width === 58 ? '58mm' : '80mm')
+      const fmt: PaperFormatDTO =
+        cfgQuery.data.paperFormat ?? (cfgQuery.data.width === 58 ? '58mm' : '80mm')
       setPaperFormat(fmt)
       if (cfgQuery.data.kind === 'system') setSystemName(cfgQuery.data.interface)
-      if (cfgQuery.data.kind === 'usb') setUsbValue(cfgQuery.data.interface)
-      if (cfgQuery.data.kind === 'network') setNetworkIp(cfgQuery.data.interface)
-      if (cfgQuery.data.kind === 'file') setFilePath(cfgQuery.data.interface)
     }
   }
 
   // Default a la impresora del SO marcada como default si todavía no se eligió ninguna.
   const systemPrinters: SystemPrinterDTO[] = systemQuery.data ?? []
-  if (kind === 'system' && !systemName && systemPrinters.length > 0) {
+  if (!systemName && systemPrinters.length > 0) {
     const def = systemPrinters.find((p) => p.isDefault) ?? systemPrinters[0]
     if (def) setSystemName(def.name)
   }
-
-  const usbOptions = buildUsbOptions(usbQuery.data ?? [])
 
   const saveMut = useMutation({
     mutationFn: (cfg: PrinterConfigDTO) => api.hardware.printer.setConfig(cfg),
@@ -131,63 +116,33 @@ function PrinterSection() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo guardar'),
   })
 
-  const testMut = useMutation({
-    mutationFn: () => api.hardware.printer.test(),
-    onSuccess: () => toast.success('Prueba enviada'),
-    onError: (err) => {
-      if (err instanceof Error && err.message.includes('A4_BROWSER_PRINT_REQUIRED')) {
-        window.print()
-        toast.info('Impresión A4 enviada al diálogo del sistema')
-        return
-      }
-      toast.error(err instanceof ApiError ? err.message : 'No se pudo imprimir la prueba')
-    },
-  })
-
   const drawerMut = useMutation({
     mutationFn: () => api.hardware.cashDrawer.open(),
     onSuccess: () => toast.success('Cajón abierto'),
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo abrir el cajón'),
   })
 
-  function onUsbSelect(value: string): void {
-    setUsbValue(value)
-    const opt = usbOptions.find((o) => o.value === value)
-    if (opt) setPaperFormat(opt.paperHint)
+  async function onTest(): Promise<void> {
+    setTesting(true)
+    try {
+      await printNode(<TestTicket paperFormat={paperFormat} />, widthFromPaperFormat(paperFormat))
+      toast.success('Test de impresión enviado')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo imprimir la prueba')
+    } finally {
+      setTesting(false)
+    }
   }
 
   function onSave(): void {
-    let iface: string
-    if (kind === 'system') {
-      if (!systemName.trim()) {
-        toast.error('Elegí una impresora del sistema')
-        return
-      }
-      iface = systemName.trim()
-    } else if (kind === 'usb') {
-      if (!usbValue.trim()) {
-        toast.error('Elegí un dispositivo USB')
-        return
-      }
-      iface = usbValue.trim()
-    } else if (kind === 'network') {
-      if (!networkIp.trim()) {
-        toast.error('Ingresá IP:puerto')
-        return
-      }
-      iface = networkIp.trim()
-    } else {
-      if (!filePath.trim()) {
-        toast.error('Ingresá una ruta de archivo')
-        return
-      }
-      iface = filePath.trim()
+    if (!systemName.trim()) {
+      toast.error('Elegí una impresora del sistema')
+      return
     }
-
-    const width: 58 | 80 = paperFormat === '58mm' ? 58 : 80
+    const width: 58 | 80 = paperFormat === '80mm' ? 80 : 58
     saveMut.mutate({
-      kind,
-      interface: iface,
+      kind: 'system',
+      interface: systemName.trim(),
       width,
       characterSet: 'PC858_EURO',
       autoOpenDrawer: autoOpen,
@@ -204,108 +159,41 @@ function PrinterSection() {
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
         <div className="col-span-2 flex flex-col gap-1">
-          <Label>Modo de conexión</Label>
+          <div className="flex items-center justify-between">
+            <Label>Impresora del sistema</Label>
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline"
+              onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'printer', 'system'] })}
+            >
+              <RefreshCw className="mr-1 inline h-3 w-3" /> refrescar
+            </button>
+          </div>
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={kind}
-            onChange={(e) => setKind(e.target.value as PrinterKindDTO)}
+            value={systemName}
+            onChange={(e) => setSystemName(e.target.value)}
           >
-            <option value="system">Impresora del sistema (recomendado)</option>
-            <option value="usb">USB directo (avanzado)</option>
-            <option value="network">Red (IP:puerto)</option>
-            <option value="file">Archivo (testing)</option>
+            <option value="">— seleccioná una impresora —</option>
+            {systemPrinters.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}{p.isDefault ? ' (predeterminada)' : ''}
+              </option>
+            ))}
           </select>
           <p className="text-xs text-muted-foreground">
-            "Impresora del sistema" usa la cola de impresión del sistema operativo (CUPS en
-            macOS/Linux, spooler en Windows). Es el modo más confiable.
+            StockFlow imprime usando la cola del sistema operativo. Configurá la impresora desde
+            Preferencias del sistema → Impresoras y luego seleccionala acá.
           </p>
+          {systemPrinters.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No se detectaron impresoras instaladas en el sistema. Instalala primero desde el SO y
+              después refrescá.
+            </p>
+          )}
         </div>
 
-        {kind === 'system' && (
-          <div className="col-span-2 flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <Label>Impresora del sistema</Label>
-              <button
-                type="button"
-                className="text-xs text-primary hover:underline"
-                onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'printer', 'system'] })}
-              >
-                <RefreshCw className="mr-1 inline h-3 w-3" /> refrescar
-              </button>
-            </div>
-            <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={systemName}
-              onChange={(e) => setSystemName(e.target.value)}
-            >
-              <option value="">— seleccioná una impresora —</option>
-              {systemPrinters.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.name}{p.isDefault ? ' (predeterminada)' : ''}
-                </option>
-              ))}
-            </select>
-            {systemPrinters.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                No se detectaron impresoras instaladas en el sistema. Configurala primero desde
-                Preferencias del sistema → Impresoras y luego refrescá.
-              </p>
-            )}
-          </div>
-        )}
-
-        {kind === 'usb' && (
-          <div className="col-span-2 flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <Label>Dispositivo USB (VID:PID)</Label>
-              <button
-                type="button"
-                className="text-xs text-primary hover:underline"
-                onClick={() => qc.invalidateQueries({ queryKey: ['hardware', 'usb'] })}
-              >
-                <RefreshCw className="mr-1 inline h-3 w-3" /> refrescar
-              </button>
-            </div>
-            <select
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={usbValue}
-              onChange={(e) => onUsbSelect(e.target.value)}
-            >
-              <option value="">— seleccioná un dispositivo —</option>
-              {usbOptions.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Modo avanzado: requiere permisos USB y no funciona con todas las impresoras en macOS.
-              Si tenés problemas, usá "Impresora del sistema".
-            </p>
-          </div>
-        )}
-
-        {kind === 'network' && (
-          <div className="col-span-2 flex flex-col gap-1">
-            <Label>Impresora de red (IP:puerto)</Label>
-            <Input
-              value={networkIp}
-              onChange={(e) => setNetworkIp(e.target.value)}
-              placeholder="192.168.1.50:9100"
-            />
-          </div>
-        )}
-
-        {kind === 'file' && (
-          <div className="col-span-2 flex flex-col gap-1">
-            <Label>Ruta de archivo (testing)</Label>
-            <Input
-              value={filePath}
-              onChange={(e) => setFilePath(e.target.value)}
-              placeholder="/tmp/stockflow-printer.bin"
-            />
-          </div>
-        )}
-
-        <div className="flex flex-col gap-1">
+        <div className="col-span-2 flex flex-col gap-1">
           <Label>Ancho de papel</Label>
           <select
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -316,6 +204,10 @@ function PrinterSection() {
             <option value="80mm">80 mm (térmica)</option>
             <option value="A4">A4 (oficina)</option>
           </select>
+          <p className="text-xs text-muted-foreground">
+            Define el ancho/tipografía que usa StockFlow al imprimir tickets. El tamaño real lo
+            determina el rollo cargado y el driver del SO.
+          </p>
         </div>
 
         <label className="col-span-2 flex items-center gap-2 text-sm">
@@ -328,8 +220,8 @@ function PrinterSection() {
             {saveMut.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
             Guardar configuración
           </Button>
-          <Button variant="outline" onClick={() => testMut.mutate()} disabled={testMut.isPending}>
-            {testMut.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+          <Button variant="outline" onClick={() => void onTest()} disabled={testing}>
+            {testing && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
             Probar impresión
           </Button>
           <Button variant="outline" onClick={() => drawerMut.mutate()} disabled={drawerMut.isPending}>
@@ -337,11 +229,10 @@ function PrinterSection() {
           </Button>
         </div>
 
-        {paperFormat === 'A4' && (
-          <p className="col-span-2 text-xs text-muted-foreground">
-            En modo A4, los tickets se imprimen vía diálogo del sistema (browser print).
-          </p>
-        )}
+        <p className="col-span-2 text-xs text-muted-foreground">
+          La impresión usa el diálogo del sistema operativo. Para imprimir en silencio (sin
+          diálogo), próximamente vamos a agregar un modo "kiosko" en versiones siguientes.
+        </p>
       </CardContent>
     </Card>
   )

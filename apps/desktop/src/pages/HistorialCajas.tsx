@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Printer, History, PlusCircle, MinusCircle, Wallet } from 'lucide-react'
 
-import { api } from '@/lib/api'
 import {
   useHistoricalCashRegisters,
   useHistoricalCashReport,
@@ -83,41 +81,16 @@ function HistoricalCashReportDialog({
   const reportQuery = useHistoricalCashReport(cashRegisterId)
   const companyQuery = useCompany()
   const printCashClose = usePrintCashCloseReport()
-  const printerConfigQuery = useQuery({
-    queryKey: ['hardwarePrinterConfig'],
-    queryFn: () => api.hardware.printer.getConfig(),
-    staleTime: 30_000,
-  })
 
   const r = reportQuery.data
 
   async function handlePrint(): Promise<void> {
     if (!r || !companyQuery.data) return
-    const printerCfg = printerConfigQuery.data ?? null
-    if (printerCfg) {
-      try {
-        const breakdownArr = r.byPaymentMethod ?? []
-        await api.hardware.printer.printCashClose({
-          company: { name: companyQuery.data.name },
-          registerNumber: r.register.number,
-          openDate: r.register.openDate,
-          closeDate: r.register.closeDate ?? Date.now(),
-          openingAmount: r.openingAmount,
-          salesCount: r.salesCount,
-          salesTotal: r.salesTotal,
-          paymentBreakdown: breakdownArr.map((b) => ({ method: b.name, amount: b.net })),
-          incomeMovements: r.incomeTotal,
-          expenseMovements: r.expenseTotal,
-          expectedClosing: r.expectedCash,
-          declaredClosing: r.closingAmount ?? '0',
-          difference: r.difference ?? '0',
-        })
-        return
-      } catch {
-        toast.warning('Impresora térmica no disponible — usando impresión desde pantalla')
-      }
+    try {
+      await printCashClose({ company: companyQuery.data, report: r, closedBy: closedByName })
+    } catch {
+      toast.warning('No se pudo imprimir el reporte')
     }
-    printCashClose({ company: companyQuery.data, report: r, closedBy: closedByName })
   }
 
   return (
