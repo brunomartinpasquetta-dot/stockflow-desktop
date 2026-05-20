@@ -304,6 +304,21 @@ export const api = {
     listElectron: (): Promise<import('@/types/api').SystemPrinterDTO[]> =>
       unwrap(sf().print.listElectron()),
   },
+  desktopWindow: {
+    open: (
+      payload: import('@/types/api').DesktopWindowOpenDTO,
+    ): Promise<{ windowKey: string; created: boolean }> =>
+      unwrap(sf().desktopWindow.open(payload)),
+    close: (windowKey: string): Promise<{ closed: boolean }> =>
+      unwrap(sf().desktopWindow.close({ windowKey })),
+    focus: (windowKey: string): Promise<{ focused: boolean }> =>
+      unwrap(sf().desktopWindow.focus({ windowKey })),
+    list: (): Promise<{ windows: import('@/types/api').DesktopWindowInfoDTO[] }> =>
+      unwrap(sf().desktopWindow.list()),
+    closeSelf: (): Promise<{ closed: boolean }> => unwrap(sf().desktopWindow.closeSelf()),
+    minimizeSelf: (): Promise<{ minimized: boolean }> => unwrap(sf().desktopWindow.minimizeSelf()),
+    focusMain: (): Promise<{ ok: true }> => unwrap(sf().desktopWindow.focusMain()),
+  },
   license: {
     getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),
     activate: (key: string): Promise<LicenseStateDTO> => unwrap(sf().license.activate({ licenseKey: key })),

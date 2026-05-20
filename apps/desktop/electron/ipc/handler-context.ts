@@ -41,9 +41,50 @@ export interface HandlerDeps {
     getConnectedClients?: () => { ip: string; lastSeen: number }[];
     applyAndRestart?: () => void;
   };
+  /**
+   * Gestor de ventanas nativas del SO (v0.1.17). Inyectado por main.ts; ausente
+   * en los tests de integración (que corren sin Electron).
+   */
+  desktopWindows?: DesktopWindowsLike;
 }
 
-export type HandlerFn = (payload: unknown) => Promise<IpcResponse<unknown>>;
+/**
+ * Contrato mínimo del gestor de ventanas nativas que usan los handlers IPC.
+ * Replica la superficie pública de `DesktopWindowsManager` (electron/desktop-windows.ts)
+ * sin acoplar este módulo a Electron.
+ */
+export interface DesktopWindowsLike {
+  open(input: {
+    pageKey: string;
+    title?: string;
+    params?: Record<string, unknown>;
+    width?: number;
+    height?: number;
+    minWidth?: number;
+    minHeight?: number;
+  }): { windowKey: string; created: boolean };
+  close(windowKey: string): boolean;
+  focus(windowKey: string): boolean;
+  list(): { windowKey: string; title: string; minimized: boolean; focused: boolean }[];
+  focusMain(): void;
+  /** Cierra la ventana nativa que originó el evento IPC. */
+  closeForWebContents(webContentsId: number): boolean;
+  /** Minimiza la ventana nativa que originó el evento IPC. */
+  minimizeForWebContents(webContentsId: number): boolean;
+}
+
+/**
+ * Contexto opcional del evento IPC. Los handlers "self" (cerrar/minimizar la
+ * propia ventana) lo necesitan para identificar el `webContents` emisor.
+ */
+export interface HandlerEventContext {
+  webContentsId: number;
+}
+
+export type HandlerFn = (
+  payload: unknown,
+  event?: HandlerEventContext,
+) => Promise<IpcResponse<unknown>>;
 export type HandlerMap = Record<string, HandlerFn>;
 export type HandlerBuilder = (deps: HandlerDeps) => HandlerMap;
 
@@ -75,14 +116,18 @@ export function withSession<P, R>(
   };
 }
 
-/** Handler sin sesión (login, system, ...): la función recibe los `deps` crudos. */
+/**
+ * Handler sin sesión (login, system, ...): la función recibe los `deps` crudos.
+ * El tercer argumento `event` (contexto del evento IPC) está disponible en el
+ * runtime real de Electron; es `undefined` en los tests de integración.
+ */
 export function unguarded<P, R>(
   deps: HandlerDeps,
-  fn: (payload: P, deps: HandlerDeps) => Promise<R> | R,
+  fn: (payload: P, deps: HandlerDeps, event?: HandlerEventContext) => Promise<R> | R,
 ): HandlerFn {
-  return async (payload): Promise<IpcResponse<unknown>> => {
+  return async (payload, event): Promise<IpcResponse<unknown>> => {
     try {
-      const data = await fn(payload as P, deps);
+      const data = await fn(payload as P, deps, event);
       return { ok: true, data };
     } catch (err) {
       return serializeError(err);

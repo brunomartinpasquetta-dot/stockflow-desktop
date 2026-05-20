@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { BackupService } from './backup/BackupService';
+import { DesktopWindowsManager } from './desktop-windows';
 import { getDatabasePath, initialize, shutdown, type DbHandle } from './bootstrap/db';
 import { getMachineId } from './bootstrap/machine';
 import { applySessionSecret } from './bootstrap/session';
@@ -33,7 +34,11 @@ let hardwareManager: HardwareManager | null = null;
 let backupService: BackupService | null = null;
 let lanServer: LanServer | null = null;
 let updaterController: UpdaterController | null = null;
+let desktopWindows: DesktopWindowsManager | null = null;
 let quittingForBackup = false;
+
+const PRELOAD_PATH = path.join(HERE, 'preload.cjs');
+const PROD_INDEX_HTML = path.join(HERE, '..', 'dist', 'index.html');
 
 function createWindow(extraArgs: string[]): void {
   mainWindow = new BrowserWindow({
@@ -41,7 +46,7 @@ function createWindow(extraArgs: string[]): void {
     height: 800,
     show: false,
     webPreferences: {
-      preload: path.join(HERE, 'preload.cjs'),
+      preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -51,6 +56,8 @@ function createWindow(extraArgs: string[]): void {
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.on('closed', () => {
+    // Al cerrar la ventana principal, cerramos todas las ventanas nativas hijas.
+    desktopWindows?.closeAll();
     mainWindow = null;
   });
 
@@ -97,6 +104,17 @@ function bootstrap(): { lanArgs: string[] } {
   const importService = new ExcelImportService();
   const mpTokenStore = new MpTokenStore(machineId);
 
+  // Gestor de ventanas nativas del SO (v0.1.17): cada pantalla abre como una
+  // BrowserWindow independiente que carga la app en modo embedded.
+  desktopWindows = new DesktopWindowsManager({
+    preloadPath: PRELOAD_PATH,
+    extraArgs: lanArgs,
+    isDev,
+    devServerUrl: DEV_SERVER_URL,
+    prodIndexHtml: PROD_INDEX_HTML,
+    getMainWindow: () => mainWindow,
+  });
+
   // Updater (no-op en dev / sin empaquetar)
   updaterController = setupAutoUpdater({
     userDataDir,
@@ -132,6 +150,7 @@ function bootstrap(): { lanArgs: string[] } {
       mainWindow?.webContents.send(channel, payload);
     },
     updater: updaterController,
+    desktopWindows,
     lanExtras: {
       applyAndRestart,
       getConnectedClients: () => lanServer?.getConnectedClients() ?? [],

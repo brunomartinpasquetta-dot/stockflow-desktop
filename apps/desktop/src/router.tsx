@@ -1,15 +1,19 @@
 /**
- * Router (P-MDI-LAYOUT)
+ * Router (v0.1.17 — ventanas nativas del SO)
  *
- * Las rutas internas (compras, ventas, etc.) son "absorbidas" por el
- * WindowManager vía `useDeepLinkRouter`. Aquí dejamos las rutas full-screen
- * (login/activación/bienvenida) y un wildcard que renderiza ProtectedRoute →
- * Layout. El DeepLinkRouter detecta el pathname y abre la ventana correspondiente.
+ * - Rutas full-screen: login / activación / bienvenida (ventana principal).
+ * - `/embedded/:pageKey`: una pantalla aislada, sin chrome — el contenido de
+ *   cada `BrowserWindow` nativa. Vive bajo `AuthShell` para heredar `AuthProvider`.
+ * - Wildcard `*`: la ventana principal (ProtectedRoute → Layout).
+ *
+ * Las rutas internas (compras, ventas, etc.) siguen siendo "absorbidas" por el
+ * WindowManager vía `useDeepLinkRouter`, que ahora abre ventanas nativas.
  */
 import { Suspense, lazy } from 'react'
 import { createHashRouter } from 'react-router-dom'
 
 import { AuthShell } from '@/components/AuthShell'
+import { EmbeddedWindow } from '@/components/EmbeddedWindow'
 import { LicenseGuard } from '@/components/LicenseGuard'
 import { PageSpinner } from '@/components/PageSpinner'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
@@ -25,6 +29,7 @@ export const router = createHashRouter([
       { path: '/bienvenida', element: <Suspense fallback={<PageSpinner />}><Bienvenida /></Suspense> },
       { path: '/login', element: <Login /> },
       { path: '/activacion', element: <Suspense fallback={<PageSpinner />}><Activacion /></Suspense> },
+      { path: '/embedded/:pageKey', element: <EmbeddedWindow /> },
       {
         element: <LicenseGuard />,
         children: [

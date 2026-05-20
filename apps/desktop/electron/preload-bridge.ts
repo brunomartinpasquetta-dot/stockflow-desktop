@@ -13,7 +13,14 @@
  *    cachea y se reenvía como `Authorization: Bearer` en las siguientes
  *    requests. `auth:logout` y respuesta 401 limpian el cache.
  */
-import type { ApiSurface, IpcResponse, LanConfigDTO, LoginResultDTO } from './ipc/types';
+import type {
+  ApiSurface,
+  DesktopWindowInfoDTO,
+  DesktopWindowOpenDTO,
+  IpcResponse,
+  LanConfigDTO,
+  LoginResultDTO,
+} from './ipc/types';
 
 export type LanBridgeMode = 'single' | 'server' | 'client';
 
@@ -63,7 +70,15 @@ export const LAN_ROUTED_GROUPS = new Set([
   'analytics',
 ]);
 
-export const LOCAL_GROUPS = new Set(['system', 'lan', 'updater', 'hardware', 'license', 'print']);
+export const LOCAL_GROUPS = new Set([
+  'system',
+  'lan',
+  'updater',
+  'hardware',
+  'license',
+  'print',
+  'desktopWindow',
+]);
 
 interface LanState {
   sessionToken: string | null;
@@ -336,6 +351,16 @@ export function createApiBridge(
       getDbPath: () => c<never>('system:getDbPath'),
       getInfo: () => c<never>('system:getInfo'),
       openExternal: (p) => c<never>('system:openExternal', p),
+    },
+    desktopWindow: {
+      open: (p: DesktopWindowOpenDTO) =>
+        c<{ windowKey: string; created: boolean }>('desktopWindow:open', p),
+      close: (p: { windowKey: string }) => c<{ closed: boolean }>('desktopWindow:close', p),
+      focus: (p: { windowKey: string }) => c<{ focused: boolean }>('desktopWindow:focus', p),
+      list: () => c<{ windows: DesktopWindowInfoDTO[] }>('desktopWindow:list'),
+      closeSelf: () => c<{ closed: boolean }>('desktopWindow:closeSelf'),
+      minimizeSelf: () => c<{ minimized: boolean }>('desktopWindow:minimizeSelf'),
+      focusMain: () => c<{ ok: true }>('desktopWindow:focusMain'),
     },
     print: {
       silent: (p) => c<never>('print:silent', p),

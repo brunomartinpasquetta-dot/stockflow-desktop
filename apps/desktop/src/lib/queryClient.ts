@@ -15,7 +15,11 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      refetchOnWindowFocus: false,
+      // v0.1.17: cada BrowserWindow nativa es un renderer aislado con su propia
+      // cache de React Query. Al enfocar una ventana se refetchean las queries
+      // stale → los datos se mantienen sincronizados entre ventanas sin un
+      // broadcast IPC de invalidaciones.
+      refetchOnWindowFocus: true,
       retry: 1,
     },
     mutations: {

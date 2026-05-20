@@ -23,6 +23,7 @@ import { buildInventoryHandlers } from './handlers/inventory.handlers';
 import { buildLanHandlers } from './handlers/lan.handlers';
 import { buildMpQrHandlers } from './handlers/mpQr.handlers';
 import { buildAccountingHandlers } from './handlers/accounting.handlers';
+import { buildDesktopWindowsHandlers } from './handlers/desktopWindows.handlers';
 import { buildLicenseHandlers } from './handlers/license.handlers';
 import { buildPaymentMethodsHandlers } from './handlers/paymentMethods.handlers';
 import { buildPriceUpdateHandlers } from './handlers/priceUpdate.handlers';
@@ -68,6 +69,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildPrintHandlers,
   buildMpQrHandlers,
   buildAccountingHandlers,
+  buildDesktopWindowsHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {
@@ -88,7 +90,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, deps: HandlerDeps): string
   const channels = Object.keys(handlers);
   for (const channel of channels) {
     const handler = handlers[channel]!;
-    ipcMain.handle(channel, (_event, payload: unknown) => handler(payload));
+    ipcMain.handle(channel, (event, payload: unknown) =>
+      handler(payload, { webContentsId: event.sender.id }),
+    );
   }
   return channels;
 }

@@ -1,10 +1,11 @@
 /**
- * Layout (P-MDI-LAYOUT)
+ * Layout (v0.1.17 — ventana principal)
  *
- * Reemplaza el sidebar vertical por un MenuBar horizontal + StatusBar + Desktop
- * MDI + Taskbar. Las páginas se renderizan dentro de ventanas flotantes; el
- * `<Outlet />` original ya no se usa (las rutas internas se "absorben" como
- * ventanas — ver `useDeepLinkRouter`).
+ * La ventana principal de StockFlow: MenuBar + QuickAccessToolbar + StatusBar +
+ * WelcomeScreen a pantalla completa + Taskbar. Cada pantalla (Artículos, Ventas,
+ * etc.) abre como una `BrowserWindow` nativa del SO independiente — ya no hay un
+ * área MDI con divs flotantes. Las rutas internas siguen "absorbiéndose" como
+ * ventanas nativas vía `useDeepLinkRouter`.
  */
 import { useLicenseStatus } from '@/contexts/LicenseContext'
 import { CommandPalette } from '@/components/CommandPalette'
@@ -17,7 +18,7 @@ import { MenuBar } from '@/components/MenuBar'
 import { OutdatedBanner } from '@/components/OutdatedBanner'
 import { QuickAccessToolbar } from '@/components/QuickAccessToolbar'
 import { StatusBar } from '@/components/StatusBar'
-import { Desktop } from '@/components/Desktop'
+import { WelcomeScreen } from '@/components/WelcomeScreen'
 import { Taskbar } from '@/components/Taskbar'
 
 export function Layout() {
@@ -47,7 +48,9 @@ function LayoutInner() {
       <MenuBar />
       <QuickAccessToolbar />
       <StatusBar />
-      <Desktop />
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <WelcomeScreen />
+      </div>
       <Taskbar />
       <CommandPalette />
     </div>

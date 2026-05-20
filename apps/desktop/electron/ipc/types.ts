@@ -764,6 +764,29 @@ export interface SystemInfoDTO {
 }
 
 /* ----------------------------------------------------------------------- */
+/* Ventanas nativas del SO (v0.1.17)                                        */
+/* ----------------------------------------------------------------------- */
+
+export interface DesktopWindowOpenDTO {
+  /** pageKey del registry (también es la windowKey). */
+  pageKey: string;
+  title?: string;
+  /** Params serializables que viajan como querystring a la ruta embedded. */
+  params?: Record<string, unknown>;
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  minHeight?: number;
+}
+
+export interface DesktopWindowInfoDTO {
+  windowKey: string;
+  title: string;
+  minimized: boolean;
+  focused: boolean;
+}
+
+/* ----------------------------------------------------------------------- */
 /* Licencias                                                                */
 /* ----------------------------------------------------------------------- */
 
@@ -1258,6 +1281,15 @@ export interface ApiSurface {
     getDbPath(): Res<{ dbPath: string }>;
     getInfo(): Res<SystemInfoDTO>;
     openExternal(payload: { url: string }): Res<{ ok: true }>;
+  };
+  desktopWindow: {
+    open(payload: DesktopWindowOpenDTO): Res<{ windowKey: string; created: boolean }>;
+    close(payload: { windowKey: string }): Res<{ closed: boolean }>;
+    focus(payload: { windowKey: string }): Res<{ focused: boolean }>;
+    list(): Res<{ windows: DesktopWindowInfoDTO[] }>;
+    closeSelf(): Res<{ closed: boolean }>;
+    minimizeSelf(): Res<{ minimized: boolean }>;
+    focusMain(): Res<{ ok: true }>;
   };
   print: {
     /** Imprime HTML inline en una BrowserWindow oculta usando webContents.print silencioso. */

@@ -1,7 +1,7 @@
 /**
  * <FormShell>
  *
- * Layout estándar para formularios que viven dentro de una `InternalWindow`.
+ * Layout estándar para formularios que viven dentro de una ventana.
  *  - Header opcional (título + acciones).
  *  - Body scrolleable (overflow-auto, min-h-0).
  *  - Footer fijo (acciones tipo guardar/cancelar).
