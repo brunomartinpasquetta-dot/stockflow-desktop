@@ -339,6 +339,7 @@ export function createApiBridge(
     },
     print: {
       silent: (p) => c<never>('print:silent', p),
+      listElectron: () => c<never>('printer:listElectron'),
     },
     license: {
       getState: () => c<never>('license:getState'),

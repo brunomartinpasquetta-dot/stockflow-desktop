@@ -301,6 +301,8 @@ export const api = {
   print: {
     silent: (payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Promise<{ ok: true }> =>
       unwrap(sf().print.silent(payload)),
+    listElectron: (): Promise<import('@/types/api').SystemPrinterDTO[]> =>
+      unwrap(sf().print.listElectron()),
   },
   license: {
     getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),

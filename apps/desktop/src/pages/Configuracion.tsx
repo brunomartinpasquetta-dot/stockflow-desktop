@@ -79,7 +79,18 @@ function PrinterSection() {
   })
   const systemQuery = useQuery({
     queryKey: ['hardware', 'printer', 'system'],
-    queryFn: () => api.hardware.printer.listSystem(),
+    // Primario: getPrintersAsync() de Electron — devuelve el deviceName EXACTO
+    // que webContents.print() necesita para el modo silencioso. Si Electron no
+    // ve impresoras (o falla), caemos al listado por lpstat.
+    queryFn: async (): Promise<SystemPrinterDTO[]> => {
+      try {
+        const electronList = await api.print.listElectron()
+        if (electronList.length > 0) return electronList
+      } catch {
+        /* sigue al fallback */
+      }
+      return api.hardware.printer.listSystem()
+    },
   })
 
   const [systemName, setSystemName] = useState<string>('')

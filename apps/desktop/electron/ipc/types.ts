@@ -1262,6 +1262,11 @@ export interface ApiSurface {
   print: {
     /** Imprime HTML inline en una BrowserWindow oculta usando webContents.print silencioso. */
     silent(payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Res<{ ok: true }>;
+    /**
+     * Lista impresoras vía `webContents.getPrintersAsync()`. El `name` devuelto
+     * es el `deviceName` exacto que `print.silent` necesita.
+     */
+    listElectron(): Res<SystemPrinterDTO[]>;
   };
   license: {
     getState(): Res<LicenseStateDTO>;
