@@ -122,7 +122,9 @@ export class PurchasesService {
         null)
       : null;
 
-    const { purchase, lines } = await repos.purchases.createWithLines({
+    // La transacción atómica (cabecera + líneas + stock + egresos de caja + AP
+    // de cuenta corriente, BUG-S03) la hace el repo. Todo o nada.
+    const { purchase, lines, accountPayable } = await repos.purchases.createWithLines({
       type: input.type,
       supplierId: input.supplierId,
       paymentType,
@@ -146,15 +148,6 @@ export class PurchasesService {
         vatRate: l.vatRate,
       })),
     });
-
-    let accountPayable: SupplierAccountPayable | null = null;
-    if (isAccountPurchase) {
-      accountPayable = await repos.supplierAccountsPayable.create({
-        supplierId: input.supplierId,
-        purchaseId: purchase.id,
-        total: purchase.total,
-      });
-    }
 
     return { purchase, lines, accountPayable };
   }

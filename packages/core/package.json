@@ -11,7 +11,8 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "test:smoke": "tsx src/tests/services.smoke.ts",
-    "test:smoke:pricing": "tsx src/tests/pricing.smoke.ts"
+    "test:smoke:pricing": "tsx src/tests/pricing.smoke.ts",
+    "test:saldos": "tsx src/tests/saldos.regression.smoke.ts"
   },
   "dependencies": {
     "@stockflow/db": "workspace:*",

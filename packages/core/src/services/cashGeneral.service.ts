@@ -112,17 +112,22 @@ export class CashGeneralService {
     return this.toDTO(m);
   }
 
+  /**
+   * Transfiere efectivo desde una caja diaria ABIERTA hacia la Caja General.
+   *
+   * BUG-S01 / BUG-S10: la operación es atómica y registra la contrapartida en
+   * la caja diaria de origen (un `cash_movements` de egreso). La caja debe estar
+   * abierta — si ya se cerró, el dinero ya quedó arqueado y no puede transferirse
+   * sin descuadrar el cierre. La UI debe ofrecer transferir ANTES de cerrar.
+   */
   async transferFromDaily(input: TransferFromDailyInput): Promise<CashGeneralMovementDTO> {
     const { currentUser, repos } = this.ctx;
     requirePermission(currentUser, 'close_cash');
     assertPositive(input.amount);
-    const m = await repos.cashGeneral.addMovement({
-      type: 'transfer_from_daily',
+    const m = await repos.cashGeneral.transferFromDaily({
+      cashRegisterId: input.cashRegisterId,
       amount: input.amount,
-      description: `Transferencia desde caja diaria`,
-      category: 'deposit',
       createdBy: currentUser.id,
-      referenceId: input.cashRegisterId,
     });
     return this.toDTO(m);
   }

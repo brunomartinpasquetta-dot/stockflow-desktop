@@ -21,15 +21,19 @@ import {
   paymentMethods,
   purchaseLines,
   purchases,
+  supplierAccountsPayable,
   type NewPurchaseLine,
   type Purchase,
   type PurchaseLine,
+  type SupplierAccountPayable,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
 
 export interface PurchaseWithLines {
   purchase: Purchase;
   lines: PurchaseLine[];
+  /** Cuenta por pagar abierta (sólo si es compra a cuenta), null en otro caso. */
+  accountPayable: SupplierAccountPayable | null;
 }
 
 export class PurchaseRepository extends BaseRepository<
@@ -205,7 +209,36 @@ export class PurchaseRepository extends BaseRepository<
           }
         }
 
-        return { purchase: insertedPurchase, lines: insertedLines };
+        // Cuenta por pagar (BUG-S03): si es compra a crédito, la AP se abre
+        // DENTRO de esta misma transacción. Antes se creaba en el servicio,
+        // fuera de la transacción → si el proceso moría quedaba una compra
+        // a crédito sin AP (deuda con el proveedor perdida silenciosamente).
+        let insertedAp: SupplierAccountPayable | null = null;
+        if (data.paymentType === 'credit') {
+          insertedAp = tx
+            .insert(supplierAccountsPayable)
+            .values({
+              supplierId: data.supplierId,
+              purchaseId: insertedPurchase.id,
+              total: insertedPurchase.total,
+              balance: insertedPurchase.total,
+              status: 'open',
+            })
+            .returning()
+            .all()[0] ?? null;
+          if (!insertedAp) {
+            throw new ConstraintError(
+              'AP_INSERT',
+              'No se pudo abrir la cuenta por pagar de la compra',
+            );
+          }
+        }
+
+        return {
+          purchase: insertedPurchase,
+          lines: insertedLines,
+          accountPayable: insertedAp,
+        };
       });
     } catch (err) {
       return rethrowDbError(err);
@@ -238,8 +271,16 @@ export class PurchaseRepository extends BaseRepository<
         }
 
         // Reverso de caja: sólo la parte que salió en efectivo físico.
+        // BUG-S05: se emite UN ingreso reverso por CADA egreso físico original,
+        //   preservando su paymentMethodId, caja y usuario (antes se lumpeaba
+        //   todo en un único movimiento con el primer paymentMethodId → rompía
+        //   el desglose byPaymentMethod si había >1 medio físico).
+        //   Un egreso con paymentMethodId NULL (legacy) cuenta como físico y se
+        //   revierte también con NULL, consistente con el criterio del cierre.
         const movs = tx
           .select({
+            cashRegisterId: cashMovements.cashRegisterId,
+            userId: cashMovements.userId,
             amount: cashMovements.amount,
             pmId: cashMovements.paymentMethodId,
             isCash: paymentMethods.isPhysicalCash,
@@ -248,28 +289,21 @@ export class PurchaseRepository extends BaseRepository<
           .leftJoin(paymentMethods, eq(cashMovements.paymentMethodId, paymentMethods.id))
           .where(and(eq(cashMovements.relatedPurchaseId, id), eq(cashMovements.type, 'expense')))
           .all();
-        const physical = movs.filter((m) => m.pmId == null || m.isCash === true);
-        const cashBack = sumDecimals(physical.map((m) => m.amount));
-        const cashPmId = physical.find((m) => m.pmId != null)?.pmId ?? null;
-        if (purchase.paymentType === 'cash' && Number(cashBack) > 0) {
-          // Tomamos la caja del egreso original (relatedPurchaseId).
-          const origMov = tx
-            .select({ cashRegisterId: cashMovements.cashRegisterId, userId: cashMovements.userId })
-            .from(cashMovements)
-            .where(and(eq(cashMovements.relatedPurchaseId, id), eq(cashMovements.type, 'expense')))
-            .get();
-          if (origMov) {
+        if (purchase.paymentType === 'cash') {
+          const physical = movs.filter((m) => m.pmId == null || m.isCash === true);
+          for (const m of physical) {
+            if (!(Number(m.amount) > 0)) continue;
             tx
               .insert(cashMovements)
               .values({
-                cashRegisterId: origMov.cashRegisterId,
+                cashRegisterId: m.cashRegisterId,
                 type: 'income',
                 description: `Anulación compra ${purchase.type} #${purchase.number}`,
-                amount: cashBack,
+                amount: m.amount,
                 date: Date.now(),
-                userId: origMov.userId,
+                userId: m.userId,
                 relatedPurchaseId: purchase.id,
-                paymentMethodId: cashPmId,
+                paymentMethodId: m.pmId,
               })
               .run();
           }

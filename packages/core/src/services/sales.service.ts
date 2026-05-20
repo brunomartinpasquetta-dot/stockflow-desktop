@@ -170,8 +170,14 @@ export class SalesService {
       }
     }
 
-    // La transacción atómica (cabecera + líneas + stock + pagos + caja) la hace el repo.
-    const { sale, lines: savedLines, payments: savedPayments } = await repos.sales.createWithLines({
+    // La transacción atómica (cabecera + líneas + stock + pagos + caja + AR de
+    // cuenta corriente, BUG-S03) la hace el repo. Todo o nada.
+    const {
+      sale,
+      lines: savedLines,
+      payments: savedPayments,
+      accountReceivable,
+    } = await repos.sales.createWithLines({
       type: draft.type,
       customerId: customer.id,
       sellerId: currentUser.id,
@@ -182,15 +188,6 @@ export class SalesService {
       notes: draft.notes ?? null,
       lines: resolvedLines,
     });
-
-    let accountReceivable: AccountReceivable | null = null;
-    if (isAccountSale) {
-      accountReceivable = await repos.accountsReceivable.create({
-        customerId: customer.id,
-        saleId: sale.id,
-        total: sale.total,
-      });
-    }
 
     return { sale, lines: savedLines, payments: savedPayments, accountReceivable };
   }

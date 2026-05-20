@@ -16,7 +16,16 @@ import type { ServiceContext } from '../context';
 
 export interface FinancialSummary {
   period: { from: number; to: number };
-  assets: { articlesValue: string; cashValue: string; total: string };
+  assets: {
+    articlesValue: string;
+    /** Efectivo total: cajas diarias abiertas + Caja General. */
+    cashValue: string;
+    /** Desglose: sólo el efectivo físico de las cajas diarias abiertas. */
+    cashRegistersValue: string;
+    /** Desglose: saldo de la Caja General (caja fuerte). */
+    cashGeneralValue: string;
+    total: string;
+  };
   sales: { total: string; count: number; vatAmount: string };
   purchases: { total: string; count: number; vatAmount: string };
   cmv: { total: string; calculatedFromCurrent: boolean };
@@ -89,23 +98,35 @@ export class AccountingService {
       articlesValue = sumDecimals([articlesValue, mulDecimal(a.stock, a.costPrice, 4)]);
     }
 
-    // Efectivo: aperturas de cajas abiertas + saldo de movimientos cash en cajas abiertas
+    // Efectivo en cajas diarias abiertas: aperturas + saldo de movimientos en
+    // efectivo físico. BUG-S07: el criterio canónico de "efectivo físico" es
+    // `isPhysicalCash` (igual que closeRegister/buildReport), NO `type==='cash'`.
+    // Un movimiento sin paymentMethodId (legacy) también cuenta como físico.
     const allRegisters = await this.ctx.repos.cashRegisters.findAll();
     const openRegs = allRegisters.filter((r) => r.status === 'open');
-    let cashValue = '0.0000';
+    let cashRegistersValue = '0.0000';
     if (openRegs.length > 0) {
       const allPms = await this.ctx.repos.paymentMethods.findAll();
-      const cashPmIds = new Set(allPms.filter((p) => p.type === 'cash').map((p) => p.id));
-      cashValue = sumDecimals(openRegs.map((r) => r.openingAmount));
+      const physicalCashPmIds = new Set(
+        allPms.filter((p) => p.isPhysicalCash).map((p) => p.id),
+      );
+      const isPhysical = (paymentMethodId: string | null): boolean =>
+        paymentMethodId == null || physicalCashPmIds.has(paymentMethodId);
+      cashRegistersValue = sumDecimals(openRegs.map((r) => r.openingAmount));
       for (const reg of openRegs) {
         const movs = await this.ctx.repos.cashMovements.findByRegister(reg.id);
         for (const m of movs) {
-          if (!m.paymentMethodId || !cashPmIds.has(m.paymentMethodId)) continue;
-          if (m.type === 'income') cashValue = sumDecimals([cashValue, m.amount]);
-          else cashValue = subDecimal(cashValue, m.amount);
+          if (!isPhysical(m.paymentMethodId)) continue;
+          if (m.type === 'income') cashRegistersValue = sumDecimals([cashRegistersValue, m.amount]);
+          else cashRegistersValue = subDecimal(cashRegistersValue, m.amount);
         }
       }
     }
+
+    // BUG-S02: el efectivo total de la empresa incluye la Caja General (caja
+    // fuerte), donde se acumula lo transferido desde las cajas diarias.
+    const cashGeneralValue = await this.ctx.repos.cashGeneral.getBalance();
+    const cashValue = sumDecimals([cashRegistersValue, cashGeneralValue]);
     const assetsTotal = sumDecimals([articlesValue, cashValue]);
 
     // 2) Ventas
@@ -155,7 +176,13 @@ export class AccountingService {
 
     return {
       period: { from, to },
-      assets: { articlesValue, cashValue, total: assetsTotal },
+      assets: {
+        articlesValue,
+        cashValue,
+        cashRegistersValue,
+        cashGeneralValue: sumDecimals([cashGeneralValue]),
+        total: assetsTotal,
+      },
       sales: { total: salesTotal, count: salesCompleted.length, vatAmount: salesVat },
       purchases: { total: purchasesTotal, count: purchasesCompleted.length, vatAmount: purchasesVat },
       cmv: { total: cmv, calculatedFromCurrent: true },

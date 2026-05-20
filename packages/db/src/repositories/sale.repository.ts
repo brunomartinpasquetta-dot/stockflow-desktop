@@ -16,6 +16,7 @@ import {
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import {
+  accountsReceivable,
   articles,
   cashMovements,
   companies,
@@ -23,6 +24,7 @@ import {
   saleLines,
   salePayments,
   sales,
+  type AccountReceivable,
   type NewSaleLine,
   type Sale,
   type SaleLine,
@@ -35,6 +37,8 @@ export interface SaleWithLines {
   lines: SaleLine[];
   /** Pagos de la venta (vacío si es a cuenta corriente). */
   payments: SalePayment[];
+  /** Cuenta corriente abierta (sólo si es venta a cuenta), null en otro caso. */
+  accountReceivable: AccountReceivable | null;
 }
 
 export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInsert> {
@@ -239,7 +243,37 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           }
         }
 
-        return { sale: insertedSale, lines: insertedLines, payments: insertedPayments };
+        // Cuenta corriente (BUG-S03): si es venta a cuenta, la AR se abre DENTRO
+        // de esta misma transacción. Antes se creaba en el servicio, fuera de la
+        // transacción → si el proceso moría en el medio quedaba una venta
+        // isAccountSale=true sin AR (deuda perdida silenciosamente).
+        let insertedAr: AccountReceivable | null = null;
+        if (data.isAccountSale) {
+          insertedAr = tx
+            .insert(accountsReceivable)
+            .values({
+              customerId: data.customerId,
+              saleId: insertedSale.id,
+              total: insertedSale.total,
+              balance: insertedSale.total,
+              status: 'open',
+            })
+            .returning()
+            .all()[0] ?? null;
+          if (!insertedAr) {
+            throw new ConstraintError(
+              'AR_INSERT',
+              'No se pudo abrir la cuenta corriente de la venta',
+            );
+          }
+        }
+
+        return {
+          sale: insertedSale,
+          lines: insertedLines,
+          payments: insertedPayments,
+          accountReceivable: insertedAr,
+        };
       });
     } catch (err) {
       return rethrowDbError(err);
@@ -272,6 +306,14 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         }
 
         // Reverso de caja: sólo la parte en efectivo físico.
+        // BUG-S04: se emite UN reverso por CADA pago físico, preservando su
+        //   paymentMethodId original (antes se lumpeaba todo en un único
+        //   movimiento con el primer paymentMethodId encontrado → rompía el
+        //   desglose byPaymentMethod del arqueo si había >1 medio físico).
+        // BUG-S06: si el medio de pago fue borrado, el LEFT JOIN deja `isCash`
+        //   en null/undefined. El cierre cuenta esos casos como efectivo físico
+        //   (criterio legacy `pmId IS NULL`), así que acá los tratamos igual:
+        //   se considera físico salvo que el medio exista y NO sea físico.
         const sps = tx
           .select({
             amount: salePayments.amount,
@@ -282,22 +324,35 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .leftJoin(paymentMethods, eq(salePayments.paymentMethodId, paymentMethods.id))
           .where(eq(salePayments.saleId, id))
           .all();
-        const cashBack = sumDecimals(sps.filter((s) => s.isCash === true).map((s) => s.amount));
-        const cashPmId = sps.find((s) => s.isCash === true)?.pmId ?? null;
-        if (!sale.isAccountSale && cashPmId && Number(cashBack) > 0) {
-          tx
-            .insert(cashMovements)
-            .values({
-              cashRegisterId: sale.cashRegisterId,
-              type: 'expense',
-              description: `Anulación venta ${sale.type} #${sale.number}`,
-              amount: cashBack,
-              date: Date.now(),
-              userId: sale.sellerId,
-              relatedSaleId: sale.id,
-              paymentMethodId: cashPmId,
-            })
-            .run();
+        if (!sale.isAccountSale) {
+          const physicalPayments = sps.filter((s) => s.isCash !== false);
+          for (const sp of physicalPayments) {
+            if (!(Number(sp.amount) > 0)) continue;
+            // BUG-S06: si el medio de pago ya no existe (isCash == null por el
+            // LEFT JOIN), revertir con paymentMethodId NULL — la FK rechazaría
+            // un id colgante, y NULL es el criterio legacy de efectivo físico
+            // consistente con closeRegister/buildReport.
+            let reversePmId: string | null = sp.pmId;
+            if (sp.isCash == null) {
+              console.warn(
+                `[voidSale] venta ${sale.id}: pago con medio ${sp.pmId} sin registro de medio de pago — se revierte como efectivo físico (paymentMethodId NULL)`,
+              );
+              reversePmId = null;
+            }
+            tx
+              .insert(cashMovements)
+              .values({
+                cashRegisterId: sale.cashRegisterId,
+                type: 'expense',
+                description: `Anulación venta ${sale.type} #${sale.number}`,
+                amount: sp.amount,
+                date: Date.now(),
+                userId: sale.sellerId,
+                relatedSaleId: sale.id,
+                paymentMethodId: reversePmId,
+              })
+              .run();
+          }
         }
 
         // Eliminar los pagos de la venta.

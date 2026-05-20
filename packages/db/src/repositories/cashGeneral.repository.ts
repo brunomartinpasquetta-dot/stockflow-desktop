@@ -4,16 +4,19 @@
  * Single-row pattern: hay UNA sola fila en `cash_general` con id='singleton'
  * (creada por la migración 0007). Los movimientos van a `cash_general_movements`.
  */
-import { and, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 
 import { addDecimal, subDecimal } from '@stockflow/shared';
 
-import { rethrowDbError } from '../errors';
+import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import {
   cashGeneral,
   cashGeneralMovements,
+  cashMovements,
+  cashRegisters,
+  paymentMethods,
   type CashGeneralMovement,
 } from '../schema/local';
 
@@ -29,6 +32,13 @@ export interface AddCashGeneralMovementInput {
   category?: CashGeneralCategory | null;
   createdBy: string;
   referenceId?: string | null;
+}
+
+export interface TransferFromDailyRepoInput {
+  /** Caja diaria de origen (debe estar abierta). */
+  cashRegisterId: string;
+  amount: string;
+  createdBy: string;
 }
 
 export interface ListMovementsFilter {
@@ -117,6 +127,117 @@ export class CashGeneralRepository {
           .all();
 
         // Upsert singleton (debería existir por la migración, pero defensivo).
+        if (cur) {
+          tx.update(cashGeneral)
+            .set({ currentBalance: balanceAfter, lastUpdate: now })
+            .where(eq(cashGeneral.id, SINGLETON_ID))
+            .run();
+        } else {
+          tx.insert(cashGeneral)
+            .values({
+              id: SINGLETON_ID,
+              currentBalance: balanceAfter,
+              lastUpdate: now,
+              createdAt: now,
+            })
+            .run();
+        }
+
+        const out = inserted[0];
+        if (!out) throw new Error('No se devolvió el movimiento insertado');
+        return out;
+      });
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Transfiere efectivo de una caja diaria a la Caja General de forma ATÓMICA
+   * (BUG-S01). Dentro de una sola transacción:
+   *  1. valida que la caja diaria exista y esté abierta,
+   *  2. inserta un `cash_movements` de tipo `expense` en la caja diaria origen
+   *     (la contrapartida del dinero que sale del cajón), con el medio de pago
+   *     de efectivo físico,
+   *  3. inserta el `cash_general_movements` (type='transfer_from_daily'),
+   *  4. actualiza el balance de la fila singleton de `cash_general`.
+   *
+   * Esto evita la duplicación: antes el dinero sumaba en Caja General pero nunca
+   * descontaba de la caja diaria de origen.
+   */
+  async transferFromDaily(input: TransferFromDailyRepoInput): Promise<CashGeneralMovement> {
+    try {
+      return this.db.transaction((tx) => {
+        const now = Date.now();
+
+        // 1) Validar caja diaria (debe existir y estar abierta).
+        const reg = tx
+          .select()
+          .from(cashRegisters)
+          .where(eq(cashRegisters.id, input.cashRegisterId))
+          .get();
+        if (!reg) throw new NotFoundError('Caja', input.cashRegisterId);
+        if (reg.status !== 'open') {
+          throw new ConstraintError(
+            'REGISTER_NOT_OPEN',
+            'Sólo se puede transferir a Caja General desde una caja diaria abierta',
+          );
+        }
+
+        // 2) Resolver el medio de pago de efectivo físico.
+        const cashPm = tx
+          .select()
+          .from(paymentMethods)
+          .where(and(eq(paymentMethods.type, 'cash'), eq(paymentMethods.isPhysicalCash, true)))
+          .orderBy(asc(paymentMethods.sortOrder))
+          .get();
+        if (!cashPm) {
+          throw new ConstraintError(
+            'NO_CASH_PAYMENT_METHOD',
+            'No hay un medio de pago de efectivo físico configurado',
+          );
+        }
+
+        // 3) Egreso en la caja diaria origen (contrapartida contable).
+        tx
+          .insert(cashMovements)
+          .values({
+            cashRegisterId: input.cashRegisterId,
+            type: 'expense',
+            description: 'Transferencia a Caja General',
+            amount: input.amount,
+            date: now,
+            userId: input.createdBy,
+            paymentMethodId: cashPm.id,
+          })
+          .run();
+
+        // 4) Movimiento + balance de Caja General.
+        const cur = tx
+          .select()
+          .from(cashGeneral)
+          .where(eq(cashGeneral.id, SINGLETON_ID))
+          .get();
+        const previousBalance = cur?.currentBalance ?? '0';
+        const balanceAfter = addDecimal(previousBalance, input.amount, 2);
+
+        const newRow = {
+          id: uuidv7(),
+          type: 'transfer_from_daily' as const,
+          amount: input.amount,
+          description: 'Transferencia desde caja diaria',
+          category: 'deposit' as const,
+          createdBy: input.createdBy,
+          referenceId: input.cashRegisterId,
+          balanceAfter,
+          createdAt: now,
+        };
+        const inserted = tx
+          .insert(cashGeneralMovements)
+          .values(newRow)
+          .returning()
+          .all();
+
         if (cur) {
           tx.update(cashGeneral)
             .set({ currentBalance: balanceAfter, lastUpdate: now })

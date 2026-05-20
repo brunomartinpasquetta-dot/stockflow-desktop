@@ -37,6 +37,7 @@ export {
   type CashGeneralCategory,
   type CashGeneralMovementType,
   type ListMovementsFilter as CashGeneralListMovementsFilter,
+  type TransferFromDailyRepoInput,
 } from './cashGeneral.repository';
 export { CashMovementRepository } from './cashMovement.repository';
 export { CashRegisterRepository } from './cashRegister.repository';
