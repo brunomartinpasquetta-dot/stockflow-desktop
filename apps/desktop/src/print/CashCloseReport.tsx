@@ -40,19 +40,37 @@ export function CashCloseReport({ data }: { data: CashCloseReportData }) {
   const movements = [...report.movements].sort((a, b) => a.date - b.date)
   return (
     <div className="print-a4">
-      <div className="mb-3 border-b pb-2">
-        <div className="text-lg font-bold uppercase">{company.name}</div>
-        {company.address && <div className="text-xs">{company.address}</div>}
-        {company.cuit && <div className="text-xs">CUIT: {company.cuit}</div>}
+      {/* Encabezado del comercio */}
+      <div className="mb-4 flex items-start justify-between border-b-2 border-black pb-3">
+        <div>
+          <div className="text-xl font-bold uppercase tracking-wide">{company.name}</div>
+          {company.address && <div className="text-xs text-gray-700">{company.address}</div>}
+          <div className="text-xs text-gray-700">
+            {company.cuit && <span>CUIT: {company.cuit}</span>}
+            {company.cuit && company.phone && <span> · </span>}
+            {company.phone && <span>Tel: {company.phone}</span>}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-base font-bold uppercase">Cierre de caja</div>
+          <div className="text-xs text-gray-700">Caja N° {r.number}</div>
+        </div>
       </div>
 
-      <h1 className="mb-1 text-base font-bold">Reporte de cierre de caja</h1>
-      <div className="mb-3 text-xs">
-        <div>Caja #{r.number}</div>
-        <div>Apertura: {formatDateTime(r.openDate)}</div>
-        <div>Cierre: {r.closeDate ? formatDateTime(r.closeDate) : '—'}</div>
-        <div>Cajero: {closedBy}</div>
+      <div className="mb-4 grid grid-cols-3 gap-2 rounded border border-gray-300 bg-gray-50 p-2 text-xs">
+        <div>
+          <span className="font-semibold">Apertura:</span> {formatDateTime(r.openDate)}
+        </div>
+        <div>
+          <span className="font-semibold">Cierre:</span>{' '}
+          {r.closeDate ? formatDateTime(r.closeDate) : '—'}
+        </div>
+        <div>
+          <span className="font-semibold">Cajero:</span> {closedBy}
+        </div>
       </div>
+
+      <h2 className="mb-1 text-sm font-bold">Resumen</h2>
 
       <div className="mb-4 max-w-md text-sm">
         <Row label="Monto inicial (apertura)" value={formatCurrency(report.openingAmount)} />

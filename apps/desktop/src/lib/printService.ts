@@ -179,12 +179,15 @@ function buildTicketCss(width: '58' | '80'): string {
   const widthMm = width === '80' ? 80 : 58
   const paddingMm = width === '80' ? '4mm 3mm' : '3mm 2mm'
   const fontPx = width === '80' ? 18 : 14
+  const smallPx = width === '80' ? 14 : 11
   const doubleHeightPx = width === '80' ? 26 : 20
-  const doublePx = width === '80' ? 34 : 26
+  const doublePx = width === '80' ? 30 : 22
+  const totalPx = width === '80' ? 30 : 22
   const sepPx = width === '80' ? 14 : 11
   const sepMargin = width === '80' ? '2mm 0' : '1.5mm 0'
   const doubleHeightMargin = width === '80' ? '2mm 0 1mm' : '1.5mm 0 0.5mm'
-  const doubleMargin = width === '80' ? '3mm 0' : '2mm 0'
+  const doubleMargin = width === '80' ? '2mm 0 1mm' : '1mm 0 0.5mm'
+  const totalMargin = width === '80' ? '2mm 0' : '1mm 0'
   const spacerMm = width === '80' ? 12 : 18
 
   return `
@@ -203,10 +206,19 @@ function buildTicketCss(width: '58' | '80'): string {
       padding: ${paddingMm};
       color: #000;
       background: #fff;
+      box-sizing: border-box;
     }
     .print-area * { color: #000; background: transparent; }
+    /* El ticket ocupa todo el ancho del rollo — sin max-width chico. */
+    .ticket-root {
+      width: 100%;
+      max-width: none;
+      box-sizing: border-box;
+    }
+    .ticket-root * { max-width: 100%; box-sizing: border-box; }
     .ticket-bold { font-weight: 700; }
     .ticket-center { text-align: center; }
+    .ticket-small { font-size: ${smallPx}px; line-height: 1.25; }
     .ticket-double-height {
       font-size: ${doubleHeightPx}px;
       font-weight: 700;
@@ -217,8 +229,16 @@ function buildTicketCss(width: '58' | '80'): string {
       font-size: ${doublePx}px;
       font-weight: 900;
       text-align: center;
-      line-height: 1.1;
+      line-height: 1.15;
       margin: ${doubleMargin};
+      text-transform: uppercase;
+      word-break: break-word;
+    }
+    .ticket-total {
+      font-size: ${totalPx}px;
+      font-weight: 900;
+      line-height: 1.2;
+      margin: ${totalMargin};
     }
     .ticket-sep {
       font-family: 'Courier New', Courier, monospace;
@@ -234,8 +254,11 @@ function buildTicketCss(width: '58' | '80'): string {
       display: flex;
       justify-content: space-between;
       gap: 4px;
+      width: 100%;
       font-variant-numeric: tabular-nums;
     }
+    .ticket-item { margin: 0.5mm 0; }
+    .ticket-indent { padding-left: 6mm; }
     .ticket-spacer { height: ${spacerMm}mm; }
   `
 }

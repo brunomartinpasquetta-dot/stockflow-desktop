@@ -111,8 +111,26 @@ body.printing #print-area { display: block; }
   @page { size: auto; margin: 0; }
 
   /* Helpers de tickets térmicos (58/80) */
+  /* El contenido del ticket SIEMPRE ocupa el ancho completo del rollo —
+     nunca un max-width chico (causaba el ticket angosto/recortado). */
+  #print-area .ticket-root {
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box;
+  }
+  #print-area .ticket-root * {
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
   #print-area .ticket-bold { font-weight: 700; }
   #print-area .ticket-center { text-align: center; }
+  #print-area .ticket-small {
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  body.printing-80 #print-area .ticket-small {
+    font-size: 14px;
+  }
   #print-area .ticket-double-height {
     font-size: 20px;
     font-weight: 700;
@@ -124,15 +142,17 @@ body.printing #print-area { display: block; }
     margin: 2mm 0 1mm;
   }
   #print-area .ticket-double {
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 900;
     text-align: center;
-    line-height: 1.1;
-    margin: 2mm 0;
+    line-height: 1.15;
+    margin: 1mm 0 0.5mm;
+    text-transform: uppercase;
+    word-break: break-word;
   }
   body.printing-80 #print-area .ticket-double {
-    font-size: 34px;
-    margin: 3mm 0;
+    font-size: 30px;
+    margin: 2mm 0 1mm;
   }
   #print-area .ticket-sep {
     font-family: 'Courier New', Courier, monospace !important;
@@ -152,7 +172,20 @@ body.printing #print-area { display: block; }
     display: flex;
     justify-content: space-between;
     gap: 4px;
+    width: 100%;
     font-variant-numeric: tabular-nums;
+  }
+  #print-area .ticket-item { margin: 0.5mm 0; }
+  #print-area .ticket-indent { padding-left: 6mm; }
+  #print-area .ticket-total {
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1.2;
+    margin: 1mm 0;
+  }
+  body.printing-80 #print-area .ticket-total {
+    font-size: 30px;
+    margin: 2mm 0;
   }
   /* Margen al fin del ticket — la térmica corta ~1cm dentro del contenido,
      así que damos aire para que el último item no quede pegado al corte. */

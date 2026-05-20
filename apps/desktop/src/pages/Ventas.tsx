@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Loader2, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
+import { List, Loader2, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import {
@@ -11,7 +11,9 @@ import {
   useCurrentCash,
   useCustomerBalances,
   useCustomers,
+  useFamilies,
   usePaymentMethods,
+  useSuppliers,
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
@@ -112,6 +114,161 @@ function CustomerPicker({
   )
 }
 
+/**
+ * Listado completo de artículos con filtros (patrón "listado de artículos"
+ * del StockFacil legacy). Doble click en una fila → carga el artículo al
+ * carrito. El modal queda abierto para cargar varios; se cierra con Escape
+ * o con el botón de cerrar.
+ */
+function ArticlePicker({
+  open,
+  articles,
+  families,
+  suppliers,
+  onClose,
+  onPick,
+}: {
+  open: boolean
+  articles: ArticleDTO[]
+  families: { id: string; name: string }[]
+  suppliers: { id: string; name: string; code: string }[]
+  onClose: () => void
+  onPick: (a: ArticleDTO) => void
+}) {
+  const [q, setQ] = useState('')
+  const [familyId, setFamilyId] = useState('')
+  const [brand, setBrand] = useState('')
+  const [supplierId, setSupplierId] = useState('')
+
+  const familyName = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const f of families) map.set(f.id, f.name)
+    return map
+  }, [families])
+
+  // Marcas presentes en los artículos (para el Select de marca).
+  const brands = useMemo(() => {
+    const set = new Set<string>()
+    for (const a of articles) if (a.brand) set.add(a.brand)
+    return [...set].sort((x, y) => x.localeCompare(y, 'es'))
+  }, [articles])
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase()
+    return articles
+      .filter((a) => {
+        if (familyId && a.familyId !== familyId) return false
+        if (brand && a.brand !== brand) return false
+        if (supplierId && a.supplierId !== supplierId) return false
+        if (term) {
+          const hay =
+            a.barcode.toLowerCase().includes(term) ||
+            a.description.toLowerCase().includes(term) ||
+            (a.brand?.toLowerCase().includes(term) ?? false)
+          if (!hay) return false
+        }
+        return true
+      })
+      .sort((x, y) => x.description.localeCompare(y.description, 'es'))
+      .slice(0, 300)
+  }, [articles, q, familyId, brand, supplierId])
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="flex max-h-[85vh] w-[92vw] max-w-5xl flex-col">
+        <DialogHeader>
+          <DialogTitle>Listado de artículos</DialogTitle>
+        </DialogHeader>
+
+        {/* Filtros */}
+        <div className="grid grid-cols-4 gap-2">
+          <Input
+            autoFocus
+            placeholder="Buscar por código, descripción o marca…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Select value={familyId} onChange={(e) => setFamilyId(e.target.value)}>
+            <option value="">Todas las familias</option>
+            {families.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
+          <Select value={brand} onChange={(e) => setBrand(e.target.value)}>
+            <option value="">Todas las marcas</option>
+            {brands.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </Select>
+          <Select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+            <option value="">Todos los proveedores</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.code} — {s.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          Doble click en una fila para agregarla a la venta · {filtered.length} artículo(s)
+        </div>
+
+        {/* Tabla */}
+        <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-muted">
+              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-2 py-1.5">Código</th>
+                <th className="px-2 py-1.5">Descripción</th>
+                <th className="px-2 py-1.5">Marca</th>
+                <th className="px-2 py-1.5">Familia</th>
+                <th className="px-2 py-1.5 text-right">Stock</th>
+                <th className="px-2 py-1.5 text-right">Precio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-muted-foreground">
+                    Sin resultados
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((a) => (
+                  <tr
+                    key={a.id}
+                    onDoubleClick={() => onPick(a)}
+                    className="cursor-pointer border-t hover:bg-accent"
+                    title="Doble click para agregar a la venta"
+                  >
+                    <td className="px-2 py-1 font-mono text-xs">{a.barcode}</td>
+                    <td className="px-2 py-1">{a.description}</td>
+                    <td className="px-2 py-1 text-muted-foreground">{a.brand ?? ''}</td>
+                    <td className="px-2 py-1 text-muted-foreground">
+                      {a.familyId ? (familyName.get(a.familyId) ?? '—') : '—'}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {formatNumber(a.stock, 3)}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {formatCurrency(a.listPrice1)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function NoCash() {
   const navigate = useNavigate()
   return (
@@ -138,6 +295,8 @@ function PDV() {
   const { currentUser } = useAuth()
   const canWrite = useCanWrite()
   const articlesQuery = useArticles()
+  const familiesQuery = useFamilies()
+  const suppliersQuery = useSuppliers()
   const customersQuery = useCustomers()
   const balancesQuery = useCustomerBalances()
   const paymentMethodsQuery = usePaymentMethods()
@@ -187,6 +346,7 @@ function PDV() {
   const [globalDiscount, setGlobalDiscount] = useState('0')
   const [isAccountSale, setIsAccountSale] = useState(false)
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
+  const [articlePickerOpen, setArticlePickerOpen] = useState(false)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
   // Medio de pago seleccionado en modo mono-medio (default: efectivo).
@@ -582,40 +742,51 @@ function PDV() {
 
       {/* ── Zona central: carrito ── */}
       <div className="flex min-h-0 flex-1 flex-col gap-2 rounded-lg border bg-card p-3">
-        <div className="relative">
-          <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={barcodeRef}
-            className="h-11 pl-10 text-base"
-            placeholder="Código o nombre del producto — escaneá o escribí y Enter"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitBarcode()
-              if (e.key === 'Escape' && barcode.trim() !== '') setBarcode('')
-            }}
-          />
-          {suggestions.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
-              {suggestions.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => {
-                    addArticle(a)
-                    setBarcode('')
-                    barcodeRef.current?.focus()
-                  }}
-                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-accent"
-                >
-                  <span className="truncate">
-                    <span className="font-mono text-xs text-muted-foreground">{a.barcode}</span> · {a.description}
-                  </span>
-                  <span className="ml-2 shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1'))}</span>
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="flex items-center gap-2">
+          <div className="relative w-1/2">
+            <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              ref={barcodeRef}
+              className="h-11 pl-10 text-base"
+              placeholder="Código o nombre del producto — escaneá o escribí y Enter"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitBarcode()
+                if (e.key === 'Escape' && barcode.trim() !== '') setBarcode('')
+              }}
+            />
+            {suggestions.length > 0 && (
+              <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
+                {suggestions.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => {
+                      addArticle(a)
+                      setBarcode('')
+                      barcodeRef.current?.focus()
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-accent"
+                  >
+                    <span className="truncate">
+                      <span className="font-mono text-xs text-muted-foreground">{a.barcode}</span> · {a.description}
+                    </span>
+                    <span className="ml-2 shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1'))}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            onClick={() => setArticlePickerOpen(true)}
+          >
+            <List className="mr-2 h-4 w-4" />
+            Ver todos
+          </Button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto rounded-md border">
@@ -831,6 +1002,17 @@ function PDV() {
       </div>
 
       <CustomerPicker open={customerPickerOpen} customers={customers} onClose={() => setCustomerPickerOpen(false)} onSelect={pickCustomer} />
+      <ArticlePicker
+        open={articlePickerOpen}
+        articles={allArticles}
+        families={familiesQuery.data ?? []}
+        suppliers={suppliersQuery.data ?? []}
+        onClose={() => {
+          setArticlePickerOpen(false)
+          barcodeRef.current?.focus()
+        }}
+        onPick={(a) => addArticle(a)}
+      />
       <WeightDialog
         open={pendingWeightArticle != null}
         articleDescription={pendingWeightArticle?.description}

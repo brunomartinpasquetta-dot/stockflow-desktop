@@ -737,7 +737,6 @@ export function Articulos() {
               suppliers={suppliers.data ?? []}
               inputsDisabled={inputsDisabled}
               canEditArticles={canEditArticles}
-              onEdit={startEdit}
               onSave={handleSave}
               onCancel={cancelEdit}
               saving={m.create.isPending || m.update.isPending}
@@ -787,7 +786,6 @@ interface ArticuloFormProps {
   suppliers: SupplierDTO[]
   inputsDisabled: boolean
   canEditArticles: boolean
-  onEdit: () => void
   onSave: () => void
   onCancel: () => void
   saving: boolean
@@ -808,7 +806,6 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
     suppliers,
     inputsDisabled,
     canEditArticles,
-    onEdit,
     onSave,
     onCancel,
     saving,
@@ -828,14 +825,6 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
           {mode === 'view' && 'Detalle del artículo'}
           {mode === 'edit' && 'Editando artículo'}
           {mode === 'create' && 'Nuevo artículo'}
-        </div>
-        <div className="flex gap-2">
-          {mode === 'view' && (
-            <Button size="sm" onClick={onEdit} disabled={!canEditArticles}>
-              <Pencil className="mr-1 h-4 w-4" />
-              Modificar
-            </Button>
-          )}
         </div>
       </div>
 
