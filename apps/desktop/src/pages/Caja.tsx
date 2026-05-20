@@ -153,6 +153,9 @@ function CajaAbierta({ registerId }: { registerId: string }) {
   const [closeAmount, setCloseAmount] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
 
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferAmount, setTransferAmount] = useState('0')
+
   // Deep-link `?action=close`: abrir el dialog de cierre al cargar.
   const [searchParamsOpen, setSearchParamsOpen] = useSearchParams()
   useEffect(() => {
@@ -174,6 +177,23 @@ function CajaAbierta({ registerId }: { registerId: string }) {
     setMovType('income')
     setMovPaymentMethodId('')
     setMovOpen(true)
+  }
+
+  async function confirmarTransferencia(): Promise<void> {
+    const amt = parseCurrencyInput(transferAmount)
+    if (Number(amt) <= 0) {
+      toast.error('El monto debe ser mayor a cero')
+      return
+    }
+    try {
+      await api.cashGeneral.transferFromDaily({ cashRegisterId: registerId, amount: amt })
+      toast.success(`Transferido ${formatCurrency(amt)} a Caja General`)
+      setTransferOpen(false)
+      setTransferAmount('0')
+      void report.refetch()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo transferir a Caja General')
+    }
   }
 
   async function guardarMovimiento(): Promise<void> {
@@ -239,26 +259,6 @@ function CajaAbierta({ registerId }: { registerId: string }) {
           ? undefined
           : { action: { label: 'Imprimir reporte', onClick: () => void printCashClose(reportData) } },
       )
-      // Oferta opcional: transferir el saldo contado a Caja General.
-      if (Number(amt) > 0) {
-        toast(
-          `¿Transferir ${formatCurrency(amt)} a Caja General?`,
-          {
-            duration: 12_000,
-            action: {
-              label: 'Transferir',
-              onClick: () => {
-                void api.cashGeneral
-                  .transferFromDaily({ cashRegisterId: registerId, amount: amt })
-                  .then(() => toast.success('Saldo transferido a Caja General'))
-                  .catch((err) =>
-                    toast.error(err instanceof Error ? err.message : 'No se pudo transferir a Caja General'),
-                  )
-              },
-            },
-          },
-        )
-      }
       setCloseAmount('')
       setCloseNotes('')
     } catch (err) {
@@ -337,16 +337,27 @@ function CajaAbierta({ registerId }: { registerId: string }) {
               </span>
             )}
           </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!canMove}
-            title={canMove ? undefined : 'Requiere permiso de encargado o administrador'}
-            onClick={openMovDialog}
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo movimiento
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canMove}
+              title={canMove ? undefined : 'Requiere permiso de encargado o administrador'}
+              onClick={() => { setTransferAmount('0'); setTransferOpen(true) }}
+            >
+              Transferir a Caja General
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canMove}
+              title={canMove ? undefined : 'Requiere permiso de encargado o administrador'}
+              onClick={openMovDialog}
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo movimiento
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -455,6 +466,31 @@ function CajaAbierta({ registerId }: { registerId: string }) {
               {addMovement.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Guardar
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: transferir a Caja General */}
+      <Dialog open={transferOpen} onOpenChange={(o) => { if (!o) setTransferOpen(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transferir a Caja General</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-md bg-muted px-3 py-2 text-sm">
+              Efectivo en el cajón: <span className="font-semibold tabular-nums">{formatCurrency(expected)}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="transfer-amount">Monto a transferir</Label>
+              <CurrencyInput id="transfer-amount" value={transferAmount} onChange={setTransferAmount} />
+              <span className="text-xs text-muted-foreground">
+                Se registra como egreso de esta caja y como ingreso en Caja General. Hacelo antes de cerrar la caja.
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferOpen(false)}>Cancelar</Button>
+            <Button onClick={() => void confirmarTransferencia()} disabled={!canWrite}>Transferir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
