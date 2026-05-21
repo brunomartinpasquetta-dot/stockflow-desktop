@@ -20,6 +20,13 @@ import { VatBookReport, type VatBookReportData } from '@/print/VatBookReport'
  * Devuelve la config de impresora (ancho lógico + opciones de impresión
  * silenciosa). El hook lee la config persistida; si todavía no cargó, devuelve
  * defaults seguros (58mm, con dialog).
+ *
+ * Impresión directa (v0.1.18): si hay una impresora del sistema configurada
+ * (`kind:'system'` con un `interface` válido) y el papel es térmico (58/80),
+ * el ticket se imprime SIEMPRE en modo silencioso, sin diálogo del SO. El flag
+ * `silentPrint` puede usarse como override para forzar el diálogo: si está
+ * explícitamente en `false`, se vuelve al `window.print()` con diálogo.
+ * Si el silent print falla, `printNode` ya hace fallback automático al diálogo.
  */
 function usePrintConfig(): { width: PrintWidth; opts: PrintOptions } {
   const cfgQuery = useQuery({
@@ -29,14 +36,18 @@ function usePrintConfig(): { width: PrintWidth; opts: PrintOptions } {
   })
   const cfg = cfgQuery.data
   const width = widthFromPaperFormat(cfg?.paperFormat)
-  // Impresión silenciosa: requiere kind:'system' (que el `interface` sea el
-  // nombre de impresora del SO) + flag activo + papel térmico (58/80).
-  const canSilent =
-    !!cfg && cfg.kind === 'system' && cfg.silentPrint === true && (width === '58' || width === '80')
+  // ¿Hay una impresora del sistema realmente configurada?
+  const hasSystemPrinter =
+    !!cfg && cfg.kind === 'system' && typeof cfg.interface === 'string' && cfg.interface.trim() !== ''
+  // Imprimir directo (silencioso) cuando hay impresora del sistema configurada
+  // y el papel es térmico. El toggle `silentPrint` sólo se respeta como override
+  // explícito para forzar el diálogo (silentPrint === false).
+  const forceDialog = !!cfg && cfg.silentPrint === false
+  const canSilent = hasSystemPrinter && !forceDialog && (width === '58' || width === '80')
   const opts: PrintOptions = {
     width,
     silent: canSilent,
-    deviceName: canSilent ? cfg.interface : undefined,
+    deviceName: canSilent && cfg ? cfg.interface : undefined,
   }
   return { width, opts }
 }

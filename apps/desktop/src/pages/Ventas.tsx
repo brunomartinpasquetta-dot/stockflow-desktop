@@ -560,6 +560,7 @@ function PDV() {
       customerName:
         cf || !customer ? null : `${customer.lastName}${customer.firstName ? `, ${customer.firstName}` : ''}`,
       customerDoc: !cf && customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
+      sellerName: currentUser?.fullName ?? null,
       isAccountSale: result.sale.isAccountSale,
       payments: ticketPayments,
     }

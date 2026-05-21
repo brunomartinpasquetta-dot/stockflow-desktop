@@ -96,7 +96,9 @@ function PrinterSection() {
   const [systemName, setSystemName] = useState<string>('')
   const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('58mm')
   const [autoOpen, setAutoOpen] = useState(true)
-  const [silentPrint, setSilentPrint] = useState(false)
+  // Override: mostrar el diálogo del SO en lugar de imprimir directo. Por
+  // defecto OFF → con impresora térmica configurada se imprime directo.
+  const [showDialog, setShowDialog] = useState(false)
   const [seeded, setSeeded] = useState<PrinterConfigDTO | null | undefined>(undefined)
   const [testing, setTesting] = useState(false)
 
@@ -105,7 +107,8 @@ function PrinterSection() {
     setSeeded(cfgQuery.data)
     if (cfgQuery.data) {
       setAutoOpen(cfgQuery.data.autoOpenDrawer)
-      setSilentPrint(cfgQuery.data.silentPrint === true)
+      // silentPrint === false fuerza el diálogo; cualquier otro valor → directo.
+      setShowDialog(cfgQuery.data.silentPrint === false)
       const fmt: PaperFormatDTO =
         cfgQuery.data.paperFormat ?? (cfgQuery.data.width === 58 ? '58mm' : '80mm')
       setPaperFormat(fmt)
@@ -160,7 +163,9 @@ function PrinterSection() {
       characterSet: 'PC858_EURO',
       autoOpenDrawer: autoOpen,
       paperFormat,
-      silentPrint: silentPrint && paperFormat !== 'A4',
+      // silentPrint:false fuerza el diálogo. Con impresora térmica y sin el
+      // override → se imprime directo (sin diálogo).
+      silentPrint: !showDialog,
     })
   }
 
@@ -233,16 +238,16 @@ function PrinterSection() {
           <input
             type="checkbox"
             className="mt-0.5"
-            checked={silentPrint}
-            onChange={(e) => setSilentPrint(e.target.checked)}
+            checked={showDialog}
+            onChange={(e) => setShowDialog(e.target.checked)}
             disabled={paperFormat === 'A4'}
           />
           <span className="flex flex-col">
-            <span>Impresión silenciosa (sin diálogo del sistema)</span>
+            <span>Mostrar diálogo de impresión</span>
             <span className="text-xs text-muted-foreground">
-              Manda el ticket directo a la impresora seleccionada arriba. Probá primero la impresión
-              con diálogo para asegurarte de que la impresora esté lista; después activá este modo.
-              Sólo aplica a tickets térmicos (58/80 mm).
+              Por defecto, con una impresora térmica (58/80 mm) configurada, los tickets se imprimen
+              directo sin diálogo del sistema. Activá esta opción sólo si necesitás que se abra el
+              diálogo nativo para elegir impresora o confirmar cada impresión.
             </span>
           </span>
         </label>
@@ -262,9 +267,9 @@ function PrinterSection() {
         </div>
 
         <p className="col-span-2 text-xs text-muted-foreground">
-          La impresión usa la cola del sistema operativo. Si activás "Impresión silenciosa", los
-          tickets salen directo sin diálogo (modo POS); si no, se abre el diálogo nativo para
-          confirmar.
+          La impresión usa la cola del sistema operativo. Con una impresora térmica configurada, los
+          tickets salen directo sin diálogo (modo POS). Si la impresión directa falla, StockFlow
+          vuelve automáticamente al diálogo nativo.
         </p>
       </CardContent>
     </Card>

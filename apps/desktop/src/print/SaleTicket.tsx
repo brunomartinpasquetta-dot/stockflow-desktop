@@ -1,5 +1,5 @@
 /**
- * Ticket de venta — diseño profesional no fiscal.
+ * Ticket de venta — diseño profesional.
  *
  * Usa las clases `ticket-*` definidas en `index.css` (@media print) y el CSS
  * inline de `printService.ts` para la impresión silenciosa. El contenido
@@ -25,6 +25,18 @@ const WIDTH = 32
 const SEP_EQ = '='.repeat(WIDTH)
 const SEP_DASH = '-'.repeat(WIDTH)
 
+/**
+ * Formatea la cantidad del ítem: entera sin decimales (`2`), o con hasta 3
+ * decimales sin ceros sobrantes para artículos vendidos por peso (`0,75`).
+ */
+function formatQuantity(value: string): string {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return value
+  return Number.isInteger(n)
+    ? formatNumber(n, 0)
+    : formatNumber(n, 3).replace(/0+$/, '').replace(/,$/, '')
+}
+
 export interface SaleTicketLine {
   description: string
   quantity: string
@@ -47,13 +59,15 @@ export interface SaleTicketData {
   customerName: string | null
   /** Documento del cliente ("DNI 12345678"); `null` si no aplica. */
   customerDoc: string | null
+  /** Nombre del vendedor que registró la venta; `null` si no se conoce. */
+  sellerName: string | null
   isAccountSale: boolean
   /** Desglose de pagos (vacío si es venta a cuenta corriente). La suma es igual al total. */
   payments: SaleTicketPayment[]
 }
 
 export function SaleTicket({ data }: { data: SaleTicketData }) {
-  const { company, sale, priceMode, lines, customerName, customerDoc, isAccountSale, payments } = data
+  const { company, sale, priceMode, lines, customerName, customerDoc, sellerName, isAccountSale, payments } = data
   const discountNum = Number(sale.discount)
   const vatNum = Number(sale.vatAmount)
   const subtotalNum = Number(sale.subtotal)
@@ -61,7 +75,6 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
   const netSubtotal = priceMode === 'gross' ? subtotalNum - vatNum : subtotalNum
   // Los comprobantes A discriminan IVA siempre (obligatorio fiscalmente).
   const discriminateVat = sale.type === 'A' || priceMode === 'net'
-  const isFiscal = sale.type === 'A' || sale.type === 'B' || sale.type === 'C'
 
   return (
     <div className="ticket-root">
@@ -74,13 +87,11 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
       <div className="ticket-sep">{SEP_EQ}</div>
 
       {/* ── Datos del comprobante ───────────────────────────── */}
-      <div className="ticket-bold ticket-center">
-        {isFiscal ? 'COMPROBANTE NO FISCAL' : VOUCHER_LABELS[sale.type]}
-      </div>
       <div className="ticket-bold">
         {VOUCHER_LABELS[sale.type]} N° {String(sale.number).padStart(8, '0')}
       </div>
       <div>{formatDateTime(sale.date)}</div>
+      {sellerName && <div>Vendedor: {sellerName}</div>}
       <div>Cliente: {customerName ?? 'Consumidor Final'}</div>
       {customerDoc && <div>{customerDoc}</div>}
 
@@ -88,7 +99,7 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
 
       {/* ── Items ───────────────────────────────────────────── */}
       <div className="ticket-bold">CANT  DESCRIPCIÓN</div>
-      <div className="ticket-bold ticket-row">
+      <div className="ticket-bold ticket-row ticket-indent">
         <span>P.UNIT</span>
         <span>SUBTOTAL</span>
       </div>
@@ -97,7 +108,7 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
       {lines.map((l, i) => (
         <div key={i} className="ticket-item">
           <div>
-            {formatNumber(l.quantity, 3)}  {l.description}
+            {formatQuantity(l.quantity)}  {l.description}
           </div>
           <div className="ticket-row ticket-indent">
             <span>{formatCurrency(l.unitPrice)}</span>
@@ -157,7 +168,9 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
       {/* ── Forma de pago ───────────────────────────────────── */}
       {isAccountSale ? (
         <div className="ticket-bold">Forma de pago: CUENTA CORRIENTE</div>
-      ) : (
+      ) : payments.length === 1 ? (
+        <div className="ticket-bold">Forma de pago: {payments[0]!.methodName}</div>
+      ) : payments.length > 1 ? (
         <>
           <div className="ticket-bold">Forma de pago:</div>
           {payments.map((p, i) => (
@@ -167,14 +180,12 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
             </div>
           ))}
         </>
-      )}
+      ) : null}
 
       <div className="ticket-sep">{SEP_EQ}</div>
 
       {/* ── Pie ─────────────────────────────────────────────── */}
       <div className="ticket-center ticket-bold">¡Gracias por su compra!</div>
-      <div className="ticket-center ticket-small">Documento no válido como</div>
-      <div className="ticket-center ticket-small">comprobante fiscal</div>
 
       <div className="ticket-spacer" />
     </div>
