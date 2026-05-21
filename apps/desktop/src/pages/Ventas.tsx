@@ -609,8 +609,8 @@ function PDV() {
           const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
           toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
         }
-      } catch {
-        toast.error('No se pudo imprimir el ticket')
+      } catch (err) {
+        toast.error(err instanceof Error ? `No se pudo imprimir: ${err.message}` : "No se pudo imprimir el ticket")
       }
 
       // Cajón de dinero: se abre si la venta llevó efectivo y la impresora
@@ -671,8 +671,8 @@ function PDV() {
           const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
           toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
         }
-      } catch {
-        toast.error('No se pudo imprimir el ticket')
+      } catch (err) {
+        toast.error(err instanceof Error ? `No se pudo imprimir: ${err.message}` : "No se pudo imprimir el ticket")
       }
       clearSale()
       void numberQuery.refetch()

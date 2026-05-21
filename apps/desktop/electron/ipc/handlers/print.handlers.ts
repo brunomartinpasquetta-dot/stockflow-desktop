@@ -182,14 +182,12 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         const execFileP = promisify(execFile);
 
         // 1) Render del HTML a PDF con una BrowserWindow oculta.
+        // NO deshabilitar JS ni usar sandbox: `printToPDF` puede fallar/colgar
+        // con `javascript:false`. La ventana sólo carga nuestro HTML de
+        // confianza (data URL), sin preload ni scripts → es seguro.
         const win = new BrowserWindow({
           show: false,
-          webPreferences: {
-            sandbox: true,
-            contextIsolation: true,
-            // Sin JS — sólo render del HTML inline.
-            javascript: false,
-          },
+          webPreferences: { contextIsolation: true },
         });
         let pdf: Buffer;
         try {
@@ -203,13 +201,18 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
             }
           });
           // Frame extra para que el layout quede aplicado.
-          await new Promise<void>((r) => setTimeout(r, 120));
+          await new Promise<void>((r) => setTimeout(r, 200));
           // pageSize en MICRONES. Ancho = rollo; alto = 297mm (el driver corta).
           pdf = await win.webContents.printToPDF({
             printBackground: true,
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
             pageSize: { width: widthMm * 1000, height: 297 * 1000 },
           });
+        } catch (err) {
+          throw new Error(
+            `No se pudo generar el PDF del ticket: ${err instanceof Error ? err.message : String(err)}`,
+            { cause: err },
+          );
         } finally {
           try {
             win.destroy();
