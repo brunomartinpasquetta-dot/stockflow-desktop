@@ -22,8 +22,49 @@ interface SilentPrintPayload {
   widthMm: 58 | 80;
 }
 
+interface PrintCurrentPayload {
+  deviceName?: string;
+  widthMm?: number;
+}
+
 export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
   return {
+    /**
+     * Imprime la VENTANA ACTUAL (la que disparó el IPC) en silencio, sin
+     * abrir el diálogo del SO. El renderer ya montó el ticket en `#print-area`
+     * y activó las clases `@media print` — acá sólo imprimimos esa misma
+     * ventana con `silent:true`. No re-renderiza nada: misma estructura que
+     * `window.print()`, sólo que sin diálogo de vista previa.
+     */
+    'print:current': unguarded(
+      deps,
+      async (payload: PrintCurrentPayload, _d, event): Promise<{ ok: true }> => {
+        const { webContents } = await import('electron');
+        const id = event?.webContentsId;
+        if (id == null) throw new Error('print:current sin webContents emisor');
+        const wc = webContents.fromId(id);
+        if (!wc) throw new Error('webContents no encontrado');
+        const widthMm = payload?.widthMm ?? 58;
+        await new Promise<void>((resolve, reject) => {
+          wc.print(
+            {
+              silent: true,
+              ...(payload?.deviceName ? { deviceName: payload.deviceName } : {}),
+              printBackground: true,
+              color: false,
+              margins: { marginType: 'none' },
+              pageSize: { width: widthMm * 1000, height: 297000 },
+            },
+            (success: boolean, failureReason?: string) => {
+              if (success) resolve();
+              else reject(new Error(failureReason || 'Print failed'));
+            },
+          );
+        });
+        return { ok: true };
+      },
+    ),
+
     'print:silent': unguarded(deps, async (payload: SilentPrintPayload): Promise<{ ok: true }> => {
       const { html, deviceName, widthMm } = payload ?? ({} as SilentPrintPayload);
       if (!html || !deviceName) {

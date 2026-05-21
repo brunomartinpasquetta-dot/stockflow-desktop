@@ -301,6 +301,8 @@ export const api = {
   print: {
     silent: (payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Promise<{ ok: true }> =>
       unwrap(sf().print.silent(payload)),
+    current: (payload: { deviceName?: string; widthMm?: number }): Promise<{ ok: true }> =>
+      unwrap(sf().print.current(payload)),
     listElectron: (): Promise<import('@/types/api').SystemPrinterDTO[]> =>
       unwrap(sf().print.listElectron()),
   },

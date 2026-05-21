@@ -86,23 +86,7 @@ export async function printNode(
   optsOrWidth: PrintWidth | PrintOptions = '58',
 ): Promise<void> {
   const opts = normalizeOpts(optsOrWidth)
-  const { width, silent, deviceName } = opts
-
-  // Modo silencioso: sólo soportado en tickets térmicos (58/80) y cuando el
-  // bridge IPC está disponible (Electron). Si falla, hacemos fallback al
-  // window.print() con dialog.
-  if (silent && deviceName && (width === '58' || width === '80')) {
-    try {
-      const html = await renderNodeToTicketHtml(node, width)
-      const widthMm: 58 | 80 = width === '80' ? 80 : 58
-      const { api } = await import('@/lib/api')
-      await api.print.silent({ html, deviceName, widthMm })
-      return
-    } catch (err) {
-      console.warn('[printService] silent print falló, fallback a dialog:', err)
-      // sigue al flujo normal
-    }
-  }
+  const { width, deviceName } = opts
 
   const area = getPrintArea()
   if (!area) return Promise.reject(new Error('No se pudo encontrar el área de impresión'))
@@ -122,29 +106,52 @@ export async function printNode(
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const finish = (): void => {
-            window.setTimeout(() => {
+          // Tickets térmicos (58/80): imprimir la VENTANA ACTUAL en silencio,
+          // sin diálogo de vista previa. Misma estructura que window.print()
+          // (el ticket ya está montado en #print-area con las clases @media
+          // print activas) — sólo que sin el diálogo del SO.
+          // A4 / fallback: window.print() con diálogo.
+          const printViaDialog = (): void => {
+            const finish = (): void => {
+              window.setTimeout(() => {
+                cleanup()
+                resolve()
+              }, 0)
+            }
+            const onAfter = (): void => {
+              window.removeEventListener('afterprint', onAfter)
+              finish()
+            }
+            window.addEventListener('afterprint', onAfter, { once: true })
+            cleanupTimer = window.setTimeout(() => {
+              window.removeEventListener('afterprint', onAfter)
+              finish()
+            }, 10_000)
+            try {
+              window.print()
+            } catch (err) {
               cleanup()
-              resolve()
-            }, 0)
+              reject(err)
+            }
           }
 
-          const onAfter = (): void => {
-            window.removeEventListener('afterprint', onAfter)
-            finish()
-          }
-          window.addEventListener('afterprint', onAfter, { once: true })
-
-          cleanupTimer = window.setTimeout(() => {
-            window.removeEventListener('afterprint', onAfter)
-            finish()
-          }, 10_000)
-
-          try {
-            window.print()
-          } catch (err) {
-            cleanup()
-            reject(err)
+          if (width === '58' || width === '80') {
+            const widthMm = width === '80' ? 80 : 58
+            void (async () => {
+              try {
+                const { api } = await import('@/lib/api')
+                await api.print.current({ deviceName, widthMm })
+                cleanup()
+                resolve()
+              } catch (err) {
+                // Si la impresión silenciosa falla, caemos al diálogo del SO
+                // para que el ticket igual salga.
+                console.warn('[printService] print:current falló, fallback a diálogo:', err)
+                printViaDialog()
+              }
+            })()
+          } else {
+            printViaDialog()
           }
         })
       })
@@ -163,109 +170,4 @@ export function widthFromPaperFormat(fmt: '58mm' | '80mm' | 'A4' | undefined | n
   if (fmt === '80mm') return '80'
   if (fmt === 'A4') return 'a4'
   return '58'
-}
-
-/* -------------------------------------------------------------------------- */
-/* Render a HTML para impresión silenciosa                                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Subset del CSS de `index.css` necesario para que el ticket impreso por la
- * BrowserWindow oculta tenga el mismo aspecto que en el flujo normal. Se
- * inlinea en el `<style>` del documento data:text/html para no depender de
- * recursos externos en la ventana invisible.
- */
-function buildTicketCss(width: '58' | '80'): string {
-  const widthMm = width === '80' ? 80 : 58
-  const paddingMm = width === '80' ? '4mm 3mm' : '3mm 2mm'
-  const fontPx = width === '80' ? 18 : 14
-  const smallPx = width === '80' ? 14 : 11
-  const doubleHeightPx = width === '80' ? 26 : 20
-  const doublePx = width === '80' ? 30 : 22
-  const totalPx = width === '80' ? 30 : 22
-  const sepPx = width === '80' ? 14 : 11
-  const sepMargin = width === '80' ? '2mm 0' : '1.5mm 0'
-  const doubleHeightMargin = width === '80' ? '2mm 0 1mm' : '1.5mm 0 0.5mm'
-  const doubleMargin = width === '80' ? '2mm 0 1mm' : '1mm 0 0.5mm'
-  const totalMargin = width === '80' ? '2mm 0' : '1mm 0'
-  const spacerMm = width === '80' ? 12 : 18
-
-  return `
-    @page { size: ${widthMm}mm auto; margin: 0; }
-    html, body { margin: 0; padding: 0; }
-    body {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: ${fontPx}px;
-      font-weight: 600;
-      line-height: 1.3;
-      color: #000;
-      background: #fff;
-    }
-    .print-area {
-      width: ${widthMm}mm;
-      padding: ${paddingMm};
-      color: #000;
-      background: #fff;
-      box-sizing: border-box;
-    }
-    .print-area * { color: #000; background: transparent; }
-    /* El ticket ocupa todo el ancho del rollo — sin max-width chico. */
-    .ticket-root {
-      width: 100%;
-      max-width: none;
-      box-sizing: border-box;
-    }
-    .ticket-root * { max-width: 100%; box-sizing: border-box; }
-    .ticket-bold { font-weight: 700; }
-    .ticket-center { text-align: center; }
-    .ticket-small { font-size: ${smallPx}px; line-height: 1.25; }
-    .ticket-double-height {
-      font-size: ${doubleHeightPx}px;
-      font-weight: 700;
-      line-height: 1.2;
-      margin: ${doubleHeightMargin};
-    }
-    .ticket-double {
-      font-size: ${doublePx}px;
-      font-weight: 900;
-      text-align: center;
-      line-height: 1.15;
-      margin: ${doubleMargin};
-      text-transform: uppercase;
-      word-break: break-word;
-    }
-    .ticket-total {
-      font-size: ${totalPx}px;
-      font-weight: 900;
-      line-height: 1.2;
-      margin: ${totalMargin};
-    }
-    .ticket-sep {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: ${sepPx}px;
-      letter-spacing: -0.5px;
-      overflow: hidden;
-      white-space: nowrap;
-      line-height: 1;
-      margin: ${sepMargin};
-      font-weight: 700;
-    }
-    .ticket-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 4px;
-      width: 100%;
-      font-variant-numeric: tabular-nums;
-    }
-    .ticket-item { margin: 0.5mm 0; }
-    .ticket-indent { padding-left: 6mm; }
-    .ticket-spacer { height: ${spacerMm}mm; }
-  `
-}
-
-async function renderNodeToTicketHtml(node: ReactElement, width: '58' | '80'): Promise<string> {
-  const { renderToString } = await import('react-dom/server')
-  const body = renderToString(node)
-  const css = buildTicketCss(width)
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div class="print-area">${body}</div></body></html>`
 }
