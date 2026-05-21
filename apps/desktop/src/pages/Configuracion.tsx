@@ -123,6 +123,12 @@ function PrinterSection() {
     if (def) setSystemName(def.name)
   }
 
+  // Nombre de la impresora que recibirá los tickets en modo directo (silencioso).
+  // Es la elegida en el dropdown, mientras el papel sea térmico y no se haya
+  // forzado el diálogo. Sirve para mostrar el cartel de estado.
+  const directPrintName =
+    paperFormat !== 'A4' && !showDialog && systemName.trim() !== '' ? systemName.trim() : null
+
   const saveMut = useMutation({
     mutationFn: (cfg: PrinterConfigDTO) => api.hardware.printer.setConfig(cfg),
     onSuccess: () => {
@@ -208,6 +214,11 @@ function PrinterSection() {
             <p className="text-xs text-muted-foreground">
               No se detectaron impresoras instaladas en el sistema. Instalala primero desde el SO y
               después refrescá.
+            </p>
+          )}
+          {directPrintName && (
+            <p className="rounded-md bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              Impresión directa activa — impresora: <span className="font-medium">{directPrintName}</span>
             </p>
           )}
         </div>
