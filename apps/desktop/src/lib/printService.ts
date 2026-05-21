@@ -86,7 +86,7 @@ export async function printNode(
   optsOrWidth: PrintWidth | PrintOptions = '58',
 ): Promise<void> {
   const opts = normalizeOpts(optsOrWidth)
-  const { width, deviceName } = opts
+  const { width } = opts
 
   const area = getPrintArea()
   if (!area) return Promise.reject(new Error('No se pudo encontrar el área de impresión'))
@@ -104,54 +104,33 @@ export async function printNode(
         width === '80' ? 'printing-80' : width === 'a4' ? 'printing-a4' : 'printing-58'
       document.body.classList.add(widthClass)
 
+      // Patrón canónico (SINATRA / DripBurger): montar en #print-area +
+      // @media print + window.print(). El diálogo del SO renderiza el ticket
+      // vía el driver de la impresora — funciona en cualquier impresora
+      // instalada en el SO. NO usar webContents.print silencioso: con drivers
+      // térmicos genéricos produce basura (bytes crudos sin interpretar).
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          // Tickets térmicos (58/80): imprimir la VENTANA ACTUAL en silencio,
-          // sin diálogo de vista previa. Misma estructura que window.print()
-          // (el ticket ya está montado en #print-area con las clases @media
-          // print activas) — sólo que sin el diálogo del SO.
-          // A4 / fallback: window.print() con diálogo.
-          const printViaDialog = (): void => {
-            const finish = (): void => {
-              window.setTimeout(() => {
-                cleanup()
-                resolve()
-              }, 0)
-            }
-            const onAfter = (): void => {
-              window.removeEventListener('afterprint', onAfter)
-              finish()
-            }
-            window.addEventListener('afterprint', onAfter, { once: true })
-            cleanupTimer = window.setTimeout(() => {
-              window.removeEventListener('afterprint', onAfter)
-              finish()
-            }, 10_000)
-            try {
-              window.print()
-            } catch (err) {
+          const finish = (): void => {
+            window.setTimeout(() => {
               cleanup()
-              reject(err)
-            }
+              resolve()
+            }, 0)
           }
-
-          if (width === '58' || width === '80') {
-            const widthMm = width === '80' ? 80 : 58
-            void (async () => {
-              try {
-                const { api } = await import('@/lib/api')
-                await api.print.current({ deviceName, widthMm })
-                cleanup()
-                resolve()
-              } catch (err) {
-                // Si la impresión silenciosa falla, caemos al diálogo del SO
-                // para que el ticket igual salga.
-                console.warn('[printService] print:current falló, fallback a diálogo:', err)
-                printViaDialog()
-              }
-            })()
-          } else {
-            printViaDialog()
+          const onAfter = (): void => {
+            window.removeEventListener('afterprint', onAfter)
+            finish()
+          }
+          window.addEventListener('afterprint', onAfter, { once: true })
+          cleanupTimer = window.setTimeout(() => {
+            window.removeEventListener('afterprint', onAfter)
+            finish()
+          }, 10_000)
+          try {
+            window.print()
+          } catch (err) {
+            cleanup()
+            reject(err)
           }
         })
       })

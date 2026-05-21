@@ -37,36 +37,8 @@ function usePrintConfig(): { width: PrintWidth; opts: PrintOptions } {
     queryFn: () => api.hardware.printer.getConfig(),
     staleTime: 30_000,
   })
-  // Lista de impresoras del SO vía Electron (devuelve el deviceName EXACTO).
-  const printersQuery = useQuery({
-    queryKey: ['print', 'electron-printers'],
-    queryFn: () => api.print.listElectron(),
-    staleTime: 30_000,
-  })
-  const cfg = cfgQuery.data
-  const width = widthFromPaperFormat(cfg?.paperFormat)
-
-  // deviceName: 1) el configurado si existe y kind='system'; 2) la impresora
-  // por defecto del SO; 3) la primera impresora disponible.
-  const printers = printersQuery.data ?? []
-  const configuredName =
-    cfg && cfg.kind === 'system' && typeof cfg.interface === 'string' && cfg.interface.trim() !== ''
-      ? cfg.interface.trim()
-      : null
-  const defaultPrinter = printers.find((p) => p.isDefault)?.name ?? printers[0]?.name ?? null
-  const deviceName = configuredName ?? defaultPrinter ?? undefined
-
-  // Override: si el usuario forzó el diálogo explícitamente.
-  const forceDialog = !!cfg && cfg.silentPrint === false
-  // Silencioso si hay deviceName y el papel es térmico (58/80).
-  const canSilent = !!deviceName && !forceDialog && (width === '58' || width === '80')
-
-  const opts: PrintOptions = {
-    width,
-    silent: canSilent,
-    deviceName: canSilent ? deviceName : undefined,
-  }
-  return { width, opts }
+  const width = widthFromPaperFormat(cfgQuery.data?.paperFormat)
+  return { width, opts: { width } }
 }
 
 export function usePrintSaleTicket() {
