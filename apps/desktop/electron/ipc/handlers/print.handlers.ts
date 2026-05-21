@@ -27,6 +27,15 @@ interface PrintCurrentPayload {
   widthMm?: number;
 }
 
+interface PrintTicketAutoPayload {
+  /** Documento HTML completo del ticket (standalone, con CSS inline). */
+  html: string;
+  /** Ancho del rollo en mm (58 u 80). */
+  widthMm: number;
+  /** Nombre base del archivo, p.ej. "ticket-venta-B-00000123". */
+  fileName: string;
+}
+
 export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
   return {
     /**
@@ -138,6 +147,124 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         }
       }
     }),
+
+    /**
+     * Impresión automática del ticket SIN diálogo (Feature v0.1.22).
+     *
+     * En vez del `webContents.print({ silent:true })` —que con drivers
+     * genéricos de CUPS produce basura infinita en térmicas— renderizamos el
+     * ticket a un PDF real con `printToPDF()` y se lo mandamos a la impresora
+     * vía `lp` (CUPS). CUPS rasteriza ese PDF con el driver real, igual que el
+     * diálogo del SO, pero sin diálogo.
+     *
+     * Si no hay impresora (o `lp` falla, o estamos en Windows), el PDF se
+     * guarda en el Escritorio del usuario y se avisa devolviendo `printed:false`.
+     */
+    'print:ticketAuto': unguarded(
+      deps,
+      async (
+        payload: PrintTicketAutoPayload,
+      ): Promise<{ printed: boolean; pdfPath: string | null }> => {
+        const { html, widthMm, fileName } = payload ?? ({} as PrintTicketAutoPayload);
+        if (!html || !fileName) {
+          throw new Error('print:ticketAuto requiere html + fileName');
+        }
+        if (widthMm !== 58 && widthMm !== 80) {
+          throw new Error(`Ancho inválido: ${String(widthMm)} (esperado 58 o 80)`);
+        }
+
+        const { BrowserWindow } = await import('electron');
+        const { writeFile, unlink } = await import('node:fs/promises');
+        const { tmpdir, homedir } = await import('node:os');
+        const { join } = await import('node:path');
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        const execFileP = promisify(execFile);
+
+        // 1) Render del HTML a PDF con una BrowserWindow oculta.
+        const win = new BrowserWindow({
+          show: false,
+          webPreferences: {
+            sandbox: true,
+            contextIsolation: true,
+            // Sin JS — sólo render del HTML inline.
+            javascript: false,
+          },
+        });
+        let pdf: Buffer;
+        try {
+          const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+          await win.loadURL(dataUrl);
+          await new Promise<void>((resolve) => {
+            if (win.webContents.isLoading()) {
+              win.webContents.once('did-finish-load', () => resolve());
+            } else {
+              resolve();
+            }
+          });
+          // Frame extra para que el layout quede aplicado.
+          await new Promise<void>((r) => setTimeout(r, 120));
+          // pageSize en MICRONES. Ancho = rollo; alto = 297mm (el driver corta).
+          pdf = await win.webContents.printToPDF({
+            printBackground: true,
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            pageSize: { width: widthMm * 1000, height: 297 * 1000 },
+          });
+        } finally {
+          try {
+            win.destroy();
+          } catch {
+            /* noop */
+          }
+        }
+
+        // 2) ¿Hay impresora? Resolver vía lpstat (LANG=C). macOS/Linux.
+        const LPSTAT = '/usr/bin/lpstat';
+        const LP = '/usr/bin/lp';
+        const env = { ...process.env, LANG: 'C', LC_ALL: 'C' };
+        const isUnix = process.platform === 'darwin' || process.platform === 'linux';
+        let printerName: string | null = null;
+        if (isUnix) {
+          try {
+            // Impresora por defecto.
+            const { stdout: dOut } = await execFileP(LPSTAT, ['-d'], { env });
+            const m = dOut.match(/:\s*(\S+)/);
+            if (m) printerName = m[1] ?? null;
+            if (!printerName) {
+              const { stdout: eOut } = await execFileP(LPSTAT, ['-e'], { env });
+              printerName =
+                eOut
+                  .split('\n')
+                  .map((l) => l.trim())
+                  .filter(Boolean)[0] ?? null;
+            }
+          } catch {
+            printerName = null;
+          }
+        }
+
+        // 3a) Hay impresora → imprimir el PDF con lp.
+        if (printerName && isUnix) {
+          const tmpFile = join(tmpdir(), `stockflow-${fileName}-${Date.now()}.pdf`);
+          await writeFile(tmpFile, pdf);
+          try {
+            await execFileP(LP, ['-d', printerName, tmpFile], { env });
+            return { printed: true, pdfPath: null };
+          } catch {
+            // Si lp falla, caemos al guardado en Escritorio (3b).
+          } finally {
+            unlink(tmpFile).catch(() => {
+              /* noop */
+            });
+          }
+        }
+
+        // 3b) Sin impresora (o lp falló, o Windows) → guardar PDF en el Escritorio.
+        const desktopPath = join(homedir(), 'Desktop', `${fileName}.pdf`);
+        await writeFile(desktopPath, pdf);
+        return { printed: false, pdfPath: desktopPath };
+      },
+    ),
 
     /**
      * Lista las impresoras vistas por Electron vía `webContents.getPrintersAsync()`.

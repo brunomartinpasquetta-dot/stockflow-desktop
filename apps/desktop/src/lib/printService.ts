@@ -150,3 +150,109 @@ export function widthFromPaperFormat(fmt: '58mm' | '80mm' | 'A4' | undefined | n
   if (fmt === 'A4') return 'a4'
   return '58'
 }
+
+/**
+ * Construye un documento HTML standalone del ticket, con TODO el CSS de las
+ * clases `ticket-*` inlineado. Los valores px/mm son los mismos que el bloque
+ * `@media print` de `index.css` (sección tickets térmicos), adaptados a 58/80mm.
+ *
+ * Se usa para la impresión automática (`autoPrintTicket`): el main process lo
+ * renderiza a PDF con `printToPDF()` y lo manda a la impresora vía `lp`.
+ */
+export function buildStandaloneTicketHtml(body: string, width: '58' | '80'): string {
+  const is80 = width === '80'
+  // Tamaños espejados de index.css (#print-area .ticket-* y body.printing-80 …).
+  const small = is80 ? 14 : 11
+  const sep = is80 ? 14 : 11
+  const dbl = is80 ? 30 : 22
+  const total = is80 ? 30 : 22
+  const dblMargin = is80 ? '2mm 0 1mm' : '1mm 0 0.5mm'
+  const sepMargin = is80 ? '2mm 0' : '1.5mm 0'
+  const totalMargin = is80 ? '2mm 0' : '1mm 0'
+  const spacer = is80 ? 12 : 18
+
+  const css = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: ${width}mm;
+      color: #000;
+      background: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+    body { padding: 0; }
+    .ticket-root {
+      width: 100%;
+      max-width: none;
+      box-sizing: border-box;
+    }
+    .ticket-root * { max-width: 100%; box-sizing: border-box; }
+    .ticket-bold { font-weight: 700; }
+    .ticket-center { text-align: center; }
+    .ticket-small { font-size: ${small}px; line-height: 1.25; }
+    .ticket-double {
+      font-size: ${dbl}px;
+      font-weight: 900;
+      text-align: center;
+      line-height: 1.15;
+      margin: ${dblMargin};
+      text-transform: uppercase;
+      word-break: break-word;
+    }
+    .ticket-sep {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: ${sep}px;
+      letter-spacing: -0.5px;
+      overflow: hidden;
+      white-space: nowrap;
+      line-height: 1;
+      margin: ${sepMargin};
+      font-weight: 700;
+    }
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+      width: 100%;
+      font-variant-numeric: tabular-nums;
+    }
+    .ticket-item { margin: 0.5mm 0; }
+    .ticket-indent { padding-left: 6mm; }
+    .ticket-total {
+      font-size: ${total}px;
+      font-weight: 900;
+      line-height: 1.2;
+      margin: ${totalMargin};
+    }
+    .ticket-spacer { height: ${spacer}mm; }
+    @page { size: auto; margin: 0; }
+  `
+
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>${css}</style>
+</head>
+<body>${body}</body>
+</html>`
+}
+
+/**
+ * Imprime el ticket automáticamente (sin diálogo). Renderiza el nodo a un
+ * documento HTML standalone, lo manda al main process que genera el PDF y lo
+ * imprime vía CUPS (lp). Si no hay impresora, el PDF se guarda en el Escritorio.
+ * Devuelve { printed, pdfPath } para que el caller avise al usuario.
+ */
+export async function autoPrintTicket(
+  node: ReactElement,
+  width: '58' | '80',
+  fileName: string,
+): Promise<{ printed: boolean; pdfPath: string | null }> {
+  const { renderToString } = await import('react-dom/server')
+  const body = renderToString(node)
+  const html = buildStandaloneTicketHtml(body, width)
+  const { api } = await import('@/lib/api')
+  return api.print.ticketAuto({ html, widthMm: width === '80' ? 80 : 58, fileName })
+}

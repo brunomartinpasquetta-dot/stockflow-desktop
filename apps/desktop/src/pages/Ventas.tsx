@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { List, Loader2, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
@@ -17,12 +17,12 @@ import {
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
-import { usePrintSaleTicket } from '@/lib/usePrint'
+import { autoPrintTicket, widthFromPaperFormat } from '@/lib/printService'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
 import { CurrencyInput } from '@/components/ui/currency-input'
-import type { SaleTicketData, SaleTicketLine, SaleTicketPayment } from '@/print/SaleTicket'
+import { SaleTicket, type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import { WeightDialog } from '@/components/WeightDialog'
@@ -51,9 +51,6 @@ const VOUCHER_OPTIONS: { value: VoucherType; label: string }[] = [
   { value: 'C', label: 'Factura C' },
   { value: 'X', label: 'Comprobante X' },
 ]
-
-/** Imprimir el ticket automáticamente al confirmar la venta (sin pasar por el toast). */
-const AUTO_PRINT_TICKET = false
 
 function isCfCustomer(c: CustomerDTO | null): boolean {
   return c == null || c.lastName.toUpperCase() === 'CONSUMIDOR FINAL' || c.docType === 'CF'
@@ -302,7 +299,6 @@ function PDV() {
   const paymentMethodsQuery = usePaymentMethods()
   const companyQuery = useCompany()
   const createSale = useCreateSale()
-  const printSaleTicket = usePrintSaleTicket()
   const printerConfigQuery = useQuery({
     queryKey: ['hardwarePrinterConfig'],
     queryFn: () => api.hardware.printer.getConfig(),
@@ -596,28 +592,38 @@ function PDV() {
       })
       const ticketData = buildTicket(result)
       const printerCfg = printerConfigQuery.data ?? null
-      let printed = false
-      if (printerCfg && AUTO_PRINT_TICKET) {
-        try {
-          await printSaleTicket(ticketData)
-          printed = true
-        } catch {
-          toast.warning('No se pudo imprimir el ticket — usá "Imprimir" para reintentar')
+
+      // La venta YA quedó registrada. La impresión es un paso posterior que,
+      // si falla, NO revierte nada.
+      const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
+      const ticketFileName = `ticket-venta-${result.sale.type}-${String(result.sale.number).padStart(8, '0')}`
+      try {
+        const { printed, pdfPath } = await autoPrintTicket(
+          createElement(SaleTicket, { data: ticketData }),
+          ticketWidth,
+          ticketFileName,
+        )
+        if (printed) {
+          toast.success('Venta registrada')
+        } else {
+          const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
+          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
         }
-        if (printerCfg.autoOpenDrawer && !result.sale.isAccountSale) {
-          const cashMethodId = activeMethods.find((m) => m.type === 'cash')?.id
-          const hasCash =
-            cashMethodId != null &&
-            result.payments.some((p) => p.paymentMethodId === cashMethodId && Number(p.amount) > 0)
-          if (hasCash) {
-            api.hardware.cashDrawer.open().catch(() => {})
-          }
+      } catch {
+        toast.error('No se pudo imprimir el ticket')
+      }
+
+      // Cajón de dinero: se abre si la venta llevó efectivo y la impresora
+      // tiene la apertura automática activada.
+      if (printerCfg?.autoOpenDrawer && !result.sale.isAccountSale) {
+        const cashMethodId = activeMethods.find((m) => m.type === 'cash')?.id
+        const hasCash =
+          cashMethodId != null &&
+          result.payments.some((p) => p.paymentMethodId === cashMethodId && Number(p.amount) > 0)
+        if (hasCash) {
+          api.hardware.cashDrawer.open().catch(() => {})
         }
       }
-      toast.success(
-        `Venta ${result.sale.type} #${result.sale.number} registrada — Total ${formatCurrency(result.sale.total)}`,
-        printed ? undefined : { action: { label: 'Imprimir', onClick: () => void printSaleTicket(ticketData) } },
-      )
       clearSale()
       void numberQuery.refetch()
     } catch (err) {
@@ -650,6 +656,24 @@ function PDV() {
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} cobrada con MercadoPago QR — ${formatCurrency(result.sale.total)}`,
       )
+      // Impresión automática del ticket (sin diálogo) — la venta ya quedó registrada.
+      const ticketData = buildTicket(result)
+      const printerCfg = printerConfigQuery.data ?? null
+      const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
+      const ticketFileName = `ticket-venta-${result.sale.type}-${String(result.sale.number).padStart(8, '0')}`
+      try {
+        const { printed, pdfPath } = await autoPrintTicket(
+          createElement(SaleTicket, { data: ticketData }),
+          ticketWidth,
+          ticketFileName,
+        )
+        if (!printed) {
+          const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
+          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
+        }
+      } catch {
+        toast.error('No se pudo imprimir el ticket')
+      }
       clearSale()
       void numberQuery.refetch()
     } catch (err) {
