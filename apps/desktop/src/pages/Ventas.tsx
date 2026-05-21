@@ -17,7 +17,7 @@ import {
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
-import { autoPrintTicket, widthFromPaperFormat } from '@/lib/printService'
+import { autoPrintTicket, printNode, widthFromPaperFormat } from '@/lib/printService'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
@@ -35,7 +35,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQuery } from '@tanstack/react-query'
-import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, PriceMode, VoucherType } from '@/types/api'
+import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, PriceMode, PrinterConfigDTO, VoucherType } from '@/types/api'
 
 interface CartLine {
   article: ArticleDTO
@@ -562,6 +562,50 @@ function PDV() {
     }
   }
 
+  /**
+   * Imprime el ticket de una venta ya registrada. Respeta el toggle de
+   * Configuración:
+   *  - `silentPrint === false` → el usuario eligió "Imprimir con diálogo del
+   *    sistema": se imprime con `printNode` (window.print + diálogo del SO),
+   *    exactamente el mismo mecanismo que "Probar impresión". Es la vía 100%
+   *    confiable.
+   *  - cualquier otro valor (default) → impresión automática vía `lp` (sin
+   *    diálogo). Si no hay impresora, el PDF queda en el Escritorio.
+   * Si la impresión falla, NO revierte la venta — sólo avisa.
+   */
+  async function printSaleTicket(
+    ticketData: SaleTicketData,
+    result: CreateSaleResultDTO,
+    printerCfg: PrinterConfigDTO | null,
+  ): Promise<void> {
+    const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
+    const ticketFileName = `ticket-venta-${result.sale.type}-${String(result.sale.number).padStart(8, '0')}`
+    const useDialog = printerCfg?.silentPrint === false
+    try {
+      if (useDialog) {
+        // Mismo mecanismo que "Probar impresión": window.print() con diálogo.
+        await printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
+        toast.success('Venta registrada')
+        return
+      }
+      const { printed, pdfPath } = await autoPrintTicket(
+        createElement(SaleTicket, { data: ticketData }),
+        ticketWidth,
+        ticketFileName,
+      )
+      if (printed) {
+        toast.success('Venta registrada')
+      } else {
+        const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
+        toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? `No se pudo imprimir: ${err.message}` : 'No se pudo imprimir el ticket',
+      )
+    }
+  }
+
   async function confirmar(): Promise<void> {
     if (!effectiveCustomerId || !canConfirm) return
     // Si el modo mono-medio elige MercadoPago QR, derivar al modal de cobro QR.
@@ -595,23 +639,7 @@ function PDV() {
 
       // La venta YA quedó registrada. La impresión es un paso posterior que,
       // si falla, NO revierte nada.
-      const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
-      const ticketFileName = `ticket-venta-${result.sale.type}-${String(result.sale.number).padStart(8, '0')}`
-      try {
-        const { printed, pdfPath } = await autoPrintTicket(
-          createElement(SaleTicket, { data: ticketData }),
-          ticketWidth,
-          ticketFileName,
-        )
-        if (printed) {
-          toast.success('Venta registrada')
-        } else {
-          const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
-          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
-        }
-      } catch (err) {
-        toast.error(err instanceof Error ? `No se pudo imprimir: ${err.message}` : "No se pudo imprimir el ticket")
-      }
+      await printSaleTicket(ticketData, result, printerCfg)
 
       // Cajón de dinero: se abre si la venta llevó efectivo y la impresora
       // tiene la apertura automática activada.
@@ -656,24 +684,10 @@ function PDV() {
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} cobrada con MercadoPago QR — ${formatCurrency(result.sale.total)}`,
       )
-      // Impresión automática del ticket (sin diálogo) — la venta ya quedó registrada.
+      // Impresión del ticket — la venta ya quedó registrada.
       const ticketData = buildTicket(result)
       const printerCfg = printerConfigQuery.data ?? null
-      const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
-      const ticketFileName = `ticket-venta-${result.sale.type}-${String(result.sale.number).padStart(8, '0')}`
-      try {
-        const { printed, pdfPath } = await autoPrintTicket(
-          createElement(SaleTicket, { data: ticketData }),
-          ticketWidth,
-          ticketFileName,
-        )
-        if (!printed) {
-          const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
-          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
-        }
-      } catch (err) {
-        toast.error(err instanceof Error ? `No se pudo imprimir: ${err.message}` : "No se pudo imprimir el ticket")
-      }
+      await printSaleTicket(ticketData, result, printerCfg)
       clearSale()
       void numberQuery.refetch()
     } catch (err) {

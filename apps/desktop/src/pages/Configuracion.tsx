@@ -251,14 +251,13 @@ function PrinterSection() {
             className="mt-0.5"
             checked={showDialog}
             onChange={(e) => setShowDialog(e.target.checked)}
-            disabled={paperFormat === 'A4'}
           />
           <span className="flex flex-col">
-            <span>Mostrar diálogo de impresión</span>
+            <span>Imprimir con diálogo del sistema</span>
             <span className="text-xs text-muted-foreground">
-              Por defecto, con una impresora térmica (58/80 mm) configurada, los tickets se imprimen
-              directo sin diálogo del sistema. Activá esta opción sólo si necesitás que se abra el
-              diálogo nativo para elegir impresora o confirmar cada impresión.
+              Si la impresión automática no funciona en tu equipo, activá esta opción: al confirmar
+              una venta se abre el diálogo de impresión (como en "Probar impresión"). Es la opción
+              más confiable.
             </span>
           </span>
         </label>

@@ -171,6 +171,13 @@ export function buildStandaloneTicketHtml(body: string, width: '58' | '80'): str
   const totalMargin = is80 ? '2mm 0' : '1mm 0'
   const spacer = is80 ? 12 : 18
 
+  // El papel físico es 58/80mm, pero el área IMPRIMIBLE de un rollo térmico es
+  // menor (un rollo de 58mm imprime ~48mm; uno de 80mm, ~72mm). El PDF se
+  // genera al ancho del papel físico (pageSize), pero el contenido del ticket
+  // se acota al área imprimible con un margen de seguridad → nunca se corta a
+  // la derecha.
+  const contentWidth = is80 ? 72 : 48
+
   const css = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
@@ -183,8 +190,9 @@ export function buildStandaloneTicketHtml(body: string, width: '58' | '80'): str
     }
     body { padding: 0; }
     .ticket-root {
-      width: 100%;
-      max-width: none;
+      width: ${contentWidth}mm;
+      max-width: ${contentWidth}mm;
+      margin: 0 auto;
       box-sizing: border-box;
     }
     .ticket-root * { max-width: 100%; box-sizing: border-box; }

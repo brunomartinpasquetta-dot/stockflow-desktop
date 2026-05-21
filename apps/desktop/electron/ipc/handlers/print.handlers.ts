@@ -251,10 +251,26 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           const tmpFile = join(tmpdir(), `stockflow-${fileName}-${Date.now()}.pdf`);
           await writeFile(tmpFile, pdf);
           try {
-            await execFileP(LP, ['-d', printerName, tmpFile], { env });
-            return { printed: true, pdfPath: null };
+            // CUPS usa el papel POR DEFECTO de la cola si no le pasamos `-o
+            // media`. En las térmicas con rollo custom (48×297mm) ese default
+            // NO matchea el tamaño real → el job nunca sale. Le pasamos el
+            // media custom explícito: `Custom.{ancho}x297mm` + `fit-to-page`.
+            const media = `Custom.${widthMm}x297mm`;
+            try {
+              await execFileP(
+                LP,
+                ['-d', printerName, '-o', `media=${media}`, '-o', 'fit-to-page', tmpFile],
+                { env },
+              );
+              return { printed: true, pdfPath: null };
+            } catch {
+              // Algunas impresoras/drivers rechazan el media Custom. Reintento
+              // UNA vez con `lp` simple (usa el papel por defecto de la cola).
+              await execFileP(LP, ['-d', printerName, tmpFile], { env });
+              return { printed: true, pdfPath: null };
+            }
           } catch {
-            // Si lp falla, caemos al guardado en Escritorio (3b).
+            // Si los dos intentos de lp fallan, caemos al guardado en Escritorio (3b).
           } finally {
             unlink(tmpFile).catch(() => {
               /* noop */
