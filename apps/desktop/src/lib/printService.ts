@@ -251,16 +251,30 @@ export function buildStandaloneTicketHtml(body: string, width: '58' | '80'): str
  * Imprime el ticket automáticamente (sin diálogo). Renderiza el nodo a un
  * documento HTML standalone, lo manda al main process que genera el PDF y lo
  * imprime vía CUPS (lp). Si no hay impresora, el PDF se guarda en el Escritorio.
- * Devuelve { printed, pdfPath } para que el caller avise al usuario.
+ *
+ * Devuelve `{ printed, pdfPath }`:
+ *  - `printed:true`  → salió por la impresora.
+ *  - `printed:false` → no había NINGUNA impresora → PDF en `pdfPath` (Escritorio).
+ * Si hay impresora pero el PDF o `lp` fallan, LANZA — el caller debe caer al
+ * diálogo del SO para que el ticket salga igual.
+ *
+ * `deviceName` (opcional): impresora configurada en StockFlow; tiene prioridad
+ * sobre la impresora por defecto del SO.
  */
 export async function autoPrintTicket(
   node: ReactElement,
   width: '58' | '80',
   fileName: string,
+  deviceName?: string,
 ): Promise<{ printed: boolean; pdfPath: string | null }> {
   const { renderToString } = await import('react-dom/server')
   const body = renderToString(node)
   const html = buildStandaloneTicketHtml(body, width)
   const { api } = await import('@/lib/api')
-  return api.print.ticketAuto({ html, widthMm: width === '80' ? 80 : 58, fileName })
+  return api.print.ticketAuto({
+    html,
+    widthMm: width === '80' ? 80 : 58,
+    fileName,
+    ...(deviceName ? { deviceName } : {}),
+  })
 }

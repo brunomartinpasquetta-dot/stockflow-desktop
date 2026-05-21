@@ -307,6 +307,7 @@ export const api = {
       html: string
       widthMm: number
       fileName: string
+      deviceName?: string
     }): Promise<{ printed: boolean; pdfPath: string | null }> =>
       unwrap(sf().print.ticketAuto(payload)),
     listElectron: (): Promise<import('@/types/api').SystemPrinterDTO[]> =>

@@ -563,15 +563,16 @@ function PDV() {
   }
 
   /**
-   * Imprime el ticket de una venta ya registrada. Respeta el toggle de
-   * Configuración:
+   * Imprime el ticket de una venta ya registrada. El ticket SIEMPRE sale
+   * (salvo que no haya ninguna impresora). Respeta el toggle de Configuración:
    *  - `silentPrint === false` → el usuario eligió "Imprimir con diálogo del
    *    sistema": se imprime con `printNode` (window.print + diálogo del SO),
-   *    exactamente el mismo mecanismo que "Probar impresión". Es la vía 100%
-   *    confiable.
+   *    exactamente el mismo mecanismo que "Probar impresión".
    *  - cualquier otro valor (default) → impresión automática vía `lp` (sin
-   *    diálogo). Si no hay impresora, el PDF queda en el Escritorio.
-   * Si la impresión falla, NO revierte la venta — sólo avisa.
+   *    diálogo). Si el PDF o `lp` fallan, cae automáticamente al diálogo del SO
+   *    para que el ticket salga igual. Si no hay NINGUNA impresora, el PDF
+   *    queda en el Escritorio.
+   * Si la impresión falla por completo, NO revierte la venta — sólo avisa.
    */
   async function printSaleTicket(
     ticketData: SaleTicketData,
@@ -581,23 +582,40 @@ function PDV() {
     const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
     const ticketFileName = `ticket-venta-${result.sale.type}-${String(result.sale.number).padStart(8, '0')}`
     const useDialog = printerCfg?.silentPrint === false
+    // Impresora configurada en StockFlow (sólo aplica al tipo "system").
+    const deviceName =
+      printerCfg?.kind === 'system' && printerCfg.interface.trim()
+        ? printerCfg.interface.trim()
+        : undefined
+    const printViaDialog = (): Promise<void> =>
+      printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
     try {
       if (useDialog) {
         // Mismo mecanismo que "Probar impresión": window.print() con diálogo.
-        await printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
+        await printViaDialog()
         toast.success('Venta registrada')
         return
       }
-      const { printed, pdfPath } = await autoPrintTicket(
-        createElement(SaleTicket, { data: ticketData }),
-        ticketWidth,
-        ticketFileName,
-      )
-      if (printed) {
+      try {
+        const { printed, pdfPath } = await autoPrintTicket(
+          createElement(SaleTicket, { data: ticketData }),
+          ticketWidth,
+          ticketFileName,
+          deviceName,
+        )
+        if (printed) {
+          toast.success('Venta registrada')
+        } else {
+          const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
+          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
+        }
+      } catch (autoErr) {
+        // La impresión silenciosa falló (el PDF no se generó o `lp` rechazó
+        // el trabajo) pero SÍ hay impresora → caemos al diálogo del SO para
+        // garantizar que el ticket salga.
+        console.warn('Impresión automática falló, uso diálogo del SO:', autoErr)
+        await printViaDialog()
         toast.success('Venta registrada')
-      } else {
-        const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
-        toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
       }
     } catch (err) {
       toast.error(

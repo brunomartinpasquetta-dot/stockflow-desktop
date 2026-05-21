@@ -34,6 +34,12 @@ interface PrintTicketAutoPayload {
   widthMm: number;
   /** Nombre base del archivo, p.ej. "ticket-venta-B-00000123". */
   fileName: string;
+  /**
+   * Nombre EXACTO de la impresora del SO configurada en StockFlow (CUPS).
+   * Si se pasa y existe, tiene prioridad sobre la impresora por defecto del
+   * sistema. Si no, se cae a `lpstat -d` / `lpstat -e`.
+   */
+  deviceName?: string;
 }
 
 export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
@@ -149,7 +155,7 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
     }),
 
     /**
-     * Impresión automática del ticket SIN diálogo (Feature v0.1.22).
+     * Impresión automática del ticket SIN diálogo (Feature v0.1.22, robusto v0.1.25).
      *
      * En vez del `webContents.print({ silent:true })` —que con drivers
      * genéricos de CUPS produce basura infinita en térmicas— renderizamos el
@@ -157,15 +163,23 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
      * vía `lp` (CUPS). CUPS rasteriza ese PDF con el driver real, igual que el
      * diálogo del SO, pero sin diálogo.
      *
-     * Si no hay impresora (o `lp` falla, o estamos en Windows), el PDF se
-     * guarda en el Escritorio del usuario y se avisa devolviendo `printed:false`.
+     * Resultado:
+     *  - `{ printed:true }`  → salió por la impresora.
+     *  - `{ printed:false, pdfPath }` → NO hay ninguna impresora → PDF al Escritorio.
+     *  - THROW → hay impresora pero falló el render del PDF o `lp` la rechazó.
+     *    El renderer cae al diálogo del SO (`window.print()`) para que el
+     *    ticket SIEMPRE salga.
+     *
+     * Loguea cada paso por consola: en el `.app` empaquetado se ven con
+     * Console.app filtrando por "StockFlow print".
      */
     'print:ticketAuto': unguarded(
       deps,
       async (
         payload: PrintTicketAutoPayload,
       ): Promise<{ printed: boolean; pdfPath: string | null }> => {
-        const { html, widthMm, fileName } = payload ?? ({} as PrintTicketAutoPayload);
+        const { html, widthMm, fileName, deviceName } = payload ?? ({} as PrintTicketAutoPayload);
+        const log = (msg: string): void => console.log(`[StockFlow print] ${msg}`);
         if (!html || !fileName) {
           throw new Error('print:ticketAuto requiere html + fileName');
         }
@@ -185,6 +199,7 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         // NO deshabilitar JS ni usar sandbox: `printToPDF` puede fallar/colgar
         // con `javascript:false`. La ventana sólo carga nuestro HTML de
         // confianza (data URL), sin preload ni scripts → es seguro.
+        log(`render PDF (ancho=${widthMm}mm, archivo=${fileName})`);
         const win = new BrowserWindow({
           show: false,
           webPreferences: { contextIsolation: true },
@@ -208,7 +223,9 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
             pageSize: { width: widthMm * 1000, height: 297 * 1000 },
           });
+          log(`PDF generado: ${pdf.length} bytes`);
         } catch (err) {
+          console.error('[StockFlow print] printToPDF falló', err);
           throw new Error(
             `No se pudo generar el PDF del ticket: ${err instanceof Error ? err.message : String(err)}`,
             { cause: err },
@@ -221,56 +238,83 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           }
         }
 
-        // 2) ¿Hay impresora? Resolver vía lpstat (LANG=C). macOS/Linux.
+        // 2) Resolver la impresora. macOS/Linux vía CUPS.
         const LPSTAT = '/usr/bin/lpstat';
         const LP = '/usr/bin/lp';
         const env = { ...process.env, LANG: 'C', LC_ALL: 'C' };
         const isUnix = process.platform === 'darwin' || process.platform === 'linux';
         let printerName: string | null = null;
         if (isUnix) {
-          try {
-            // Impresora por defecto.
-            const { stdout: dOut } = await execFileP(LPSTAT, ['-d'], { env });
-            const m = dOut.match(/:\s*(\S+)/);
-            if (m) printerName = m[1] ?? null;
-            if (!printerName) {
+          // 2a) La impresora configurada en StockFlow tiene prioridad: el
+          // ticket debe salir por ESA, no por la default del SO (pueden diferir).
+          if (deviceName) {
+            try {
+              await execFileP(LPSTAT, ['-p', deviceName], { env });
+              printerName = deviceName;
+              log(`impresora configurada OK: ${deviceName}`);
+            } catch {
+              log(`impresora configurada "${deviceName}" no existe en CUPS — busco default`);
+            }
+          }
+          // 2b) Default del sistema.
+          if (!printerName) {
+            try {
+              const { stdout: dOut } = await execFileP(LPSTAT, ['-d'], { env });
+              const m = dOut.match(/:\s*(\S+)/);
+              if (m) printerName = m[1] ?? null;
+            } catch {
+              /* sin default */
+            }
+          }
+          // 2c) Primera impresora disponible.
+          if (!printerName) {
+            try {
               const { stdout: eOut } = await execFileP(LPSTAT, ['-e'], { env });
               printerName =
                 eOut
                   .split('\n')
                   .map((l) => l.trim())
                   .filter(Boolean)[0] ?? null;
+            } catch {
+              /* sin impresoras */
             }
-          } catch {
-            printerName = null;
           }
         }
+        log(`impresora resuelta: ${printerName ?? '(ninguna)'}`);
 
         // 3a) Hay impresora → imprimir el PDF con lp.
         if (printerName && isUnix) {
           const tmpFile = join(tmpdir(), `stockflow-${fileName}-${Date.now()}.pdf`);
           await writeFile(tmpFile, pdf);
           try {
-            // CUPS usa el papel POR DEFECTO de la cola si no le pasamos `-o
-            // media`. En las térmicas con rollo custom (48×297mm) ese default
-            // NO matchea el tamaño real → el job nunca sale. Le pasamos el
-            // media custom explícito: `Custom.{ancho}x297mm` + `fit-to-page`.
+            // Probamos el media custom del rollo; si el driver lo rechaza,
+            // reintentamos con `lp` simple (papel por defecto de la cola).
             const media = `Custom.${widthMm}x297mm`;
             try {
-              await execFileP(
+              const { stdout } = await execFileP(
                 LP,
                 ['-d', printerName, '-o', `media=${media}`, '-o', 'fit-to-page', tmpFile],
                 { env },
               );
+              log(`lp OK (media=${media}): ${stdout.trim()}`);
               return { printed: true, pdfPath: null };
-            } catch {
-              // Algunas impresoras/drivers rechazan el media Custom. Reintento
-              // UNA vez con `lp` simple (usa el papel por defecto de la cola).
-              await execFileP(LP, ['-d', printerName, tmpFile], { env });
+            } catch (errMedia) {
+              log(
+                `lp con media falló (${errMedia instanceof Error ? errMedia.message : String(errMedia)}) — reintento simple`,
+              );
+              const { stdout } = await execFileP(LP, ['-d', printerName, tmpFile], { env });
+              log(`lp OK (simple): ${stdout.trim()}`);
               return { printed: true, pdfPath: null };
             }
-          } catch {
-            // Si los dos intentos de lp fallan, caemos al guardado en Escritorio (3b).
+          } catch (err) {
+            // Los dos intentos de lp fallaron. NO guardamos en Escritorio en
+            // silencio: lanzamos para que el renderer caiga al diálogo del SO
+            // y el ticket salga igual.
+            console.error('[StockFlow print] lp falló', err);
+            throw new Error(
+              `La impresora "${printerName}" rechazó el trabajo: ${err instanceof Error ? err.message : String(err)}`,
+              { cause: err },
+            );
           } finally {
             unlink(tmpFile).catch(() => {
               /* noop */
@@ -278,9 +322,10 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           }
         }
 
-        // 3b) Sin impresora (o lp falló, o Windows) → guardar PDF en el Escritorio.
+        // 3b) No hay NINGUNA impresora (o Windows) → guardar PDF en el Escritorio.
         const desktopPath = join(homedir(), 'Desktop', `${fileName}.pdf`);
         await writeFile(desktopPath, pdf);
+        log(`sin impresora → PDF guardado en ${desktopPath}`);
         return { printed: false, pdfPath: desktopPath };
       },
     ),

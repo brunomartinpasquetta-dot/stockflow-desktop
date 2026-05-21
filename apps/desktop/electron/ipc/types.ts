@@ -1305,6 +1305,8 @@ export interface ApiSurface {
       html: string;
       widthMm: number;
       fileName: string;
+      /** Impresora configurada en StockFlow; tiene prioridad sobre la default. */
+      deviceName?: string;
     }): Res<{ printed: boolean; pdfPath: string | null }>;
     /**
      * Lista impresoras vía `webContents.getPrintersAsync()`. El `name` devuelto
