@@ -11,8 +11,8 @@ userData/
 .turbo
 *.log
 
-# Íconos binarios generados con scripts/generate-icons.mjs (se regeneran del SVG)
-apps/desktop/build/icon.png
-apps/desktop/build/icon.icns
-apps/desktop/build/icon.ico
-apps/desktop/build/dmg-background.png
+# Íconos/fondos binarios: AHORA se versionan (los necesita el build de CI).
+# Antes estaban ignorados y "se regeneraban del SVG", pero la CI no corría
+# generate:icons → faltaban icon.ico (Windows usaba ícono default) y
+# dmg-background.png (el .dmg de macOS fallaba con ENOENT). Se commitean los
+# binarios reales generados con scripts/generate-icons.mjs.
