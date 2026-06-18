@@ -33,8 +33,12 @@ jobs:
         run: pnpm --filter @stockflow/desktop run publish:mac
       - name: Publish (Windows)
         if: matrix.os == 'windows-latest'
+        # SIN code signing: el .exe se publica sin firmar (SmartScreen pedirá
+        # "Más información → Ejecutar de todas formas"). NO pasar CSC_LINK aquí:
+        # si el secret no existe llega como string vacío "", y electron-builder
+        # lo trata como ruta de certificado (CSC_LINK != null) → intenta resolver
+        # "" y falla con "WIN_CSC_LINK is not correct, cannot resolve ... not a file".
+        # Dejándolo sin definir (undefined), electron-builder saltea la firma.
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: pnpm --filter @stockflow/desktop run publish:win
