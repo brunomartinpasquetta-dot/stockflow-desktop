@@ -48,6 +48,8 @@ export interface ImportExecuteResult {
   skipped: number;
   familiesCreated: number;
   suppliersCreated: number;
+  /** Errores reales por fila que NO se pudo insertar (no se tragan en silencio). */
+  errors: ImportError[];
 }
 
 const VALID_VAT_RATES = new Set(['0', '10.5', '21', '27']);
@@ -64,6 +66,41 @@ function isNumStr(v: string): boolean {
 
 function asNumber(v: string): number {
   return Number(v.replace(',', '.'));
+}
+
+/**
+ * Normaliza un número escrito en formato AR/US a JS number. `null` si no parsea.
+ * Soporta "1.234,50" (punto miles + coma decimal), "1234,50" y "1234.50".
+ */
+function parseNum(v: string): number | null {
+  let s = v.trim();
+  if (!s) return null;
+  if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if (s.includes(',')) s = s.replace(',', '.');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+/** Decimal de dinero (4 dec) que cumple `moneySchema`, o undefined. */
+function toMoney(v: string): string | undefined {
+  const n = parseNum(v);
+  return n != null && n >= 0 ? n.toFixed(4) : undefined;
+}
+/** Decimal de cantidad (3 dec) que cumple `qtySchema`, o undefined. */
+function toQty(v: string): string | undefined {
+  const n = parseNum(v);
+  return n != null && n >= 0 ? n.toFixed(3) : undefined;
+}
+/**
+ * Alícuota de IVA normalizada al enum EXACTO que exige el schema
+ * (`vatRateSchema`: '0.00'|'10.50'|'21.00'|'27.00'). El Excel suele traer
+ * "21", "10.5", 21 (número) → acá pasan a "21.00"/"10.50". undefined si no es
+ * una alícuota válida (→ el schema aplica su default '21.00').
+ */
+function toVat(v: string): string | undefined {
+  const n = parseNum(v);
+  if (n == null) return undefined;
+  const s = n.toFixed(2);
+  return ['0.00', '10.50', '21.00', '27.00'].includes(s) ? s : undefined;
 }
 
 export class ExcelImportService {
@@ -273,6 +310,7 @@ export class ExcelImportService {
 
     let created = 0;
     let skipped = 0;
+    const errors: ImportError[] = [];
     const total = filtered.length;
 
     for (let i = 0; i < filtered.length; i++) {
@@ -282,11 +320,14 @@ export class ExcelImportService {
       const listPrice1 = toStr(row[mapping.listPrice1]);
       const stock = toStr(row[mapping.stock]);
 
+      // Normalizamos al formato EXACTO del schema (moneySchema/qtySchema):
+      // el Excel trae "1500", "1.234,50", números, etc. Sin esto el INSERT
+      // fallaba la validación Zod y la fila se "saltaba" en silencio.
       const data: Record<string, unknown> = {
         barcode,
         description,
-        listPrice1,
-        stock,
+        listPrice1: toMoney(listPrice1) ?? '0.0000',
+        stock: toQty(stock) ?? '0.000',
       };
       if (mapping.brand) data.brand = toStr(row[mapping.brand]) || null;
       if (mapping.familyName) {
@@ -300,27 +341,35 @@ export class ExcelImportService {
         if (sid) data.supplierId = sid;
       }
       if (mapping.costPrice) {
-        const v = toStr(row[mapping.costPrice]);
+        const v = toMoney(toStr(row[mapping.costPrice]));
         if (v) data.costPrice = v;
       }
       if (mapping.vatRate) {
-        const v = toStr(row[mapping.vatRate]);
+        const v = toVat(toStr(row[mapping.vatRate]));
         if (v) data.vatRate = v;
       }
       if (mapping.minStock) {
-        const v = toStr(row[mapping.minStock]);
+        const v = toQty(toStr(row[mapping.minStock]));
         if (v) data.minStock = v;
       }
 
       try {
         await (repos.articles as unknown as { create: (d: Record<string, unknown>) => Promise<unknown> }).create(data);
         created++;
-      } catch {
+      } catch (err) {
         skipped++;
+        // NO tragamos el error: lo reportamos para que la UI muestre el motivo
+        // real (antes "OK" en falso con la base vacía).
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[import] fila ${filtered[i]!.rowNum} (${barcode || description}) falló: ${msg}`);
+        if (errors.length < 100) {
+          errors.push({ row: filtered[i]!.rowNum, field: '*', message: `${barcode || description || 'fila'}: ${msg}` });
+        }
       }
       if (onProgress) onProgress(i + 1, total);
     }
 
-    return { created, skipped, familiesCreated, suppliersCreated };
+    console.info(`[import] insertados=${created} saltados=${skipped} familias=${familiesCreated} proveedores=${suppliersCreated}`);
+    return { created, skipped, familiesCreated, suppliersCreated, errors };
   }
 }

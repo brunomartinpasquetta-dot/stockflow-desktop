@@ -1580,4 +1580,5 @@ export interface ImportExecuteResultDTO {
   skipped: number;
   familiesCreated: number;
   suppliersCreated: number;
+  errors: ImportErrorDTO[];
 }

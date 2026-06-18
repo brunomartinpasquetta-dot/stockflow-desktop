@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,11 +41,34 @@ let quittingForBackup = false;
 const PRELOAD_PATH = path.join(HERE, 'preload.cjs');
 const PROD_INDEX_HTML = path.join(HERE, '..', 'dist', 'index.html');
 
+/**
+ * Menú nativo del SO. El sistema ya tiene su MenuBar custom de 8 grupos, así que
+ * en Windows/Linux se elimina la barra nativa (File/Edit/View/Window/Help).
+ * En macOS NO se puede dejar en null sin romper Cmd+C/V/X/Z/Q → se deja un menú
+ * mínimo (app + edit + window) con roles estándar. Los atajos custom (F1-F12,
+ * Cmd+K) los maneja el renderer y no dependen de este menú.
+ */
+function setupAppMenu(): void {
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        { role: 'appMenu' },
+        { role: 'editMenu' },
+        { role: 'windowMenu' },
+      ]),
+    );
+  } else {
+    Menu.setApplicationMenu(null);
+  }
+}
+
 function createWindow(extraArgs: string[]): void {
+  setupAppMenu();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     show: false,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

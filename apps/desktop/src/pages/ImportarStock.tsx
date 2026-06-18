@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Upload, ChevronRight, ChevronLeft } from 'lucide-react'
 
@@ -48,7 +49,8 @@ export function ImportarStock() {
   const [validating, setValidating] = useState(false)
   const [executing, setExecuting] = useState(false)
   const [progress, setProgress] = useState({ done: 0, total: 0 })
-  const [result, setResult] = useState<{ created: number; skipped: number; familiesCreated: number; suppliersCreated: number } | null>(null)
+  const [result, setResult] = useState<{ created: number; skipped: number; familiesCreated: number; suppliersCreated: number; errors: { row: number; field: string; message: string }[] } | null>(null)
+  const qc = useQueryClient()
 
   async function onPickFile(): Promise<void> {
     setParseLoading(true)
@@ -138,7 +140,14 @@ export function ImportarStock() {
       }
       const r = await api.import.execute(parsed.filePath, fullMapping, options)
       setResult(r)
-      toast.success(`Importación finalizada: ${r.created} artículos creados`)
+      // Refrescar la lista de Artículos (si no, la grilla no muestra lo importado
+      // hasta remmontar). queryKey ['articles'] = useArticles.
+      await qc.invalidateQueries({ queryKey: ['articles'] })
+      if (r.created > 0) {
+        toast.success(`Se importaron ${r.created} artículos${r.skipped ? ` (${r.skipped} saltados)` : ''}`)
+      } else {
+        toast.error(`No se importó ningún artículo (${r.skipped} con error). Revisá el detalle.`)
+      }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'La importación falló')
     } finally {
@@ -383,6 +392,18 @@ export function ImportarStock() {
                 <div>Saltados: {result.skipped}</div>
                 <div>Familias creadas: {result.familiesCreated}</div>
                 <div>Proveedores creados: {result.suppliersCreated}</div>
+                {result.errors.length > 0 && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2">
+                    <div className="text-xs font-medium text-destructive">
+                      {result.errors.length} fila(s) no se pudieron importar:
+                    </div>
+                    <ul className="mt-1 max-h-40 list-disc overflow-auto pl-4 text-xs text-muted-foreground">
+                      {result.errors.slice(0, 50).map((e, i) => (
+                        <li key={i}>Fila {e.row}: {e.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div className="pt-2">
                   <Button onClick={reset}>Importar otro archivo</Button>
                 </div>
