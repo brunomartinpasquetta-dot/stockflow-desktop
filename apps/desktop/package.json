@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "0.1.25",
+  "version": "0.1.26",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -20,11 +20,11 @@
     "test:license": "tsx electron/__tests__/license.smoke.ts",
     "test:hardware": "tsx electron/__tests__/hardware.smoke.ts",
     "test:lan": "tsx electron/__tests__/lan.smoke.ts",
-    "build:win": "node scripts/package.mjs --win",
+    "build:win": "node scripts/package.mjs --win --config electron-builder.win.yml",
     "build:mac": "node scripts/package.mjs --mac",
     "build:linux": "node scripts/package.mjs --linux",
     "build:all": "node scripts/package.mjs -mwl",
-    "publish:win": "node scripts/package.mjs --win --publish=always",
+    "publish:win": "node scripts/package.mjs --win --publish=always --config electron-builder.win.yml",
     "publish:mac": "node scripts/package.mjs --mac --publish=always",
     "package:dry": "node scripts/package.mjs --mac --dir",
     "preview": "vite preview"

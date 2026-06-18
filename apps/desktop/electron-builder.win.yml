@@ -1,0 +1,18 @@
+# Config de Windows: hereda todo de electron-builder.yml y SOLO desactiva el
+# rebuild de nativos que hace electron-builder.
+#
+# Por qué: en el runner de Windows con pnpm, electron-builder intenta recompilar
+# `usb` con `pnpm rebuild usb`, pero invoca `pnpm.cjs` como ejecutable
+# (fork/exec) y Windows lo rechaza ("%1 is not a valid Win32 application").
+# Eso hacía fallar TODOS los builds de Windows (v0.1.x solo generaba .dmg).
+#
+# Los nativos (better-sqlite3, usb, @serialport/bindings-cpp) YA quedan
+# compilados para win32-x64 por el `postinstall` (electron-rebuild) durante
+# `pnpm install`, así que el rebuild de electron-builder es redundante.
+# npmRebuild debe ser booleano real (electron-builder compara con `=== false`),
+# por eso va en YAML y no como `-c.npmRebuild=false` (que llega como string).
+#
+# Scope: SOLO Windows. macOS sigue usando electron-builder.yml con su rebuild
+# multi-arch (x64 + arm64) intacto.
+extends: electron-builder.yml
+npmRebuild: false
