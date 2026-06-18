@@ -15,6 +15,7 @@ import { LanManager } from './lan/LanManager';
 import { LanServer } from './lan/LanServer';
 import { DEFAULT_LAN_PORT } from './lan/types';
 import { LicenseManager } from './license/LicenseManager';
+import { CLOUD_API_URL_DEFAULT, CLOUD_PUBLIC_KEY_PEM } from './license/cloud-public-key';
 import { setupLogger } from './logger';
 import { MpTokenStore } from './secure/MpTokenStore';
 import { MpQrService, createServiceContext } from '@stockflow/core';
@@ -92,8 +93,8 @@ function bootstrap(): { lanArgs: string[] } {
   licenseManager = new LicenseManager({
     userDataDir,
     machineId,
-    apiUrl: process.env.CLOUD_API_URL ?? 'http://localhost:3009',
-    publicKeyPem: process.env.CLOUD_JWT_PUBLIC_KEY ?? '',
+    apiUrl: process.env.CLOUD_API_URL ?? CLOUD_API_URL_DEFAULT,
+    publicKeyPem: process.env.CLOUD_JWT_PUBLIC_KEY ?? CLOUD_PUBLIC_KEY_PEM,
   });
   hardwareManager = new HardwareManager({ userDataDir });
   backupService = new BackupService({
