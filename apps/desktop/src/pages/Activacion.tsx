@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BRANDING } from '@/assets/branding'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -25,8 +25,15 @@ export function Activacion() {
   const mutation = useMutation({
     mutationFn: (key: string): Promise<LicenseStateDTO> => api.license.activate(key),
     onSuccess: (state) => {
+      console.info('[license] estado tras activación:', state.status)
       if (state.status === 'active' || state.status === 'readOnly') {
-        qc.invalidateQueries({ queryKey: ['license'] })
+        // Sembrar el cache sincrónicamente con el estado autoritativo devuelto por
+        // la activación. Si sólo invalidáramos, el LicenseGuard leería el estado
+        // viejo ('unlicensed') durante el refetch y rebotaría a /activacion →
+        // loop de activación. Sólo se ve en el build empaquetado (Windows): en dev
+        // el getState() del main siempre devuelve 'active' y tapaba el bug.
+        qc.setQueryData(['license'], state)
+        void qc.invalidateQueries({ queryKey: ['license'] })
         toast.success('Licencia activada')
         navigate('/', { replace: true })
       } else {
@@ -37,6 +44,15 @@ export function Activacion() {
       setErrorMsg(err instanceof ApiError ? err.message : 'No se pudo activar la licencia.')
     },
   })
+
+  // Red de seguridad: si la licencia ya está activa (p.ej. el guard rebotó acá
+  // tras una activación, o se reabrió la app ya licenciada), salir de esta
+  // pantalla. Evita quedar trabado en /activacion con licencia válida.
+  useEffect(() => {
+    if (status === 'active' || status === 'readOnly') {
+      navigate('/', { replace: true })
+    }
+  }, [status, navigate])
 
   function submit(): void {
     setErrorMsg(null)

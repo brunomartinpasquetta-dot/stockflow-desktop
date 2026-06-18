@@ -15,7 +15,7 @@
  * verificación del JWT se expone como `static parseAndVerify(...)`.
  */
 import { createVerify } from 'node:crypto';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
@@ -147,14 +147,18 @@ export class LicenseManager {
 
   private storeJwt(jwt: string): void {
     try {
+      // Asegurar el dir (en Windows, recién creado, podría no existir todavía).
+      mkdirSync(this.userDataDir, { recursive: true });
       const safeStorage = loadSafeStorage();
+      const canEncrypt = !!(safeStorage && safeStorage.isEncryptionAvailable());
       let buf: Buffer;
-      if (safeStorage && safeStorage.isEncryptionAvailable()) {
+      if (canEncrypt && safeStorage) {
         buf = safeStorage.encryptString(jwt);
       } else {
         buf = Buffer.from(jwt, 'utf8');
       }
       writeFileSync(this.licenseFilePath(), buf);
+      console.info(`[license] licencia guardada (safeStorage=${canEncrypt}) en ${this.licenseFilePath()}`);
     } catch (err) {
       console.error('[license] No se pudo guardar la licencia:', err);
     }
@@ -262,16 +266,29 @@ export class LicenseManager {
   }
 
   async activate(licenseKey: string): Promise<LicenseState> {
+    const key = licenseKey.trim();
+    const isMaster = key.toUpperCase() === 'SF-BRUN-OWNR-MSTR-2026';
+    console.info(`[license] activando key=${key.slice(0, 7)}… master=${isMaster}`);
     // Clave maestra del owner: licencia 'pro' válida indefinidamente, sin cloud.
-    // Persiste vía archivo marker (license.master) en userData.
-    if (licenseKey.trim().toUpperCase() === 'SF-BRUN-OWNR-MSTR-2026') {
+    // Persiste vía archivo marker (license.master) en userData. NO usa safeStorage
+    // (la disponibilidad de safeStorage es irrelevante para la master key).
+    if (isMaster) {
       try {
+        // En Windows el userData puede no existir aún en el primer arranque.
+        mkdirSync(this.userDataDir, { recursive: true });
         writeFileSync(this.masterFilePath(), `Master license — activada ${new Date().toISOString()}\n`);
+        console.info(
+          `[license] master license persistida en ${this.masterFilePath()} (existe=${existsSync(
+            this.masterFilePath(),
+          )})`,
+        );
       } catch (err) {
         console.error('[license] No se pudo persistir la master license:', err);
       }
       this.tenantName = 'Bruno Pasquetta — Master';
-      return this.getState();
+      const state = this.getState();
+      console.info(`[license] estado tras activar master: ${state.status}`);
+      return state;
     }
     let res: Response;
     try {

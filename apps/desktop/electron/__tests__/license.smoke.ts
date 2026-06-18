@@ -150,6 +150,40 @@ async function main(): Promise<void> {
   } finally {
     globalThis.fetch = realFetch;
   }
+
+  // --- master key: persiste vía marker file (sin cloud ni safeStorage) ---
+  // Usa su PROPIO dir para no chocar con el license.dat del bloque anterior.
+  {
+    const masterDir = mkdtempSync(join(tmpdir(), 'stockflow-license-master-'));
+    try {
+      const mgr = new LicenseManager({
+        userDataDir: masterDir,
+        machineId: 'fake-machine',
+        apiUrl: 'http://localhost:1',
+        publicKeyPem: '',
+      });
+      // Minúsculas + espacios → debe normalizar (trim + case-insensitive).
+      const st = await mgr.activate('  sf-brun-ownr-mstr-2026  ');
+      check('activate(master, lower+spaces) → active', st.status === 'active', st.status);
+      check('activate(master) → plan pro', st.plan === 'pro', String(st.plan));
+      check('getState() tras master → active', mgr.getState().status === 'active');
+
+      // Reabrir la app = nueva instancia sobre el mismo userData → sigue activa.
+      const reopened = new LicenseManager({
+        userDataDir: masterDir,
+        machineId: 'fake-machine',
+        apiUrl: 'http://localhost:1',
+        publicKeyPem: '',
+      });
+      check(
+        'reabrir app (instancia nueva) → sigue active',
+        reopened.getState().status === 'active',
+        reopened.getState().status,
+      );
+    } finally {
+      rmSync(masterDir, { recursive: true, force: true });
+    }
+  }
 }
 
 main()
