@@ -231,7 +231,7 @@ function CajaAbierta({ registerId }: { registerId: string }) {
       setCloseOpen(false)
       const diff = result.report.difference ?? '0'
       const company = companyQuery.data ?? {
-        id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, priceMode: 'gross' as const, createdAt: 0, updatedAt: 0,
+        id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, priceMode: 'gross' as const, allowNegativeStock: true, createdAt: 0, updatedAt: 0,
       }
       const reportData = {
         company,

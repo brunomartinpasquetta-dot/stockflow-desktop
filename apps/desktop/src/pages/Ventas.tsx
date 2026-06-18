@@ -285,7 +285,7 @@ function NoCash() {
 }
 
 const FALLBACK_COMPANY: CompanyDTO = {
-  id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, priceMode: 'gross', createdAt: 0, updatedAt: 0,
+  id: '', name: 'StockFlow', address: null, phone: null, email: null, cuit: null, ingBrutos: null, priceMode: 'gross', allowNegativeStock: true, createdAt: 0, updatedAt: 0,
 }
 
 function PDV() {
@@ -459,7 +459,9 @@ function PDV() {
   }, [barcode, allArticles])
   const suggestions = useMemo(() => {
     const v = barcode.trim().toLowerCase()
-    if (v.length < 2 || exactByBarcode) return []
+    // minLength 1: hay artículos con códigos cortos ("1","2","3") que antes no
+    // aparecían en sugerencias (BUG-OP-03a).
+    if (v.length < 1 || exactByBarcode) return []
     return allArticles
       .filter((a) => a.barcode.toLowerCase().startsWith(v) || a.description.toLowerCase().includes(v))
       .slice(0, 8)
@@ -593,7 +595,6 @@ function PDV() {
       if (useDialog) {
         // Mismo mecanismo que "Probar impresión": window.print() con diálogo.
         await printViaDialog()
-        toast.success('Venta registrada')
         return
       }
       try {
@@ -603,9 +604,7 @@ function PDV() {
           ticketFileName,
           deviceName,
         )
-        if (printed) {
-          toast.success('Venta registrada')
-        } else {
+        if (!printed) {
           const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
           toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
         }
@@ -615,7 +614,6 @@ function PDV() {
         // garantizar que el ticket salga.
         console.warn('Impresión automática falló, uso diálogo del SO:', autoErr)
         await printViaDialog()
-        toast.success('Venta registrada')
       }
     } catch (err) {
       toast.error(
@@ -652,15 +650,19 @@ function PDV() {
           vatRate: l.article.vatRate,
         })),
       })
-      const ticketData = buildTicket(result)
+      // La venta YA quedó registrada y pegó en caja. Avisamos al operador y
+      // reseteamos el form ANTES de imprimir: el aviso + el reset NO deben
+      // depender del ticket. Si la impresión falla o se CUELGA (diálogo sin
+      // cerrar, lp trabado), la venta igual está hecha y el operador no queda
+      // trabado ni con riesgo de vender 2 veces (BUG-OP-03b).
+      toast.success(
+        `Venta ${result.sale.type} #${result.sale.number} registrada — ${formatCurrency(result.sale.total)}`,
+      )
+      clearSale()
+      void numberQuery.refetch()
+
       const printerCfg = printerConfigQuery.data ?? null
-
-      // La venta YA quedó registrada. La impresión es un paso posterior que,
-      // si falla, NO revierte nada.
-      await printSaleTicket(ticketData, result, printerCfg)
-
-      // Cajón de dinero: se abre si la venta llevó efectivo y la impresora
-      // tiene la apertura automática activada.
+      // Cajón de dinero (fire-and-forget) si la venta llevó efectivo.
       if (printerCfg?.autoOpenDrawer && !result.sale.isAccountSale) {
         const cashMethodId = activeMethods.find((m) => m.type === 'cash')?.id
         const hasCash =
@@ -670,8 +672,11 @@ function PDV() {
           api.hardware.cashDrawer.open().catch(() => {})
         }
       }
-      clearSale()
-      void numberQuery.refetch()
+      // Impresión AISLADA: no se await-ea → nunca bloquea el reset.
+      const ticketData = buildTicket(result)
+      void printSaleTicket(ticketData, result, printerCfg).catch((e) => {
+        console.warn('[venta] impresión del ticket falló:', e)
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
     }
@@ -702,12 +707,15 @@ function PDV() {
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} cobrada con MercadoPago QR — ${formatCurrency(result.sale.total)}`,
       )
-      // Impresión del ticket — la venta ya quedó registrada.
-      const ticketData = buildTicket(result)
-      const printerCfg = printerConfigQuery.data ?? null
-      await printSaleTicket(ticketData, result, printerCfg)
+      // Reset ANTES de imprimir (mismo criterio que confirmar): el ticket no
+      // bloquea. La venta ya quedó registrada y avisada arriba.
       clearSale()
       void numberQuery.refetch()
+      const ticketData = buildTicket(result)
+      const printerCfg = printerConfigQuery.data ?? null
+      void printSaleTicket(ticketData, result, printerCfg).catch((e) => {
+        console.warn('[venta] impresión del ticket falló:', e)
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
     } finally {

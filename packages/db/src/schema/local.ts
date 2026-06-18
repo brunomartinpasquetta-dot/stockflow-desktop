@@ -54,6 +54,12 @@ export const companies = sqliteTable(
      *  - 'net'   = los precios cargados son netos; el IVA se suma al vender.
      */
     priceMode: text('price_mode', { enum: ['gross', 'net'] }).notNull().default('gross'),
+    /**
+     * Permitir vender sin stock (stock queda en negativo). Default ON: la
+     * mayoría de los comercios lo necesitan (venta a descubierto). OFF = se
+     * bloquea la venta cuando stock < cantidad (BUG-OP-01).
+     */
+    allowNegativeStock: integer('allow_negative_stock', { mode: 'boolean' }).notNull().default(true),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },

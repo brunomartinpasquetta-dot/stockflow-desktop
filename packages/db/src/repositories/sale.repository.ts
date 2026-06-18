@@ -87,8 +87,16 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         const number = (numRow?.value ?? 0) + 1;
 
         // Modo de precios vigente de la empresa: define cómo se calcula el IVA y el total.
-        const cmpRow = tx.select({ priceMode: companies.priceMode }).from(companies).limit(1).get();
+        const cmpRow = tx
+          .select({ priceMode: companies.priceMode, allowNegativeStock: companies.allowNegativeStock })
+          .from(companies)
+          .limit(1)
+          .get();
         const priceMode: PriceMode = cmpRow?.priceMode === 'net' ? 'net' : 'gross';
+        // Permitir vender sin stock (BUG-OP-01). Default false (bloquea) cuando
+        // NO hay empresa configurada — en producción siempre existe la fila
+        // (getOrCreate antes de vender) con default ON.
+        const allowNegativeStock = cmpRow?.allowNegativeStock ?? false;
 
         // Calcular importes de líneas. En 'gross' los unitPrice ya incluyen IVA; en 'net' son netos.
         const computedLines = data.lines.map((line, idx) => {
@@ -171,7 +179,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             .where(eq(articles.id, l.articleId))
             .get();
           if (!current) throw new NotFoundError('Artículo', l.articleId);
-          if (!gteDecimal(current.stock, l.quantity)) {
+          if (!allowNegativeStock && !gteDecimal(current.stock, l.quantity)) {
             throw new ConstraintError(
               'STOCK_INSUFFICIENT',
               `Stock insuficiente para el artículo ${l.articleId}: hay ${current.stock}, se requieren ${l.quantity}`,

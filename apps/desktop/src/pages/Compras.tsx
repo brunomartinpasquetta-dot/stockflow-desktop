@@ -273,7 +273,8 @@ export function Compras() {
   }, [barcode, allArticles])
   const suggestions = useMemo(() => {
     const v = barcode.trim().toLowerCase()
-    if (v.length < 2 || exactByBarcode) return []
+    // minLength 1: códigos cortos ("1","2","3") deben aparecer (BUG-OP-03a).
+    if (v.length < 1 || exactByBarcode) return []
     return allArticles
       .filter((a) => a.barcode.toLowerCase().startsWith(v) || a.description.toLowerCase().includes(v))
       .slice(0, 8)

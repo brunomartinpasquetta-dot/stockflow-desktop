@@ -21,6 +21,7 @@ interface FormState {
   cuit: string
   ingBrutos: string
   priceMode: PriceMode
+  allowNegativeStock: boolean
 }
 
 function fromCompany(c: CompanyDTO): FormState {
@@ -32,6 +33,7 @@ function fromCompany(c: CompanyDTO): FormState {
     cuit: c.cuit ?? '',
     ingBrutos: c.ingBrutos ?? '',
     priceMode: c.priceMode,
+    allowNegativeStock: c.allowNegativeStock,
   }
 }
 
@@ -88,6 +90,7 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
         cuit: form.cuit.trim() || null,
         ingBrutos: form.ingBrutos.trim() || null,
         priceMode: form.priceMode,
+        allowNegativeStock: form.allowNegativeStock,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['company'] })
@@ -167,6 +170,22 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
               subtitle="Los precios que cargás son netos, el sistema agrega el IVA al vender. Para responsables inscriptos que facturan a otras empresas."
             />
           </div>
+
+          <label className="flex items-start gap-2 rounded-lg border px-3 py-2.5">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={form.allowNegativeStock}
+              onChange={(e) => set('allowNegativeStock', e.target.checked)}
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">Permitir vender sin stock</span>
+              <span className="text-xs text-muted-foreground">
+                Si está activo, podés vender aunque no haya stock suficiente (el stock queda en
+                negativo, como faltante). Si lo desactivás, la venta se bloquea cuando falta stock.
+              </span>
+            </span>
+          </label>
         </CardContent>
       </Card>
 

@@ -23,6 +23,8 @@ export interface ImportMapping {
   costPrice?: string | null;
   vatRate?: string | null;
   minStock?: string | null;
+  listPrice2?: string | null;
+  listPrice3?: string | null;
 }
 
 export interface ImportOptions {
@@ -351,6 +353,14 @@ export class ExcelImportService {
       if (mapping.minStock) {
         const v = toQty(toStr(row[mapping.minStock]));
         if (v) data.minStock = v;
+      }
+      if (mapping.listPrice2) {
+        const v = toMoney(toStr(row[mapping.listPrice2]));
+        if (v) data.listPrice2 = v;
+      }
+      if (mapping.listPrice3) {
+        const v = toMoney(toStr(row[mapping.listPrice3]));
+        if (v) data.listPrice3 = v;
       }
 
       try {

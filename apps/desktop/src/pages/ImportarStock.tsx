@@ -20,7 +20,7 @@ interface ParsedFile {
 }
 
 const REQUIRED_FIELDS: Array<keyof ImportMappingDTO> = ['barcode', 'description', 'listPrice1', 'stock']
-const OPTIONAL_FIELDS: Array<keyof ImportMappingDTO> = ['brand', 'familyName', 'supplierName', 'costPrice', 'vatRate', 'minStock']
+const OPTIONAL_FIELDS: Array<keyof ImportMappingDTO> = ['brand', 'familyName', 'supplierName', 'costPrice', 'vatRate', 'minStock', 'listPrice2', 'listPrice3']
 
 const FIELD_LABELS: Record<keyof ImportMappingDTO, string> = {
   barcode: 'Código de barras',
@@ -33,6 +33,8 @@ const FIELD_LABELS: Record<keyof ImportMappingDTO, string> = {
   costPrice: 'Precio de costo',
   vatRate: 'Alícuota IVA',
   minStock: 'Stock mínimo',
+  listPrice2: 'Precio de lista 2',
+  listPrice3: 'Precio de lista 3',
 }
 
 export function ImportarStock() {
@@ -68,6 +70,8 @@ export function ImportarStock() {
         const lower = h.toLowerCase()
         if (/cod|barra|sku|ean/.test(lower) && !initial.barcode) initial.barcode = h
         else if (/desc|nombre|articulo|producto/.test(lower) && !initial.description) initial.description = h
+        else if (/lista.*2|precio.*2/.test(lower) && !initial.listPrice2) initial.listPrice2 = h
+        else if (/lista.*3|precio.*3/.test(lower) && !initial.listPrice3) initial.listPrice3 = h
         else if (/precio.*venta|pvp|lista|precio$/.test(lower) && !initial.listPrice1) initial.listPrice1 = h
         else if (/stock|cantidad|existencia/.test(lower) && !initial.stock) initial.stock = h
         else if (/marca/.test(lower) && !initial.brand) initial.brand = h
@@ -108,6 +112,8 @@ export function ImportarStock() {
         costPrice: mapping.costPrice ?? null,
         vatRate: mapping.vatRate ?? null,
         minStock: mapping.minStock ?? null,
+        listPrice2: mapping.listPrice2 ?? null,
+        listPrice3: mapping.listPrice3 ?? null,
       }
       const r = await api.import.validate(parsed.filePath, fullMapping)
       setValidation(r)
@@ -137,6 +143,8 @@ export function ImportarStock() {
         costPrice: mapping.costPrice ?? null,
         vatRate: mapping.vatRate ?? null,
         minStock: mapping.minStock ?? null,
+        listPrice2: mapping.listPrice2 ?? null,
+        listPrice3: mapping.listPrice3 ?? null,
       }
       const r = await api.import.execute(parsed.filePath, fullMapping, options)
       setResult(r)

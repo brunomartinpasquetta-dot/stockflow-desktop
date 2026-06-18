@@ -50,6 +50,13 @@
       "when": 1778900000000,
       "tag": "0007_caja_general",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1779000000000,
+      "tag": "0008_allow_negative_stock",
+      "breakpoints": true
     }
   ]
 }

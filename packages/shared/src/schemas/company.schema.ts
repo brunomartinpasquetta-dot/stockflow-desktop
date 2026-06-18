@@ -16,6 +16,8 @@ export const CompanySchema = z.object({
   cuit: z.string().nullable(),
   ingBrutos: z.string().nullable(),
   priceMode: priceModeSchema,
+  /** Permitir vender sin stock (stock negativo). Default ON. */
+  allowNegativeStock: z.boolean(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -33,6 +35,7 @@ const companyBase = z.object({
     }),
   ingBrutos: z.string().nullish(),
   priceMode: priceModeSchema.optional(),
+  allowNegativeStock: z.boolean().optional(),
 });
 
 export const CreateCompanySchema = companyBase;

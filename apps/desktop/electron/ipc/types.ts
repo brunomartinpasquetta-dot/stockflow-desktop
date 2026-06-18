@@ -183,6 +183,8 @@ export interface CompanyDTO {
   ingBrutos: string | null;
   /** 'gross' = los precios cargados ya incluyen IVA; 'net' = son netos. */
   priceMode: PriceMode;
+  /** Permitir vender sin stock (stock negativo). Default ON. */
+  allowNegativeStock: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -1555,6 +1557,8 @@ export interface ImportMappingDTO {
   costPrice?: string | null;
   vatRate?: string | null;
   minStock?: string | null;
+  listPrice2?: string | null;
+  listPrice3?: string | null;
 }
 
 export interface ImportOptionsDTO {
