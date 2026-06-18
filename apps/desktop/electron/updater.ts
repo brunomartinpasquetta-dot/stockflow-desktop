@@ -68,9 +68,34 @@ export function compareVersions(a: string, b: string): number {
 }
 
 /**
+ * Elige el asset de descarga correcto según el SO/arch del PROCESO actual:
+ *  - Windows → instalador NSIS `.exe` (excluye `.exe.blockmap`).
+ *  - macOS   → `.dmg` de la arquitectura (arm64 / x64).
+ *  - Linux   → `.AppImage`.
+ * Devuelve undefined si no hay asset para esta plataforma → el caller cae a la
+ * página del release. (Bug viejo: siempre servía `.dmg`, incluso en Windows.)
+ */
+function pickAssetForPlatform(assets: GithubAsset[]): GithubAsset | undefined {
+  const arch = process.arch; // 'arm64' | 'x64'
+  if (process.platform === 'win32') {
+    return assets.find((a) => a.name.toLowerCase().endsWith('.exe'));
+  }
+  if (process.platform === 'darwin') {
+    return (
+      assets.find((a) => a.name.endsWith(`-${arch}.dmg`)) ??
+      (arch === 'x64'
+        ? assets.find((a) => a.name.endsWith('.dmg') && !a.name.includes('arm64'))
+        : undefined) ??
+      assets.find((a) => a.name.endsWith('.dmg'))
+    );
+  }
+  return assets.find((a) => a.name.toLowerCase().endsWith('.appimage'));
+}
+
+/**
  * Consulta GitHub Releases por la última versión publicada. Devuelve `null`
- * si la red falla o la respuesta no tiene `tag_name`. Elige el asset `.dmg`
- * para la arquitectura del proceso actual cuando está disponible.
+ * si la red falla o la respuesta no tiene `tag_name`. Elige el asset acorde al
+ * SO/arch del proceso (Windows `.exe`, macOS `.dmg`, Linux `.AppImage`).
  */
 export async function checkRemoteVersion(): Promise<RemoteRelease | null> {
   try {
@@ -85,16 +110,11 @@ export async function checkRemoteVersion(): Promise<RemoteRelease | null> {
     };
     const tag = data.tag_name?.replace(/^v/, '');
     if (!tag) return null;
-    const arch = process.arch; // 'arm64' | 'x64'
     const assets = data.assets ?? [];
-    const archAsset =
-      assets.find((a) => a.name.endsWith(`-${arch}.dmg`)) ??
-      (arch === 'x64'
-        ? assets.find((a) => a.name.endsWith('.dmg') && !a.name.includes('arm64'))
-        : undefined);
-    const fallback = assets.find((a) => a.name.endsWith('.dmg'));
-    const downloadUrl =
-      archAsset?.browser_download_url ?? fallback?.browser_download_url ?? data.html_url ?? '';
+    const asset = pickAssetForPlatform(assets);
+    // Si no hay asset para este SO, mandamos a la página del release — NUNCA a
+    // un instalador de otra plataforma (antes Windows recibía el .dmg).
+    const downloadUrl = asset?.browser_download_url ?? data.html_url ?? '';
     return { latestVersion: tag, downloadUrl };
   } catch {
     return null;
