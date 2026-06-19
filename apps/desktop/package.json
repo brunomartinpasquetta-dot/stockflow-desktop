@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "0.1.39",
+  "version": "0.1.40",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -57,7 +57,7 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^1.14.0",
     "node-thermal-printer": "^4.4.5",
-    "pdf-to-printer": "^5.8.0",
+    "pdf-to-printer": "5.8.0",
     "postcss": "^8.5.14",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

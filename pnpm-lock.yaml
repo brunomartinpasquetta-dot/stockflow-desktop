@@ -156,7 +156,7 @@ importers:
         specifier: ^4.4.5
         version: 4.6.0
       pdf-to-printer:
-        specifier: ^5.8.0
+        specifier: 5.8.0
         version: 5.8.0
       postcss:
         specifier: ^8.5.14

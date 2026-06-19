@@ -23,9 +23,8 @@ extraResources:
 asar: true
 asarUnpack:
   - "**/*.node"
-  # SumatraPDF.exe (impresión silenciosa en Windows) debe quedar FUERA del asar
-  # para poder ejecutarse como binario.
-  - "**/node_modules/pdf-to-printer/**"
+# Nota: SumatraPDF.exe NO se desempaqueta acá (el asarUnpack con pnpm no funcionó,
+# v0.1.39). Se copia a resources/ vía extraResources en electron-builder.win.yml.
 
 mac:
   category: public.app-category.business

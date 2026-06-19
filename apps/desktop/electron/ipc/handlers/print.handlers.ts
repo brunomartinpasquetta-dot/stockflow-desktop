@@ -42,6 +42,58 @@ interface PrintTicketAutoPayload {
   deviceName?: string;
 }
 
+/**
+ * Resuelve la ruta ABSOLUTA del binario SumatraPDF (Windows).
+ *  - Producción: copiado por electron-builder a `resources/SumatraPDF.exe`
+ *    (FUERA del asar → ejecutable). Camino determinístico (extraResources).
+ *  - Dev/no empaquetado: el .exe que trae el paquete pdf-to-printer.
+ * Devuelve null si no lo encuentra.
+ */
+async function resolveSumatraExe(): Promise<string | null> {
+  const { existsSync, readdirSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  // 1) Producción: resources/SumatraPDF.exe (extraResources, renombrado). Si el
+  //    copiado conservó el nombre versionado, escaneamos resources/ igual.
+  try {
+    const rp = process.resourcesPath;
+    if (rp) {
+      const fixed = join(rp, 'SumatraPDF.exe');
+      if (existsSync(fixed)) return fixed;
+      const scan = existsSync(rp) ? readdirSync(rp).find((f) => /sumatra.*\.exe$/i.test(f)) : undefined;
+      if (scan) return join(rp, scan);
+    }
+  } catch {
+    /* process.resourcesPath puede no existir fuera de un build empaquetado */
+  }
+  // 2) Dev: dist del paquete pdf-to-printer.
+  try {
+    const { createRequire } = await import('node:module');
+    const req = createRequire(import.meta.url);
+    const dist = dirname(req.resolve('pdf-to-printer'));
+    const exe = existsSync(dist) ? readdirSync(dist).find((f) => /sumatra.*\.exe$/i.test(f)) : undefined;
+    if (exe) return join(dist, exe);
+  } catch {
+    /* noop */
+  }
+  return null;
+}
+
+/**
+ * Imprime un PDF en SILENCIO en Windows ejecutando SumatraPDF DIRECTAMENTE con
+ * ruta absoluta (`-print-to <printer> -silent` o `-print-to-default -silent`).
+ * No depende del asar ni de la resolución interna de pdf-to-printer (que dejaba
+ * el .exe inejecutable dentro del asar). Timeout anti-cuelgue.
+ */
+async function printPdfWithSumatra(exe: string, file: string, printerName?: string): Promise<void> {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const run = promisify(execFile);
+  const args = printerName
+    ? ['-print-to', printerName, '-silent', file]
+    : ['-print-to-default', '-silent', file];
+  await run(exe, args, { windowsHide: true, timeout: 20_000 });
+}
+
 export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
   return {
     /**
@@ -105,25 +157,25 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         } catch (e) {
           add(`pdf-to-printer: NO se pudo cargar: ${e instanceof Error ? e.message : String(e)}`);
         }
+        // Ruta que REALMENTE se va a usar para imprimir (resources/ en prod).
+        add(`resourcesPath: ${process.resourcesPath}`);
+        const sumatraExe = await resolveSumatraExe();
+        if (sumatraExe) {
+          add(`SumatraPDF que se usará: ${sumatraExe}`);
+          add(`  ¿es ejecutable (fuera de app.asar)?: ${!sumatraExe.includes('app.asar') || sumatraExe.includes('app.asar.unpacked')}`);
+        } else {
+          add('SumatraPDF: NO se encontró ni en resources/ ni en el paquete → la impresión directa NO va a funcionar.');
+        }
+        // Diagnóstico extra: dónde lo busca pdf-to-printer dentro del paquete.
         try {
           const req = createRequire(import.meta.url);
-          const entry = req.resolve('pdf-to-printer');
-          const dist = dirname(entry);
+          const dist = dirname(req.resolve('pdf-to-printer'));
           const exes = existsSync(dist)
             ? readdirSync(dist).filter((f) => /sumatra/i.test(f) && f.toLowerCase().endsWith('.exe'))
             : [];
-          if (exes.length) {
-            const full = join(dist, exes[0]!);
-            add(`SumatraPDF: ${full}`);
-            add(
-              `SumatraPDF existe en disco: ${existsSync(full)}  (debe ser TRUE; la ruta NO debe contener "app.asar" sin ".unpacked")`,
-            );
-          } else {
-            add(`SumatraPDF: NO encontrado en ${dist}`);
-            add(`  contenido del dir: ${existsSync(dist) ? readdirSync(dist).join(', ') : '(dir inexistente)'}`);
-          }
-        } catch (e) {
-          add(`SumatraPDF: no se pudo resolver ruta: ${e instanceof Error ? e.message : String(e)}`);
+          add(`(pdf-to-printer dist: ${dist} → ${exes.join(', ') || 'sin .exe'})`);
+        } catch {
+          /* noop */
         }
 
         // 3) Impresoras que ve pdf-to-printer.
@@ -137,7 +189,7 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         }
         add('');
 
-        // 4) Intento de impresión REAL (PDF chico → pdf-to-printer).
+        // 4) Intento de impresión REAL (PDF chico → SumatraPDF directo).
         let tmpFile = '';
         try {
           const pdf = await win.webContents.printToPDF({
@@ -148,15 +200,15 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           tmpFile = join(tmpdir(), `stockflow-diag-${process.pid}.pdf`);
           await writeFile(tmpFile, pdf);
           add(`PDF de prueba: ${pdf.length} bytes`);
-          if (ptp?.print) {
+          if (sumatraExe) {
             try {
-              await ptp.print(tmpFile, payload?.deviceName ? { printer: payload.deviceName } : {});
+              await printPdfWithSumatra(sumatraExe, tmpFile, payload?.deviceName || undefined);
               add(`>>> INTENTO DE IMPRESIÓN: OK (impresora=${payload?.deviceName ?? 'default del SO'}). ¿Salió papel?`);
             } catch (e) {
               add(`>>> INTENTO DE IMPRESIÓN: FALLÓ → ${e instanceof Error ? e.message : String(e)}`);
             }
           } else {
-            add('>>> INTENTO DE IMPRESIÓN: omitido (pdf-to-printer no cargó).');
+            add('>>> INTENTO DE IMPRESIÓN: omitido (no se encontró SumatraPDF.exe).');
           }
         } catch (e) {
           add(`PDF de prueba ERROR: ${e instanceof Error ? e.message : String(e)}`);
@@ -383,25 +435,24 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           }
         }
 
-        // 2a) WINDOWS: imprimir el PDF en SILENCIO con el driver gráfico del SO
-        // vía pdf-to-printer (SumatraPDF bundleado). Evita los DOS caminos rotos
-        // del historial: ESC/POS crudo (basura infinita) y webContents.print
-        // silent (regresión Electron #39092). Igual criterio que un POS comercial.
+        // 2a) WINDOWS: imprimir el PDF en SILENCIO ejecutando SumatraPDF DIRECTO
+        // con ruta absoluta (copiado a resources/ vía extraResources, FUERA del
+        // asar → ejecutable). Reemplaza pdf-to-printer.print(), que dejaba el .exe
+        // inejecutable dentro del asar (diagnóstico v0.1.39). Evita los DOS
+        // caminos rotos del historial: ESC/POS crudo y webContents.print silent.
         if (isWindows) {
           const tmpFile = join(tmpdir(), `stockflow-${fileName}-${Date.now()}.pdf`);
           await writeFile(tmpFile, pdf);
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ptpNs: any = await import('pdf-to-printer');
-            const ptp = ptpNs.default ?? ptpNs;
-            const ptpPrint: (f: string, o?: { printer?: string }) => Promise<unknown> = ptp.print;
-            const ptpGetPrinters: () => Promise<{ name: string }[]> = ptp.getPrinters;
             // Resolver el nombre que entiende SumatraPDF (nombre de Windows). Si
             // el guardado no matchea exacto, probamos parcial; si no, default.
             let printerName = deviceName;
             try {
-              const printers = await ptpGetPrinters();
-              log(`pdf-to-printer impresoras: ${printers.map((p) => p.name).join(' | ') || '(ninguna)'}`);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const ptpNs: any = await import('pdf-to-printer');
+              const ptp = ptpNs.default ?? ptpNs;
+              const printers = (await ptp.getPrinters()) as { name: string }[];
+              log(`impresoras: ${printers.map((p) => p.name).join(' | ') || '(ninguna)'}`);
               if (printerName && !printers.find((p) => p.name === printerName)) {
                 const t = printerName;
                 const partial = printers.find((p) => p.name.includes(t) || t.includes(p.name));
@@ -409,15 +460,18 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
                 log(`deviceName "${t}" no exacto → uso "${printerName}"`);
               }
             } catch (e) {
-              log(`pdf-to-printer.getPrinters falló: ${e instanceof Error ? e.message : String(e)}`);
+              log(`getPrinters falló (sigo con el deviceName configurado): ${e instanceof Error ? e.message : String(e)}`);
             }
-            await ptpPrint(tmpFile, printerName ? { printer: printerName } : {});
-            log(`pdf-to-printer OK (impresora=${printerName ?? 'default del SO'})`);
+            const sumatra = await resolveSumatraExe();
+            if (!sumatra) throw new Error('no se encontró SumatraPDF.exe (resources/ ni paquete)');
+            log(`SumatraPDF: ${sumatra}`);
+            await printPdfWithSumatra(sumatra, tmpFile, printerName ?? undefined);
+            log(`impresión OK (impresora=${printerName ?? 'default del SO'})`);
             return { printed: true, pdfPath: null };
           } catch (err) {
-            console.error('[StockFlow print] pdf-to-printer falló', err);
+            console.error('[StockFlow print] impresión Windows falló', err);
             // Lanzamos → el renderer cae al diálogo del SO (no se pierde el ticket).
-            throw new Error(`pdf-to-printer falló: ${err instanceof Error ? err.message : String(err)}`, {
+            throw new Error(`impresión Windows falló: ${err instanceof Error ? err.message : String(err)}`, {
               cause: err,
             });
           } finally {
