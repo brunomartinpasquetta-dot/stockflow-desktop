@@ -1294,6 +1294,8 @@ export interface ApiSurface {
     focusMain(): Res<{ ok: true }>;
   };
   print: {
+    /** Diagnóstico de impresión (Windows): impresoras, SumatraPDF, intento real. Devuelve un reporte de texto. */
+    diagnose(payload: { deviceName?: string }): Res<{ report: string }>;
     /** Imprime HTML inline en una BrowserWindow oculta usando webContents.print silencioso. */
     silent(payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Res<{ ok: true }>;
     /** Imprime la ventana actual (ya con el ticket montado en #print-area) en silencio, sin diálogo. */

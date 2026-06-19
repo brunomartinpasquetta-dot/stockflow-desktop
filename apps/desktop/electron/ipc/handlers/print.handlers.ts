@@ -45,6 +45,135 @@ interface PrintTicketAutoPayload {
 export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
   return {
     /**
+     * DIAGNÓSTICO de impresión (Windows). Devuelve un reporte de texto con todo
+     * lo necesario para entender por qué no imprime, SIN abrir DevTools ni buscar
+     * archivos de log: impresoras que ve Electron y pdf-to-printer, si encontró
+     * SumatraPDF.exe (y en qué ruta — clave para detectar problemas de empaquetado
+     * asar), y el resultado REAL de un intento de impresión con el error exacto.
+     */
+    'print:diagnose': unguarded(deps, async (payload: { deviceName?: string }): Promise<{ report: string }> => {
+      const lines: string[] = [];
+      const add = (s: string): void => {
+        lines.push(s);
+      };
+      const { BrowserWindow, app } = await import('electron');
+      const { writeFile, unlink } = await import('node:fs/promises');
+      const { existsSync, readdirSync } = await import('node:fs');
+      const { tmpdir } = await import('node:os');
+      const { join, dirname } = await import('node:path');
+      const { createRequire } = await import('node:module');
+
+      add(`StockFlow v${app.getVersion()} — diagnóstico de impresión`);
+      add(`Plataforma: ${process.platform} ${process.arch} | empaquetado=${app.isPackaged}`);
+      add(`Impresora configurada (deviceName): "${payload?.deviceName ?? '(ninguna)'}"`);
+      add('');
+
+      const win = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true } });
+      try {
+        await win.loadURL(
+          'data:text/html,' +
+            encodeURIComponent(
+              '<html><body style="font-family:sans-serif;padding:10px"><h3>StockFlow</h3><p>PRUEBA DE IMPRESION (diagnostico)</p></body></html>',
+            ),
+        );
+
+        // 1) Impresoras que ve Electron.
+        try {
+          const ep = await win.webContents.getPrintersAsync();
+          add(`Electron ve ${ep.length} impresora(s):`);
+          ep.forEach((p) =>
+            add(`  - name="${p.name}" display="${p.displayName}"${(p as { isDefault?: boolean }).isDefault ? ' *default' : ''}`),
+          );
+        } catch (e) {
+          add(`Electron getPrintersAsync ERROR: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        add('');
+
+        if (process.platform !== 'win32') {
+          add('No es Windows → impresión por lp/CUPS (pdf-to-printer no aplica).');
+          return { report: lines.join('\n') };
+        }
+
+        // 2) Módulo pdf-to-printer + ubicación de SumatraPDF.exe.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let ptp: any = null;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const ns: any = await import('pdf-to-printer');
+          ptp = ns.default ?? ns;
+          add('pdf-to-printer: módulo cargado OK');
+        } catch (e) {
+          add(`pdf-to-printer: NO se pudo cargar: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        try {
+          const req = createRequire(import.meta.url);
+          const entry = req.resolve('pdf-to-printer');
+          const dist = dirname(entry);
+          const exes = existsSync(dist)
+            ? readdirSync(dist).filter((f) => /sumatra/i.test(f) && f.toLowerCase().endsWith('.exe'))
+            : [];
+          if (exes.length) {
+            const full = join(dist, exes[0]!);
+            add(`SumatraPDF: ${full}`);
+            add(
+              `SumatraPDF existe en disco: ${existsSync(full)}  (debe ser TRUE; la ruta NO debe contener "app.asar" sin ".unpacked")`,
+            );
+          } else {
+            add(`SumatraPDF: NO encontrado en ${dist}`);
+            add(`  contenido del dir: ${existsSync(dist) ? readdirSync(dist).join(', ') : '(dir inexistente)'}`);
+          }
+        } catch (e) {
+          add(`SumatraPDF: no se pudo resolver ruta: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        // 3) Impresoras que ve pdf-to-printer.
+        if (ptp?.getPrinters) {
+          try {
+            const pp = (await ptp.getPrinters()) as { name: string }[];
+            add(`pdf-to-printer ve ${pp.length} impresora(s): ${pp.map((p) => `"${p.name}"`).join(', ') || '(ninguna)'}`);
+          } catch (e) {
+            add(`pdf-to-printer getPrinters ERROR: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        add('');
+
+        // 4) Intento de impresión REAL (PDF chico → pdf-to-printer).
+        let tmpFile = '';
+        try {
+          const pdf = await win.webContents.printToPDF({
+            printBackground: true,
+            pageSize: { width: 58 * 1000, height: 60 * 1000 },
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+          });
+          tmpFile = join(tmpdir(), `stockflow-diag-${process.pid}.pdf`);
+          await writeFile(tmpFile, pdf);
+          add(`PDF de prueba: ${pdf.length} bytes`);
+          if (ptp?.print) {
+            try {
+              await ptp.print(tmpFile, payload?.deviceName ? { printer: payload.deviceName } : {});
+              add(`>>> INTENTO DE IMPRESIÓN: OK (impresora=${payload?.deviceName ?? 'default del SO'}). ¿Salió papel?`);
+            } catch (e) {
+              add(`>>> INTENTO DE IMPRESIÓN: FALLÓ → ${e instanceof Error ? e.message : String(e)}`);
+            }
+          } else {
+            add('>>> INTENTO DE IMPRESIÓN: omitido (pdf-to-printer no cargó).');
+          }
+        } catch (e) {
+          add(`PDF de prueba ERROR: ${e instanceof Error ? e.message : String(e)}`);
+        } finally {
+          if (tmpFile) await unlink(tmpFile).catch(() => undefined);
+        }
+      } finally {
+        try {
+          win.destroy();
+        } catch {
+          /* noop */
+        }
+      }
+      return { report: lines.join('\n') };
+    }),
+
+    /**
      * Imprime la VENTANA ACTUAL (la que disparó el IPC) en silencio, sin
      * abrir el diálogo del SO. El renderer ya montó el ticket en `#print-area`
      * y activó las clases `@media print` — acá sólo imprimimos esa misma

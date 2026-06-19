@@ -101,6 +101,8 @@ function PrinterSection() {
   const [showDialog, setShowDialog] = useState(false)
   const [seeded, setSeeded] = useState<PrinterConfigDTO | null | undefined>(undefined)
   const [testing, setTesting] = useState(false)
+  const [diagnosing, setDiagnosing] = useState(false)
+  const [diagReport, setDiagReport] = useState<string>('')
 
   // Sembrar formulario desde la config persistida.
   if (seeded !== cfgQuery.data) {
@@ -175,6 +177,22 @@ function PrinterSection() {
       }
     } finally {
       setTesting(false)
+    }
+  }
+
+  // Diagnóstico de impresión: muestra EN PANTALLA qué impresoras ve el sistema y
+  // pdf-to-printer, si encontró SumatraPDF.exe, y el resultado real de un intento
+  // de impresión. Sirve para diagnosticar sin DevTools ni archivos de log.
+  async function onDiagnose(): Promise<void> {
+    setDiagnosing(true)
+    setDiagReport('Ejecutando diagnóstico…')
+    try {
+      const r = await api.print.diagnose({ deviceName: systemName.trim() || undefined })
+      setDiagReport(r.report)
+    } catch (err) {
+      setDiagReport(`ERROR ejecutando el diagnóstico: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setDiagnosing(false)
     }
   }
 
@@ -296,7 +314,33 @@ function PrinterSection() {
           <Button variant="outline" onClick={() => drawerMut.mutate()} disabled={drawerMut.isPending}>
             Abrir cajón
           </Button>
+          <Button variant="outline" onClick={() => void onDiagnose()} disabled={diagnosing}>
+            {diagnosing && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+            Diagnóstico de impresión
+          </Button>
         </div>
+
+        {diagReport && (
+          <div className="col-span-2 space-y-2 rounded-md border bg-muted/40 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">Diagnóstico de impresión</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => {
+                  void navigator.clipboard.writeText(diagReport)
+                  toast.success('Diagnóstico copiado')
+                }}
+              >
+                Copiar
+              </Button>
+            </div>
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-snug">
+              {diagReport}
+            </pre>
+          </div>
+        )}
 
         <p className="col-span-2 text-xs text-muted-foreground">
           La impresión usa la cola del sistema operativo. Con una impresora térmica configurada, los
