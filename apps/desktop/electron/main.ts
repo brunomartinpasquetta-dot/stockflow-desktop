@@ -31,6 +31,7 @@ let mainWindow: BrowserWindow | null = null;
 let dbHandle: DbHandle | null = null;
 let licenseManager: LicenseManager | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
+let mpCronTimer: NodeJS.Timeout | null = null;
 let hardwareManager: HardwareManager | null = null;
 let backupService: BackupService | null = null;
 let lanServer: LanServer | null = null;
@@ -185,7 +186,9 @@ function bootstrap(): { lanArgs: string[] } {
   console.info(`[main] StockFlow listo — DB: ${dbPath} — ${channels.length} canales IPC registrados`);
 
   // Cron: expirar órdenes MP vencidas cada 60s. Usa un admin como currentUser.
-  setInterval(() => {
+  // Se guarda la referencia para poder limpiarlo en before-quit (si no, mantiene
+  // vivo el proceso y deja un zombie en Windows).
+  mpCronTimer = setInterval(() => {
     void (async () => {
       try {
         if (!dbHandle) return;
@@ -294,11 +297,22 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', (event) => {
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    // Cierre limpio de TODO lo que mantiene vivo el proceso (timers, puertos
+    // serie, servidor LAN, ventanas ocultas). Idempotente. Si algo de esto queda
+    // vivo, en Windows el proceso no muere → zombie que retiene el
+    // single-instance lock y impide reabrir la app.
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+    if (mpCronTimer) { clearInterval(mpCronTimer); mpCronTimer = null; }
+    updaterController?.dispose?.();
+    void hardwareManager?.dispose(); // cierra puertos serie (balanza/impresora)
     if (lanServer) {
-      void lanServer.stop();
+      void lanServer.stop(); // libera el puerto LAN (evita EADDRINUSE al reabrir)
       lanServer = null;
     }
+    try { desktopWindows?.closeAll(); } catch { /* */ }
+
+    // Backup pre-quit (si está configurado) CON watchdog: una copia que se cuelga
+    // no debe impedir el cierre (era otra causa de proceso zombie).
     if (
       !quittingForBackup &&
       hardwareManager?.getConfig().backup.autoOnAppQuit &&
@@ -306,15 +320,24 @@ if (!app.requestSingleInstanceLock()) {
     ) {
       event.preventDefault();
       quittingForBackup = true;
+      const forceExit = setTimeout(() => {
+        console.warn('[lifecycle] backup pre-quit tardó demasiado — salgo igual');
+        shutdown(dbHandle);
+        app.exit(0);
+      }, 8000);
       void backupService
         .createBackup()
         .catch((err) => console.error('[main] backup pre-quit falló:', err))
         .finally(() => {
+          clearTimeout(forceExit);
           shutdown(dbHandle);
           app.exit(0);
         });
       return;
     }
     shutdown(dbHandle);
+    // Salida FORZADA: garantiza que el proceso y sus subprocesos mueran aunque
+    // quede algún handle nativo colgado → libera el lock y permite reabrir.
+    app.exit(0);
   });
 }

@@ -101,6 +101,30 @@ export class HardwareManager {
     return this.cfg;
   }
 
+  /**
+   * Cierra los puertos serie abiertos (balanza/impresora) al salir de la app.
+   * Los handles nativos de `serialport` mantienen vivo el proceso de Electron en
+   * Windows → si no se cierran, queda un proceso zombie que impide reabrir.
+   */
+  async dispose(): Promise<void> {
+    if (this.scaleUnsub) {
+      this.scaleUnsub();
+      this.scaleUnsub = null;
+    }
+    try {
+      if (this.printer) await this.printer.disconnect();
+    } catch {
+      /* best-effort */
+    }
+    try {
+      if (this.scale) await this.scale.disconnect();
+    } catch {
+      /* best-effort */
+    }
+    this.printer = null;
+    this.scale = null;
+  }
+
   async setPrinterConfig(cfg: PrinterConfig | null): Promise<void> {
     this.cfg.printer = cfg;
     this.persistAtomic();

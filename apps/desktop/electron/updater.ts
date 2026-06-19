@@ -154,6 +154,8 @@ export interface UpdaterController {
   quitAndInstall: () => void;
   getAutoCheck: () => boolean;
   setAutoCheck: (v: boolean) => void;
+  /** Limpia los timers del updater (chequeo periódico) para un cierre limpio. */
+  dispose?: () => void;
 }
 
 export interface UpdaterContext {
@@ -221,8 +223,8 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
     });
   }
 
-  setTimeout(checkInternal, FIVE_SECONDS_MS);
-  setInterval(checkInternal, FOUR_HOURS_MS);
+  const startupCheck = setTimeout(checkInternal, FIVE_SECONDS_MS);
+  const periodicCheck = setInterval(checkInternal, FOUR_HOURS_MS);
 
   return {
     checkNow: async () => {
@@ -238,6 +240,10 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
     setAutoCheck: (v: boolean) => {
       prefs = { autoCheck: v };
       writePrefs(ctx.userDataDir, prefs);
+    },
+    dispose: () => {
+      clearTimeout(startupCheck);
+      clearInterval(periodicCheck);
     },
   };
 }
