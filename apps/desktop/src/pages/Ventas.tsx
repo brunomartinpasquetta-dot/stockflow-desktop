@@ -462,13 +462,23 @@ function PDV() {
   }, [barcode, allArticles])
   const suggestions = useMemo(() => {
     const v = barcode.trim().toLowerCase()
-    // minLength 1: hay artículos con códigos cortos ("1","2","3") que antes no
-    // aparecían en sugerencias (BUG-OP-03a).
-    if (v.length < 1 || exactByBarcode) return []
-    return allArticles
-      .filter((a) => a.barcode.toLowerCase().startsWith(v) || a.description.toLowerCase().includes(v))
-      .slice(0, 8)
-  }, [barcode, allArticles, exactByBarcode])
+    // Vista previa SIEMPRE que haya texto (aunque exista match exacto): al escribir
+    // NÚMEROS deben verse los resultados, igual que el resto de los buscadores.
+    // Match por SUBSTRING en código + descripción + marca (mismo criterio que el
+    // buscador completo); orden por relevancia: exacto → empieza con → contiene.
+    if (v.length < 1) return []
+    const matches = allArticles.filter(
+      (a) =>
+        a.barcode.toLowerCase().includes(v) ||
+        a.description.toLowerCase().includes(v) ||
+        (a.brand?.toLowerCase().includes(v) ?? false),
+    )
+    const rank = (a: ArticleDTO): number => {
+      const bc = a.barcode.toLowerCase()
+      return bc === v ? 0 : bc.startsWith(v) ? 1 : 2
+    }
+    return [...matches].sort((a, b) => rank(a) - rank(b)).slice(0, 8)
+  }, [barcode, allArticles])
 
   function commitBarcode(): void {
     const v = barcode.trim()
