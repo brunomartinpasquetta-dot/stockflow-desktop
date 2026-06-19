@@ -32,7 +32,7 @@ function dayStart(iso: string): number {
 function dayEnd(iso: string): number {
   return new Date(`${iso}T23:59:59.999`).getTime()
 }
-const VOUCHER_LABELS: Record<VoucherType, string> = { A: 'Factura A', B: 'Factura B', C: 'Factura C', X: 'Comprobante X' }
+const VOUCHER_LABELS: Record<VoucherType, string> = { A: 'Factura A', B: 'Factura B', C: 'Factura C', X: 'Remito X' }
 const PAGE_SIZE = 50
 
 function SaleDetailDialog({

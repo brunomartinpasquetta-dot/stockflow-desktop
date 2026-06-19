@@ -15,7 +15,7 @@ const VOUCHER_LABELS: Record<VoucherType, string> = {
   A: 'Factura A',
   B: 'Factura B',
   C: 'Factura C',
-  X: 'Comprobante X',
+  X: 'Remito X',
 }
 
 // Ancho lógico del ticket en caracteres (para los separadores).

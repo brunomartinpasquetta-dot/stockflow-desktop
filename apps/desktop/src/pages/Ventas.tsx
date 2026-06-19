@@ -45,11 +45,14 @@ interface CartLine {
   priceManuallySet: boolean
 }
 
+// Por defecto "Remito X" (no fiscal): sin conexión AFIP/ARCA no se pueden emitir
+// facturas con CAE válidas. Las Factura A/B/C quedan disponibles pero marcadas
+// "requiere AFIP" (cuando haya conexión fiscal, el tipo lo determinará ARCA).
 const VOUCHER_OPTIONS: { value: VoucherType; label: string }[] = [
-  { value: 'B', label: 'Factura B' },
-  { value: 'A', label: 'Factura A' },
-  { value: 'C', label: 'Factura C' },
-  { value: 'X', label: 'Comprobante X' },
+  { value: 'X', label: 'Remito X (no fiscal)' },
+  { value: 'A', label: 'Factura A (requiere AFIP)' },
+  { value: 'B', label: 'Factura B (requiere AFIP)' },
+  { value: 'C', label: 'Factura C (requiere AFIP)' },
 ]
 
 function isCfCustomer(c: CustomerDTO | null): boolean {
@@ -332,7 +335,7 @@ function PDV() {
   const customerDebt = (balancesQuery.data ?? []).find((b) => b.customerId === effectiveCustomerId)?.totalDebt ?? '0'
   const isCF = isCfCustomer(selectedCustomer)
 
-  const [voucherType, setVoucherType] = useState<VoucherType>('B')
+  const [voucherType, setVoucherType] = useState<VoucherType>('X')
   const numberQuery = useQuery({
     queryKey: ['sales', 'nextNumber', voucherType],
     queryFn: () => api.sales.getNextNumber(voucherType),

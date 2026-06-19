@@ -95,7 +95,11 @@ export class AccountingService {
     let articlesValue = '0.0000';
     for (const a of articles) {
       if (a.active === false) continue;
-      articlesValue = sumDecimals([articlesValue, mulDecimal(a.stock, a.costPrice, 4)]);
+      // El stock NEGATIVO vale $0 en valorización de activos: no tenés esa
+      // mercadería, así que no puede sumar ni restar al valor del inventario
+      // (el faltante se gestiona aparte). Sin esto, articlesValue → negativo.
+      const stockValido = Math.max(0, Number(a.stock));
+      articlesValue = sumDecimals([articlesValue, mulDecimal(stockValido, a.costPrice, 4)]);
     }
 
     // Efectivo en cajas diarias abiertas: aperturas + saldo de movimientos en

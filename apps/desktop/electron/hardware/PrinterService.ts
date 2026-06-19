@@ -474,8 +474,14 @@ export class PrinterService {
     parts.push(LF);
 
     parts.push(BOLD_ON);
-    push(`${center(`COMPROBANTE ${sale.voucherType}  N° ${sale.number}`, cols)}\n`);
-    parts.push(BOLD_OFF, ALIGN_LEFT);
+    const docLabel = sale.voucherType === 'X' ? 'REMITO X' : `FACTURA ${sale.voucherType}`;
+    push(`${center(`${docLabel}  N° ${sale.number}`, cols)}\n`);
+    parts.push(BOLD_OFF);
+    // Remito X = no fiscal: dejarlo explícito en el ticket.
+    if (sale.voucherType === 'X') {
+      push(`${center('DOCUMENTO NO FISCAL', cols)}\n`);
+    }
+    parts.push(ALIGN_LEFT);
     push(`${formatDateTime(sale.createdAt)}\n`);
     if (sale.customer) {
       push(`Cliente: ${sale.customer.name}\n`);

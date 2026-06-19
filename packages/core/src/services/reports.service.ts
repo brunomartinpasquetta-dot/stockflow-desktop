@@ -221,8 +221,11 @@ export class ReportsService {
         } satisfies FamilyInventoryRow);
       row.articleCount += 1;
       row.totalStock = sumDecimals([row.totalStock, a.stock], 3);
-      row.costValue = sumDecimals([row.costValue, mulDecimal(a.stock, a.costPrice, 4)]);
-      row.saleValue = sumDecimals([row.saleValue, mulDecimal(a.stock, a.listPrice1, 4)]);
+      // Valorización: el stock negativo cuenta como 0 (no es un activo). El
+      // totalStock (cantidad) SÍ refleja el negativo; sólo el valor en $ lo pisa.
+      const stockValido = Math.max(0, Number(a.stock));
+      row.costValue = sumDecimals([row.costValue, mulDecimal(stockValido, a.costPrice, 4)]);
+      row.saleValue = sumDecimals([row.saleValue, mulDecimal(stockValido, a.listPrice1, 4)]);
       buckets.set(key, row);
     }
     return [...buckets.values()];
@@ -350,8 +353,10 @@ export class ReportsService {
         arr = [];
         bySup.set(fKey, arr);
       }
-      const costValue = mulDecimal(a.stock, a.costPrice, 4);
-      const saleValue = mulDecimal(a.stock, a.listPrice1, 4);
+      // Valorización: stock negativo = 0 (no es activo). El stock mostrado sigue negativo.
+      const stockValido = Math.max(0, Number(a.stock));
+      const costValue = mulDecimal(stockValido, a.costPrice, 4);
+      const saleValue = mulDecimal(stockValido, a.listPrice1, 4);
       arr.push({
         articleId: a.id,
         barcode: a.barcode,
