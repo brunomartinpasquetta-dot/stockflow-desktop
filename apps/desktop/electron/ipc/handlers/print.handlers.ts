@@ -390,7 +390,17 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         log(`render PDF (ancho=${widthMm}mm, archivo=${fileName})`);
         const win = new BrowserWindow({
           show: false,
-          webPreferences: { contextIsolation: true },
+          // FUERA DE PANTALLA: en Windows, webContents.print sobre una ventana
+          // OCULTA (show:false) sale en BLANCO (no pinta). La mostramos off-screen
+          // y sin foco (showInactive, más abajo) para que el compositor la pinte
+          // de verdad → el print captura el contenido. El usuario no la ve.
+          x: -10000,
+          y: -10000,
+          width: 480,
+          height: 1400,
+          frame: false,
+          skipTaskbar: true,
+          webPreferences: { contextIsolation: true, backgroundThrottling: false },
         });
         let pdf: Buffer | null;
         try {
@@ -406,7 +416,15 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           // Frame extra para que el layout quede aplicado.
           await new Promise<void>((r) => setTimeout(r, 200));
 
-          // WINDOWS: imprimir DIRECTO desde esta ventana OCULTA. El HTML del
+          // Windows: mostrar la ventana FUERA DE PANTALLA (sin foco) para que
+          // PINTE — webContents.print sobre una ventana oculta sale en blanco.
+          if (isWindows) {
+            win.showInactive();
+            await new Promise<void>((r) => setTimeout(r, 350));
+          }
+
+          // WINDOWS: imprimir DIRECTO desde esta ventana (ya pintada off-screen).
+          // El HTML del
           // ticket viene COMPLETO (renderToString lo horneó con TODOS los datos
           // de la venta) → NO hay carrera de render de React como en el #print-area
           // de la página viva (que salía en blanco bajo la tormenta de re-render
