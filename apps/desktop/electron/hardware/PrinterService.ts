@@ -56,6 +56,61 @@ const CODEPAGE_PC858 = Buffer.from([ESC, 0x74, 0x13]); // page 19 = PC858 Euro
 const LPSTAT_PATH = process.platform === 'darwin' || process.platform === 'linux' ? '/usr/bin/lpstat' : 'lpstat';
 const LP_PATH = process.platform === 'darwin' || process.platform === 'linux' ? '/usr/bin/lp' : 'lp';
 
+// Script PowerShell que manda bytes RAW al spooler de Windows vía winspool
+// (OpenPrinter → StartDocPrinter datatype "RAW" → WritePrinter). Es la forma
+// estándar y SIN dependencias nativas de enviar ESC/POS crudo a una impresora
+// térmica ya instalada en Windows. Recibe -Printer (nombre del SO) y -DataFile
+// (ruta al .bin con los bytes ESC/POS).
+const RAW_PRINT_PS1 = `param([Parameter(Mandatory=$true)][string]$Printer, [Parameter(Mandatory=$true)][string]$DataFile)
+$ErrorActionPreference = 'Stop'
+$bytes = [System.IO.File]::ReadAllBytes($DataFile)
+$src = @'
+using System;
+using System.Runtime.InteropServices;
+public class StockFlowRawPrinter {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct DOCINFOW {
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+  }
+  [DllImport("winspool.Drv", EntryPoint="OpenPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
+  public static extern bool OpenPrinter(string src, out IntPtr hPrinter, IntPtr pd);
+  [DllImport("winspool.Drv", EntryPoint="ClosePrinter", SetLastError=true)]
+  public static extern bool ClosePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="StartDocPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
+  public static extern bool StartDocPrinter(IntPtr hPrinter, int level, ref DOCINFOW di);
+  [DllImport("winspool.Drv", EntryPoint="EndDocPrinter", SetLastError=true)]
+  public static extern bool EndDocPrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="StartPagePrinter", SetLastError=true)]
+  public static extern bool StartPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="EndPagePrinter", SetLastError=true)]
+  public static extern bool EndPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="WritePrinter", SetLastError=true)]
+  public static extern bool WritePrinter(IntPtr hPrinter, byte[] pBytes, int dwCount, out int dwWritten);
+  public static void Send(string printerName, byte[] bytes) {
+    IntPtr h;
+    if (!OpenPrinter(printerName, out h, IntPtr.Zero))
+      throw new Exception("OpenPrinter fallo err=" + Marshal.GetLastWin32Error());
+    try {
+      DOCINFOW di = new DOCINFOW();
+      di.pDocName = "StockFlow Ticket";
+      di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, ref di)) throw new Exception("StartDocPrinter fallo err=" + Marshal.GetLastWin32Error());
+      try {
+        if (!StartPagePrinter(h)) throw new Exception("StartPagePrinter fallo");
+        int written;
+        if (!WritePrinter(h, bytes, bytes.Length, out written)) throw new Exception("WritePrinter fallo");
+        EndPagePrinter(h);
+      } finally { EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
+  }
+}
+'@
+Add-Type -TypeDefinition $src -Language CSharp
+[StockFlowRawPrinter]::Send($Printer, $bytes)
+`;
+
 function widthCols(w: PrinterWidth): number {
   return w === 80 ? 48 : 32;
 }
@@ -236,29 +291,56 @@ export class PrinterService {
       return;
     }
     if (process.platform === 'win32') {
-      try {
-        // Dep opcional — sólo se carga si el usuario la instaló manualmente.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const printerMod: any = await (
-          new Function('return import("@thiagoelg/node-printer").catch(() => null)') as () => Promise<unknown>
-        )();
-        const printer = printerMod?.default ?? printerMod;
-        if (printer && typeof printer.printDirect === 'function') {
-          await new Promise<void>((resolve, reject) => {
-            printer.printDirect({
-              data,
-              printer: printerName,
-              type: 'RAW',
-              success: () => resolve(),
-              error: (err: Error) => reject(err),
+      // Envío RAW al spooler de Windows vía winspool (OpenPrinter/StartDocPrinter
+      // datatype "RAW"/WritePrinter), invocado con PowerShell. Sin dependencia
+      // nativa (evita el riesgo de build de @thiagoelg/node-printer en CI). Es el
+      // mismo mecanismo que usa cualquier POS para mandar ESC/POS crudo a una
+      // impresora térmica instalada en el SO.
+      const { writeFile: writeTmp, unlink } = await import('node:fs/promises');
+      const { tmpdir } = await import('node:os');
+      const { join } = await import('node:path');
+      const { execFile } = await import('node:child_process');
+      const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const binFile = join(tmpdir(), `stockflow-escpos-${stamp}.bin`);
+      const ps1File = join(tmpdir(), `stockflow-rawprint-${stamp}.ps1`);
+      await writeTmp(binFile, data);
+      await writeTmp(ps1File, RAW_PRINT_PS1, 'utf8');
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            ps1File,
+            '-Printer',
+            printerName,
+            '-DataFile',
+            binFile,
+          ],
+          { windowsHide: true, timeout: 20000 },
+          (err, _stdout, stderr) => {
+            void Promise.all([
+              unlink(binFile).catch(() => undefined),
+              unlink(ps1File).catch(() => undefined),
+            ]).finally(() => {
+              if (err) {
+                reject(
+                  new Error(
+                    `No se pudo enviar RAW a "${printerName}": ${String(stderr).trim() || err.message}`,
+                    { cause: err },
+                  ),
+                );
+              } else {
+                resolve();
+              }
             });
-          });
-          return;
-        }
-      } catch (err) {
-        throw new Error('Falló la impresión RAW en Windows', { cause: err });
-      }
-      throw new Error('Impresión RAW en Windows requiere instalar la dependencia opcional @thiagoelg/node-printer');
+          },
+        );
+      });
+      return;
     }
     throw new Error(`Plataforma no soportada para impresión del sistema: ${process.platform}`);
   }

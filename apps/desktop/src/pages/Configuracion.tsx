@@ -148,17 +148,24 @@ function PrinterSection() {
 
   async function onTest(): Promise<void> {
     setTesting(true)
-    // Directo (sin diálogo) si hay impresora térmica directa configurada; si no,
-    // diálogo del SO. El modo silencioso usa webContents.print sobre la ventana
-    // visible (mismo render que el diálogo, sin diálogo); cae al diálogo si falla.
-    const silent = !showDialog && paperFormat !== 'A4' && systemName.trim() !== ''
+    // Térmica directa: ESC/POS CRUDO al spooler (RAW, sin diálogo) — el método
+    // estándar para térmicas, que NO usa el motor roto de Electron. Usa la config
+    // GUARDADA, así que guardá antes de probar. Si el transporte RAW falla o el
+    // driver no es ESC/POS (o es A4), cae al diálogo del SO con window.print().
+    const tryEscPos = paperFormat !== 'A4' && systemName.trim() !== ''
     try {
-      await printNode(<TestTicket paperFormat={paperFormat} />, {
-        width: widthFromPaperFormat(paperFormat),
-        silent,
-        deviceName: systemName.trim() || undefined,
-      })
-      toast.success(silent ? 'Prueba enviada a la impresora (sin diálogo)' : 'Test de impresión enviado')
+      if (tryEscPos) {
+        try {
+          await api.hardware.printer.test()
+          toast.success('Prueba ESC/POS enviada a la impresora (sin diálogo)')
+          return
+        } catch (escErr) {
+          console.warn('ESC/POS test falló, uso diálogo del SO:', escErr)
+          toast.warning('ESC/POS no respondió; abro el diálogo del sistema')
+        }
+      }
+      await printNode(<TestTicket paperFormat={paperFormat} />, widthFromPaperFormat(paperFormat))
+      toast.success('Test de impresión enviado')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo imprimir la prueba')
     } finally {
