@@ -392,7 +392,7 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           show: false,
           webPreferences: { contextIsolation: true },
         });
-        let pdf: Buffer;
+        let pdf: Buffer | null;
         try {
           const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
           await win.loadURL(dataUrl);
@@ -406,25 +406,55 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           // Frame extra para que el layout quede aplicado.
           await new Promise<void>((r) => setTimeout(r, 200));
 
-          // Alto del PDF: en Windows lo ajustamos al CONTENIDO (+8mm de feed)
-          // para no escupir ~30cm de papel por ticket. En mac/linux dejamos
-          // 297mm (lp + el driver cortan al contenido, ya validado).
-          let pageHeightMicrons = 297 * 1000;
+          // WINDOWS: imprimir DIRECTO desde esta ventana OCULTA. El HTML del
+          // ticket viene COMPLETO (renderToString lo horneó con TODOS los datos
+          // de la venta) → NO hay carrera de render de React como en el #print-area
+          // de la página viva (que salía en blanco bajo la tormenta de re-render
+          // de la venta). webContents.print SIN pageSize custom (cerebro: pageSize
+          // custom = "basura infinita"). Esta ventana renderiza el contenido (lo
+          // prueba printToPDF) → el print sale CON datos. Si falla → diálogo.
           if (isWindows) {
-            try {
-              const px = (await win.webContents.executeJavaScript('document.body.scrollHeight')) as number;
-              // 1px @96dpi ≈ 264.58 micrones.
-              pageHeightMicrons = Math.max(40 * 1000, Math.round(px * 264.58) + 8 * 1000);
-              log(`alto contenido=${px}px → ${Math.round(pageHeightMicrons / 1000)}mm`);
-            } catch {
-              /* usa el default 297mm */
+            const ok = await new Promise<boolean>((resolve) => {
+              let settled = false;
+              const done = (success: boolean, why?: string): void => {
+                if (settled) return;
+                settled = true;
+                log(`silent print: ${success ? 'OK' : 'FALLÓ'}${why ? ` (${why})` : ''}`);
+                resolve(success);
+              };
+              const watchdog = setTimeout(() => done(false, 'timeout 8s — el callback no disparó'), 8000);
+              try {
+                win.webContents.print(
+                  {
+                    silent: true,
+                    printBackground: true,
+                    margins: { marginType: 'none' },
+                    ...(deviceName ? { deviceName } : {}),
+                  },
+                  (success: boolean, reason?: string) => {
+                    clearTimeout(watchdog);
+                    done(success, reason);
+                  },
+                );
+              } catch (e) {
+                clearTimeout(watchdog);
+                done(false, e instanceof Error ? e.message : String(e));
+              }
+            });
+            if (ok) {
+              // Dar tiempo al spooler antes de destruir la ventana oculta.
+              await new Promise<void>((r) => setTimeout(r, 600));
+              log('Windows: impresión silenciosa OK');
+              return { printed: true, pdfPath: null };
             }
+            throw new Error('La impresión silenciosa de Windows no se completó');
           }
-          // pageSize en MICRONES. Ancho = rollo.
+
+          // UNIX (mac/linux): render a PDF para imprimir vía lp/CUPS.
           pdf = await win.webContents.printToPDF({
             printBackground: true,
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
-            pageSize: { width: widthMm * 1000, height: pageHeightMicrons },
+            pageSize: { width: widthMm * 1000, height: 297 * 1000 },
           });
           log(`PDF generado: ${pdf.length} bytes`);
         } catch (err) {
@@ -441,51 +471,9 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           }
         }
 
-        // 2a) WINDOWS: imprimir el PDF en SILENCIO ejecutando SumatraPDF DIRECTO
-        // con ruta absoluta (copiado a resources/ vía extraResources, FUERA del
-        // asar → ejecutable). Reemplaza pdf-to-printer.print(), que dejaba el .exe
-        // inejecutable dentro del asar (diagnóstico v0.1.39). Evita los DOS
-        // caminos rotos del historial: ESC/POS crudo y webContents.print silent.
-        if (isWindows) {
-          const tmpFile = join(tmpdir(), `stockflow-${fileName}-${Date.now()}.pdf`);
-          await writeFile(tmpFile, pdf);
-          try {
-            // Resolver el nombre que entiende SumatraPDF (nombre de Windows). Si
-            // el guardado no matchea exacto, probamos parcial; si no, default.
-            let printerName = deviceName;
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const ptpNs: any = await import('pdf-to-printer');
-              const ptp = ptpNs.default ?? ptpNs;
-              const printers = (await ptp.getPrinters()) as { name: string }[];
-              log(`impresoras: ${printers.map((p) => p.name).join(' | ') || '(ninguna)'}`);
-              if (printerName && !printers.find((p) => p.name === printerName)) {
-                const t = printerName;
-                const partial = printers.find((p) => p.name.includes(t) || t.includes(p.name));
-                printerName = partial?.name ?? printerName;
-                log(`deviceName "${t}" no exacto → uso "${printerName}"`);
-              }
-            } catch (e) {
-              log(`getPrinters falló (sigo con el deviceName configurado): ${e instanceof Error ? e.message : String(e)}`);
-            }
-            const sumatra = await resolveSumatraExe();
-            if (!sumatra) throw new Error('no se encontró SumatraPDF.exe (resources/ ni paquete)');
-            log(`SumatraPDF: ${sumatra}`);
-            await printPdfWithSumatra(sumatra, tmpFile, printerName ?? undefined);
-            log(`impresión OK (impresora=${printerName ?? 'default del SO'})`);
-            return { printed: true, pdfPath: null };
-          } catch (err) {
-            console.error('[StockFlow print] impresión Windows falló', err);
-            // Lanzamos → el renderer cae al diálogo del SO (no se pierde el ticket).
-            throw new Error(`impresión Windows falló: ${err instanceof Error ? err.message : String(err)}`, {
-              cause: err,
-            });
-          } finally {
-            unlink(tmpFile).catch(() => {
-              /* noop */
-            });
-          }
-        }
+        // (Windows ya imprimió y retornó arriba con webContents.print.) De acá en
+        // más es sólo Unix (lp/CUPS), que sí necesita el PDF.
+        if (pdf == null) throw new Error('No se generó el PDF del ticket');
 
         // 2) Resolver la impresora. macOS/Linux vía CUPS.
         const LPSTAT = '/usr/bin/lpstat';

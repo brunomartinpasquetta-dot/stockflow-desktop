@@ -17,7 +17,7 @@ import {
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
-import { printNode, widthFromPaperFormat } from '@/lib/printService'
+import { autoPrintTicket, printNode, widthFromPaperFormat } from '@/lib/printService'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
@@ -586,16 +586,34 @@ function PDV() {
     const silent = printerCfg?.silentPrint !== false
     const deviceName =
       printerCfg?.kind === 'system' && printerCfg.interface.trim() ? printerCfg.interface.trim() : undefined
+    const ticketFileName = `ticket-venta-${ticketData.sale.type}-${String(ticketData.sale.number).padStart(8, '0')}`
+    const printViaDialog = (): Promise<void> =>
+      printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
     try {
-      // printNode imprime con #print-area + @media print. silent → webContents.print
-      // silencioso sobre ESTA ventana (mismo render que el diálogo, sin diálogo);
-      // si no, window.print() (diálogo). Si el silencioso falla, cae al diálogo
-      // automáticamente → el ticket siempre sale.
-      await printNode(createElement(SaleTicket, { data: ticketData }), {
-        width: ticketWidth,
-        silent,
-        deviceName,
-      })
+      if (!silent) {
+        await printViaDialog()
+        return
+      }
+      // Silencioso: el ticket se HORNEA a HTML completo (renderToString) y se
+      // imprime en una ventana OCULTA dedicada (webContents.print). El contenido
+      // viaja DENTRO del HTML → no hay carrera de render como en el #print-area de
+      // la página viva (que bajo la tormenta de re-render de la venta salía en
+      // blanco). Si el silencioso falla, cae al diálogo para no perder el ticket.
+      try {
+        const { printed, pdfPath } = await autoPrintTicket(
+          createElement(SaleTicket, { data: ticketData }),
+          ticketWidth,
+          ticketFileName,
+          deviceName,
+        )
+        if (!printed) {
+          const archivo = pdfPath ? pdfPath.split(/[/\\]/).pop() : `${ticketFileName}.pdf`
+          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
+        }
+      } catch (autoErr) {
+        console.warn('Impresión automática falló, uso diálogo del SO:', autoErr)
+        await printViaDialog()
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? `No se pudo imprimir: ${err.message}` : 'No se pudo imprimir el ticket',
