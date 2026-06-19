@@ -17,7 +17,7 @@ import {
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
-import { autoPrintTicket, printNode, widthFromPaperFormat } from '@/lib/printService'
+import { printNode, widthFromPaperFormat } from '@/lib/printService'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
@@ -578,43 +578,16 @@ function PDV() {
    */
   async function printSaleTicket(
     ticketData: SaleTicketData,
-    result: CreateSaleResultDTO,
+    _result: CreateSaleResultDTO,
     printerCfg: PrinterConfigDTO | null,
   ): Promise<void> {
     const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
-    const ticketFileName = `ticket-venta-${result.sale.type}-${String(result.sale.number).padStart(8, '0')}`
-    const useDialog = printerCfg?.silentPrint === false
-    // Impresora configurada en StockFlow (sólo aplica al tipo "system").
-    const deviceName =
-      printerCfg?.kind === 'system' && printerCfg.interface.trim()
-        ? printerCfg.interface.trim()
-        : undefined
-    const printViaDialog = (): Promise<void> =>
-      printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
     try {
-      if (useDialog) {
-        // Mismo mecanismo que "Probar impresión": window.print() con diálogo.
-        await printViaDialog()
-        return
-      }
-      try {
-        const { printed, pdfPath } = await autoPrintTicket(
-          createElement(SaleTicket, { data: ticketData }),
-          ticketWidth,
-          ticketFileName,
-          deviceName,
-        )
-        if (!printed) {
-          const archivo = pdfPath ? pdfPath.split('/').pop() : `${ticketFileName}.pdf`
-          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
-        }
-      } catch (autoErr) {
-        // La impresión silenciosa falló (el PDF no se generó o `lp` rechazó
-        // el trabajo) pero SÍ hay impresora → caemos al diálogo del SO para
-        // garantizar que el ticket salga.
-        console.warn('Impresión automática falló, uso diálogo del SO:', autoErr)
-        await printViaDialog()
-      }
+      // Patrón canónico window.print() (#print-area + @media print) — MISMO
+      // mecanismo que "Probar impresión", que ya imprime bien. Si el usuario
+      // configuró impresión directa, el main activó --kiosk-printing → sale SIN
+      // diálogo a la impresora predeterminada; si no, abre el diálogo del SO.
+      await printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
     } catch (err) {
       toast.error(
         err instanceof Error ? `No se pudo imprimir: ${err.message}` : 'No se pudo imprimir el ticket',
