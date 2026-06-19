@@ -19,6 +19,7 @@
  * normal (window.print con dialog) para que el ticket siempre salga.
  */
 import type { ReactElement } from 'react'
+import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 
 export type PrintWidth = '58' | '80' | 'a4'
@@ -97,7 +98,13 @@ export async function printNode(
     try {
       const root = createRoot(area)
       activeRoot = root
-      root.render(node)
+      // flushSync: forzar el render SÍNCRONO del ticket en #print-area. En React 19
+      // `render()` es asíncrono y, bajo la tormenta de re-render de la venta
+      // (clearSale + refetch), el commit no llegaba antes de imprimir → salía en
+      // BLANCO. flushSync garantiza que el contenido esté en el DOM antes del print.
+      flushSync(() => {
+        root.render(node)
+      })
 
       document.body.classList.add('printing')
       const widthClass =
