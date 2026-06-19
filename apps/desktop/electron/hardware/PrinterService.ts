@@ -49,6 +49,29 @@ const DRAWER_KICK = Buffer.from([ESC, 0x70, 0x00, 0x19, 0xfa]); // pin 2, 25ms, 
 
 const CODEPAGE_PC858 = Buffer.from([ESC, 0x74, 0x13]); // page 19 = PC858 Euro
 
+// La POS-58 imprime en PC858 (la seteamos con `ESC t 19`). El texto venía
+// codificado como latin1, cuyos bytes NO coinciden con PC858 para los acentos
+// (á latin1=0xE1 ≠ á PC858=0xA0) → salían torcidos. Mapeamos los no-ASCII
+// frecuentes del español a su byte PC858. ASCII pasa tal cual; lo desconocido → '?'.
+const CP858_MAP: Record<string, number> = {
+  á: 0xa0, é: 0x82, í: 0xa1, ó: 0xa2, ú: 0xa3,
+  Á: 0xb5, É: 0x90, Í: 0xd6, Ó: 0xe0, Ú: 0xe9,
+  ñ: 0xa4, Ñ: 0xa5, ü: 0x81, Ü: 0x9a,
+  '¿': 0xa8, '¡': 0xad, ª: 0xa6, º: 0xa7, '°': 0xf8, '€': 0xd5,
+};
+function encodeCp858(s: string): Buffer {
+  const out: number[] = [];
+  for (const ch of s) {
+    const mapped = CP858_MAP[ch];
+    if (mapped !== undefined) out.push(mapped);
+    else {
+      const code = ch.charCodeAt(0);
+      out.push(code <= 0x7f ? code : 0x3f); // no-ASCII desconocido → '?'
+    }
+  }
+  return Buffer.from(out);
+}
+
 // Paths absolutos de binarios del sistema. Electron en producción NO hereda
 // el PATH del shell del usuario en macOS, por lo que `execFile('lpstat', …)`
 // falla silenciosamente con ENOENT. Resolver a path absoluto fuerza el lookup
@@ -438,7 +461,7 @@ export class PrinterService {
     }
     const cols = this.cols;
     const parts: Buffer[] = [];
-    const push = (s: string) => parts.push(Buffer.from(s, 'latin1'));
+    const push = (s: string) => parts.push(encodeCp858(s));
     parts.push(INIT, CODEPAGE_PC858);
 
     parts.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
@@ -494,7 +517,7 @@ export class PrinterService {
     }
     const cols = this.cols;
     const parts: Buffer[] = [];
-    const push = (s: string) => parts.push(Buffer.from(s, 'latin1'));
+    const push = (s: string) => parts.push(encodeCp858(s));
     parts.push(INIT, CODEPAGE_PC858);
     parts.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
     push(`${report.company.name}\n`);
@@ -534,7 +557,7 @@ export class PrinterService {
     }
     const cols = this.cols;
     const parts: Buffer[] = [];
-    const push = (s: string) => parts.push(Buffer.from(s, 'latin1'));
+    const push = (s: string) => parts.push(encodeCp858(s));
     parts.push(INIT, CODEPAGE_PC858);
     parts.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
     push('PRUEBA DE IMPRESION\n');

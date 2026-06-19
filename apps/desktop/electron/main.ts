@@ -81,9 +81,21 @@ function createWindow(extraArgs: string[]): void {
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.on('closed', () => {
-    // Al cerrar la ventana principal, cerramos todas las ventanas nativas hijas.
+    // Al cerrar la ventana principal forzamos el cierre TOTAL. Si quedara alguna
+    // ventana OCULTA viva (un print/diagnóstico que no se destruyó),
+    // `window-all-closed` NO dispararía y el proceso main quedaría vivo reteniendo
+    // el single-instance lock → zombie que impide reabrir. Destruimos todas las
+    // ventanas y disparamos el quit explícito.
     desktopWindows?.closeAll();
     mainWindow = null;
+    for (const w of BrowserWindow.getAllWindows()) {
+      try {
+        w.destroy();
+      } catch {
+        /* noop */
+      }
+    }
+    if (process.platform !== 'darwin') app.quit();
   });
 
   if (isDev) {
@@ -302,6 +314,13 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', (event) => {
+    // Liberar el single-instance lock YA: aunque el cierre (backup/dispose) tarde
+    // unos segundos, el usuario puede REABRIR la app sin esperar (mata el "no abre").
+    try {
+      app.releaseSingleInstanceLock();
+    } catch {
+      /* noop */
+    }
     // Cierre limpio de TODO lo que mantiene vivo el proceso (timers, puertos
     // serie, servidor LAN, ventanas ocultas). Idempotente. Si algo de esto queda
     // vivo, en Windows el proceso no muere → zombie que retiene el
