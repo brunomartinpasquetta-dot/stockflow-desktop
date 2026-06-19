@@ -23,6 +23,9 @@ extraResources:
 asar: true
 asarUnpack:
   - "**/*.node"
+  # SumatraPDF.exe (impresión silenciosa en Windows) debe quedar FUERA del asar
+  # para poder ejecutarse como binario.
+  - "**/node_modules/pdf-to-printer/**"
 
 mac:
   category: public.app-category.business

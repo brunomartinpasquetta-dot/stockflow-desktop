@@ -219,99 +219,25 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           // Frame extra para que el layout quede aplicado.
           await new Promise<void>((r) => setTimeout(r, 200));
 
-          // WINDOWS: no existe `lp`/CUPS. Imprimimos en SILENCIO con el driver
-          // del SO vía webContents.print — el mismo stack que usa el diálogo de
-          // "Probar impresión" (que al cliente le funciona), pero sin abrir el
-          // diálogo. SIN pageSize custom: forzar dimensiones rompe los drivers
-          // térmicos genéricos ("basura infinita" conocida en mac); dejamos que
-          // el driver use el papel/rollo ya configurado por el usuario.
-          // Si falla, lanzamos → el renderer cae al diálogo del SO (sale igual).
+          // Alto del PDF: en Windows lo ajustamos al CONTENIDO (+8mm de feed)
+          // para no escupir ~30cm de papel por ticket. En mac/linux dejamos
+          // 297mm (lp + el driver cortan al contenido, ya validado).
+          let pageHeightMicrons = 297 * 1000;
           if (isWindows) {
-            // Resolver el deviceName al nombre EXACTO del SO (PrinterInfo.name).
-            // En Windows `webContents.print` exige el "system name" (ej.
-            // `Brother_QL_820NWB`), NO el "friendly name" (`Brother QL-820NWB` =
-            // displayName). Si no coincide exacto, el silent falla o el callback
-            // NUNCA dispara → NO IMPRIME NADA. Mapeamos desde getPrintersAsync:
-            // name exacto → por displayName → parcial → default del SO.
-            let target = deviceName;
             try {
-              const printers = await win.webContents.getPrintersAsync();
-              log(
-                `impresoras del SO: ${printers
-                  .map(
-                    (p) =>
-                      `${p.name}${p.displayName && p.displayName !== p.name ? ` [${p.displayName}]` : ''}${(p as { isDefault?: boolean }).isDefault ? ' *default' : ''}`,
-                  )
-                  .join(' | ') || '(ninguna)'}`,
-              );
-              if (target) {
-                const t = target;
-                const exact = printers.find((p) => p.name === t);
-                if (!exact) {
-                  const byDisplay = printers.find((p) => p.displayName === t);
-                  const partial = printers.find(
-                    (p) =>
-                      p.name.includes(t) ||
-                      t.includes(p.name) ||
-                      (p.displayName ? p.displayName.includes(t) || t.includes(p.displayName) : false),
-                  );
-                  const def = printers.find((p) => (p as { isDefault?: boolean }).isDefault);
-                  target = byDisplay?.name ?? partial?.name ?? def?.name ?? undefined;
-                  log(`deviceName config "${t}" NO es match exacto → uso "${target ?? '(default del SO)'}"`);
-                } else {
-                  log(`deviceName match exacto: ${t}`);
-                }
-              } else {
-                log('sin deviceName configurado → impresora default del SO');
-              }
-            } catch (e) {
-              log(`getPrintersAsync falló: ${e instanceof Error ? e.message : String(e)}`);
+              const px = (await win.webContents.executeJavaScript('document.body.scrollHeight')) as number;
+              // 1px @96dpi ≈ 264.58 micrones.
+              pageHeightMicrons = Math.max(40 * 1000, Math.round(px * 264.58) + 8 * 1000);
+              log(`alto contenido=${px}px → ${Math.round(pageHeightMicrons / 1000)}mm`);
+            } catch {
+              /* usa el default 297mm */
             }
-
-            const ok = await new Promise<boolean>((resolve) => {
-              let settled = false;
-              const finish = (success: boolean, why?: string): void => {
-                if (settled) return;
-                settled = true;
-                log(`silent print: ${success ? 'OK' : 'FALLÓ'}${why ? ` (${why})` : ''}`);
-                resolve(success);
-              };
-              // Anti-cuelgue: en Windows el callback a veces NUNCA dispara
-              // (deviceName inválido / regresión de Electron) y la venta quedaba
-              // colgada → "no salía nada". Con timeout caemos al diálogo del SO.
-              const watchdog = setTimeout(() => finish(false, 'timeout 7s — el callback no disparó'), 7000);
-              try {
-                win.webContents.print(
-                  {
-                    silent: true,
-                    printBackground: true,
-                    margins: { marginType: 'none' },
-                    ...(target ? { deviceName: target } : {}),
-                  },
-                  (success, reason) => {
-                    clearTimeout(watchdog);
-                    finish(success, reason);
-                  },
-                );
-              } catch (e) {
-                clearTimeout(watchdog);
-                finish(false, e instanceof Error ? e.message : String(e));
-              }
-            });
-            if (ok) {
-              // Dar tiempo al spooler antes de destruir la ventana oculta.
-              await new Promise<void>((r) => setTimeout(r, 400));
-              log('Windows: impresión silenciosa OK');
-              return { printed: true, pdfPath: null };
-            }
-            throw new Error('La impresión silenciosa de Windows no se completó');
           }
-
-          // pageSize en MICRONES. Ancho = rollo; alto = 297mm (el driver corta).
+          // pageSize en MICRONES. Ancho = rollo.
           pdf = await win.webContents.printToPDF({
             printBackground: true,
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
-            pageSize: { width: widthMm * 1000, height: 297 * 1000 },
+            pageSize: { width: widthMm * 1000, height: pageHeightMicrons },
           });
           log(`PDF generado: ${pdf.length} bytes`);
         } catch (err) {
@@ -325,6 +251,50 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
             win.destroy();
           } catch {
             /* noop */
+          }
+        }
+
+        // 2a) WINDOWS: imprimir el PDF en SILENCIO con el driver gráfico del SO
+        // vía pdf-to-printer (SumatraPDF bundleado). Evita los DOS caminos rotos
+        // del historial: ESC/POS crudo (basura infinita) y webContents.print
+        // silent (regresión Electron #39092). Igual criterio que un POS comercial.
+        if (isWindows) {
+          const tmpFile = join(tmpdir(), `stockflow-${fileName}-${Date.now()}.pdf`);
+          await writeFile(tmpFile, pdf);
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ptpNs: any = await import('pdf-to-printer');
+            const ptp = ptpNs.default ?? ptpNs;
+            const ptpPrint: (f: string, o?: { printer?: string }) => Promise<unknown> = ptp.print;
+            const ptpGetPrinters: () => Promise<{ name: string }[]> = ptp.getPrinters;
+            // Resolver el nombre que entiende SumatraPDF (nombre de Windows). Si
+            // el guardado no matchea exacto, probamos parcial; si no, default.
+            let printerName = deviceName;
+            try {
+              const printers = await ptpGetPrinters();
+              log(`pdf-to-printer impresoras: ${printers.map((p) => p.name).join(' | ') || '(ninguna)'}`);
+              if (printerName && !printers.find((p) => p.name === printerName)) {
+                const t = printerName;
+                const partial = printers.find((p) => p.name.includes(t) || t.includes(p.name));
+                printerName = partial?.name ?? printerName;
+                log(`deviceName "${t}" no exacto → uso "${printerName}"`);
+              }
+            } catch (e) {
+              log(`pdf-to-printer.getPrinters falló: ${e instanceof Error ? e.message : String(e)}`);
+            }
+            await ptpPrint(tmpFile, printerName ? { printer: printerName } : {});
+            log(`pdf-to-printer OK (impresora=${printerName ?? 'default del SO'})`);
+            return { printed: true, pdfPath: null };
+          } catch (err) {
+            console.error('[StockFlow print] pdf-to-printer falló', err);
+            // Lanzamos → el renderer cae al diálogo del SO (no se pierde el ticket).
+            throw new Error(`pdf-to-printer falló: ${err instanceof Error ? err.message : String(err)}`, {
+              cause: err,
+            });
+          } finally {
+            unlink(tmpFile).catch(() => {
+              /* noop */
+            });
           }
         }
 
