@@ -118,6 +118,9 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
       add(`StockFlow v${app.getVersion()} — diagnóstico de impresión`);
       add(`Plataforma: ${process.platform} ${process.arch} | empaquetado=${app.isPackaged}`);
       add(`Impresora configurada (deviceName): "${payload?.deviceName ?? '(ninguna)'}"`);
+      // CLAVE: el camino real de impresión ahora es window.print() + kiosk-printing.
+      // Si está ON, la venta/prueba imprime SIN diálogo a la impresora DEFAULT del SO.
+      add(`kiosk-printing (impresión directa sin diálogo): ${app.commandLine.hasSwitch('kiosk-printing') ? 'ON' : 'OFF'}`);
       add('');
 
       const win = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true } });
@@ -157,14 +160,14 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         } catch (e) {
           add(`pdf-to-printer: NO se pudo cargar: ${e instanceof Error ? e.message : String(e)}`);
         }
-        // Ruta que REALMENTE se va a usar para imprimir (resources/ en prod).
+        // SECUNDARIO (SumatraPDF): ya NO es el camino principal de impresión —
+        // ahora se usa window.print()+kiosk-printing. Se deja como diagnóstico.
         add(`resourcesPath: ${process.resourcesPath}`);
         const sumatraExe = await resolveSumatraExe();
         if (sumatraExe) {
-          add(`SumatraPDF que se usará: ${sumatraExe}`);
-          add(`  ¿es ejecutable (fuera de app.asar)?: ${!sumatraExe.includes('app.asar') || sumatraExe.includes('app.asar.unpacked')}`);
+          add(`(secundario) SumatraPDF: ${sumatraExe}`);
         } else {
-          add('SumatraPDF: NO se encontró ni en resources/ ni en el paquete → la impresión directa NO va a funcionar.');
+          add('(secundario) SumatraPDF: no encontrado.');
         }
         // Diagnóstico extra: dónde lo busca pdf-to-printer dentro del paquete.
         try {
@@ -189,7 +192,8 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         }
         add('');
 
-        // 4) Intento de impresión REAL (PDF chico → SumatraPDF directo).
+        // 4) Prueba SECUNDARIA (SumatraPDF directo). El camino PRINCIPAL es
+        // window.print()+kiosk — esto es sólo para ver si SumatraPDF imprime algo.
         let tmpFile = '';
         try {
           const pdf = await win.webContents.printToPDF({
@@ -203,12 +207,12 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           if (sumatraExe) {
             try {
               await printPdfWithSumatra(sumatraExe, tmpFile, payload?.deviceName || undefined);
-              add(`>>> INTENTO DE IMPRESIÓN: OK (impresora=${payload?.deviceName ?? 'default del SO'}). ¿Salió papel?`);
+              add(`(secundario) prueba SumatraPDF: ejecutó OK (impresora=${payload?.deviceName ?? 'default del SO'})`);
             } catch (e) {
-              add(`>>> INTENTO DE IMPRESIÓN: FALLÓ → ${e instanceof Error ? e.message : String(e)}`);
+              add(`(secundario) prueba SumatraPDF: FALLÓ → ${e instanceof Error ? e.message : String(e)}`);
             }
           } else {
-            add('>>> INTENTO DE IMPRESIÓN: omitido (no se encontró SumatraPDF.exe).');
+            add('(secundario) prueba SumatraPDF: omitida (no se encontró SumatraPDF.exe).');
           }
         } catch (e) {
           add(`PDF de prueba ERROR: ${e instanceof Error ? e.message : String(e)}`);

@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { autoPrintTicket, printNode, widthFromPaperFormat } from '@/lib/printService'
+import { printNode, widthFromPaperFormat } from '@/lib/printService'
 import type {
   BackupConfigDTO,
   BackupEntryDTO,
@@ -148,33 +148,15 @@ function PrinterSection() {
 
   async function onTest(): Promise<void> {
     setTesting(true)
-    const width = widthFromPaperFormat(paperFormat)
-    const node = <TestTicket paperFormat={paperFormat} />
-    // Respeta "impresora directa": si está ON (sin diálogo, papel térmico e
-    // impresora elegida) imprime SILENCIOSO por el MISMO camino que la venta;
-    // si no, abre el diálogo del sistema. Antes el test SIEMPRE abría diálogo.
-    const silent = !showDialog && paperFormat !== 'A4' && systemName.trim() !== ''
+    // Patrón canónico window.print() (#print-area + @media print). Si el usuario
+    // configuró impresión directa, el main activó --kiosk-printing → sale SIN
+    // diálogo a la impresora predeterminada; si no, abre el diálogo del SO.
+    // (Cambiar el modo directo/diálogo requiere reiniciar la app.)
     try {
-      if (silent) {
-        const r = await autoPrintTicket(node, width === '80' ? '80' : '58', 'prueba-impresion', systemName.trim())
-        if (r.printed) {
-          toast.success('Prueba enviada a la impresora (sin diálogo)')
-        } else {
-          toast.warning('No se detectó impresora; abro el diálogo del sistema')
-          await printNode(node, width)
-        }
-      } else {
-        await printNode(node, width)
-        toast.success('Test de impresión enviado')
-      }
+      await printNode(<TestTicket paperFormat={paperFormat} />, widthFromPaperFormat(paperFormat))
+      toast.success('Test de impresión enviado')
     } catch (err) {
-      // Si la impresión directa falla/cuelga, caemos al diálogo para no perder la prueba.
-      try {
-        await printNode(node, width)
-        toast.warning('La impresión directa falló; usé el diálogo del sistema')
-      } catch {
-        toast.error(err instanceof Error ? err.message : 'No se pudo imprimir la prueba')
-      }
+      toast.error(err instanceof Error ? err.message : 'No se pudo imprimir la prueba')
     } finally {
       setTesting(false)
     }
