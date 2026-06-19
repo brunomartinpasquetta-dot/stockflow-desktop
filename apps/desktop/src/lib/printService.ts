@@ -19,7 +19,6 @@
  * normal (window.print con dialog) para que el ticket siempre salga.
  */
 import type { ReactElement } from 'react'
-import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 
 export type PrintWidth = '58' | '80' | 'a4'
@@ -94,80 +93,77 @@ export async function printNode(
 
   cleanup()
 
-  return new Promise<void>((resolve, reject) => {
-    try {
-      const root = createRoot(area)
-      activeRoot = root
-      // flushSync: forzar el render SÍNCRONO del ticket en #print-area. En React 19
-      // `render()` es asíncrono y, bajo la tormenta de re-render de la venta
-      // (clearSale + refetch), el commit no llegaba antes de imprimir → salía en
-      // BLANCO. flushSync garantiza que el contenido esté en el DOM antes del print.
-      flushSync(() => {
-        root.render(node)
-      })
+  try {
+    const root = createRoot(area)
+    activeRoot = root
+    root.render(node)
 
-      document.body.classList.add('printing')
-      const widthClass =
-        width === '80' ? 'printing-80' : width === 'a4' ? 'printing-a4' : 'printing-58'
-      document.body.classList.add(widthClass)
+    document.body.classList.add('printing')
+    const widthClass =
+      width === '80' ? 'printing-80' : width === 'a4' ? 'printing-a4' : 'printing-58'
+    document.body.classList.add(widthClass)
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const finish = (): void => {
-            window.setTimeout(() => {
-              cleanup()
-              resolve()
-            }, 0)
-          }
-          // DIÁLOGO: window.print() — el SO muestra el diálogo y el driver
-          // renderiza el ticket. Funciona en cualquier impresora del SO.
-          const printViaDialog = (): void => {
-            const onAfter = (): void => {
-              window.removeEventListener('afterprint', onAfter)
-              finish()
-            }
-            window.addEventListener('afterprint', onAfter, { once: true })
-            cleanupTimer = window.setTimeout(() => {
-              window.removeEventListener('afterprint', onAfter)
-              finish()
-            }, 10_000)
-            try {
-              window.print()
-            } catch (err) {
-              cleanup()
-              reject(err)
-            }
-          }
-          // SILENCIOSO: `webContents.print({ silent:true })` sobre ESTA ventana
-          // (la visible, con el ticket ya montado en #print-area + @media print).
-          // Es EXACTAMENTE el render del diálogo, pero sin diálogo. SIN pageSize
-          // custom (cerebro: pageSize custom = "basura infinita"). En Electron
-          // `--kiosk-printing` NO suprime el diálogo de window.print(); este es el
-          // camino real. Si falla, caemos al diálogo para no perder el ticket.
-          if (silent) {
-            void (async () => {
-              try {
-                const { api } = await import('@/lib/api')
-                await api.print.current({
-                  ...(deviceName ? { deviceName } : {}),
-                  widthMm: width === '80' ? 80 : 58,
-                })
-                finish()
-              } catch (err) {
-                console.warn('Impresión silenciosa falló, uso diálogo del SO:', err)
-                printViaDialog()
-              }
-            })()
-          } else {
-            printViaDialog()
-          }
-        })
-      })
-    } catch (err) {
-      cleanup()
-      reject(err)
+    // Esperar a que el ticket REALMENTE quede montado en el DOM antes de imprimir.
+    // En React 19 `render()` es ASÍNCRONO y, en la venta, compite con la tormenta
+    // de re-render (clearSale + refetch) → sin esperar, el silencioso imprimía el
+    // área VACÍA (ticket en blanco). Polleamos por contenido (hasta ~1.3s) + 2
+    // frames de paint. Determinístico, sin depender de flushSync.
+    const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()))
+    for (let i = 0; i < 80; i++) {
+      if (area.childElementCount > 0 && (area.textContent ?? '').replace(/\s/g, '').length > 0) break
+      await nextFrame()
     }
-  })
+    await nextFrame()
+    await nextFrame()
+
+    // SILENCIOSO: `webContents.print({ silent:true })` sobre ESTA ventana visible
+    // (el ticket ya montado en #print-area + @media print). Es EXACTAMENTE el
+    // render del diálogo, pero sin diálogo. SIN pageSize custom (cerebro: pageSize
+    // custom = "basura infinita"). En Electron `--kiosk-printing` NO suprime el
+    // diálogo de window.print(); este es el camino real. Si falla → diálogo.
+    if (silent) {
+      try {
+        const { api } = await import('@/lib/api')
+        await api.print.current({
+          ...(deviceName ? { deviceName } : {}),
+          widthMm: width === '80' ? 80 : 58,
+        })
+        cleanup()
+        return
+      } catch (err) {
+        console.warn('Impresión silenciosa falló, uso diálogo del SO:', err)
+        // continúa al diálogo abajo para no perder el ticket
+      }
+    }
+
+    // DIÁLOGO: window.print() — el SO muestra el diálogo y el driver renderiza.
+    await new Promise<void>((resolve, reject) => {
+      const finish = (): void => {
+        window.setTimeout(() => {
+          cleanup()
+          resolve()
+        }, 0)
+      }
+      const onAfter = (): void => {
+        window.removeEventListener('afterprint', onAfter)
+        finish()
+      }
+      window.addEventListener('afterprint', onAfter, { once: true })
+      cleanupTimer = window.setTimeout(() => {
+        window.removeEventListener('afterprint', onAfter)
+        finish()
+      }, 10_000)
+      try {
+        window.print()
+      } catch (err) {
+        cleanup()
+        reject(err)
+      }
+    })
+  } catch (err) {
+    cleanup()
+    throw err
+  }
 }
 
 /**
