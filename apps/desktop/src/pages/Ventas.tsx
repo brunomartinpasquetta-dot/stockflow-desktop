@@ -582,12 +582,20 @@ function PDV() {
     printerCfg: PrinterConfigDTO | null,
   ): Promise<void> {
     const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
+    // Directo (sin diálogo) salvo que el usuario haya elegido el diálogo del SO.
+    const silent = printerCfg?.silentPrint !== false
+    const deviceName =
+      printerCfg?.kind === 'system' && printerCfg.interface.trim() ? printerCfg.interface.trim() : undefined
     try {
-      // Patrón canónico window.print() (#print-area + @media print) — MISMO
-      // mecanismo que "Probar impresión", que ya imprime bien. Si el usuario
-      // configuró impresión directa, el main activó --kiosk-printing → sale SIN
-      // diálogo a la impresora predeterminada; si no, abre el diálogo del SO.
-      await printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
+      // printNode imprime con #print-area + @media print. silent → webContents.print
+      // silencioso sobre ESTA ventana (mismo render que el diálogo, sin diálogo);
+      // si no, window.print() (diálogo). Si el silencioso falla, cae al diálogo
+      // automáticamente → el ticket siempre sale.
+      await printNode(createElement(SaleTicket, { data: ticketData }), {
+        width: ticketWidth,
+        silent,
+        deviceName,
+      })
     } catch (err) {
       toast.error(
         err instanceof Error ? `No se pudo imprimir: ${err.message}` : 'No se pudo imprimir el ticket',

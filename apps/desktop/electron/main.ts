@@ -247,18 +247,10 @@ function startLicenseHeartbeat(): void {
   }, HEARTBEAT_INTERVAL_MS);
 }
 
-// Impresión directa SIN diálogo (patrón probado DripBurger/Sinatra). Con
-// `--kiosk-printing`, `window.print()` imprime SOLO —el cajero no confirma nada—
-// a la impresora PREDETERMINADA del SO, reusando el camino #print-area + @media
-// print que YA funciona (el diálogo imprime bien en la POS-58 del cliente). Se
-// activa SIEMPRE y antes de whenReady (igual que en DripBurger/Sinatra, donde el
-// kiosk va siempre). Evita los dos caminos rotos del historial: webContents.print
-// silent (#39092) y SumatraPDF (corría sin sacar papel).
-// Limitación conocida: imprime a la impresora DEFAULT del SO → la térmica debe
-// estar como predeterminada de Windows. (Si algún día se necesita el diálogo del
-// SO para algún caso, habría que hacerlo configurable + reiniciar la app.)
-app.commandLine.appendSwitch('kiosk-printing');
-console.log('[main] kiosk-printing ON (impresión directa, sin diálogo)');
+// Nota impresión: en Electron `--kiosk-printing` NO suprime el diálogo de
+// `window.print()` (sí funciona en Chrome puro, como DripBurger/Sinatra que son
+// web). La impresión directa SIN diálogo se hace con `webContents.print({silent})`
+// sobre la ventana visible (ver print:current + printService.printNode silent).
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();

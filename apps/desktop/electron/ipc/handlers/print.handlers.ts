@@ -244,8 +244,11 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         if (id == null) throw new Error('print:current sin webContents emisor');
         const wc = webContents.fromId(id);
         if (!wc) throw new Error('webContents no encontrado');
-        const widthMm = payload?.widthMm ?? 58;
         await new Promise<void>((resolve, reject) => {
+          // SIN pageSize custom: forzar dimensiones rompe los drivers térmicos
+          // genéricos → "basura infinita" (lección del cerebro). Dejamos el papel
+          // del driver, igual que el diálogo (window.print), que en esta PC SÍ
+          // imprime bien — esto es ese mismo render, pero sin el diálogo.
           wc.print(
             {
               silent: true,
@@ -253,7 +256,6 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
               printBackground: true,
               color: false,
               margins: { marginType: 'none' },
-              pageSize: { width: widthMm * 1000, height: 297000 },
             },
             (success: boolean, failureReason?: string) => {
               if (success) resolve();

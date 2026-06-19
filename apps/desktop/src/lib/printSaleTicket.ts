@@ -21,8 +21,15 @@ export async function printSaleTicketSilent(
   printerCfg: PrinterConfigDTO | null,
 ): Promise<void> {
   const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
+  const silent = printerCfg?.silentPrint !== false
+  const deviceName =
+    printerCfg?.kind === 'system' && printerCfg.interface.trim() ? printerCfg.interface.trim() : undefined
   try {
-    await printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
+    await printNode(createElement(SaleTicket, { data: ticketData }), {
+      width: ticketWidth,
+      silent,
+      deviceName,
+    })
   } catch (err) {
     toast.error(
       err instanceof Error ? `No se pudo imprimir: ${err.message}` : 'No se pudo imprimir el ticket',

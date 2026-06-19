@@ -148,13 +148,17 @@ function PrinterSection() {
 
   async function onTest(): Promise<void> {
     setTesting(true)
-    // Patrón canónico window.print() (#print-area + @media print). Si el usuario
-    // configuró impresión directa, el main activó --kiosk-printing → sale SIN
-    // diálogo a la impresora predeterminada; si no, abre el diálogo del SO.
-    // (Cambiar el modo directo/diálogo requiere reiniciar la app.)
+    // Directo (sin diálogo) si hay impresora térmica directa configurada; si no,
+    // diálogo del SO. El modo silencioso usa webContents.print sobre la ventana
+    // visible (mismo render que el diálogo, sin diálogo); cae al diálogo si falla.
+    const silent = !showDialog && paperFormat !== 'A4' && systemName.trim() !== ''
     try {
-      await printNode(<TestTicket paperFormat={paperFormat} />, widthFromPaperFormat(paperFormat))
-      toast.success('Test de impresión enviado')
+      await printNode(<TestTicket paperFormat={paperFormat} />, {
+        width: widthFromPaperFormat(paperFormat),
+        silent,
+        deviceName: systemName.trim() || undefined,
+      })
+      toast.success(silent ? 'Prueba enviada a la impresora (sin diálogo)' : 'Test de impresión enviado')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo imprimir la prueba')
     } finally {

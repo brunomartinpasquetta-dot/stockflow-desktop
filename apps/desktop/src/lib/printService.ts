@@ -86,7 +86,7 @@ export async function printNode(
   optsOrWidth: PrintWidth | PrintOptions = '58',
 ): Promise<void> {
   const opts = normalizeOpts(optsOrWidth)
-  const { width } = opts
+  const { width, silent, deviceName } = opts
 
   const area = getPrintArea()
   if (!area) return Promise.reject(new Error('No se pudo encontrar el área de impresión'))
@@ -104,11 +104,6 @@ export async function printNode(
         width === '80' ? 'printing-80' : width === 'a4' ? 'printing-a4' : 'printing-58'
       document.body.classList.add(widthClass)
 
-      // Patrón canónico (SINATRA / DripBurger): montar en #print-area +
-      // @media print + window.print(). El diálogo del SO renderiza el ticket
-      // vía el driver de la impresora — funciona en cualquier impresora
-      // instalada en el SO. NO usar webContents.print silencioso: con drivers
-      // térmicos genéricos produce basura (bytes crudos sin interpretar).
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           const finish = (): void => {
@@ -117,20 +112,47 @@ export async function printNode(
               resolve()
             }, 0)
           }
-          const onAfter = (): void => {
-            window.removeEventListener('afterprint', onAfter)
-            finish()
+          // DIÁLOGO: window.print() — el SO muestra el diálogo y el driver
+          // renderiza el ticket. Funciona en cualquier impresora del SO.
+          const printViaDialog = (): void => {
+            const onAfter = (): void => {
+              window.removeEventListener('afterprint', onAfter)
+              finish()
+            }
+            window.addEventListener('afterprint', onAfter, { once: true })
+            cleanupTimer = window.setTimeout(() => {
+              window.removeEventListener('afterprint', onAfter)
+              finish()
+            }, 10_000)
+            try {
+              window.print()
+            } catch (err) {
+              cleanup()
+              reject(err)
+            }
           }
-          window.addEventListener('afterprint', onAfter, { once: true })
-          cleanupTimer = window.setTimeout(() => {
-            window.removeEventListener('afterprint', onAfter)
-            finish()
-          }, 10_000)
-          try {
-            window.print()
-          } catch (err) {
-            cleanup()
-            reject(err)
+          // SILENCIOSO: `webContents.print({ silent:true })` sobre ESTA ventana
+          // (la visible, con el ticket ya montado en #print-area + @media print).
+          // Es EXACTAMENTE el render del diálogo, pero sin diálogo. SIN pageSize
+          // custom (cerebro: pageSize custom = "basura infinita"). En Electron
+          // `--kiosk-printing` NO suprime el diálogo de window.print(); este es el
+          // camino real. Si falla, caemos al diálogo para no perder el ticket.
+          if (silent) {
+            void (async () => {
+              try {
+                const { api } = await import('@/lib/api')
+                await api.print.current({
+                  ...(deviceName ? { deviceName } : {}),
+                  widthMm: width === '80' ? 80 : 58,
+                })
+                finish()
+              } catch (err) {
+                console.warn('Impresión silenciosa falló, uso diálogo del SO:', err)
+                printViaDialog()
+              }
+            })()
+          } else {
+            printViaDialog()
           }
         })
       })
