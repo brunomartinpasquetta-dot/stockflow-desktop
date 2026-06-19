@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { List, Loader2, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
@@ -17,12 +17,12 @@ import {
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
-import { autoPrintTicket, printNode, widthFromPaperFormat } from '@/lib/printService'
+import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
 import { CurrencyInput } from '@/components/ui/currency-input'
-import { SaleTicket, type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
+import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import { WeightDialog } from '@/components/WeightDialog'
@@ -581,44 +581,10 @@ function PDV() {
     _result: CreateSaleResultDTO,
     printerCfg: PrinterConfigDTO | null,
   ): Promise<void> {
-    const ticketWidth = widthFromPaperFormat(printerCfg?.paperFormat) === '80' ? '80' : '58'
-    // Directo (sin diálogo) salvo que el usuario haya elegido el diálogo del SO.
-    const silent = printerCfg?.silentPrint !== false
-    const deviceName =
-      printerCfg?.kind === 'system' && printerCfg.interface.trim() ? printerCfg.interface.trim() : undefined
-    const ticketFileName = `ticket-venta-${ticketData.sale.type}-${String(ticketData.sale.number).padStart(8, '0')}`
-    const printViaDialog = (): Promise<void> =>
-      printNode(createElement(SaleTicket, { data: ticketData }), ticketWidth)
-    try {
-      if (!silent) {
-        await printViaDialog()
-        return
-      }
-      // Silencioso: el ticket se HORNEA a HTML completo (renderToString) y se
-      // imprime en una ventana OCULTA dedicada (webContents.print). El contenido
-      // viaja DENTRO del HTML → no hay carrera de render como en el #print-area de
-      // la página viva (que bajo la tormenta de re-render de la venta salía en
-      // blanco). Si el silencioso falla, cae al diálogo para no perder el ticket.
-      try {
-        const { printed, pdfPath } = await autoPrintTicket(
-          createElement(SaleTicket, { data: ticketData }),
-          ticketWidth,
-          ticketFileName,
-          deviceName,
-        )
-        if (!printed) {
-          const archivo = pdfPath ? pdfPath.split(/[/\\]/).pop() : `${ticketFileName}.pdf`
-          toast.warning(`No se detectó impresora. El ticket se guardó en el Escritorio: ${archivo}`)
-        }
-      } catch (autoErr) {
-        console.warn('Impresión automática falló, uso diálogo del SO:', autoErr)
-        await printViaDialog()
-      }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? `No se pudo imprimir: ${err.message}` : 'No se pudo imprimir el ticket',
-      )
-    }
+    // Delegado al helper compartido: térmica del sistema → ESC/POS crudo al
+    // spooler (silent real); si no, o si falla, diálogo del SO. Mismo camino que
+    // "Reimprimir" en Historial → comportamiento consistente.
+    await printSaleTicketSilent(ticketData, printerCfg)
   }
 
   async function confirmar(): Promise<void> {
