@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
-import { useArticles, useCustomers, usePaymentMethods } from '@/lib/hooks'
+import { useArticles, useCompany, useCustomers, usePaymentMethods } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
@@ -19,6 +19,8 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { SaleDTO, VoucherType } from '@/types/api'
+import type { SaleTicketData } from '@/print/SaleTicket'
+import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 
 function todayIso(): string {
   const d = new Date()
@@ -48,6 +50,12 @@ function SaleDetailDialog({
   const detailQuery = useQuery({ queryKey: ['sale', saleId], queryFn: () => api.sales.get(saleId) })
   const articlesQuery = useArticles()
   const methodsQuery = usePaymentMethods()
+  const companyQuery = useCompany()
+  const printerCfgQuery = useQuery({
+    queryKey: ['hardwarePrinterConfig'],
+    queryFn: () => api.hardware.printer.getConfig(),
+    staleTime: 30_000,
+  })
   const descById = useMemo(() => new Map((articlesQuery.data ?? []).map((a) => [a.id, a.description])), [articlesQuery.data])
   const pmNameById = useMemo(() => new Map((methodsQuery.data ?? []).map((m) => [m.id, m.name])), [methodsQuery.data])
   const [confirming, setConfirming] = useState(false)
@@ -67,6 +75,35 @@ function SaleDetailDialog({
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo anular la venta'),
   })
+
+  // Reimprime el ticket de una venta histórica reusando el MISMO path de
+  // impresión silenciosa que el flujo de venta (útil si la auto-impresión falló
+  // o se trabó el papel). Reconstruye el ticket desde el detalle guardado.
+  async function reprint(): Promise<void> {
+    const d = detailQuery.data
+    const company = companyQuery.data
+    if (!d || !company) return
+    const ticketData: SaleTicketData = {
+      company,
+      sale: d.sale,
+      priceMode: company.priceMode,
+      lines: d.lines.map((l) => ({
+        description: descById.get(l.articleId) ?? '—',
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal,
+      })),
+      customerName: customerName || null,
+      customerDoc: null,
+      sellerName: null,
+      isAccountSale: d.sale.isAccountSale,
+      payments: d.payments.map((p) => ({
+        methodName: pmNameById.get(p.paymentMethodId) ?? 'Medio de pago',
+        amount: p.amount,
+      })),
+    }
+    await printSaleTicketSilent(ticketData, printerCfgQuery.data ?? null)
+  }
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -119,6 +156,16 @@ function SaleDetailDialog({
               {sale.isAccountSale
                 ? 'Cuenta corriente'
                 : (detailQuery.data?.payments ?? []).map((p) => `${pmNameById.get(p.paymentMethodId) ?? p.paymentMethodId} ${formatCurrency(p.amount)}`).join(' · ') || '—'}
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void reprint()}
+                disabled={!companyQuery.data || detailQuery.isLoading}
+              >
+                Reimprimir ticket
+              </Button>
             </div>
             {canVoid && sale.status === 'completed' && !confirming && (
               <div className="flex justify-end">
