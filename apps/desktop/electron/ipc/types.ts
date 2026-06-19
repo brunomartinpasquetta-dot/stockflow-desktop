@@ -1294,27 +1294,11 @@ export interface ApiSurface {
     focusMain(): Res<{ ok: true }>;
   };
   print: {
-    /** Diagnóstico de impresión (Windows): impresoras, SumatraPDF, intento real. Devuelve un reporte de texto. */
+    /** Diagnóstico de impresión: reporte de texto (impresoras del SO + config). */
     diagnose(payload: { deviceName?: string }): Res<{ report: string }>;
-    /** Imprime HTML inline en una BrowserWindow oculta usando webContents.print silencioso. */
-    silent(payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Res<{ ok: true }>;
-    /** Imprime la ventana actual (ya con el ticket montado en #print-area) en silencio, sin diálogo. */
-    current(payload: { deviceName?: string; widthMm?: number }): Res<{ ok: true }>;
-    /**
-     * Impresión automática del ticket SIN diálogo: renderiza el HTML a un PDF
-     * real (printToPDF) y lo manda a la impresora vía `lp` (CUPS). Si no hay
-     * impresora, guarda el PDF en el Escritorio. `printed` indica qué pasó.
-     */
-    ticketAuto(payload: {
-      html: string;
-      widthMm: number;
-      fileName: string;
-      /** Impresora configurada en StockFlow; tiene prioridad sobre la default. */
-      deviceName?: string;
-    }): Res<{ printed: boolean; pdfPath: string | null }>;
     /**
      * Lista impresoras vía `webContents.getPrintersAsync()`. El `name` devuelto
-     * es el `deviceName` exacto que `print.silent` necesita.
+     * es el nombre EXACTO del SO que se guarda en la config (kind:'system').
      */
     listElectron(): Res<SystemPrinterDTO[]>;
   };

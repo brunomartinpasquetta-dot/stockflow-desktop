@@ -301,17 +301,6 @@ export const api = {
   print: {
     diagnose: (payload: { deviceName?: string }): Promise<{ report: string }> =>
       unwrap(sf().print.diagnose(payload)),
-    silent: (payload: { html: string; deviceName: string; widthMm: 58 | 80 }): Promise<{ ok: true }> =>
-      unwrap(sf().print.silent(payload)),
-    current: (payload: { deviceName?: string; widthMm?: number }): Promise<{ ok: true }> =>
-      unwrap(sf().print.current(payload)),
-    ticketAuto: (payload: {
-      html: string
-      widthMm: number
-      fileName: string
-      deviceName?: string
-    }): Promise<{ printed: boolean; pdfPath: string | null }> =>
-      unwrap(sf().print.ticketAuto(payload)),
     listElectron: (): Promise<import('@/types/api').SystemPrinterDTO[]> =>
       unwrap(sf().print.listElectron()),
   },

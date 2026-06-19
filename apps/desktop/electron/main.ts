@@ -259,10 +259,9 @@ function startLicenseHeartbeat(): void {
   }, HEARTBEAT_INTERVAL_MS);
 }
 
-// Nota impresión: en Electron `--kiosk-printing` NO suprime el diálogo de
-// `window.print()` (sí funciona en Chrome puro, como DripBurger/Sinatra que son
-// web). La impresión directa SIN diálogo se hace con `webContents.print({silent})`
-// sobre la ventana visible (ver print:current + printService.printNode silent).
+// Nota impresión: la impresión silenciosa de tickets va por ESC/POS crudo al
+// spooler del SO (ver PrinterService). El motor de impresión de Electron daba
+// hoja en blanco en térmicas. window.print()+diálogo queda sólo como fallback/A4.
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();

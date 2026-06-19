@@ -364,9 +364,6 @@ export function createApiBridge(
     },
     print: {
       diagnose: (p) => c<never>('print:diagnose', p),
-      silent: (p) => c<never>('print:silent', p),
-      current: (p) => c<never>('print:current', p),
-      ticketAuto: (p) => c<never>('print:ticketAuto', p),
       listElectron: () => c<never>('printer:listElectron'),
     },
     license: {

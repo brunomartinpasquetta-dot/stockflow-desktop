@@ -17,10 +17,5 @@
 extends: electron-builder.yml
 npmRebuild: false
 
-# Impresión directa en Windows: SumatraPDF.exe DEBE quedar FUERA del asar para
-# poder ejecutarse. El asarUnpack con pnpm no lo logró (v0.1.39: el .exe quedó
-# adentro de app.asar, inejecutable). Lo copiamos a `resources/SumatraPDF.exe`
-# con extraResources (determinístico) y lo ejecutamos por ruta absoluta.
-extraResources:
-  - from: node_modules/pdf-to-printer/dist/SumatraPDF-3.4.6-32.exe
-    to: SumatraPDF.exe
+# (La impresión de tickets va por ESC/POS crudo al spooler — ver PrinterService;
+# ya no se usa SumatraPDF/pdf-to-printer, por eso no hay extraResources.)

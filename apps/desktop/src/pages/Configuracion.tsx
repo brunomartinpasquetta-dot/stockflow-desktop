@@ -173,9 +173,8 @@ function PrinterSection() {
     }
   }
 
-  // Diagnóstico de impresión: muestra EN PANTALLA qué impresoras ve el sistema y
-  // pdf-to-printer, si encontró SumatraPDF.exe, y el resultado real de un intento
-  // de impresión. Sirve para diagnosticar sin DevTools ni archivos de log.
+  // Diagnóstico de impresión: muestra EN PANTALLA las impresoras que ve el SO y
+  // la impresora configurada, para confirmar nombres sin DevTools ni logs.
   async function onDiagnose(): Promise<void> {
     setDiagnosing(true)
     setDiagReport('Ejecutando diagnóstico…')
