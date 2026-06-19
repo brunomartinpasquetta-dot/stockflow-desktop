@@ -1,5 +1,4 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron';
-import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -248,36 +247,18 @@ function startLicenseHeartbeat(): void {
   }, HEARTBEAT_INTERVAL_MS);
 }
 
-/**
- * Impresión silenciosa en Windows (patrón probado DripBurger/Sinatra). Con
- * `--kiosk-printing`, `window.print()` imprime SIN diálogo a la impresora
- * PREDETERMINADA del SO, reusando el camino #print-area + @media print que YA
- * funciona (el diálogo imprime bien en la POS-58 del cliente). Evita los dos
- * caminos rotos del historial: webContents.print silent (#39092) y SumatraPDF
- * (corría pero no sacaba papel). El switch DEBE setearse antes de whenReady, por
- * eso leemos la config directo del archivo `hardware.json`. Sólo se activa si el
- * usuario eligió impresión directa (no rompe el modo diálogo). Limitación: usa
- * la impresora DEFAULT del SO → la térmica debe estar como predeterminada.
- */
-function maybeEnableKioskPrinting(): void {
-  try {
-    const cfgPath = path.join(app.getPath('userData'), 'hardware.json');
-    if (!existsSync(cfgPath)) return;
-    const parsed = JSON.parse(readFileSync(cfgPath, 'utf8')) as {
-      printer?: { silentPrint?: boolean } | null;
-    };
-    // Igual criterio que printSaleTicket: directo salvo que el usuario haya
-    // elegido explícitamente el diálogo (silentPrint === false).
-    if (parsed.printer && parsed.printer.silentPrint !== false) {
-      app.commandLine.appendSwitch('kiosk-printing');
-      console.log('[main] kiosk-printing ON (impresión directa configurada)');
-    }
-  } catch (err) {
-    console.warn('[main] no se pudo evaluar kiosk-printing:', err instanceof Error ? err.message : err);
-  }
-}
-
-maybeEnableKioskPrinting();
+// Impresión directa SIN diálogo (patrón probado DripBurger/Sinatra). Con
+// `--kiosk-printing`, `window.print()` imprime SOLO —el cajero no confirma nada—
+// a la impresora PREDETERMINADA del SO, reusando el camino #print-area + @media
+// print que YA funciona (el diálogo imprime bien en la POS-58 del cliente). Se
+// activa SIEMPRE y antes de whenReady (igual que en DripBurger/Sinatra, donde el
+// kiosk va siempre). Evita los dos caminos rotos del historial: webContents.print
+// silent (#39092) y SumatraPDF (corría sin sacar papel).
+// Limitación conocida: imprime a la impresora DEFAULT del SO → la térmica debe
+// estar como predeterminada de Windows. (Si algún día se necesita el diálogo del
+// SO para algún caso, habría que hacerlo configurable + reiniciar la app.)
+app.commandLine.appendSwitch('kiosk-printing');
+console.log('[main] kiosk-printing ON (impresión directa, sin diálogo)');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
