@@ -264,19 +264,23 @@ export function Articulos() {
         )
       : base
     const dir = sortDir === 'asc' ? 1 : -1
+    // Valor a comparar (familyId → nombre de familia; el resto, el campo crudo).
+    const getVal = (a: ArticleDTO): string =>
+      sortKey === 'familyId'
+        ? a.familyId
+          ? (familyName.get(a.familyId) ?? '')
+          : ''
+        : String(a[sortKey] ?? '')
     return [...filteredRows].sort((a, b) => {
-      const av = a[sortKey] ?? ''
-      const bv = b[sortKey] ?? ''
-      if (sortKey === 'listPrice1' || sortKey === 'stock') {
-        return (Number(av) - Number(bv)) * dir
-      }
-      const asv = sortKey === 'familyId'
-        ? (a.familyId ? (familyName.get(a.familyId) ?? '') : '')
-        : String(av)
-      const bsv = sortKey === 'familyId'
-        ? (b.familyId ? (familyName.get(b.familyId) ?? '') : '')
-        : String(bv)
-      return asv.localeCompare(bsv, 'es') * dir
+      const av = getVal(a)
+      const bv = getVal(b)
+      // Números guardados como string (precios, stock, mínimos, código): comparar
+      // como NÚMERO si ambos son numéricos → evita el orden 1,10,11,2,...,9.
+      const an = Number(av)
+      const bn = Number(bv)
+      const bothNum = Number.isFinite(an) && Number.isFinite(bn) && av.trim() !== '' && bv.trim() !== ''
+      if (bothNum) return (an - bn) * dir
+      return av.localeCompare(bv, 'es', { numeric: true, sensitivity: 'base' }) * dir
     })
   }, [articles.data, search, sortKey, sortDir, familyName])
 

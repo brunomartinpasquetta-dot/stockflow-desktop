@@ -76,7 +76,14 @@ export function Familias() {
       },
     },
     { key: 'parentId', header: 'Familia padre', render: (r) => (r.parentId ? (nameById.get(r.parentId) ?? '—') : '— (raíz)') },
-    { key: 'articles', header: 'Artículos', align: 'right', render: (r) => String(articleCount.get(r.id) ?? 0) },
+    {
+      key: 'articles',
+      header: 'Artículos',
+      align: 'right',
+      // 'articles' no es un campo de FamilyDTO → sin sortValue el orden era no-op.
+      sortValue: (r) => articleCount.get(r.id) ?? 0,
+      render: (r) => String(articleCount.get(r.id) ?? 0),
+    },
   ]
 
   const parentOptions = (families.data ?? [])

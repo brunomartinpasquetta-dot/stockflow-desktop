@@ -95,14 +95,24 @@ export function EntityTable<T extends { id: string }>({
       const v = (r as Record<string, unknown>)[sortKey]
       return typeof v === 'number' ? v : String(v ?? '')
     }
-    const out = [...filtered].sort((a, b) => {
+    // Comparador que ENTIENDE números guardados como string (montos, stock,
+    // cantidades = string en los DTO). Sin esto, "10" < "2" lexicográfico → el
+    // orden salía 1,10,11,2,...,9 y parecía que "faltaban" o estaban descolocadas.
+    const cmp = (a: T, b: T): number => {
       const av = get(a)
       const bv = get(b)
-      if (av < bv) return sortAsc ? -1 : 1
-      if (av > bv) return sortAsc ? 1 : -1
-      return 0
-    })
-    return out
+      const an = typeof av === 'number' ? av : Number(av)
+      const bn = typeof bv === 'number' ? bv : Number(bv)
+      const bothNum =
+        Number.isFinite(an) &&
+        Number.isFinite(bn) &&
+        String(av).trim() !== '' &&
+        String(bv).trim() !== ''
+      if (bothNum) return an - bn
+      // Texto: comparación natural (numeric:true ordena "Caja 2" antes que "Caja 10").
+      return String(av).localeCompare(String(bv), 'es', { numeric: true, sensitivity: 'base' })
+    }
+    return [...filtered].sort((a, b) => (sortAsc ? cmp(a, b) : -cmp(a, b)))
   }, [filtered, sortKey, sortAsc, columns])
 
   const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
@@ -115,6 +125,9 @@ export function EntityTable<T extends { id: string }>({
       setSortKey(key)
       setSortAsc(true)
     }
+    // Volver a la página 1: si estabas en la página 2 y reordenás, sin esto
+    // seguías viendo el bloque de la página 2 → parecía que "faltaban filas".
+    setPage(0)
   }
 
   async function confirmDelete(): Promise<void> {
