@@ -186,6 +186,7 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
         if (widthMm !== 58 && widthMm !== 80) {
           throw new Error(`Ancho inválido: ${String(widthMm)} (esperado 58 o 80)`);
         }
+        const isWindows = process.platform === 'win32';
 
         const { BrowserWindow } = await import('electron');
         const { writeFile, unlink } = await import('node:fs/promises');
@@ -217,6 +218,38 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
           });
           // Frame extra para que el layout quede aplicado.
           await new Promise<void>((r) => setTimeout(r, 200));
+
+          // WINDOWS: no existe `lp`/CUPS. Imprimimos en SILENCIO con el driver
+          // del SO vía webContents.print — el mismo stack que usa el diálogo de
+          // "Probar impresión" (que al cliente le funciona), pero sin abrir el
+          // diálogo. SIN pageSize custom: forzar dimensiones rompe los drivers
+          // térmicos genéricos ("basura infinita" conocida en mac); dejamos que
+          // el driver use el papel/rollo ya configurado por el usuario.
+          // Si falla, lanzamos → el renderer cae al diálogo del SO (sale igual).
+          if (isWindows) {
+            const ok = await new Promise<boolean>((resolve) => {
+              win.webContents.print(
+                {
+                  silent: true,
+                  printBackground: true,
+                  margins: { marginType: 'none' },
+                  ...(deviceName ? { deviceName } : {}),
+                },
+                (success, reason) => {
+                  if (!success) log(`webContents.print silent falló: ${reason}`);
+                  resolve(success);
+                },
+              );
+            });
+            if (ok) {
+              // Dar tiempo al spooler antes de destruir la ventana oculta.
+              await new Promise<void>((r) => setTimeout(r, 400));
+              log('Windows: impresión silenciosa OK');
+              return { printed: true, pdfPath: null };
+            }
+            throw new Error('La impresión silenciosa de Windows no se completó');
+          }
+
           // pageSize en MICRONES. Ancho = rollo; alto = 297mm (el driver corta).
           pdf = await win.webContents.printToPDF({
             printBackground: true,
