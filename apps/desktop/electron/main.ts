@@ -158,6 +158,7 @@ function bootstrap(): { lanArgs: string[] } {
     getWindow: () => mainWindow,
     isPackaged: app.isPackaged,
     isDev,
+    appVersion: app.getVersion(),
   });
 
   // applyAndRestart: usado por lan:applyAndRestart y wizard.

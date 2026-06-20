@@ -25,10 +25,16 @@ export function AcercaDe() {
     setChecking(true)
     try {
       const r = await api.updater.checkNow()
-      if (r.status === 'disabled' || r.status === 'disabled-in-dev') {
-        toast.info('Auto-update sólo está disponible en builds de producción.')
+      if (r.status === 'disabled' || r.status === 'disabled-in-dev' || r.status === 'updater-unavailable') {
+        toast.info('Las actualizaciones sólo funcionan en la app instalada (versión de producción).')
       } else if (r.status === 'error') {
         toast.error(`No se pudo verificar (${r.version ?? 'error desconocido'})`)
+      } else if (r.status === 'outdated') {
+        toast.warning(
+          `Hay una nueva versión disponible${r.version ? ` (v${r.version})` : ''}. Mirá el aviso arriba en la ventana principal para descargarla.`,
+        )
+      } else if (r.status === 'latest') {
+        toast.success(`Ya tenés la última versión${r.version ? ` (v${r.version})` : ''}.`)
       } else {
         toast.success(`Verificación iniciada${r.version ? `: v${r.version}` : ''}`)
       }
@@ -56,6 +62,7 @@ export function AcercaDe() {
   }
 
   const plan = license?.plan ?? '—'
+  const fullName = license?.fullName ?? '—'
   const tenantName = license?.tenantName ?? '—'
   const licenseKey = license?.licenseKey ?? '—'
   const keyShort = licenseKey === '—' ? '—' : licenseKey.length > 19 ? `${licenseKey.slice(0, 16)}...` : licenseKey
@@ -77,6 +84,8 @@ export function AcercaDe() {
           <div className="font-mono">{version}</div>
           <div className="font-medium">Plan</div>
           <div className="font-mono">{plan}</div>
+          <div className="font-medium">Titular</div>
+          <div className="font-mono">{fullName}</div>
           <div className="font-medium">Empresa</div>
           <div className="font-mono">{tenantName}</div>
           <div className="font-medium">Licencia</div>

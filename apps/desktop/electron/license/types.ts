@@ -20,6 +20,8 @@ export interface LicenseState {
   expiresAt: number | null;
   licenseKey: string | null;
   tenantName: string | null;
+  /** Nombre del titular/cliente (full_name del tenant cloud). */
+  fullName: string | null;
   /**
    * ID del tenant según el JWT de licencia (`tid`). En master license / dev
    * mode es `'OWNER'`. Se usa, por ejemplo, para armar la URL real del webhook

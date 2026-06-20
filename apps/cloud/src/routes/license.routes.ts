@@ -82,7 +82,7 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
     if (!tenant) return reply.code(404).send({ error: 'Cuenta no encontrada' });
     const [license] = await app.cloudDb.select().from(licenses).where(eq(licenses.id, user.sub)).limit(1);
     return reply.send({
-      tenant: { name: tenant.companyName, plan: tenant.plan },
+      tenant: { name: tenant.companyName, fullName: tenant.fullName, plan: tenant.plan },
       license: { key: license?.licenseKey ?? user.lk, expiresAt: user.exp * 1000 },
       features: PLAN_FEATURES[tenant.plan as PlanId] ?? PLAN_FEATURES.basic,
     });

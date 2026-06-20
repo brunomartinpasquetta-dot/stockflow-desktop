@@ -71,8 +71,10 @@ export class LicenseManager {
 
   /** Estado en runtime impuesto por el heartbeat (revocada / suspendida). */
   private runtimeStatus: LicenseStatus | null = null;
-  /** Nombre del tenant cacheado (de la activación o de /api/me). */
+  /** Nombre del tenant (empresa) cacheado (de la activación o de /api/me). */
   private tenantName: string | null = null;
+  /** Nombre del titular/cliente (full_name) cacheado (de /api/me). */
+  private clientName: string | null = null;
 
   constructor(opts: LicenseManagerOptions) {
     this.userDataDir = opts.userDataDir;
@@ -203,6 +205,7 @@ export class LicenseManager {
     }
     this.runtimeStatus = null;
     this.tenantName = null;
+    this.clientName = null;
     const state = this.getState();
     console.info(`[license] licencia desactivada — estado: ${state.status}`);
     return state;
@@ -222,6 +225,7 @@ export class LicenseManager {
         expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
         licenseKey: 'SF-DEV0-DEV0-DEV0-DEV0',
         tenantName: 'Desarrollo',
+        fullName: 'Desarrollo',
         tenantId: 'OWNER',
         lastError: null,
       };
@@ -234,6 +238,7 @@ export class LicenseManager {
         expiresAt: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000,
         licenseKey: 'SF-BRUN-OWNR-MSTR-2026',
         tenantName: this.tenantName ?? 'Bruno Pasquetta — Master',
+        fullName: this.clientName,
         tenantId: 'OWNER',
         lastError: null,
       };
@@ -246,6 +251,7 @@ export class LicenseManager {
         expiresAt: null,
         licenseKey: null,
         tenantName: null,
+        fullName: null,
         tenantId: null,
         lastError: 'No hay licencia válida',
       };
@@ -260,6 +266,7 @@ export class LicenseManager {
         expiresAt: payload?.exp != null ? payload.exp * 1000 : null,
         licenseKey: payload?.lk ?? null,
         tenantName: this.tenantName,
+        fullName: this.clientName,
         tenantId: payload?.tid ?? null,
         lastError: expired ? 'La licencia expiró. Volvé a conectarte para renovarla.' : 'No hay licencia válida',
       };
@@ -270,6 +277,7 @@ export class LicenseManager {
       expiresAt: payload.exp * 1000,
       licenseKey: payload.lk,
       tenantName: this.tenantName,
+      fullName: this.clientName,
       tenantId: payload.tid,
       lastError: null,
     };
@@ -339,6 +347,7 @@ export class LicenseManager {
         expiresAt: null,
         licenseKey: null,
         tenantName: null,
+        fullName: null,
         tenantId: null,
         lastError: this.translateActivateError(res.status, serverMsg),
       };
@@ -354,6 +363,7 @@ export class LicenseManager {
         expiresAt: null,
         licenseKey: null,
         tenantName: null,
+        fullName: null,
         tenantId: null,
         lastError: 'Respuesta inválida del servidor de licencias.',
       };
@@ -402,6 +412,12 @@ export class LicenseManager {
           this.storeJwt(data.jwt);
         }
         this.runtimeStatus = 'active';
+        // Auto-cura: si no tenemos el nombre de la empresa/titular (p.ej. la
+        // activación trajo el JWT pero /api/me falló esa vez), lo traemos ahora.
+        if (!this.tenantName || !this.clientName) {
+          const freshJwt = data && typeof data.jwt === 'string' && data.jwt.length > 0 ? data.jwt : jwt;
+          await this.fetchTenantName(freshJwt);
+        }
       }
     } catch (err) {
       console.error('[license] heartbeat falló:', err);
@@ -414,8 +430,9 @@ export class LicenseManager {
         headers: { authorization: `Bearer ${jwt}` },
       });
       if (!res.ok) return;
-      const body = (await res.json()) as { tenant?: { name?: string } };
+      const body = (await res.json()) as { tenant?: { name?: string; fullName?: string } };
       if (body?.tenant?.name) this.tenantName = body.tenant.name;
+      if (body?.tenant?.fullName) this.clientName = body.tenant.fullName;
     } catch {
       // best-effort
     }
@@ -434,5 +451,6 @@ export class LicenseManager {
     }
     this.runtimeStatus = null;
     this.tenantName = null;
+    this.clientName = null;
   }
 }

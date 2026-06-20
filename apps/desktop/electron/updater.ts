@@ -136,17 +136,19 @@ export async function checkForOutdatedVersion(opts: {
   appVersion: string;
   isPackaged: boolean;
   onOutdated: (info: OutdatedInfo) => void;
-}): Promise<void> {
-  if (!opts.isPackaged) return;
+}): Promise<{ outdated: boolean; latestVersion: string | null }> {
+  if (!opts.isPackaged) return { outdated: false, latestVersion: null };
   const remote = await checkRemoteVersion();
-  if (!remote) return;
+  if (!remote) return { outdated: false, latestVersion: null };
   if (compareVersions(remote.latestVersion, opts.appVersion) > 0) {
     opts.onOutdated({
       currentVersion: opts.appVersion,
       latestVersion: remote.latestVersion,
       downloadUrl: remote.downloadUrl,
     });
+    return { outdated: true, latestVersion: remote.latestVersion };
   }
+  return { outdated: false, latestVersion: remote.latestVersion };
 }
 
 export interface UpdaterController {
@@ -163,6 +165,8 @@ export interface UpdaterContext {
   getWindow: () => BrowserWindow | null;
   isPackaged: boolean;
   isDev: boolean;
+  /** Versión instalada, para el chequeo manual de "nueva versión disponible". */
+  appVersion: string;
 }
 
 /**
@@ -228,12 +232,29 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
 
   return {
     checkNow: async () => {
+      // 1) Chequeo manual contra GitHub Releases (igual que al arrancar): si hay
+      //    una versión más nueva, emite `updater:outdated` → aparece el banner
+      //    "nueva versión disponible" en la ventana principal. Este es el camino
+      //    que el botón "Verificar" debe disparar (autoUpdater por sí solo no lo hace).
+      let manual: { outdated: boolean; latestVersion: string | null } = {
+        outdated: false,
+        latestVersion: null,
+      };
       try {
-        const r = await autoUpdater.checkForUpdates();
-        return { status: 'checking', version: r?.updateInfo?.version };
+        manual = await checkForOutdatedVersion({
+          appVersion: ctx.appVersion,
+          isPackaged: ctx.isPackaged,
+          onOutdated: (info) => ctx.getWindow()?.webContents.send('updater:outdated', info),
+        });
       } catch (err) {
-        return { status: 'error', version: err instanceof Error ? err.message : undefined };
+        console.warn('[updater] chequeo manual falló:', err instanceof Error ? err.message : err);
       }
+      // 2) electron-updater (auto-descarga del .exe en Windows), best-effort.
+      autoUpdater.checkForUpdates().catch((err: Error) => {
+        console.warn('[updater] checkForUpdates falló:', err?.message ?? err);
+      });
+      if (manual.outdated) return { status: 'outdated', version: manual.latestVersion ?? undefined };
+      return { status: 'latest', version: manual.latestVersion ?? undefined };
     },
     quitAndInstall: () => autoUpdater.quitAndInstall(false, true),
     getAutoCheck: () => prefs.autoCheck,
