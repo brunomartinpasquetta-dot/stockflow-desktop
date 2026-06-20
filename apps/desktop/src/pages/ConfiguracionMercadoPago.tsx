@@ -61,7 +61,7 @@ export function ConfiguracionMercadoPago() {
   const licenseActive = licenseState?.status === 'active'
   const tenantId = licenseActive ? licenseState?.tenantId ?? 'OWNER' : null
   const webhookUrl = tenantId
-    ? `https://api.stockflow.com.ar/api/mp/webhook/${tenantId}`
+    ? `https://stockflow.bpsgsistemas.com/api/mp/webhook/${tenantId}`
     : null
 
   return (

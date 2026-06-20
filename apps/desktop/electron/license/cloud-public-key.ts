@@ -20,4 +20,4 @@ f3jJ0HQn6lEIGSXPxwwyYYdySttiK2oJdVbqvEqbF6GNO1U7G6rvDh9SG+TXaHkj
 -----END PUBLIC KEY-----`;
 
 /** URL base del cloud de licencias en producción. Override: `CLOUD_API_URL`. */
-export const CLOUD_API_URL_DEFAULT = 'https://api.stockflow.com.ar';
+export const CLOUD_API_URL_DEFAULT = 'https://stockflow.bpsgsistemas.com';
