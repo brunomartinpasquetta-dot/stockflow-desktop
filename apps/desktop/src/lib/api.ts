@@ -328,6 +328,7 @@ export const api = {
     getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),
     activate: (key: string): Promise<LicenseStateDTO> => unwrap(sf().license.activate({ licenseKey: key })),
     heartbeat: (): Promise<LicenseStateDTO> => unwrap(sf().license.heartbeat()),
+    deactivate: (): Promise<LicenseStateDTO> => unwrap(sf().license.deactivate()),
   },
   hardware: {
     listUsbDevices: (): Promise<UsbDeviceInfoDTO[]> => unwrap(sf().hardware.listUsbDevices()),

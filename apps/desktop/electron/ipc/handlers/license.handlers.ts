@@ -20,5 +20,8 @@ export function buildLicenseHandlers(deps: HandlerDeps): HandlerMap {
       await deps.licenseManager.heartbeat();
       return deps.licenseManager.getState();
     }),
+    'license:deactivate': unguarded(deps, async (): Promise<LicenseStateDTO> =>
+      deps.licenseManager.deactivate(),
+    ),
   };
 }

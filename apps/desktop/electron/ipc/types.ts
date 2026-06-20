@@ -1327,6 +1327,8 @@ export interface ApiSurface {
   license: {
     getState(): Res<LicenseStateDTO>;
     activate(payload: { licenseKey: string }): Res<LicenseStateDTO>;
+    /** Saca la licencia de esta máquina (borra markers locales) → sin licencia. */
+    deactivate(): Res<LicenseStateDTO>;
     heartbeat(): Res<LicenseStateDTO>;
   };
   hardware: {

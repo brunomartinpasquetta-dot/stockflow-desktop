@@ -186,6 +186,28 @@ export class LicenseManager {
     }
   }
 
+  /**
+   * Saca la licencia de ESTA máquina: borra los markers locales (master +
+   * `license.dat`) y resetea el estado en runtime → la app vuelve a "sin
+   * licencia" (pantalla de Activación), para poder activar otra. NO notifica al
+   * cloud: reasignar una licencia cloud a otra PC requiere liberar el machine_id
+   * desde el admin del cloud.
+   */
+  deactivate(): LicenseState {
+    for (const f of [this.masterFilePath(), this.licenseFilePath()]) {
+      try {
+        if (existsSync(f)) rmSync(f);
+      } catch (err) {
+        console.error('[license] No se pudo borrar', f, err);
+      }
+    }
+    this.runtimeStatus = null;
+    this.tenantName = null;
+    const state = this.getState();
+    console.info(`[license] licencia desactivada — estado: ${state.status}`);
+    return state;
+  }
+
   /* ------------------------------------------------------------------ */
   /* Estado                                                              */
   /* ------------------------------------------------------------------ */

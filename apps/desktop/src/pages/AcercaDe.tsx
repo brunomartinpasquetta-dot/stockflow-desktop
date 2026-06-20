@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BRANDING } from '@/assets/branding'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,7 +12,10 @@ import { Button } from '@/components/ui/button'
 export function AcercaDe() {
   const [version, setVersion] = useState<string>('—')
   const [checking, setChecking] = useState(false)
-  const { state: license } = useLicense()
+  const [confirmDeact, setConfirmDeact] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
+  const { state: license, refresh } = useLicense()
+  const navigate = useNavigate()
 
   useEffect(() => {
     api.system.getVersion().then((r) => setVersion(r.version)).catch(() => undefined)
@@ -32,6 +36,22 @@ export function AcercaDe() {
       toast.error(err instanceof ApiError ? err.message : 'No se pudo verificar')
     } finally {
       setChecking(false)
+    }
+  }
+
+  // Saca la licencia de ESTA PC y lleva a Activación para poner otra (ej. al
+  // entregarle el equipo al cliente: se saca la master del owner y se activa la suya).
+  async function onDeactivate(): Promise<void> {
+    setDeactivating(true)
+    try {
+      await api.license.deactivate()
+      refresh()
+      toast.success('Licencia desactivada. Activá la nueva licencia.')
+      navigate('/activacion')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo desactivar la licencia')
+    } finally {
+      setDeactivating(false)
     }
   }
 
@@ -61,6 +81,33 @@ export function AcercaDe() {
           <div className="font-mono">{tenantName}</div>
           <div className="font-medium">Licencia</div>
           <div className="font-mono">{keyShort}</div>
+          <div className="col-span-2 mt-3 border-t pt-3">
+            {!confirmDeact ? (
+              <Button variant="outline" size="sm" onClick={() => setConfirmDeact(true)}>
+                Cambiar / desactivar licencia
+              </Button>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Se quita la licencia de ESTA PC y vas a tener que activar otra. ¿Seguro?
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => void onDeactivate()}
+                    disabled={deactivating}
+                  >
+                    {deactivating && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                    Sí, desactivar
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmDeact(false)} disabled={deactivating}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
