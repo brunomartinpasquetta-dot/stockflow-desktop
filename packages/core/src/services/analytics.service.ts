@@ -36,6 +36,24 @@ export interface PaymentMethodRankRow {
   percentageOfTotal: string;
 }
 
+export interface VentaPorFormaPagoRow {
+  paymentMethodId: string;
+  name: string;
+  isPhysicalCash: boolean;
+  montoTotal: string;
+  cantidadOperaciones: number;
+  cantidadVentas: number;
+  porcentajeDelTotal: string;
+  ticketPromedio: string;
+}
+
+export interface VentaPorFormaPagoEnTiempoRow {
+  bucket: string;
+  paymentMethodId: string;
+  name: string;
+  monto: string;
+}
+
 export interface CustomerRankRow {
   customerId: string;
   fullName: string;
@@ -224,6 +242,135 @@ export class AnalyticsService {
       totalAmount: fmt(r.total),
       salesCount: r.salesCount,
       percentageOfTotal: fmt(grand > 0 ? (r.total / grand) * 100 : 0),
+    }));
+  }
+
+  /**
+   * Ventas DESGLOSADAS por forma de pago. Trabaja sobre `sale_payments`, así que
+   * los pagos MIXTOS (split: parte efectivo + parte tarjeta) reparten cada porción
+   * a su medio. Las ventas a CUENTA CORRIENTE no tienen sale_payments (se cobran
+   * después), así que se agregan como una línea sintética "Cuenta Corriente" con
+   * el total de esas ventas → el total de TODOS los medios cuadra con el total de
+   * ventas del período. Excluye anuladas (voided).
+   */
+  async getVentasPorFormaPago(input: DateRange): Promise<VentaPorFormaPagoRow[]> {
+    this.requireRead();
+    const sqlPagos = `
+      SELECT
+        pm.id AS paymentMethodId,
+        pm.name AS name,
+        pm.is_physical_cash AS isPhysicalCash,
+        SUM(CAST(sp.amount AS REAL)) AS monto,
+        COUNT(*) AS operaciones,
+        COUNT(DISTINCT sp.sale_id) AS ventas
+      FROM sale_payments sp
+      JOIN sales s ON s.id = sp.sale_id
+      JOIN payment_methods pm ON pm.id = sp.payment_method_id
+      WHERE s.status != 'voided'
+        AND s.date BETWEEN ? AND ?
+      GROUP BY pm.id, pm.name, pm.is_physical_cash
+    `;
+    const pagos = this.ctx.db.$client.prepare(sqlPagos).all(input.from, input.to) as Array<{
+      paymentMethodId: string;
+      name: string;
+      isPhysicalCash: number;
+      monto: number;
+      operaciones: number;
+      ventas: number;
+    }>;
+    // Cuenta corriente: ventas a crédito (sin pago al momento) → línea sintética.
+    const sqlCtaCte = `
+      SELECT SUM(CAST(s.total AS REAL)) AS monto, COUNT(*) AS ventas
+      FROM sales s
+      WHERE s.status != 'voided'
+        AND s.is_account_sale = 1
+        AND s.date BETWEEN ? AND ?
+    `;
+    const cc = this.ctx.db.$client.prepare(sqlCtaCte).get(input.from, input.to) as {
+      monto: number | null;
+      ventas: number;
+    };
+
+    const items = pagos.map((p) => ({
+      paymentMethodId: p.paymentMethodId,
+      name: p.name,
+      isPhysicalCash: !!p.isPhysicalCash,
+      monto: p.monto || 0,
+      operaciones: p.operaciones,
+      ventas: p.ventas,
+    }));
+    if (cc && (cc.monto || 0) > 0) {
+      items.push({
+        paymentMethodId: 'cuenta-corriente',
+        name: 'Cuenta Corriente',
+        isPhysicalCash: false,
+        monto: cc.monto || 0,
+        operaciones: cc.ventas,
+        ventas: cc.ventas,
+      });
+    }
+    const grand = items.reduce((acc, r) => acc + r.monto, 0);
+    items.sort((a, b) => b.monto - a.monto);
+    return items.map((r) => ({
+      paymentMethodId: r.paymentMethodId,
+      name: r.name,
+      isPhysicalCash: r.isPhysicalCash,
+      montoTotal: fmt(r.monto),
+      cantidadOperaciones: r.operaciones,
+      cantidadVentas: r.ventas,
+      porcentajeDelTotal: fmt(grand > 0 ? (r.monto / grand) * 100 : 0),
+      ticketPromedio: fmt(r.ventas > 0 ? r.monto / r.ventas : 0),
+    }));
+  }
+
+  /**
+   * Evolución temporal del monto por forma de pago (para gráfico de barras
+   * apiladas / líneas). Formato LARGO: una fila por (bucket, medio). Incluye la
+   * cuenta corriente como medio sintético (UNION) para consistencia con
+   * getVentasPorFormaPago. Excluye anuladas.
+   */
+  async getVentasPorFormaPagoEnTiempo(
+    input: DateRange & { granularity: 'daily' | 'weekly' | 'monthly' },
+  ): Promise<VentaPorFormaPagoEnTiempoRow[]> {
+    this.requireRead();
+    const fmtSpec =
+      input.granularity === 'daily' ? '%Y-%m-%d' : input.granularity === 'weekly' ? '%Y-W%W' : '%Y-%m';
+    const sql = `
+      SELECT bucket, paymentMethodId, name, SUM(monto) AS monto FROM (
+        SELECT
+          strftime('${fmtSpec}', s.date / 1000, 'unixepoch') AS bucket,
+          pm.id AS paymentMethodId,
+          pm.name AS name,
+          CAST(sp.amount AS REAL) AS monto
+        FROM sale_payments sp
+        JOIN sales s ON s.id = sp.sale_id
+        JOIN payment_methods pm ON pm.id = sp.payment_method_id
+        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        UNION ALL
+        SELECT
+          strftime('${fmtSpec}', s.date / 1000, 'unixepoch') AS bucket,
+          'cuenta-corriente' AS paymentMethodId,
+          'Cuenta Corriente' AS name,
+          CAST(s.total AS REAL) AS monto
+        FROM sales s
+        WHERE s.status != 'voided' AND s.is_account_sale = 1 AND s.date BETWEEN ? AND ?
+      )
+      GROUP BY bucket, paymentMethodId, name
+      ORDER BY bucket ASC
+    `;
+    const rows = this.ctx.db.$client
+      .prepare(sql)
+      .all(input.from, input.to, input.from, input.to) as Array<{
+      bucket: string;
+      paymentMethodId: string;
+      name: string;
+      monto: number;
+    }>;
+    return rows.map((r) => ({
+      bucket: r.bucket,
+      paymentMethodId: r.paymentMethodId,
+      name: r.name,
+      monto: fmt(r.monto),
     }));
   }
 

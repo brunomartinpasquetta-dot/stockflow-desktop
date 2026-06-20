@@ -22,7 +22,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts'
-import { BarChart3, Download } from 'lucide-react'
+import { BarChart3, Download, Banknote, CreditCard, QrCode, Landmark, Wallet } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,6 @@ import { usePermission } from '@/contexts/AuthContext'
 import {
   useTopProducts,
   useBottomProducts,
-  usePaymentMethodsRanking,
   useTopCustomers,
   useTopSuppliers,
   useSalesTrend,
@@ -44,6 +43,8 @@ import {
   useSalesByDayOfWeek,
   useMarginByCategory,
   useStockRotation,
+  useVentasPorFormaPago,
+  useVentasPorFormaPagoEnTiempo,
 } from '@/lib/hooks'
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899', '#0ea5e9', '#f97316']
@@ -66,12 +67,23 @@ function dayEnd(iso: string): number {
 
 const DOW_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
+/** Ícono por nombre de forma de pago. */
+function iconForMedio(name: string): typeof Wallet {
+  const n = name.toLowerCase()
+  if (n.includes('efectivo')) return Banknote
+  if (n.includes('transfer') || n.includes('qr') || n.includes('mp') || n.includes('mercado')) return QrCode
+  if (n.includes('débito') || n.includes('debito') || n.includes('crédito') || n.includes('credito') || n.includes('tarjeta')) return CreditCard
+  if (n.includes('cuenta')) return Landmark
+  return Wallet
+}
+
 export function Estadisticas() {
   const canView = usePermission('view_reports')
   const [preset, setPreset] = useState<'7d' | '30d' | '90d' | 'custom'>('30d')
   const [fromIso, setFromIso] = useState(() => isoDaysAgo(30))
   const [toIso, setToIso] = useState(() => todayIso())
   const [activeTab, setActiveTab] = useState('resumen')
+  const [mediosSel, setMediosSel] = useState<Set<string>>(new Set())
 
   function applyPreset(p: '7d' | '30d' | '90d'): void {
     setPreset(p)
@@ -103,7 +115,67 @@ export function Estadisticas() {
   const topS = useTopSuppliers({ ...range, limit: 10 }, activeTab === 'proveedores')
 
   // Pagos
-  const pmRank = usePaymentMethodsRanking(range, activeTab === 'pagos')
+  const pagoGranularity = useMemo<'daily' | 'weekly' | 'monthly'>(() => {
+    const days = (range.to - range.from) / (1000 * 60 * 60 * 24)
+    if (days <= 31) return 'daily'
+    if (days <= 92) return 'weekly'
+    return 'monthly'
+  }, [range])
+
+  const vfp = useVentasPorFormaPago(range, activeTab === 'pagos' || activeTab === 'resumen')
+  const vfpTiempo = useVentasPorFormaPagoEnTiempo(
+    { ...range, granularity: pagoGranularity },
+    activeTab === 'pagos',
+  )
+
+  // Color estable por medio (índice en vfp.data → PIE_COLORS)
+  const colorMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    ;(vfp.data ?? []).forEach((r, i) => {
+      map[r.paymentMethodId] = PIE_COLORS[i % PIE_COLORS.length] ?? '#6366f1'
+    })
+    return map
+  }, [vfp.data])
+
+  // Filtro de forma de pago (vacío = todos)
+  const isSel = (id: string): boolean => mediosSel.size === 0 || mediosSel.has(id)
+  const toggleMedio = (id: string): void => {
+    setMediosSel((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const vfpFiltrado = (vfp.data ?? []).filter((r) => isSel(r.paymentMethodId))
+  // Totales para la tabla detallada (sobre el filtrado). SIN useMemo manual: el
+  // React Compiler memoiza solo, y un useMemo con dep inestable (vfpFiltrado se
+  // recrea por render) rompía el lint ("memoization could not be preserved").
+  const vfpTotMonto = vfpFiltrado.reduce((acc, r) => acc + Number(r.montoTotal), 0)
+  const vfpTotVentas = vfpFiltrado.reduce((acc, r) => acc + r.cantidadVentas, 0)
+  const vfpTotOper = vfpFiltrado.reduce((acc, r) => acc + r.cantidadOperaciones, 0)
+  const vfpTotales = {
+    monto: vfpTotMonto,
+    ventas: vfpTotVentas,
+    operaciones: vfpTotOper,
+    ticket: vfpTotVentas > 0 ? vfpTotMonto / vfpTotVentas : 0,
+  }
+  const totalSeleccionado = vfpTotMonto
+
+  // Pivot largo → ancho para el gráfico de evolución temporal (sin useMemo).
+  const vfpTiempoPivot = ((): Record<string, number | string>[] => {
+    const buckets = new Map<string, Record<string, number | string>>()
+    ;(vfpTiempo.data ?? []).forEach((r) => {
+      if (!isSel(r.paymentMethodId)) return
+      let row = buckets.get(r.bucket)
+      if (!row) {
+        row = { bucket: r.bucket }
+        buckets.set(r.bucket, row)
+      }
+      row[r.paymentMethodId] = Number(row[r.paymentMethodId] ?? 0) + Number(r.monto)
+    })
+    return Array.from(buckets.values())
+  })()
 
   // Tiempo
   const byHour = useSalesByHour(range, activeTab === 'tiempo')
@@ -178,11 +250,13 @@ export function Estadisticas() {
       Compras: r.purchasesCount,
       Total: Number(r.totalAmount),
     })))
-    append('Formas de Pago', (pmRank.data ?? []).map((r) => ({
+    append('Ventas por Forma de Pago', (vfp.data ?? []).map((r) => ({
       Medio: r.name,
-      Total: Number(r.totalAmount),
-      Ventas: r.salesCount,
-      '% Total': Number(r.percentageOfTotal),
+      Monto: Number(r.montoTotal),
+      '% Total': Number(r.porcentajeDelTotal),
+      Ventas: r.cantidadVentas,
+      Operaciones: r.cantidadOperaciones,
+      'Ticket Prom': Number(r.ticketPromedio),
     })))
     append('Por Hora', (byHour.data ?? []).map((r) => ({
       Hora: `${String(r.hour).padStart(2, '0')}:00`,
@@ -228,6 +302,36 @@ export function Estadisticas() {
             <Label className="text-xs">Hasta</Label>
             <Input type="date" value={toIso} onChange={(e) => { setToIso(e.target.value); setPreset('custom') }} />
           </div>
+          {(vfp.data ?? []).length > 0 && (
+            <div className="flex w-full flex-col gap-1">
+              <Label className="text-xs">Formas de pago</Label>
+              <div className="flex flex-wrap items-center gap-1">
+                <Button
+                  size="sm"
+                  variant={mediosSel.size === 0 ? 'default' : 'outline'}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setMediosSel(new Set())}
+                >
+                  Todos
+                </Button>
+                {(vfp.data ?? []).map((r) => {
+                  const active = isSel(r.paymentMethodId)
+                  return (
+                    <Button
+                      key={r.paymentMethodId}
+                      size="sm"
+                      variant={active ? 'default' : 'outline'}
+                      className="h-7 px-2 text-xs"
+                      style={active ? { backgroundColor: colorMap[r.paymentMethodId], borderColor: colorMap[r.paymentMethodId] } : undefined}
+                      onClick={() => toggleMedio(r.paymentMethodId)}
+                    >
+                      {r.name}
+                    </Button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -248,6 +352,14 @@ export function Estadisticas() {
             <KpiCard label="Ticket Promedio" value={formatCurrency(avgTicket.data?.avg ?? '0')} />
             <KpiCard label="Margen Bruto" value={`${formatCurrency(grossMargin.amount)} (${grossMargin.pct.toFixed(1)}%)`} />
           </div>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-xs text-muted-foreground">
+                Ventas por medios seleccionados{mediosSel.size === 0 ? ' (todos)' : ''}
+              </div>
+              <div className="mt-1 text-xl font-bold tabular-nums">{formatCurrency(totalSeleccionado)}</div>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Tendencia de ventas</h3>
@@ -413,47 +525,124 @@ export function Estadisticas() {
         </TabsContent>
 
         <TabsContent value="pagos" className="flex flex-col gap-3">
+          {/* a) Grid de cards por medio */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {vfpFiltrado.length === 0 ? (
+              <Card><CardContent className="py-6 text-center text-xs text-muted-foreground">Sin datos</CardContent></Card>
+            ) : vfpFiltrado.map((r) => {
+              const color = colorMap[r.paymentMethodId]
+              const Icon = iconForMedio(r.name)
+              return (
+                <Card key={r.paymentMethodId} className="border-l-4" style={{ borderLeftColor: color }}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Icon className="h-4 w-4" style={{ color }} />
+                      {r.name}
+                    </div>
+                    <div className="mt-1 text-xl font-bold tabular-nums">{formatCurrency(r.montoTotal)}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{r.porcentajeDelTotal}% del total</div>
+                    <div className="text-xs text-muted-foreground">{r.cantidadVentas} ventas</div>
+                    <div className="text-xs text-muted-foreground">Ticket prom. {formatCurrency(r.ticketPromedio)}</div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* b) Gráfico de torta */}
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Formas de pago</h3>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={(pmRank.data ?? []).map((r) => ({ name: r.name, value: Number(r.totalAmount) }))}
-                        dataKey="value"
-                        nameKey="name"
-                        outerRadius={90}
-                        label
-                      >
-                        {(pmRank.data ?? []).map((_, i) => (
-                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Medio</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">% del total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(pmRank.data ?? []).map((r) => (
-                      <TableRow key={r.paymentMethodId}>
-                        <TableCell className="text-xs">{r.name}</TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">{formatCurrency(r.totalAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">{r.percentageOfTotal}%</TableCell>
+              <h3 className="mb-2 text-sm font-medium">Distribución por forma de pago</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={vfpFiltrado.map((r) => ({ name: r.name, value: Number(r.montoTotal) }))}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={90}
+                      label
+                    >
+                      {vfpFiltrado.map((r) => (
+                        <Cell key={r.paymentMethodId} fill={colorMap[r.paymentMethodId]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* c) Tabla detallada */}
+          <Card>
+            <CardContent className="pt-4">
+              <h3 className="mb-2 text-sm font-medium">Detalle por forma de pago</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Medio</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="text-right">%</TableHead>
+                    <TableHead className="text-right">Ventas</TableHead>
+                    <TableHead className="text-right">Operaciones</TableHead>
+                    <TableHead className="text-right">Ticket Prom.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vfpFiltrado.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="py-4 text-center text-xs text-muted-foreground">Sin datos</TableCell></TableRow>
+                  ) : (
+                    <>
+                      {vfpFiltrado.map((r) => (
+                        <TableRow key={r.paymentMethodId}>
+                          <TableCell className="text-xs">{r.name}</TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">{formatCurrency(r.montoTotal)}</TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">{r.porcentajeDelTotal}%</TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">{r.cantidadVentas}</TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">{r.cantidadOperaciones}</TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">{formatCurrency(r.ticketPromedio)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="font-bold">
+                        <TableCell className="text-xs">TOTAL</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">{formatCurrency(vfpTotales.monto)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">100%</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">{vfpTotales.ventas}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">{vfpTotales.operaciones}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">{formatCurrency(vfpTotales.ticket)}</TableCell>
                       </TableRow>
+                    </>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* d) Evolución temporal apilada */}
+          <Card>
+            <CardContent className="pt-4">
+              <h3 className="mb-2 text-sm font-medium">Evolución por forma de pago</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={vfpTiempoPivot}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="bucket" />
+                    <YAxis />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <Legend />
+                    {vfpFiltrado.map((r) => (
+                      <Bar
+                        key={r.paymentMethodId}
+                        stackId="m"
+                        dataKey={r.paymentMethodId}
+                        name={r.name}
+                        fill={colorMap[r.paymentMethodId]}
+                      />
                     ))}
-                  </TableBody>
-                </Table>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>

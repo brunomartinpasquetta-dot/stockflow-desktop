@@ -973,6 +973,24 @@ export interface AnalyticsPaymentMethodRankRowDTO {
   percentageOfTotal: string;
 }
 
+export interface AnalyticsVentaPorFormaPagoRowDTO {
+  paymentMethodId: string;
+  name: string;
+  isPhysicalCash: boolean;
+  montoTotal: string;
+  cantidadOperaciones: number;
+  cantidadVentas: number;
+  porcentajeDelTotal: string;
+  ticketPromedio: string;
+}
+
+export interface AnalyticsVentaPorFormaPagoEnTiempoRowDTO {
+  bucket: string;
+  paymentMethodId: string;
+  name: string;
+  monto: string;
+}
+
 export interface AnalyticsCustomerRankRowDTO {
   customerId: string;
   fullName: string;
@@ -1237,6 +1255,10 @@ export interface ApiSurface {
     getTopSellingProducts(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsTopProductRowDTO[]>;
     getBottomSellingProducts(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsTopProductRowDTO[]>;
     getPaymentMethodsRanking(payload: DateRangeDTO): Res<AnalyticsPaymentMethodRankRowDTO[]>;
+    ventasPorFormaPago(payload: DateRangeDTO): Res<AnalyticsVentaPorFormaPagoRowDTO[]>;
+    ventasPorFormaPagoEnTiempo(
+      payload: DateRangeDTO & { granularity: 'daily' | 'weekly' | 'monthly' },
+    ): Res<AnalyticsVentaPorFormaPagoEnTiempoRowDTO[]>;
     getTopCustomers(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsCustomerRankRowDTO[]>;
     getTopSuppliers(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsSupplierRankRowDTO[]>;
     getSalesTrend(payload: DateRangeDTO & { granularity: 'daily' | 'weekly' | 'monthly' }): Res<AnalyticsSalesTrendRowDTO[]>;

@@ -271,6 +271,11 @@ export const api = {
       unwrap(sf().analytics.getBottomSellingProducts(input)),
     getPaymentMethodsRanking: (input: { from: number; to: number }) =>
       unwrap(sf().analytics.getPaymentMethodsRanking(input)),
+    ventasPorFormaPago: (input: { from: number; to: number }) =>
+      unwrap(sf().analytics.ventasPorFormaPago(input)),
+    ventasPorFormaPagoEnTiempo: (
+      input: { from: number; to: number; granularity: 'daily' | 'weekly' | 'monthly' },
+    ) => unwrap(sf().analytics.ventasPorFormaPagoEnTiempo(input)),
     getTopCustomers: (input: { from: number; to: number; limit?: number }) =>
       unwrap(sf().analytics.getTopCustomers(input)),
     getTopSuppliers: (input: { from: number; to: number; limit?: number }) =>

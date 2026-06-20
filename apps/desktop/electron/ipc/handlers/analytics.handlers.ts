@@ -12,6 +12,8 @@ import type {
   AnalyticsStockRotationRowDTO,
   AnalyticsSupplierRankRowDTO,
   AnalyticsTopProductRowDTO,
+  AnalyticsVentaPorFormaPagoRowDTO,
+  AnalyticsVentaPorFormaPagoEnTiempoRowDTO,
 } from '../types';
 
 type DateRange = { from: number; to: number };
@@ -32,6 +34,19 @@ export function buildAnalyticsHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: DateRange, ctx): Promise<AnalyticsPaymentMethodRankRowDTO[]> =>
         new AnalyticsService(ctx).getPaymentMethodsRanking(payload),
+    ),
+    'analytics:ventasPorFormaPago': withSession(
+      deps,
+      (payload: DateRange, ctx): Promise<AnalyticsVentaPorFormaPagoRowDTO[]> =>
+        new AnalyticsService(ctx).getVentasPorFormaPago(payload),
+    ),
+    'analytics:ventasPorFormaPagoEnTiempo': withSession(
+      deps,
+      (
+        payload: DateRange & { granularity: 'daily' | 'weekly' | 'monthly' },
+        ctx,
+      ): Promise<AnalyticsVentaPorFormaPagoEnTiempoRowDTO[]> =>
+        new AnalyticsService(ctx).getVentasPorFormaPagoEnTiempo(payload),
     ),
     'analytics:getTopCustomers': withSession(
       deps,

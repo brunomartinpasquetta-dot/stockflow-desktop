@@ -356,6 +356,23 @@ export function usePaymentMethodsRanking(input: DR, enabled = true) {
     enabled,
   })
 }
+export function useVentasPorFormaPago(input: DR, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'ventasPorFormaPago', input.from, input.to],
+    queryFn: () => api.analytics.ventasPorFormaPago(input),
+    enabled,
+  })
+}
+export function useVentasPorFormaPagoEnTiempo(
+  input: DR & { granularity: 'daily' | 'weekly' | 'monthly' },
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['analytics', 'ventasPorFormaPagoEnTiempo', input.from, input.to, input.granularity],
+    queryFn: () => api.analytics.ventasPorFormaPagoEnTiempo(input),
+    enabled,
+  })
+}
 export function useTopCustomers(input: DR & { limit?: number }, enabled = true) {
   return useQuery({
     queryKey: ['analytics', 'topCustomers', input.from, input.to, input.limit ?? 10],
