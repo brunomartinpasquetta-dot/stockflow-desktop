@@ -8,7 +8,8 @@ import { app } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { closeLocalDb, createRepositories, initLocalDb, type LocalDatabase, type Repositories } from '@stockflow/db';
+import { closeLocalDb, createRepositories, initLocalDb, roleAreaAccess, type LocalDatabase, type Repositories } from '@stockflow/db';
+import { applyAreaConfig } from '@stockflow/core';
 
 export interface DbHandle {
   db: LocalDatabase;
@@ -33,7 +34,30 @@ let closed = false;
 export function initialize(dbPath: string): DbHandle {
   closed = false;
   const { db } = initLocalDb(dbPath, { migrationsFolder: MIGRATIONS_FOLDER });
-  return { db, repos: createRepositories(db), dbPath };
+  const repos = createRepositories(db);
+
+  // Cargar la configuración de permisos por rol/área en el motor de @stockflow/core.
+  // Si la tabla está vacía (DB recién migrada sin seed), `applyAreaConfig([])`
+  // recompone manager/seller como vacío salvo lo que diga la config; pero el seed
+  // ya la pobló, así que en la práctica siempre hay filas. admin nunca depende de esto.
+  try {
+    const rows = db
+      .select({
+        role: roleAreaAccess.role,
+        area: roleAreaAccess.area,
+        allowed: roleAreaAccess.allowed,
+      })
+      .from(roleAreaAccess)
+      .all();
+    if (rows.length > 0) {
+      applyAreaConfig(rows);
+    }
+  } catch (err) {
+    // Si la tabla no existiera por algún motivo, dejamos el DEFAULT (PERMISSION_MATRIX).
+    console.error('[bootstrap/db] No se pudo cargar role_area_access:', err);
+  }
+
+  return { db, repos, dbPath };
 }
 
 export function shutdown(handle: DbHandle | null): void {

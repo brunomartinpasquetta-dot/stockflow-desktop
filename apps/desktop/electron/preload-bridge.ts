@@ -20,6 +20,7 @@ import type {
   IpcResponse,
   LanConfigDTO,
   LoginResultDTO,
+  RolesConfigDTO,
 } from './ipc/types';
 
 export type LanBridgeMode = 'single' | 'server' | 'client';
@@ -50,6 +51,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'suppliers',
   'families',
   'users',
+  'roles',
   'company',
   'sales',
   'purchases',
@@ -272,6 +274,10 @@ export function createApiBridge(
       create: (p) => c<never>('users:create', p),
       update: (p) => c<never>('users:update', p),
       delete: (p) => c<never>('users:delete', p),
+    },
+    roles: {
+      getConfig: () => c<RolesConfigDTO>('roles:getConfig'),
+      setConfig: (p) => c<RolesConfigDTO>('roles:setConfig', p),
     },
     company: {
       get: () => c<never>('company:get'),

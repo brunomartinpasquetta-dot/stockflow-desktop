@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
+import { api } from '@/lib/api'
 import { useUserMutations, useUsers } from '@/lib/hooks'
 import { ROLE_LABELS } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
@@ -9,7 +12,11 @@ import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { Badge } from '@/components/ui/badge'
-import type { UserDTO } from '@/types/api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import type { ConfigurableRoleDTO, RolesConfigDTO, UserDTO } from '@/types/api'
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: ROLE_LABELS.admin },
@@ -29,7 +36,9 @@ const editUserSchema = z.object({
   password: z.string().refine((v) => v === '' || v.length >= 4, { message: 'Mínimo 4 caracteres (o dejá vacío para no cambiarla)' }),
 })
 
-export function Usuarios() {
+/* ----------------------------- Tab Usuarios ----------------------------- */
+
+function UsuariosTab() {
   const canWrite = useCanWrite()
   const users = useUsers()
   const m = useUserMutations()
@@ -128,8 +137,7 @@ export function Usuarios() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <h1 className="text-lg font-semibold">Usuarios</h1>
+    <>
       <EntityTable
         readOnly={!canWrite}
         columns={columns}
@@ -161,6 +169,216 @@ export function Usuarios() {
         defaultValues={defaultValues}
         onSubmit={handleSubmit}
       />
+    </>
+  )
+}
+
+/* ------------------------------- Tab Roles ------------------------------ */
+
+const CONFIGURABLE_ROLES: ConfigurableRoleDTO[] = ['manager', 'seller']
+
+function PermCheckbox({
+  checked,
+  disabled,
+  onChange,
+  'aria-label': ariaLabel,
+}: {
+  checked: boolean
+  disabled?: boolean
+  onChange?: (next: boolean) => void
+  'aria-label': string
+}) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={ariaLabel}
+      checked={checked}
+      disabled={disabled}
+      onChange={(e) => onChange?.(e.target.checked)}
+      className="h-4 w-4 cursor-pointer rounded border-input text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-50"
+    />
+  )
+}
+
+type RolesDraft = Record<ConfigurableRoleDTO, Set<string>>
+
+function buildDraft(config: RolesConfigDTO): RolesDraft {
+  return {
+    manager: new Set(config.roles.manager),
+    seller: new Set(config.roles.seller),
+  }
+}
+
+function sameSet(a: Set<string>, b: readonly string[]): boolean {
+  if (a.size !== b.length) return false
+  for (const k of b) if (!a.has(k)) return false
+  return true
+}
+
+function RolesTab() {
+  const queryClient = useQueryClient()
+  const configQuery = useQuery({ queryKey: ['roles-config'], queryFn: api.roles.getConfig })
+
+  // Estado editable derivado de la config del backend. Se reinicia (durante el
+  // render, sin efecto) cada vez que cambia la identidad de la config cargada.
+  const [draftState, setDraftState] = useState<{ source: RolesConfigDTO | null; draft: RolesDraft | null }>({
+    source: null,
+    draft: null,
+  })
+  if (configQuery.data && draftState.source !== configQuery.data) {
+    setDraftState({ source: configQuery.data, draft: buildDraft(configQuery.data) })
+  }
+  const draft = draftState.draft
+  const setDraft = (updater: (prev: RolesDraft | null) => RolesDraft | null): void =>
+    setDraftState((prev) => ({ ...prev, draft: updater(prev.draft) }))
+
+  const setConfig = useMutation({
+    mutationFn: api.roles.setConfig,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['roles-config'], data)
+      void queryClient.invalidateQueries({ queryKey: ['roles-config'] })
+    },
+  })
+
+  const config = configQuery.data
+
+  const dirtyRoles = useMemo<ConfigurableRoleDTO[]>(() => {
+    if (!config || !draft) return []
+    return CONFIGURABLE_ROLES.filter((role) => !sameSet(draft[role], config.roles[role]))
+  }, [config, draft])
+
+  function toggle(role: ConfigurableRoleDTO, areaKey: string, next: boolean): void {
+    setDraft((prev) => {
+      if (!prev) return prev
+      const updated = new Set(prev[role])
+      if (next) updated.add(areaKey)
+      else updated.delete(areaKey)
+      return { ...prev, [role]: updated }
+    })
+  }
+
+  async function handleSave(): Promise<void> {
+    if (!draft || dirtyRoles.length === 0) return
+    try {
+      for (const role of dirtyRoles) {
+        await setConfig.mutateAsync({ role, areas: [...draft[role]] })
+      }
+      toast.success('Permisos de roles actualizados')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudieron guardar los cambios')
+    }
+  }
+
+  if (configQuery.isLoading || !config || !draft) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cargando configuración de roles…
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (configQuery.isError) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-sm text-destructive">No se pudo cargar la configuración de roles.</CardContent>
+      </Card>
+    )
+  }
+
+  const saving = setConfig.isPending
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Permisos por rol</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Habilitá o deshabilitá el acceso de cada rol a las distintas áreas del sistema. El administrador siempre tiene
+          acceso total.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Área</TableHead>
+                <TableHead className="text-center">{ROLE_LABELS.admin}</TableHead>
+                <TableHead className="text-center">{ROLE_LABELS.manager}</TableHead>
+                <TableHead className="text-center">{ROLE_LABELS.seller}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {config.areas.map((area) => (
+                <TableRow key={area.key}>
+                  <TableCell className="font-medium">{area.label}</TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <PermCheckbox checked disabled aria-label={`${area.label} — ${ROLE_LABELS.admin}`} />
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Acceso total</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <PermCheckbox
+                      checked={draft.manager.has(area.key)}
+                      disabled={saving}
+                      onChange={(next) => toggle('manager', area.key, next)}
+                      aria-label={`${area.label} — ${ROLE_LABELS.manager}`}
+                    />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <PermCheckbox
+                      checked={draft.seller.has(area.key)}
+                      disabled={saving}
+                      onChange={(next) => toggle('seller', area.key, next)}
+                      aria-label={`${area.label} — ${ROLE_LABELS.seller}`}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Los cambios se aplican a cada usuario en su próximo inicio de sesión.
+        </p>
+
+        <div className="flex items-center gap-3">
+          <Button onClick={() => void handleSave()} disabled={saving || dirtyRoles.length === 0}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Guardar cambios
+          </Button>
+          {dirtyRoles.length > 0 && !saving ? (
+            <span className="text-xs text-muted-foreground">Hay cambios sin guardar.</span>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* -------------------------------- Página -------------------------------- */
+
+export function Usuarios() {
+  const [tab, setTab] = useState<'usuarios' | 'roles'>('usuarios')
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h1 className="text-lg font-semibold">Usuarios</h1>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'usuarios' | 'roles')} className="flex flex-col gap-3">
+        <TabsList>
+          <TabsTrigger value="usuarios">Usuarios</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
+        </TabsList>
+        <TabsContent value="usuarios" className="flex flex-col gap-3">
+          <UsuariosTab />
+        </TabsContent>
+        <TabsContent value="roles">
+          <RolesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

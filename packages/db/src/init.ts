@@ -71,6 +71,7 @@ export function initLocalDb(
         defaultFamilyCreated: false,
         companyCreated: false,
         paymentMethodsCreated: 0,
+        roleAreaAccessCreated: 0,
       };
 
   return { db, seed: seedResult };

@@ -13,7 +13,7 @@ import { useEffect } from 'react'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
-import { hasPermission } from '@/lib/permissions'
+import { hasPermissionFor } from '@/lib/permissions'
 import { WINDOWS } from '@/windows/registry'
 
 function isEditingTarget(): boolean {
@@ -57,7 +57,7 @@ export function useMdiShortcuts(): void {
         if (!entry) return
         // Validar permisos antes de abrir.
         if (entry.roles && (!currentUser || !entry.roles.includes(currentUser.role))) return
-        if (entry.requires && !hasPermission(currentUser?.role, entry.requires)) return
+        if (entry.requires && !hasPermissionFor(currentUser?.permissions, entry.requires)) return
         e.preventDefault()
         wm.openWindow({ pageKey: entry.pageKey })
       }

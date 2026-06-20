@@ -1,4 +1,4 @@
-import { requirePermission } from '@stockflow/core';
+import { effectivePermissionsFor, requirePermission } from '@stockflow/core';
 import type { User } from '@stockflow/db';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
@@ -12,6 +12,7 @@ function toPublicUser(u: User): UserDTO {
     fullName: u.fullName,
     role: u.role,
     active: u.active,
+    permissions: effectivePermissionsFor(u.role),
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
   };

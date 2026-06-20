@@ -52,6 +52,8 @@ import type {
   PurchaseLineDTO,
   ReceivePaymentInputDTO,
   ReceivePaymentResultDTO,
+  RolesConfigDTO,
+  RolesSetConfigPayload,
   GlobalSearchCategoryDTO,
   GlobalSearchResultDTO,
   SaleDTO,
@@ -163,6 +165,10 @@ export const api = {
     create: (data: EntityPayload): Promise<UserDTO> => unwrap(sf().users.create(data)),
     update: (id: string, data: EntityPayload): Promise<UserDTO> => unwrap(sf().users.update({ id, data })),
     delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().users.delete({ id })),
+  },
+  roles: {
+    getConfig: (): Promise<RolesConfigDTO> => unwrap(sf().roles.getConfig()),
+    setConfig: (payload: RolesSetConfigPayload): Promise<RolesConfigDTO> => unwrap(sf().roles.setConfig(payload)),
   },
   company: {
     get: (): Promise<CompanyDTO> => unwrap(sf().company.get()),

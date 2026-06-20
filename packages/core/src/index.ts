@@ -21,9 +21,15 @@ export * from './pricing';
 export {
   PERMISSION_ACTIONS,
   PERMISSION_MATRIX,
+  PERMISSION_AREAS,
   type PermissionAction,
+  type PermissionArea,
+  type RoleAreaAccessRow,
   hasPermission,
   requirePermission,
+  applyAreaConfig,
+  resetEffectiveMatrix,
+  effectivePermissionsFor,
 } from './auth/permissions';
 export {
   type SessionPayload,

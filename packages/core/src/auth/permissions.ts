@@ -62,6 +62,86 @@ export const PERMISSION_ACTIONS = [
 
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
 
+/* ------------------------------------------------------------------ */
+/* Áreas / funciones configurables por rol                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Agrupación de acciones por ÁREA funcional. La configuración por rol
+ * (`role_area_access`) habilita/deshabilita áreas completas; el motor recompone
+ * los permisos efectivos como la UNIÓN de las acciones de las áreas habilitadas.
+ *
+ * `admin` SIEMPRE tiene todas las acciones (no se lee config para admin).
+ *
+ * Acciones admin-only (no pertenecen a ninguna área, sólo admin las tiene):
+ *   manage_users, manage_company, manage_hardware, manage_backup.
+ */
+export interface PermissionArea {
+  key: string;
+  label: string;
+  actions: PermissionAction[];
+}
+
+export const PERMISSION_AREAS: readonly PermissionArea[] = [
+  {
+    key: 'articulos',
+    label: 'Artículos / Stock',
+    actions: [
+      'view_articles',
+      'manage_articles',
+      'adjust_stock',
+      'manage_prices',
+      'import_data',
+      'manage_families',
+    ],
+  },
+  {
+    key: 'proveedores',
+    label: 'Proveedores',
+    actions: ['manage_suppliers', 'manage_supplier_accounts'],
+  },
+  {
+    key: 'clientes',
+    label: 'Clientes / Cuentas corrientes',
+    actions: ['receive_payment'],
+  },
+  {
+    key: 'ventas',
+    label: 'Ventas',
+    actions: ['create_sale', 'void_sale', 'view_articles'],
+  },
+  {
+    key: 'compras',
+    label: 'Compras',
+    actions: ['manage_purchases'],
+  },
+  {
+    key: 'caja',
+    label: 'Caja',
+    actions: ['open_cash', 'close_cash', 'add_cash_movement', 'manage_cash_general'],
+  },
+  {
+    key: 'reportes',
+    label: 'Reportes / Estadísticas',
+    actions: ['view_reports'],
+  },
+  {
+    key: 'contabilidad',
+    label: 'Contabilidad',
+    actions: ['view_accounting'],
+  },
+  {
+    key: 'medios_pago',
+    label: 'Medios de pago',
+    actions: ['manage_payment_methods', 'manage_cards', 'manage_mp_qr'],
+  },
+] as const;
+
+/** Mapa rápido key -> área. */
+const AREA_BY_KEY = new Map<string, PermissionArea>(
+  PERMISSION_AREAS.map((a) => [a.key, a]),
+);
+
 /** Acciones que un seller puede ejecutar (el resto le está vedado). */
 const SELLER_ACTIONS: ReadonlySet<PermissionAction> = new Set([
   'create_sale',
@@ -80,15 +160,73 @@ const MANAGER_DENIED: ReadonlySet<PermissionAction> = new Set([
   'import_data',
 ]);
 
+/**
+ * Matriz DEFAULT (hardcodeada). Sirve de fallback cuando la config de áreas no
+ * está cargada o está vacía. `effectiveMatrix` se inicializa a partir de ésta.
+ */
 export const PERMISSION_MATRIX: Readonly<Record<UserRole, ReadonlySet<PermissionAction>>> = {
   admin: new Set(PERMISSION_ACTIONS),
   manager: new Set(PERMISSION_ACTIONS.filter((a) => !MANAGER_DENIED.has(a))),
   seller: SELLER_ACTIONS,
 };
 
-/** ¿El rol `role` puede ejecutar `action`? */
+/**
+ * Estado MUTABLE de permisos efectivos. Inicializado = PERMISSION_MATRIX y
+ * recalculado en caliente por `applyAreaConfig`.
+ *
+ * `admin` SIEMPRE es el set completo de acciones (inmutable, no se lee config).
+ */
+const effectiveMatrix: Record<UserRole, Set<PermissionAction>> = {
+  admin: new Set(PERMISSION_MATRIX.admin),
+  manager: new Set(PERMISSION_MATRIX.manager),
+  seller: new Set(PERMISSION_MATRIX.seller),
+};
+
+/** Fila de configuración de acceso por área (espejo de `role_area_access`). */
+export interface RoleAreaAccessRow {
+  role: string;
+  area: string;
+  allowed: boolean;
+}
+
+/**
+ * Recalcula los permisos efectivos de `manager` y `seller` a partir de las
+ * áreas habilitadas en `rows`. `admin` queda intacto (siempre todas).
+ *
+ * Cada rol configurable pasa a tener la UNIÓN de las acciones de las áreas con
+ * `allowed === true`. Las áreas ausentes o `allowed === false` quedan denegadas.
+ */
+export function applyAreaConfig(rows: readonly RoleAreaAccessRow[]): void {
+  for (const role of ['manager', 'seller'] as const) {
+    const next = new Set<PermissionAction>();
+    for (const row of rows) {
+      if (row.role !== role || !row.allowed) continue;
+      const area = AREA_BY_KEY.get(row.area);
+      if (!area) continue; // área desconocida: ignorar.
+      for (const action of area.actions) next.add(action);
+    }
+    effectiveMatrix[role] = next;
+  }
+  // admin: invariante — siempre todas las acciones.
+  effectiveMatrix.admin = new Set(PERMISSION_ACTIONS);
+}
+
+/** Restaura `effectiveMatrix` a la matriz DEFAULT (útil para tests). */
+export function resetEffectiveMatrix(): void {
+  effectiveMatrix.admin = new Set(PERMISSION_MATRIX.admin);
+  effectiveMatrix.manager = new Set(PERMISSION_MATRIX.manager);
+  effectiveMatrix.seller = new Set(PERMISSION_MATRIX.seller);
+}
+
+/** Permisos EFECTIVOS de un rol (admin = todos). Pensado para el UserDTO. */
+export function effectivePermissionsFor(role: UserRole): PermissionAction[] {
+  if (role === 'admin') return [...PERMISSION_ACTIONS];
+  return Array.from(effectiveMatrix[role] ?? new Set<PermissionAction>());
+}
+
+/** ¿El rol `role` puede ejecutar `action`? (lee la config efectiva). */
 export function hasPermission(role: UserRole, action: PermissionAction): boolean {
-  return PERMISSION_MATRIX[role]?.has(action) ?? false;
+  return effectiveMatrix[role]?.has(action) ?? false;
 }
 
 /** Lanza `PermissionDeniedError` si el rol no tiene el permiso. */

@@ -28,7 +28,7 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
-import { hasPermission, type PermissionAction } from '@/lib/permissions'
+import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
 import type { Role } from '@/types/api'
 import { WINDOWS } from '@/windows/registry'
 import { cn } from '@/lib/utils'
@@ -63,7 +63,7 @@ export function QuickAccessToolbar() {
     if (!def) return false
     const role: Role | undefined = currentUser?.role
     if (def.roles && (!role || !def.roles.includes(role))) return false
-    if (def.requires && !hasPermission(role, def.requires as PermissionAction)) return false
+    if (def.requires && !hasPermissionFor(currentUser?.permissions, def.requires as PermissionAction)) return false
     return true
   }
 

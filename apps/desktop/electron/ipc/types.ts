@@ -77,8 +77,36 @@ export interface UserDTO {
   fullName: string;
   role: Role;
   active: boolean;
+  /**
+   * Permisos EFECTIVOS del usuario (acciones que puede ejecutar), resueltos por
+   * el motor de @stockflow/core a partir de la config de áreas por rol. El
+   * renderer los consume directamente y NO replica la matriz de permisos.
+   * admin = todas las acciones.
+   */
+  permissions: string[];
   createdAt: number;
   updatedAt: number;
+}
+
+/** Rol cuya configuración de áreas es editable (admin nunca lo es). */
+export type ConfigurableRoleDTO = 'manager' | 'seller';
+
+/** Configuración de permisos por rol/área (consumida por la UI de Roles). */
+export interface RolesConfigDTO {
+  /** Catálogo de áreas funcionales disponibles. */
+  areas: { key: string; label: string }[];
+  /** Áreas HABILITADAS por rol (lista de `key`). */
+  roles: {
+    manager: string[];
+    seller: string[];
+  };
+}
+
+/** Payload de `roles:setConfig`: setea las áreas habilitadas de un rol. */
+export interface RolesSetConfigPayload {
+  role: ConfigurableRoleDTO;
+  /** Áreas a habilitar (por `key`). El resto quedan deshabilitadas. */
+  areas: string[];
 }
 
 export interface ArticleDTO {
@@ -1202,6 +1230,10 @@ export interface ApiSurface {
     create(payload: EntityPayload): Res<UserDTO>;
     update(payload: UpdatePayload): Res<UserDTO>;
     delete(payload: IdPayload): Res<{ deleted: true }>;
+  };
+  roles: {
+    getConfig(): Res<RolesConfigDTO>;
+    setConfig(payload: RolesSetConfigPayload): Res<RolesConfigDTO>;
   };
   company: {
     get(): Res<CompanyDTO>;

@@ -9,9 +9,36 @@ import { and, eq, isNull } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 
 import type { LocalDatabase } from './local/client';
-import { companies, customers, families, paymentMethods, users } from './schema/local';
+import {
+  companies,
+  customers,
+  families,
+  paymentMethods,
+  roleAreaAccess,
+  users,
+} from './schema/local';
 
 const BCRYPT_COST = 10;
+
+/**
+ * Áreas funcionales conocidas (espejo de PERMISSION_AREAS en @stockflow/core).
+ * Se replican acá para no acoplar @stockflow/db a @stockflow/core. El motor de
+ * core ignora áreas desconocidas, así que el contrato es laxo.
+ */
+const PERMISSION_AREA_KEYS = [
+  'articulos',
+  'proveedores',
+  'clientes',
+  'ventas',
+  'compras',
+  'caja',
+  'reportes',
+  'contabilidad',
+  'medios_pago',
+] as const;
+
+/** Áreas habilitadas por defecto para el rol seller. El resto queda denegado. */
+const SELLER_DEFAULT_AREAS: ReadonlySet<string> = new Set(['ventas', 'clientes', 'caja']);
 
 /** Medios de pago pre-cargados (IDs fijos: referenciables sin lookup en migraciones). */
 const DEFAULT_PAYMENT_METHODS = [
@@ -27,6 +54,7 @@ export interface SeedResult {
   defaultFamilyCreated: boolean;
   companyCreated: boolean;
   paymentMethodsCreated: number;
+  roleAreaAccessCreated: number;
 }
 
 /** Inserta los datos base si todavía no existen. Devuelve qué se creó. */
@@ -37,6 +65,7 @@ export function seedLocalDb(db: LocalDatabase): SeedResult {
     defaultFamilyCreated: false,
     companyCreated: false,
     paymentMethodsCreated: 0,
+    roleAreaAccessCreated: 0,
   };
 
   // 1) Usuario admin
@@ -128,6 +157,25 @@ export function seedLocalDb(db: LocalDatabase): SeedResult {
         })
         .run();
       result.paymentMethodsCreated++;
+    }
+  }
+
+  // 6) Permisos por rol/área (idempotente, sólo siembra filas faltantes).
+  //    manager: TODAS las áreas habilitadas.
+  //    seller: ventas / clientes / caja habilitadas; el resto denegado.
+  //    admin: NO se siembra (siempre tiene acceso total, no se lee config).
+  for (const role of ['manager', 'seller'] as const) {
+    for (const area of PERMISSION_AREA_KEYS) {
+      const exists = db
+        .select({ role: roleAreaAccess.role })
+        .from(roleAreaAccess)
+        .where(and(eq(roleAreaAccess.role, role), eq(roleAreaAccess.area, area)))
+        .limit(1)
+        .all();
+      if (exists.length > 0) continue;
+      const allowed = role === 'manager' ? true : SELLER_DEFAULT_AREAS.has(area);
+      db.insert(roleAreaAccess).values({ role, area, allowed }).run();
+      result.roleAreaAccessCreated++;
     }
   }
 

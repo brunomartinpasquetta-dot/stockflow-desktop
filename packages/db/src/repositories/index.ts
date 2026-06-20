@@ -19,6 +19,7 @@ import { PaymentMethodRepository } from './paymentMethod.repository';
 import { PriceUpdateRepository } from './priceUpdate.repository';
 import { PurchaseRepository } from './purchase.repository';
 import { PurchaseLineRepository } from './purchaseLine.repository';
+import { RolePermissionRepository } from './rolePermission.repository';
 import { SaleRepository } from './sale.repository';
 import { SaleLineRepository } from './saleLine.repository';
 import { SalePaymentRepository } from './salePayment.repository';
@@ -53,6 +54,10 @@ export {
 } from './priceUpdate.repository';
 export { PurchaseRepository, type PurchaseWithLines } from './purchase.repository';
 export { PurchaseLineRepository } from './purchaseLine.repository';
+export {
+  RolePermissionRepository,
+  type ConfigurableRole,
+} from './rolePermission.repository';
 export { SaleRepository, type SaleWithLines } from './sale.repository';
 export { SaleLineRepository } from './saleLine.repository';
 export { SalePaymentRepository, type SalePaymentInput } from './salePayment.repository';
@@ -87,6 +92,7 @@ export interface Repositories {
   /** Tabla `cards` heredada: queda en DB sin uso activo desde P07.2. */
   cards: CardRepository;
   company: CompanyRepository;
+  rolePermissions: RolePermissionRepository;
 }
 
 /** Crea el conjunto completo de repositorios sobre una conexión dada. */
@@ -113,5 +119,6 @@ export function createRepositories(db: LocalDatabase): Repositories {
     priceUpdates: new PriceUpdateRepository(db),
     cards: new CardRepository(db),
     company: new CompanyRepository(db),
+    rolePermissions: new RolePermissionRepository(db),
   };
 }

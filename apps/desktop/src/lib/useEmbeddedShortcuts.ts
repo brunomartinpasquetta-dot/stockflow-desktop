@@ -13,7 +13,7 @@ import { useEffect } from 'react'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/lib/api'
-import { hasPermission } from '@/lib/permissions'
+import { hasPermissionFor } from '@/lib/permissions'
 import { WINDOWS } from '@/windows/registry'
 
 function isEditingTarget(): boolean {
@@ -64,7 +64,7 @@ export function useEmbeddedShortcuts(): void {
         const entry = Object.values(WINDOWS).find((w) => w.fKey === fnum)
         if (!entry) return
         if (entry.roles && (!currentUser || !entry.roles.includes(currentUser.role))) return
-        if (entry.requires && !hasPermission(currentUser?.role, entry.requires)) return
+        if (entry.requires && !hasPermissionFor(currentUser?.permissions, entry.requires)) return
         e.preventDefault()
         void api.desktopWindow.open(buildOpenPayload(entry.pageKey))
       }

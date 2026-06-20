@@ -17,6 +17,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -88,6 +89,27 @@ export const users = sqliteTable(
       'users_role_check',
       sql`${t.role} in ('admin', 'manager', 'seller')`,
     ),
+  }),
+);
+
+/* ------------------------------------------------------------------ */
+/* role_area_access — permisos configurables por rol y área funcional   */
+/* ------------------------------------------------------------------ */
+/**
+ * Habilita/deshabilita ÁREAS funcionales por rol (manager/seller). `admin`
+ * SIEMPRE tiene acceso total: nunca se lee esta tabla para admin. El motor de
+ * permisos (@stockflow/core) recompone las acciones efectivas como la unión de
+ * las áreas con `allowed = 1`.
+ */
+export const roleAreaAccess = sqliteTable(
+  'role_area_access',
+  {
+    role: text('role', { enum: ['admin', 'manager', 'seller'] }).notNull(),
+    area: text('area').notNull(),
+    allowed: integer('allowed', { mode: 'boolean' }).notNull().default(true),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.role, t.area] }),
   }),
 );
 
@@ -942,6 +964,8 @@ export type Company = typeof companies.$inferSelect;
 export type NewCompany = typeof companies.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type RoleAreaAccess = typeof roleAreaAccess.$inferSelect;
+export type NewRoleAreaAccess = typeof roleAreaAccess.$inferInsert;
 export type Family = typeof families.$inferSelect;
 export type NewFamily = typeof families.$inferInsert;
 export type Supplier = typeof suppliers.$inferSelect;
@@ -981,6 +1005,7 @@ export type NewSupplierPayment = typeof supplierPayments.$inferInsert;
 export const localSchema = {
   companies,
   users,
+  roleAreaAccess,
   families,
   suppliers,
   articles,

@@ -45,7 +45,7 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
-import { hasPermission, ROLE_LABELS, type PermissionAction } from '@/lib/permissions'
+import { hasPermissionFor, ROLE_LABELS, type PermissionAction } from '@/lib/permissions'
 import type { Role } from '@/types/api'
 import {
   DropdownMenu,
@@ -165,7 +165,7 @@ export function MenuBar() {
     if (item.separator) return true
     if (item.action) return true
     if (item.roles && (!currentUser || !item.roles.includes(currentUser.role))) return false
-    if (item.requires && !hasPermission(currentUser?.role, item.requires)) return false
+    if (item.requires && !hasPermissionFor(currentUser?.permissions, item.requires)) return false
     return true
   }
 

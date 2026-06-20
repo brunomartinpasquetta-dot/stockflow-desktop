@@ -1,6 +1,9 @@
 /**
- * Matriz de permisos por rol (réplica del lado UI de la de @stockflow/core, para
- * no arrastrar el grafo de los packages al renderer). El backend re-chequea todo.
+ * Tipos y labels de permisos para el renderer.
+ *
+ * El check de permisos NO replica la matriz por rol: se hace contra la lista de
+ * acciones EFECTIVAS que el backend resuelve y envía en `UserDTO.permissions`
+ * (ver `hasPermissionFor`). El backend re-chequea todo de todos modos.
  */
 import type { Role } from '@/types/api'
 
@@ -31,7 +34,7 @@ export type PermissionAction =
   | 'view_accounting'
   | 'manage_cash_general'
 
-const ALL_ACTIONS: readonly PermissionAction[] = [
+export const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_users',
   'manage_company',
   'manage_articles',
@@ -59,18 +62,16 @@ const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_cash_general',
 ]
 
-const MANAGER_DENIED = new Set<PermissionAction>(['manage_users', 'manage_company', 'adjust_stock'])
-const SELLER_ALLOWED = new Set<PermissionAction>(['create_sale', 'view_articles', 'open_cash', 'receive_payment'])
-
-const MATRIX: Record<Role, ReadonlySet<PermissionAction>> = {
-  admin: new Set(ALL_ACTIONS),
-  manager: new Set(ALL_ACTIONS.filter((a) => !MANAGER_DENIED.has(a))),
-  seller: SELLER_ALLOWED,
-}
-
-export function hasPermission(role: Role | null | undefined, action: PermissionAction): boolean {
-  if (!role) return false
-  return MATRIX[role]?.has(action) ?? false
+/**
+ * Check de permiso contra la lista de acciones EFECTIVAS del usuario logueado
+ * (`UserDTO.permissions`, resuelta por el backend). Es la única fuente de verdad
+ * del lado UI. Durante la carga inicial `permissions` es undefined → devuelve false.
+ */
+export function hasPermissionFor(
+  permissions: readonly string[] | undefined,
+  action: PermissionAction,
+): boolean {
+  return !!permissions?.includes(action)
 }
 
 export const ROLE_LABELS: Record<Role, string> = {

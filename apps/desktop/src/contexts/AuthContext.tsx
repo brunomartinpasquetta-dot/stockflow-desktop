@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { api } from '@/lib/api'
 import { UNAUTHENTICATED_EVENT, queryClient } from '@/lib/queryClient'
-import { hasPermission, type PermissionAction } from '@/lib/permissions'
+import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
 import type { UserDTO } from '@/types/api'
 
 interface AuthContextValue {
@@ -78,5 +78,5 @@ export function useAuth(): AuthContextValue {
 
 export function usePermission(action: PermissionAction): boolean {
   const { currentUser } = useAuth()
-  return hasPermission(currentUser?.role, action)
+  return hasPermissionFor(currentUser?.permissions, action)
 }
