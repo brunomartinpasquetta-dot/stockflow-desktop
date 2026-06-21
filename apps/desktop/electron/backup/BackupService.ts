@@ -41,7 +41,10 @@ export class BackupService {
   }
 
   async createBackup(destOverride?: string): Promise<BackupEntry> {
-    const dest = destOverride ?? this.deps.backupDir;
+    const dest = destOverride || this.deps.backupDir;
+    if (!dest) {
+      throw new Error('No hay una carpeta de backup configurada. Elegí una en Configuración → Backup.');
+    }
     if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
     const now = Date.now();
     const filename = this.filenameFor(now);
@@ -80,7 +83,9 @@ export class BackupService {
       return { filename, fullPath, sizeBytes: st.size, createdAt: now };
     } catch (err) {
       try { await fsp.unlink(tmpPath); } catch { /* ignore */ }
-      throw new Error('No se pudo crear el backup', { cause: err });
+      const detail = err instanceof Error ? (err.message || String(err)) : String(err);
+      console.error('[backup] createBackup falló:', err);
+      throw new Error(`No se pudo crear el backup: ${detail}`, { cause: err });
     }
   }
 

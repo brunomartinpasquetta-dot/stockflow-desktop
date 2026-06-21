@@ -26,7 +26,16 @@ const dbMigrations = join(repoRoot, 'packages', 'db', 'migrations');
 
 const pkg = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'));
 const runtimeDeps = Object.keys(pkg.dependencies ?? {});
-const external = ['electron', ...runtimeDeps.filter((d) => !d.startsWith('@stockflow/'))];
+// Estas deps pure-JS se BUNDLEAN en el output (no quedan external) porque con pnpm
+// electron-builder no sigue sus deps transitivas symlinkeadas → quedan incompletas en
+// el .asar. Ej.: `archiver` se copiaba sin zip-stream/compress-commons/archiver-utils,
+// y `import('archiver')` reventaba con MODULE_NOT_FOUND → "No se pudo crear el backup".
+// Bundlearlas con esbuild inlinea todo el grafo y evita depender del node_modules empaquetado.
+const BUNDLE_IN = new Set(['archiver']);
+const external = [
+  'electron',
+  ...runtimeDeps.filter((d) => !d.startsWith('@stockflow/') && !BUNDLE_IN.has(d)),
+];
 
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
