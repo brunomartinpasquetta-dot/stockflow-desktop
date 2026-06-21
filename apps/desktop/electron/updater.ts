@@ -176,6 +176,26 @@ export interface UpdaterContext {
 export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   let prefs = readPrefs(ctx.userDataDir);
 
+  // Chequeo manual contra GitHub Releases. Funciona SIEMPRE: NO depende de
+  // electron-updater (que está en devDependencies y NO se empaqueta → en prod el
+  // require falla). Es lo mismo que dispara el banner "nueva versión disponible"
+  // al arrancar; el botón "Verificar" lo usa para hacer lo mismo on-demand.
+  async function manualCheck(): Promise<{ status: string; version?: string }> {
+    try {
+      const r = await checkForOutdatedVersion({
+        appVersion: ctx.appVersion,
+        isPackaged: ctx.isPackaged,
+        onOutdated: (info) => ctx.getWindow()?.webContents.send('updater:outdated', info),
+      });
+      return r.outdated
+        ? { status: 'outdated', version: r.latestVersion ?? undefined }
+        : { status: 'latest', version: r.latestVersion ?? undefined };
+    } catch (err) {
+      console.warn('[updater] chequeo manual falló:', err instanceof Error ? err.message : err);
+      return { status: 'error' };
+    }
+  }
+
   if (!ctx.isPackaged || ctx.isDev) {
     return {
       checkNow: async () => ({ status: 'disabled-in-dev' }),
@@ -196,8 +216,10 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     autoUpdater = require('electron-updater').autoUpdater;
   } catch {
+    // electron-updater no empaquetado (caso real en prod): igual ofrecemos el
+    // chequeo manual → el botón "Verificar" muestra el banner si hay versión nueva.
     return {
-      checkNow: async () => ({ status: 'updater-unavailable' }),
+      checkNow: manualCheck,
       quitAndInstall: () => { /* no-op */ },
       getAutoCheck: () => prefs.autoCheck,
       setAutoCheck: (v) => {
@@ -232,29 +254,13 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
 
   return {
     checkNow: async () => {
-      // 1) Chequeo manual contra GitHub Releases (igual que al arrancar): si hay
-      //    una versión más nueva, emite `updater:outdated` → aparece el banner
-      //    "nueva versión disponible" en la ventana principal. Este es el camino
-      //    que el botón "Verificar" debe disparar (autoUpdater por sí solo no lo hace).
-      let manual: { outdated: boolean; latestVersion: string | null } = {
-        outdated: false,
-        latestVersion: null,
-      };
-      try {
-        manual = await checkForOutdatedVersion({
-          appVersion: ctx.appVersion,
-          isPackaged: ctx.isPackaged,
-          onOutdated: (info) => ctx.getWindow()?.webContents.send('updater:outdated', info),
-        });
-      } catch (err) {
-        console.warn('[updater] chequeo manual falló:', err instanceof Error ? err.message : err);
-      }
-      // 2) electron-updater (auto-descarga del .exe en Windows), best-effort.
+      // Chequeo manual (banner "nueva versión disponible", igual que al arrancar).
+      const r = await manualCheck();
+      // electron-updater (auto-descarga del .exe en Windows), best-effort.
       autoUpdater.checkForUpdates().catch((err: Error) => {
         console.warn('[updater] checkForUpdates falló:', err?.message ?? err);
       });
-      if (manual.outdated) return { status: 'outdated', version: manual.latestVersion ?? undefined };
-      return { status: 'latest', version: manual.latestVersion ?? undefined };
+      return r;
     },
     quitAndInstall: () => autoUpdater.quitAndInstall(false, true),
     getAutoCheck: () => prefs.autoCheck,
