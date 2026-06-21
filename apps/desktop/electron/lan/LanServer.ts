@@ -15,7 +15,9 @@
  *    al data como `_lanSessionToken`. El cliente lo cachea (preload).
  *  - Antes de cada handler con JWT válido, hacemos `sessionStore.runWith(user)`
  *    para que `withSession(deps,...)` vea ese user como sesión activa durante
- *    el lifetime del RPC.
+ *    el lifetime del RPC. `runWith` AÍSLA la sesión por invocación vía
+ *    AsyncLocalStorage: RPCs concurrentes nunca comparten `currentUser`, y la
+ *    sesión local del proceso (caja servidor) queda intacta.
  *
  * Decisiones:
  *  - `node:http` (sin Fastify) para no inflar el bundle.

@@ -8,9 +8,9 @@ import {
   cmpDecimal,
   gteDecimal,
   mulDecimal,
+  proratedVatBreakdown,
   subDecimal,
   sumDecimals,
-  vatBreakdown,
 } from '@stockflow/shared';
 
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
@@ -105,7 +105,6 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             line.discount ?? '0.0000',
             4,
           );
-          const { vat } = vatBreakdown(lineTotal, line.vatRate ?? '21.00', priceMode);
           return {
             articleId: line.articleId,
             lineNumber: idx + 1,
@@ -114,15 +113,22 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             discount: line.discount ?? '0.0000',
             vatRate: line.vatRate ?? '21.00',
             lineTotal,
-            vat,
           };
         });
 
         const lineSum = sumDecimals(computedLines.map((l) => l.lineTotal));
-        const vatAmount = sumDecimals(computedLines.map((l) => l.vat));
+        const subtotal = lineSum;
+        // BUG FISCAL: el descuento global se prorratea sobre las líneas ANTES de
+        // calcular el IVA persistido, para que Neto + IVA == Total. Mismo cálculo
+        // que `calculateSaleTotals` (pricing) y que el Libro IVA (accounting).
+        const { vatAmount } = proratedVatBreakdown(
+          computedLines.map((l) => ({ lineTotal: l.lineTotal, vatRate: l.vatRate })),
+          saleDiscount,
+          subtotal,
+          priceMode,
+        );
         // 'gross': subtotal ya incluye IVA → total = subtotal − descuento global.
         // 'net':   subtotal es neto → total = subtotal + IVA − descuento global.
-        const subtotal = lineSum;
         const total =
           priceMode === 'gross'
             ? subDecimal(lineSum, saleDiscount, 4)
@@ -257,6 +263,28 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         // isAccountSale=true sin AR (deuda perdida silenciosamente).
         let insertedAr: AccountReceivable | null = null;
         if (data.isAccountSale) {
+          // BUG RACE: revalidar el límite de crédito DENTRO de la transacción.
+          // El service ya lo chequeó antes (defensa temprana), pero dos ventas a
+          // cuenta concurrentes (caso LAN) pueden pasar ese chequeo y superar el
+          // límite. Acá recalculamos el balance del cliente con `tx` (mismas
+          // cuentas que getTotalBalance) justo antes de abrir la AR.
+          // creditLimit '0.0000' / ausente = sin límite.
+          const creditLimit = data.creditLimit ?? '0.0000';
+          if (Number(creditLimit) > 0) {
+            const balRows = tx
+              .select({ balance: accountsReceivable.balance })
+              .from(accountsReceivable)
+              .where(eq(accountsReceivable.customerId, data.customerId))
+              .all();
+            const currentBalance = sumDecimals(balRows.map((r) => r.balance));
+            if (Number(currentBalance) + Number(total) > Number(creditLimit)) {
+              throw new ConstraintError(
+                'CREDIT_LIMIT_EXCEEDED',
+                `Se supera el límite de crédito del cliente (${creditLimit})`,
+              );
+            }
+          }
+
           insertedAr = tx
             .insert(accountsReceivable)
             .values({

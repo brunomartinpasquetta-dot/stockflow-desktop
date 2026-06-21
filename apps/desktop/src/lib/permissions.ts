@@ -33,6 +33,7 @@ export type PermissionAction =
   | 'manage_mp_qr'
   | 'view_accounting'
   | 'manage_cash_general'
+  | 'manage_customers'
 
 export const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_users',
@@ -60,6 +61,7 @@ export const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_mp_qr',
   'view_accounting',
   'manage_cash_general',
+  'manage_customers',
 ]
 
 /**

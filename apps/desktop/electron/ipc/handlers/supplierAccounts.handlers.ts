@@ -1,4 +1,4 @@
-import { SupplierAccountsService } from '@stockflow/core';
+import { requirePermission, SupplierAccountsService } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
@@ -13,7 +13,10 @@ export function buildSupplierAccountsHandlers(deps: HandlerDeps): HandlerMap {
   return {
     'supplierAccounts:listBalances': withSession(
       deps,
-      (_payload, ctx): Promise<SupplierBalanceDTO[]> => new SupplierAccountsService(ctx).listSupplierBalances(),
+      (_payload, ctx): Promise<SupplierBalanceDTO[]> => {
+        requirePermission(ctx.currentUser, 'manage_supplier_accounts');
+        return new SupplierAccountsService(ctx).listSupplierBalances();
+      },
     ),
     'supplierAccounts:payInvoice': withSession(
       deps,
@@ -25,13 +28,17 @@ export function buildSupplierAccountsHandlers(deps: HandlerDeps): HandlerMap {
       (
         payload: { supplierId: string; dateRange?: { from: number; to: number } },
         ctx,
-      ): Promise<SupplierStatementDTO> =>
-        new SupplierAccountsService(ctx).getSupplierStatement(payload.supplierId, payload.dateRange),
+      ): Promise<SupplierStatementDTO> => {
+        requirePermission(ctx.currentUser, 'manage_supplier_accounts');
+        return new SupplierAccountsService(ctx).getSupplierStatement(payload.supplierId, payload.dateRange);
+      },
     ),
     'supplierAccounts:listOpenBySupplier': withSession(
       deps,
-      (payload: { supplierId: string }, ctx): Promise<SupplierAccountPayableDTO[]> =>
-        new SupplierAccountsService(ctx).listOpenBySupplier(payload.supplierId),
+      (payload: { supplierId: string }, ctx): Promise<SupplierAccountPayableDTO[]> => {
+        requirePermission(ctx.currentUser, 'manage_supplier_accounts');
+        return new SupplierAccountsService(ctx).listOpenBySupplier(payload.supplierId);
+      },
     ),
   };
 }

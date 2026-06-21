@@ -21,6 +21,7 @@
  *  view_articles     |   ✓   |    ✓    |   ✓
  *  open_cash         |   ✓   |    ✓    |   ✓
  *  receive_payment   |   ✓   |    ✓    |   ✓
+ *  manage_customers  |   ✓   |    ✓    |   ✓(*área clientes)
  *  manage_hardware   |   ✓   |    ✗    |   ✗
  *  manage_backup     |   ✓   |    ✗    |   ✗
  *  import_data       |   ✓   |    ✗    |   ✗
@@ -58,6 +59,7 @@ export const PERMISSION_ACTIONS = [
   'manage_mp_qr',
   'view_accounting',
   'manage_cash_general',
+  'manage_customers',
 ] as const;
 
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
@@ -104,6 +106,13 @@ export const PERMISSION_AREAS: readonly PermissionArea[] = [
     key: 'clientes',
     label: 'Clientes / Cuentas corrientes',
     actions: ['receive_payment'],
+  },
+  {
+    // Separada de `clientes` a propósito: el vendedor cobra cuentas (área
+    // `clientes`) pero NO debería poder editar clientes / su límite de crédito.
+    key: 'gestion_clientes',
+    label: 'Gestión de clientes (alta/edición)',
+    actions: ['manage_customers'],
   },
   {
     key: 'ventas',

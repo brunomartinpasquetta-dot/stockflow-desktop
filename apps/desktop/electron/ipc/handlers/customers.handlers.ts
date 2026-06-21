@@ -16,20 +16,20 @@ export function buildCustomersHandlers(deps: HandlerDeps): HandlerMap {
         ctx.repos.customers.findById(payload.id),
     ),
     'customers:create': withSession(deps, (payload: NewCustomer, ctx): Promise<CustomerDTO> => {
-      requirePermission(ctx.currentUser, 'create_sale');
+      requirePermission(ctx.currentUser, 'manage_customers');
       return ctx.repos.customers.create(payload);
     }),
     'customers:update': withSession(
       deps,
       (payload: { id: string; data: Partial<NewCustomer> }, ctx): Promise<CustomerDTO> => {
-        requirePermission(ctx.currentUser, 'create_sale');
+        requirePermission(ctx.currentUser, 'manage_customers');
         return ctx.repos.customers.update(payload.id, payload.data);
       },
     ),
     'customers:delete': withSession(
       deps,
       async (payload: { id: string }, ctx): Promise<{ deleted: true }> => {
-        requirePermission(ctx.currentUser, 'manage_articles');
+        requirePermission(ctx.currentUser, 'manage_customers');
         await ctx.repos.customers.delete(payload.id);
         return { deleted: true };
       },

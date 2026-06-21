@@ -1,4 +1,4 @@
-import { AccountsReceivableService } from '@stockflow/core';
+import { AccountsReceivableService, requirePermission } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
@@ -21,23 +21,31 @@ export function buildAccountsHandlers(deps: HandlerDeps): HandlerMap {
       (
         payload: { customerId: string; dateRange?: { from: number; to: number } },
         ctx,
-      ): Promise<CustomerStatementDTO> =>
-        new AccountsReceivableService(ctx).getCustomerStatement(payload.customerId, payload.dateRange),
+      ): Promise<CustomerStatementDTO> => {
+        requirePermission(ctx.currentUser, 'receive_payment');
+        return new AccountsReceivableService(ctx).getCustomerStatement(payload.customerId, payload.dateRange);
+      },
     ),
     'accounts:getTotalReceivables': withSession(
       deps,
-      async (_payload, ctx): Promise<{ total: string }> => ({
-        total: await new AccountsReceivableService(ctx).getTotalReceivables(),
-      }),
+      async (_payload, ctx): Promise<{ total: string }> => {
+        requirePermission(ctx.currentUser, 'receive_payment');
+        return { total: await new AccountsReceivableService(ctx).getTotalReceivables() };
+      },
     ),
     'accounts:listBalances': withSession(
       deps,
-      (_payload, ctx): Promise<CustomerBalanceDTO[]> => new AccountsReceivableService(ctx).listCustomerBalances(),
+      (_payload, ctx): Promise<CustomerBalanceDTO[]> => {
+        requirePermission(ctx.currentUser, 'receive_payment');
+        return new AccountsReceivableService(ctx).listCustomerBalances();
+      },
     ),
     'accounts:listOpenByCustomer': withSession(
       deps,
-      (payload: { customerId: string }, ctx): Promise<AccountReceivableDTO[]> =>
-        ctx.repos.accountsReceivable.findOpenByCustomer(payload.customerId),
+      (payload: { customerId: string }, ctx): Promise<AccountReceivableDTO[]> => {
+        requirePermission(ctx.currentUser, 'receive_payment');
+        return ctx.repos.accountsReceivable.findOpenByCustomer(payload.customerId);
+      },
     ),
   };
 }

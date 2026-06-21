@@ -49,6 +49,13 @@ export const CreateSaleSchema = z.object({
   discount: moneySchema.default('0.0000'),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),
+  /**
+   * Límite de crédito del cliente al momento de la venta (BUG-S-RACE): se
+   * revalida DENTRO de la transacción de `createWithLines` para evitar que dos
+   * ventas a cuenta concurrentes superen el límite. '0.0000' (o ausente) = sin
+   * límite.
+   */
+  creditLimit: moneySchema.optional(),
 });
 
 /** Venta + líneas (mínimo 1) + pagos (N; vacío sólo si es a cuenta corriente). */

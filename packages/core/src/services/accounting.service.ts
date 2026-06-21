@@ -9,7 +9,14 @@
  * Limitación conocida: el CMV se calcula con `articles.costPrice` actual (no
  * histórico). Se indica al consumidor con `cmv.calculatedFromCurrent = true`.
  */
-import { sumDecimals, subDecimal, mulDecimal, vatBreakdown, type PriceMode } from '@stockflow/shared';
+import {
+  sumDecimals,
+  subDecimal,
+  mulDecimal,
+  vatBreakdown,
+  proratedVatBreakdown,
+  type PriceMode,
+} from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -138,11 +145,26 @@ export class AccountingService {
     const salesCompleted = salesAll.filter((s) => s.status === 'completed');
     const salesIds = salesCompleted.map((s) => s.id);
     const saleLinesAll = await this.ctx.repos.saleLines.findAll();
-    const salesLinesByCompleted = saleLinesAll.filter((l) => salesIds.includes(l.saleId));
-    let salesVat = '0.0000';
+    const salesIdSet = new Set(salesIds);
+    const salesLinesByCompleted = saleLinesAll.filter((l) => salesIdSet.has(l.saleId));
+    // BUG FISCAL: prorratear el descuento global de cabecera sobre las líneas
+    // ANTES del IVA, por venta, para que Neto + IVA == Total (posición IVA).
+    const linesBySaleId = new Map<string, typeof salesLinesByCompleted>();
     for (const l of salesLinesByCompleted) {
-      const br = vatBreakdown(l.lineTotal, l.vatRate, priceMode);
-      salesVat = sumDecimals([salesVat, br.vat]);
+      const arr = linesBySaleId.get(l.saleId);
+      if (arr) arr.push(l);
+      else linesBySaleId.set(l.saleId, [l]);
+    }
+    let salesVat = '0.0000';
+    for (const s of salesCompleted) {
+      const lines = linesBySaleId.get(s.id) ?? [];
+      const { vatAmount } = proratedVatBreakdown(
+        lines.map((l) => ({ lineTotal: l.lineTotal, vatRate: l.vatRate })),
+        s.discount,
+        s.subtotal,
+        priceMode,
+      );
+      salesVat = sumDecimals([salesVat, vatAmount]);
     }
     const salesTotal = sumDecimals(salesCompleted.map((s) => s.total));
 
@@ -231,8 +253,23 @@ export class AccountingService {
       let vat105 = '0.0000';
       let vat27 = '0.0000';
       const lines = linesBySale.get(s.id) ?? [];
+      // BUG FISCAL: prorratear el descuento global de cabecera sobre cada línea
+      // ANTES del IVA (mismo criterio que `proratedVatBreakdown`), para que
+      // Neto + IVA == Total en el Libro IVA. Se hace por línea para mantener el
+      // desglose por alícuota (vat21/vat105/vat27).
+      const discountNum = Number(s.discount);
+      const subtotalNum = Number(s.subtotal);
+      const prorate =
+        Number.isFinite(discountNum) &&
+        discountNum !== 0 &&
+        Number.isFinite(subtotalNum) &&
+        subtotalNum !== 0;
       for (const l of lines) {
-        const br = vatBreakdown(l.lineTotal, l.vatRate, priceMode);
+        const lineDiscount = prorate
+          ? mulDecimal(s.discount, (Number(l.lineTotal) / subtotalNum).toFixed(8), 4)
+          : '0.0000';
+        const baseLine = subDecimal(l.lineTotal, lineDiscount, 4);
+        const br = vatBreakdown(baseLine, l.vatRate, priceMode);
         netAmount = sumDecimals([netAmount, br.net]);
         const key = vatBucketKey(l.vatRate);
         if (key === 'vat21') vat21 = sumDecimals([vat21, br.vat]);

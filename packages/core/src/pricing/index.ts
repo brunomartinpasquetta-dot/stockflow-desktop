@@ -11,13 +11,14 @@ import {
   addDecimal,
   gteDecimal,
   mulDecimal,
+  proratedVatBreakdown,
   subDecimal,
   sumDecimals,
   vatBreakdown,
 } from '@stockflow/shared';
 
 export type { PriceMode } from '@stockflow/shared';
-export { vatBreakdown } from '@stockflow/shared';
+export { vatBreakdown, proratedVatBreakdown } from '@stockflow/shared';
 
 /**
  * Precio unitario que corresponde a una línea, según:
@@ -123,7 +124,14 @@ export function calculateSaleTotals(
     };
   });
   const subtotal = sumDecimals(computed.map((c) => c.lineTotal));
-  const vatAmount = sumDecimals(computed.map((c) => c.vat));
+  // BUG FISCAL: el descuento global se prorratea sobre las líneas ANTES de
+  // calcular el IVA, para que Neto + IVA == Total (Libro IVA / posición IVA).
+  const { vatAmount } = proratedVatBreakdown(
+    computed.map((c) => ({ lineTotal: c.lineTotal, vatRate: c.vatRate })),
+    globalDiscount,
+    subtotal,
+    mode,
+  );
   const total =
     mode === 'gross'
       ? subDecimal(subtotal, globalDiscount, 4)

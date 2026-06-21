@@ -76,13 +76,17 @@ export function calculateSaleTotals(
   mode: PriceMode = 'gross',
 ): SaleTotals {
   let subtotal = 0
+  for (const l of lines) subtotal += n(l.quantity) * n(l.unitPrice) - n(l.discount)
+  const disc = n(globalDiscount)
+  // Prorratear el descuento global sobre cada línea ANTES del IVA, para que
+  // Neto + IVA = Total (consistente con el backend; evita inflar el IVA).
   let vatAmount = 0
   for (const l of lines) {
     const lt = n(l.quantity) * n(l.unitPrice) - n(l.discount)
-    subtotal += lt
-    vatAmount += vatBreakdown(lt, l.vatRate ?? '21.00', mode).vat
+    const base = subtotal > 0 ? lt - (disc * lt) / subtotal : lt
+    vatAmount += vatBreakdown(base, l.vatRate ?? '21.00', mode).vat
   }
-  const total = mode === 'gross' ? subtotal - n(globalDiscount) : subtotal + vatAmount - n(globalDiscount)
+  const total = mode === 'gross' ? subtotal - disc : subtotal - disc + vatAmount
   return { subtotal: subtotal.toFixed(4), vatAmount: vatAmount.toFixed(4), total: total.toFixed(4), priceMode: mode }
 }
 

@@ -1,4 +1,4 @@
-import { SalesService } from '@stockflow/core';
+import { requirePermission, SalesService } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
@@ -31,8 +31,10 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
     ),
     'sales:listByDateRange': withSession(
       deps,
-      (payload: { from: number; to: number }, ctx): Promise<SaleDTO[]> =>
-        ctx.repos.sales.findByDateRange(payload.from, payload.to),
+      (payload: { from: number; to: number }, ctx): Promise<SaleDTO[]> => {
+        requirePermission(ctx.currentUser, 'view_reports');
+        return ctx.repos.sales.findByDateRange(payload.from, payload.to);
+      },
     ),
     'sales:getNextNumber': withSession(
       deps,

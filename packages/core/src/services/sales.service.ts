@@ -185,6 +185,10 @@ export class SalesService {
       isAccountSale,
       payments,
       discount: draft.discount ?? '0.0000',
+      // El límite se revalida DENTRO de la transacción del repo (defensa contra
+      // dos ventas a cuenta concurrentes que superan el límite — caso LAN). El
+      // chequeo de arriba es sólo defensa temprana. '0.0000' = sin límite.
+      creditLimit: customer.creditLimit,
       notes: draft.notes ?? null,
       lines: resolvedLines,
     });

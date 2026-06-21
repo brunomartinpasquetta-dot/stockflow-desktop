@@ -29,6 +29,7 @@ const PERMISSION_AREA_KEYS = [
   'articulos',
   'proveedores',
   'clientes',
+  'gestion_clientes',
   'ventas',
   'compras',
   'caja',
