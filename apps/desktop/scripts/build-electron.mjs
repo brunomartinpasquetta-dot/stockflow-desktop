@@ -52,6 +52,13 @@ const common = {
 await build({
   ...common,
   format: 'esm',
+  // Las deps CJS que bundleamos (p.ej. archiver) hacen `require('fs')` interno.
+  // En un output ESM esbuild no tiene `require` → "Dynamic require of fs is not
+  // supported" (crash). Inyectamos un `require` real vía createRequire. Sólo en el
+  // build ESM (main); el preload es CJS y ya tiene `require` nativo.
+  banner: {
+    js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
+  },
   entryPoints: [join(appRoot, 'electron', 'main.ts')],
   outfile: join(outDir, 'main.mjs'),
 });
