@@ -36,6 +36,8 @@ interface ActivateResponse {
 
 interface HeartbeatResponse {
   jwt: string | null;
+  /** Tenant con la suscripción suspendida → la app pasa a sólo-lectura. */
+  suspended?: boolean;
 }
 
 function b64urlToBuffer(s: string): Buffer {
@@ -411,7 +413,9 @@ export class LicenseManager {
         if (data && typeof data.jwt === 'string' && data.jwt.length > 0) {
           this.storeJwt(data.jwt);
         }
-        this.runtimeStatus = 'active';
+        // Suscripción suspendida (cloud devuelve 200 + suspended:true): la app
+        // sigue abierta pero en sólo-lectura. Si no, opera normal.
+        this.runtimeStatus = data?.suspended === true ? 'readOnly' : 'active';
         // Auto-cura: si no tenemos el nombre de la empresa/titular (p.ej. la
         // activación trajo el JWT pero /api/me falló esa vez), lo traemos ahora.
         if (!this.tenantName || !this.clientName) {

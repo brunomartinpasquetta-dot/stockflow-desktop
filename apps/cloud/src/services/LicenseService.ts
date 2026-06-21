@@ -124,7 +124,7 @@ export class LicenseService {
     lk: string,
     tid: string,
     signJwt: (payload: object) => string,
-  ): Promise<{ jwt: string | null }> {
+  ): Promise<{ jwt: string | null; suspended?: boolean }> {
     await db.update(licenses).set({ lastHeartbeat: new Date() }).where(eq(licenses.id, licenseId));
 
     const [license] = await db.select().from(licenses).where(eq(licenses.id, licenseId)).limit(1);
@@ -132,9 +132,22 @@ export class LicenseService {
       throw httpError('Licencia inactiva', 401);
     }
 
-    if (currentExpMs - Date.now() < ONE_DAY_MS) {
+    // Estado del tenant: si está 'suspended' (pago atrasado) NO revocamos —
+    // devolvemos JWT renovado igual + `suspended: true` para que el desktop
+    // entre en modo sólo-lectura. 'active' opera normal; cualquier otro estado
+    // (cancelled, etc.) se trata como revocado (401).
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, license.tenantId)).limit(1);
+    if (!tenant || (tenant.status !== 'active' && tenant.status !== 'suspended')) {
+      throw httpError('Suscripción cancelada', 401);
+    }
+    const suspended = tenant.status === 'suspended';
+
+    // Renovación deslizante: si al JWT le quedan <24h, emitimos uno nuevo.
+    // Cuando está suspendido renovamos siempre para mantener vivo el token
+    // (la app sigue abierta en sólo-lectura).
+    if (suspended || currentExpMs - Date.now() < ONE_DAY_MS) {
       const jwt = signJwt({ sub: licenseId, tid, plan, lk } satisfies JwtPayload);
-      return { jwt };
+      return suspended ? { jwt, suspended: true } : { jwt };
     }
     return { jwt: null };
   }

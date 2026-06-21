@@ -59,7 +59,7 @@ export const UpdatePaymentMethodSchema = z
 /** Un pago individual: integrante de una venta (sale_payments) o de una cobranza. */
 export const PaymentInputSchema = z.object({
   paymentMethodId: idSchema,
-  amount: moneySchema,
+  amount: moneySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
   reference: z.string().max(60).nullish(),
 });
 export type PaymentInput = z.infer<typeof PaymentInputSchema>;

@@ -19,6 +19,7 @@ import {
   accountsReceivable,
   articles,
   cashMovements,
+  cashRegisters,
   companies,
   paymentMethods,
   saleLines,
@@ -362,6 +363,39 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .all();
         if (!sale.isAccountSale) {
           const physicalPayments = sps.filter((s) => s.isCash !== false);
+          const hasPhysicalReverse = physicalPayments.some((s) => Number(s.amount) > 0);
+          // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
+          //   (el arqueo histórico recalcula el esperado en vivo y dejaría de
+          //   cuadrar). Resolvemos la caja DESTINO dentro de la transacción:
+          //   - caja original 'open'  → usar esa (comportamiento actual);
+          //   - caja original 'closed' (o ya inexistente) → usar la caja ABIERTA
+          //     actual (a lo sumo una);
+          //   - sin caja abierta → abortar pidiendo abrir una.
+          let targetRegisterId = sale.cashRegisterId;
+          let fromClosedRegister = false;
+          if (hasPhysicalReverse) {
+            const originReg = tx
+              .select({ status: cashRegisters.status })
+              .from(cashRegisters)
+              .where(eq(cashRegisters.id, sale.cashRegisterId))
+              .get();
+            if (originReg?.status !== 'open') {
+              const openReg = tx
+                .select({ id: cashRegisters.id })
+                .from(cashRegisters)
+                .where(eq(cashRegisters.status, 'open'))
+                .limit(1)
+                .get();
+              if (!openReg) {
+                throw new ConstraintError(
+                  'NO_OPEN_CASH_REGISTER',
+                  'Abrí una caja para poder anular esta operación (la caja original ya está cerrada)',
+                );
+              }
+              targetRegisterId = openReg.id;
+              fromClosedRegister = true;
+            }
+          }
           for (const sp of physicalPayments) {
             if (!(Number(sp.amount) > 0)) continue;
             // BUG-S06: si el medio de pago ya no existe (isCash == null por el
@@ -375,12 +409,17 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
               );
               reversePmId = null;
             }
+            // Si el reverso va a una caja distinta (la original estaba cerrada),
+            // aclararlo en la descripción incluyendo el número de comprobante.
+            const desc = fromClosedRegister
+              ? `Anulación venta ${sale.type} #${sale.number} (caja original cerrada)`
+              : `Anulación venta ${sale.type} #${sale.number}`;
             tx
               .insert(cashMovements)
               .values({
-                cashRegisterId: sale.cashRegisterId,
+                cashRegisterId: targetRegisterId,
                 type: 'expense',
-                description: `Anulación venta ${sale.type} #${sale.number}`,
+                description: desc,
                 amount: sp.amount,
                 date: Date.now(),
                 userId: sale.sellerId,

@@ -64,7 +64,12 @@ export function parseCurrencyInput(input: string | number | null | undefined): s
   }
   // un solo punto sin coma -> se asume separador decimal ("programador")
   const n = Number(s)
-  return Number.isFinite(n) ? String(n) : '0'
+  if (!Number.isFinite(n)) return '0'
+  // Garantizar el contrato `^\d+(\.\d{1,4})?$`: redondear a 4 decimales y
+  // evitar notación científica (toFixed nunca la produce). Luego quitar los
+  // ceros/punto sobrantes a la derecha ("12.3400"→"12.34", "12.0000"→"12").
+  const fixed = Math.abs(n).toFixed(4)
+  return fixed.replace(/\.?0+$/, '')
 }
 
 /** Versión numérica útil para cálculos derivados en vivo. */

@@ -17,6 +17,7 @@ import type { LocalDatabase } from '../local/client';
 import {
   articles,
   cashMovements,
+  cashRegisters,
   companies,
   paymentMethods,
   purchaseLines,
@@ -290,15 +291,57 @@ export class PurchaseRepository extends BaseRepository<
           .where(and(eq(cashMovements.relatedPurchaseId, id), eq(cashMovements.type, 'expense')))
           .all();
         if (purchase.paymentType === 'cash') {
-          const physical = movs.filter((m) => m.pmId == null || m.isCash === true);
+          const physical = movs.filter(
+            (m) => (m.pmId == null || m.isCash === true) && Number(m.amount) > 0,
+          );
+          // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
+          //   (el arqueo histórico recalcula el esperado en vivo y dejaría de
+          //   cuadrar). Resolvemos la caja DESTINO dentro de la transacción para
+          //   cada egreso físico original:
+          //   - su caja original 'open'  → usar esa (comportamiento actual);
+          //   - su caja original 'closed' (o ya inexistente) → usar la caja
+          //     ABIERTA actual (a lo sumo una);
+          //   - sin caja abierta → abortar pidiendo abrir una.
+          // La caja abierta se busca una sola vez (lazy) y se cachea.
+          let openRegisterId: string | null | undefined;
+          const resolveOpenRegisterId = (): string => {
+            if (openRegisterId === undefined) {
+              openRegisterId =
+                tx
+                  .select({ id: cashRegisters.id })
+                  .from(cashRegisters)
+                  .where(eq(cashRegisters.status, 'open'))
+                  .limit(1)
+                  .get()?.id ?? null;
+            }
+            if (!openRegisterId) {
+              throw new ConstraintError(
+                'NO_OPEN_CASH_REGISTER',
+                'Abrí una caja para poder anular esta operación (la caja original ya está cerrada)',
+              );
+            }
+            return openRegisterId;
+          };
+
           for (const m of physical) {
-            if (!(Number(m.amount) > 0)) continue;
+            const originReg = tx
+              .select({ status: cashRegisters.status })
+              .from(cashRegisters)
+              .where(eq(cashRegisters.id, m.cashRegisterId))
+              .get();
+            const fromClosedRegister = originReg?.status !== 'open';
+            const targetRegisterId = fromClosedRegister
+              ? resolveOpenRegisterId()
+              : m.cashRegisterId;
+            const desc = fromClosedRegister
+              ? `Anulación compra ${purchase.type} #${purchase.number} (caja original cerrada)`
+              : `Anulación compra ${purchase.type} #${purchase.number}`;
             tx
               .insert(cashMovements)
               .values({
-                cashRegisterId: m.cashRegisterId,
+                cashRegisterId: targetRegisterId,
                 type: 'income',
-                description: `Anulación compra ${purchase.type} #${purchase.number}`,
+                description: desc,
                 amount: m.amount,
                 date: Date.now(),
                 userId: m.userId,

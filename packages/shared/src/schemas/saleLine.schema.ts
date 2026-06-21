@@ -23,8 +23,8 @@ export const SaleLineSchema = z.object({
  */
 export const CreateSaleLineInputSchema = z.object({
   articleId: idSchema,
-  quantity: qtySchema,
-  unitPrice: moneySchema,
+  quantity: qtySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+  unitPrice: moneySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
   discount: moneySchema.default('0.0000'),
   vatRate: vatRateSchema.default('21.00'),
 });

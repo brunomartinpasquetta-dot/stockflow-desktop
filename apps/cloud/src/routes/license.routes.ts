@@ -68,7 +68,9 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
           user.tid,
           (p) => app.jwt.sign(p),
         );
-        return reply.send({ jwt: result.jwt });
+        return reply.send(
+          result.suspended ? { jwt: result.jwt, suspended: true } : { jwt: result.jwt },
+        );
       } catch (err) {
         const code = statusOf(err);
         return reply.code(code === 400 ? 401 : code).send({ error: messageOf(err) });
