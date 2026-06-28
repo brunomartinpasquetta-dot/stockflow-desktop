@@ -142,19 +142,15 @@ export function AcercaDe() {
         <CardContent className="flex flex-col gap-1 text-sm">
           <div>
             Email:{' '}
-            <a className="text-primary hover:underline" href="mailto:soporte@stockflow.com.ar">
-              soporte@stockflow.com.ar
+            <a className="text-primary hover:underline" href="mailto:bruno.martin.pasquetta@gmail.com">
+              bruno.martin.pasquetta@gmail.com
             </a>
           </div>
           <div>
-            Web:{' '}
-            <a className="text-primary hover:underline" href="https://stockflow.com.ar" target="_blank" rel="noreferrer">
-              stockflow.com.ar
+            WhatsApp:{' '}
+            <a className="text-primary hover:underline" href="https://wa.me/5493425847340" target="_blank" rel="noreferrer">
+              +54 342 584 7340
             </a>
-          </div>
-          <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
-            <a className="hover:underline" href="#">Términos</a>
-            <a className="hover:underline" href="#">Privacidad</a>
           </div>
         </CardContent>
       </Card>

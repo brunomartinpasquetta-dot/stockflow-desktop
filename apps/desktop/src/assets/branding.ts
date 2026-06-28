@@ -4,6 +4,7 @@ import logoFull from './branding/logo-full.svg'
 import logoTagline from './branding/logo-tagline.svg'
 import logoWhite from './branding/logo-white.svg'
 import logoMono from './branding/logo-mono.svg'
+import logoStacked from './branding/logo-stacked.png'
 
 export const BRANDING = {
   iconSvg,
@@ -12,4 +13,5 @@ export const BRANDING = {
   logoTagline,
   logoWhite,
   logoMono,
+  logoStacked,
 } as const

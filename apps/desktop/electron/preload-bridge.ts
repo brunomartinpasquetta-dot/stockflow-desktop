@@ -367,6 +367,7 @@ export function createApiBridge(
       closeSelf: () => c<{ closed: boolean }>('desktopWindow:closeSelf'),
       minimizeSelf: () => c<{ minimized: boolean }>('desktopWindow:minimizeSelf'),
       focusMain: () => c<{ ok: true }>('desktopWindow:focusMain'),
+      openManual: () => c<never>('desktopWindow:openManual'),
     },
     print: {
       diagnose: (p) => c<never>('print:diagnose', p),

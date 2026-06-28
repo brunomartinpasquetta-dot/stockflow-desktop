@@ -74,5 +74,9 @@ export function buildDesktopWindowsHandlers(deps: HandlerDeps): HandlerMap {
       deps.desktopWindows?.focusMain();
       return { ok: true };
     }),
+    'desktopWindow:openManual': unguarded(deps, async (): Promise<{ created: boolean }> => {
+      if (!deps.desktopWindows) throw new Error('Gestor de ventanas no disponible');
+      return deps.desktopWindows.openManual();
+    }),
   };
 }

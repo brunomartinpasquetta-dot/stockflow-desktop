@@ -149,6 +149,7 @@ function bootstrap(): { lanArgs: string[] } {
     isDev,
     devServerUrl: DEV_SERVER_URL,
     prodIndexHtml: PROD_INDEX_HTML,
+    manualPdfPath: app.isPackaged ? path.join(process.resourcesPath, 'manual.pdf') : path.join(HERE, '..', 'build', 'manual.pdf'),
     getMainWindow: () => mainWindow,
   });
 

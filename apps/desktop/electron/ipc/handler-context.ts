@@ -67,6 +67,8 @@ export interface DesktopWindowsLike {
   focus(windowKey: string): boolean;
   list(): { windowKey: string; title: string; minimized: boolean; focused: boolean }[];
   focusMain(): void;
+  /** Abre (o enfoca) la ventana del manual de usuario (visor PDF nativo). */
+  openManual(): { created: boolean };
   /** Cierra la ventana nativa que originó el evento IPC. */
   closeForWebContents(webContentsId: number): boolean;
   /** Minimiza la ventana nativa que originó el evento IPC. */

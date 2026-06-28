@@ -15,6 +15,7 @@ import { useState } from 'react'
 import {
   ArrowLeftRight,
   BarChart3,
+  BookOpen,
   Boxes,
   Building2,
   Calculator,
@@ -45,6 +46,7 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
+import { api } from '@/lib/api'
 import { hasPermissionFor, ROLE_LABELS, type PermissionAction } from '@/lib/permissions'
 import type { Role } from '@/types/api'
 import {
@@ -64,7 +66,7 @@ interface MenuItem {
   requires?: PermissionAction
   roles?: Role[]
   separator?: boolean
-  action?: 'logout' | 'exit'
+  action?: 'logout' | 'exit' | 'manual'
   /** Tab inicial cuando la página soporte tabs (ej. Configuración). */
   initialTab?: string
 }
@@ -152,6 +154,7 @@ const GROUPS: MenuGroup[] = [
     name: 'Ayuda',
     items: [
       { pageKey: 'acerca-de', label: 'Acerca de', icon: Info },
+      { action: 'manual', label: 'Manual de usuario', icon: BookOpen },
     ],
   },
 ]
@@ -176,6 +179,10 @@ export function MenuBar() {
     }
     if (item.action === 'exit') {
       window.close()
+      return
+    }
+    if (item.action === 'manual') {
+      void api.desktopWindow.openManual()
       return
     }
     if (item.pageKey) {

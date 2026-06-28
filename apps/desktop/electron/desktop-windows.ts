@@ -46,6 +46,8 @@ export interface DesktopWindowsConfig {
   prodIndexHtml: string;
   /** Path absoluto al icono de la app (opcional). */
   iconPath?: string;
+  /** Path absoluto al manual de usuario (PDF) que renderiza Chromium. */
+  manualPdfPath: string;
   /** Devuelve la ventana principal (para `focusMain`). */
   getMainWindow: () => BrowserWindow | null;
 }
@@ -148,6 +150,40 @@ export class DesktopWindowsManager {
       });
     }
     return result;
+  }
+
+  /**
+   * Abre (o enfoca si ya existe) la ventana del manual de usuario: un visor de
+   * PDF nativo de Chromium. No necesita preload (es sólo el PDF).
+   */
+  openManual(): { created: boolean } {
+    const existing = this.windows.get('__manual__');
+    if (existing && !existing.isDestroyed()) {
+      if (existing.isMinimized()) existing.restore();
+      existing.focus();
+      return { created: false };
+    }
+
+    const win = new BrowserWindow({
+      width: 1000,
+      height: 800,
+      title: 'Manual de usuario - StockFlow',
+      show: false,
+      autoHideMenuBar: true,
+      ...(this.config.iconPath ? { icon: this.config.iconPath } : {}),
+    });
+
+    win.once('ready-to-show', () => {
+      if (!win.isDestroyed()) win.show();
+    });
+    win.on('closed', () => {
+      this.windows.delete('__manual__');
+    });
+
+    void win.loadFile(this.config.manualPdfPath);
+
+    this.windows.set('__manual__', win);
+    return { created: true };
   }
 
   /** Enfoca la ventana principal de la app. */

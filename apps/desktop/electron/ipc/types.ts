@@ -1348,6 +1348,7 @@ export interface ApiSurface {
     closeSelf(): Res<{ closed: boolean }>;
     minimizeSelf(): Res<{ minimized: boolean }>;
     focusMain(): Res<{ ok: true }>;
+    openManual(): Res<{ created: boolean }>;
   };
   print: {
     /** Diagnóstico de impresión: reporte de texto (impresoras del SO + config). */

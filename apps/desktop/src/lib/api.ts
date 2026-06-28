@@ -329,6 +329,7 @@ export const api = {
     closeSelf: (): Promise<{ closed: boolean }> => unwrap(sf().desktopWindow.closeSelf()),
     minimizeSelf: (): Promise<{ minimized: boolean }> => unwrap(sf().desktopWindow.minimizeSelf()),
     focusMain: (): Promise<{ ok: true }> => unwrap(sf().desktopWindow.focusMain()),
+    openManual: (): Promise<{ created: boolean }> => unwrap(sf().desktopWindow.openManual()),
   },
   license: {
     getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),

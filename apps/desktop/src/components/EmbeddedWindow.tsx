@@ -16,7 +16,7 @@
  * todo el RouterProvider en `main.tsx`, así que esta ruta los hereda. Sólo falta
  * `AuthProvider`, que lo aporta `AuthShell` arriba de las rutas.
  */
-import { Suspense, useMemo } from 'react'
+import { Suspense, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/contexts/AuthContext'
@@ -45,6 +45,11 @@ export function EmbeddedWindow() {
   useEmbeddedShortcuts()
 
   const def = pageKey ? WINDOWS[pageKey] : undefined
+
+  // Título nativo por función (cada ventana de módulo tiene su propio título).
+  useEffect(() => {
+    if (def?.title) document.title = `${def.title} - StockFlow`
+  }, [def?.title])
 
   // Params planos de la querystring (excluyendo el param reservado de extras).
   const params = useMemo<Record<string, string>>(() => {

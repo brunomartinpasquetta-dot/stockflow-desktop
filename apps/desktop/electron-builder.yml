@@ -19,6 +19,8 @@ extraResources:
     to: migrations/local
     filter:
       - "**/*"
+  - from: build/manual.pdf
+    to: manual.pdf
 
 asar: true
 asarUnpack:
