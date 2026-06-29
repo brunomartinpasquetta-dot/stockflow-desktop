@@ -225,6 +225,12 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           for (const p of paymentsIn) {
             const pm = pmMap.get(p.paymentMethodId);
             if (!pm) throw new NotFoundError('Medio de pago', p.paymentMethodId);
+            // Comisión del medio de pago: el comercio la ABSORBE. El cliente paga
+            // `amount` íntegro; commissionAmount se descuenta del neto que recibe el
+            // comercio. commissionAmount = amount * commissionPct / 100 (4 decimales).
+            const commissionPct = pm.commissionPct ?? '0.0000';
+            const commissionAmount = mulDecimal(mulDecimal(p.amount, commissionPct, 6), '0.01', 4);
+            const netAmount = subDecimal(p.amount, commissionAmount, 4);
             const sp = tx
               .insert(salePayments)
               .values({
@@ -232,6 +238,9 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
                 paymentMethodId: p.paymentMethodId,
                 amount: p.amount,
                 reference: p.reference ?? null,
+                commissionPct,
+                commissionAmount,
+                netAmount,
               })
               .returning()
               .all()[0];

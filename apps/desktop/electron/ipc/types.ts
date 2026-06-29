@@ -493,6 +493,8 @@ export interface PaymentMethodBreakdownDTO {
   incomeTotal: string;
   expenseTotal: string;
   net: string;
+  /** Comisión total descontada por este medio (monto × commissionPct). */
+  commissionTotal?: string;
 }
 
 export interface HistoricalCashRegisterDTO {
@@ -560,6 +562,8 @@ export interface CashReportDTO {
   difference: string | null;
   byPaymentMethod: PaymentMethodBreakdownDTO[];
   movements: CashMovementDTO[];
+  /** Comisión total descontada de los medios de pago en el período. */
+  commissionTotal?: string;
 }
 
 export interface StockCheckDTO {
@@ -1496,6 +1500,8 @@ export interface PrinterConfigDTO {
   paperFormat?: PaperFormatDTO;
   /** Impresión silenciosa (sin dialog del SO). Default false. */
   silentPrint?: boolean;
+  /** Imprimir el ticket automáticamente al confirmar una venta. Default true. */
+  autoPrintOnSale?: boolean;
 }
 
 export type ScaleProtocolDTO = 'kretz' | 'systel' | 'magris' | 'generic';

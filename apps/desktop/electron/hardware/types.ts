@@ -27,6 +27,12 @@ export interface PrinterConfig {
    * y un `interface` (nombre de impresora del SO) válido. Default false.
    */
   silentPrint?: boolean;
+  /**
+   * Imprimir el ticket automáticamente al confirmar una venta. Si es false, la
+   * venta NO imprime al confirmar (el operador puede usar "Imprimir último
+   * ticket" en el PDV). Default true.
+   */
+  autoPrintOnSale?: boolean;
 }
 
 export type ScaleProtocol = 'kretz' | 'systel' | 'magris' | 'generic';

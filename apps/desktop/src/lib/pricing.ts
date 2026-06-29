@@ -12,12 +12,22 @@ function n(v: string | number | null | undefined): number {
   return Number.isFinite(x) ? x : 0
 }
 
-/** Precio unitario según lista del cliente / precio mayorista (si quantity >= wholesaleMinQty). */
-export function resolvePrice(article: ArticleDTO, customer: CustomerDTO | null, quantity: string | number): string {
+/**
+ * Precio unitario según lista del cliente / precio mayorista (si quantity >= wholesaleMinQty).
+ * `forcedList` (override del selector de lista del PDV) manda sobre `customer.priceList`
+ * cuando está presente. La lógica mayorista se mantiene por encima de ambos.
+ */
+export function resolvePrice(
+  article: ArticleDTO,
+  customer: CustomerDTO | null,
+  quantity: string | number,
+  forcedList?: 1 | 2 | 3,
+): string {
   if (n(article.wholesalePrice) > 0 && n(quantity) >= n(article.wholesaleMinQty)) {
     return article.wholesalePrice
   }
-  switch (customer?.priceList) {
+  const list = forcedList ?? customer?.priceList
+  switch (list) {
     case 2:
       return article.listPrice2
     case 3:

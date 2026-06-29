@@ -1,8 +1,10 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, lte } from 'drizzle-orm';
+import { sumDecimals } from '@stockflow/shared';
 
 import { ConstraintError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import {
+  sales,
   salePayments,
   type NewSalePayment,
   type SalePayment,
@@ -52,6 +54,67 @@ export class SalePaymentRepository extends BaseRepository<
         }
         return out;
       });
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Comisiones de los pagos de una caja (sólo ventas COMPLETADAS).
+   * JOIN sale_payments → sales WHERE sales.cash_register_id = X AND status='completed'.
+   * Devuelve el total y el desglose por medio de pago. La comisión la ABSORBE el
+   * comercio (costo financiero); no se le suma al cliente.
+   */
+  async getCommissionByRegister(
+    cashRegisterId: string,
+  ): Promise<{ total: string; byMethod: Map<string, string> }> {
+    try {
+      const rows = this.db
+        .select({
+          paymentMethodId: salePayments.paymentMethodId,
+          commissionAmount: salePayments.commissionAmount,
+        })
+        .from(salePayments)
+        .innerJoin(sales, eq(salePayments.saleId, sales.id))
+        .where(
+          and(
+            eq(sales.cashRegisterId, cashRegisterId),
+            eq(sales.status, 'completed'),
+          ),
+        )
+        .all();
+
+      const byMethod = new Map<string, string>();
+      for (const r of rows) {
+        const prev = byMethod.get(r.paymentMethodId) ?? '0.0000';
+        byMethod.set(r.paymentMethodId, sumDecimals([prev, r.commissionAmount]));
+      }
+      const total = sumDecimals(rows.map((r) => r.commissionAmount));
+      return { total, byMethod };
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Suma de comisiones de las ventas COMPLETADAS en un rango de fechas (costo
+   * financiero del período). Absorbida por el comercio.
+   */
+  async getCommissionByDateRange(from: number, to: number): Promise<string> {
+    try {
+      const rows = this.db
+        .select({ commissionAmount: salePayments.commissionAmount })
+        .from(salePayments)
+        .innerJoin(sales, eq(salePayments.saleId, sales.id))
+        .where(
+          and(
+            gte(sales.date, from),
+            lte(sales.date, to),
+            eq(sales.status, 'completed'),
+          ),
+        )
+        .all();
+      return sumDecimals(rows.map((r) => r.commissionAmount));
     } catch (err) {
       return rethrowDbError(err);
     }

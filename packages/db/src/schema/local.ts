@@ -396,6 +396,15 @@ export const salePayments = sqliteTable(
     amount: text('amount').notNull(),
     /** Ej. últimos 4 dígitos de tarjeta, número de transferencia. */
     reference: text('reference'),
+    /**
+     * Comisión del medio de pago aplicada a este pago (el comercio la ABSORBE).
+     * `commissionPct`: % copiado del medio de pago al momento de la venta.
+     * `commissionAmount`: amount * commissionPct / 100 (4 decimales).
+     * `netAmount`: amount - commissionAmount (lo que efectivamente recibe el comercio).
+     */
+    commissionPct: text('commission_pct').notNull().default('0.0000'),
+    commissionAmount: text('commission_amount').notNull().default('0.0000'),
+    netAmount: text('net_amount').notNull().default('0.0000'),
     createdAt: createdAtCol(),
   },
   (t) => ({

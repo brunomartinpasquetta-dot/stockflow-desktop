@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { List, Loader2, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
+import { List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import {
@@ -352,6 +352,34 @@ function PDV() {
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
   // Modo mixto explícito (toggle "Pago Mixto"): expone el split N-filas.
   const [mixedMode, setMixedMode] = useState(false)
+  // Lista de precios activa del PDV (override del selector). Default Lista 1.
+  // Manda sobre la lista del cliente cuando el operador la cambia a mano.
+  const [selectedPriceList, setSelectedPriceList] = useState<1 | 2 | 3>(1)
+  // Última venta confirmada (para "Imprimir último ticket" manual).
+  const [lastSaleResult, setLastSaleResult] = useState<{
+    ticketData: SaleTicketData
+    printerCfg: PrinterConfigDTO | null
+  } | null>(null)
+  // Toggle "Imprimir ticket automáticamente". Valor inicial = config; al
+  // cambiarlo se persiste en la config (se recuerda entre sesiones).
+  const [autoPrintOnSale, setAutoPrintOnSale] = useState(true)
+  const [autoPrintSeeded, setAutoPrintSeeded] = useState(false)
+  // Sembrar el toggle desde la config persistida una sola vez (undefined→true).
+  if (!autoPrintSeeded && printerConfigQuery.data !== undefined) {
+    setAutoPrintSeeded(true)
+    setAutoPrintOnSale(printerConfigQuery.data?.autoPrintOnSale !== false)
+  }
+  function toggleAutoPrint(next: boolean): void {
+    setAutoPrintOnSale(next)
+    const cfg = printerConfigQuery.data
+    if (cfg) {
+      // Persistir el cambio en la config (mismo flag que Configuración).
+      api.hardware.printer
+        .setConfig({ ...cfg, autoPrintOnSale: next })
+        .then(() => printerConfigQuery.refetch())
+        .catch(() => {})
+    }
+  }
 
   useEffect(() => {
     barcodeRef.current?.focus()
@@ -400,13 +428,13 @@ function PDV() {
         next[idx] = {
           ...line,
           quantity: newQty,
-          unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(article, selectedCustomer, newQty),
+          unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(article, selectedCustomer, newQty, selectedPriceList),
         }
         return next
       }
       return [
         ...prev,
-        { article, quantity: qty, unitPrice: resolvePrice(article, selectedCustomer, qty), discount: '0', priceManuallySet: false },
+        { article, quantity: qty, unitPrice: resolvePrice(article, selectedCustomer, qty, selectedPriceList), discount: '0', priceManuallySet: false },
       ]
     })
   }
@@ -420,7 +448,7 @@ function PDV() {
       next[i] = {
         ...line,
         quantity: value,
-        unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(line.article, selectedCustomer, value),
+        unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(line.article, selectedCustomer, value, selectedPriceList),
       }
       return next
     })
@@ -450,9 +478,19 @@ function PDV() {
   function pickCustomer(c: CustomerDTO): void {
     setCustomerId(c.id)
     setCustomerPickerOpen(false)
-    setCart((prev) => prev.map((l) => (l.priceManuallySet ? l : { ...l, unitPrice: resolvePrice(l.article, c, l.quantity) })))
+    // Autocompletar la lista de precios con la del cliente (CF / sin lista → Lista 1).
+    // Se puede cambiar manualmente después.
+    const list: 1 | 2 | 3 = isCfCustomer(c) ? 1 : (c.priceList as 1 | 2 | 3) ?? 1
+    setSelectedPriceList(list)
+    setCart((prev) => prev.map((l) => (l.priceManuallySet ? l : { ...l, unitPrice: resolvePrice(l.article, c, l.quantity, list) })))
     if (isCfCustomer(c)) setIsAccountSale(false)
     barcodeRef.current?.focus()
+  }
+
+  // Cambio manual del selector de lista: re-resolver las líneas NO editadas a mano.
+  function changePriceList(list: 1 | 2 | 3): void {
+    setSelectedPriceList(list)
+    setCart((prev) => prev.map((l) => (l.priceManuallySet ? l : { ...l, unitPrice: resolvePrice(l.article, selectedCustomer, l.quantity, list) })))
   }
 
   // --- búsqueda de productos ---
@@ -536,6 +574,27 @@ function PDV() {
     () => activeMethods.find((m) => m.id === selectedMethodId) ?? null,
     [activeMethods, selectedMethodId],
   )
+
+  // ── Comisión del medio de pago (FEATURE #1, sólo informativo para el vendedor) ──
+  // El comercio ABSORBE la comisión; el cliente paga el total normal. Acá se
+  // muestra al vendedor cuánto se lleva el medio y cuánto NETO entra a caja.
+  // NUNCA se agrega al ticket ni al total que paga el cliente.
+  const commissionByPct = useMemo(() => new Map(activeMethods.map((m) => [m.id, Number(m.commissionPct)])), [activeMethods])
+  const commissionTotal = useMemo(() => {
+    if (accountSale) return 0
+    let sum = 0
+    if (mixedMode) {
+      for (const p of split.payments) {
+        const pct = commissionByPct.get(p.paymentMethodId) ?? 0
+        if (pct > 0) sum += (Number(p.amount) * pct) / 100
+      }
+    } else if (selectedMethod) {
+      const pct = Number(selectedMethod.commissionPct)
+      if (pct > 0) sum += (totalNum * pct) / 100
+    }
+    return sum
+  }, [accountSale, mixedMode, split.payments, selectedMethod, commissionByPct, totalNum])
+  const netToCash = totalNum - commissionTotal
 
   const canConfirm =
     canWrite &&
@@ -650,13 +709,28 @@ function PDV() {
           api.hardware.cashDrawer.open().catch(() => {})
         }
       }
-      // Impresión AISLADA: no se await-ea → nunca bloquea el reset.
+      // Guardamos SIEMPRE el último ticket para "Imprimir último ticket".
       const ticketData = buildTicket(result)
-      void printSaleTicket(ticketData, result, printerCfg).catch((e) => {
-        console.warn('[venta] impresión del ticket falló:', e)
-      })
+      setLastSaleResult({ ticketData, printerCfg })
+      // Impresión AISLADA: no se await-ea → nunca bloquea el reset.
+      // Sólo se imprime si el toggle "Imprimir ticket automáticamente" está ON.
+      if (autoPrintOnSale) {
+        void printSaleTicket(ticketData, result, printerCfg).catch((e) => {
+          console.warn('[venta] impresión del ticket falló:', e)
+        })
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
+    }
+  }
+
+  // Imprime manualmente la ÚLTIMA venta confirmada (útil con auto-print apagado).
+  async function imprimirUltimoTicket(): Promise<void> {
+    if (!lastSaleResult) return
+    try {
+      await printSaleTicketSilent(lastSaleResult.ticketData, lastSaleResult.printerCfg)
+    } catch (e) {
+      console.warn('[venta] reimpresión del último ticket falló:', e)
     }
   }
 
@@ -691,9 +765,12 @@ function PDV() {
       void numberQuery.refetch()
       const ticketData = buildTicket(result)
       const printerCfg = printerConfigQuery.data ?? null
-      void printSaleTicket(ticketData, result, printerCfg).catch((e) => {
-        console.warn('[venta] impresión del ticket falló:', e)
-      })
+      setLastSaleResult({ ticketData, printerCfg })
+      if (autoPrintOnSale) {
+        void printSaleTicket(ticketData, result, printerCfg).catch((e) => {
+          console.warn('[venta] impresión del ticket falló:', e)
+        })
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
     } finally {
@@ -747,6 +824,21 @@ function PDV() {
               </span>
               <Search className="h-4 w-4 shrink-0 opacity-60" />
             </Button>
+            <div className="flex shrink-0 flex-col gap-0.5">
+              <Label htmlFor="pdv-pricelist" className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Lista de precios
+              </Label>
+              <Select
+                id="pdv-pricelist"
+                className="h-9 w-32"
+                value={String(selectedPriceList)}
+                onChange={(e) => changePriceList(Number(e.target.value) as 1 | 2 | 3)}
+              >
+                <option value="1">Lista 1</option>
+                <option value="2">Lista 2</option>
+                <option value="3">Lista 3</option>
+              </Select>
+            </div>
           </div>
           {selectedCustomer && (selectedCustomer.docNumber || Number(customerDebt) > 0) && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -815,7 +907,7 @@ function PDV() {
                     <span className="truncate">
                       <span className="font-mono text-xs text-muted-foreground">{a.barcode}</span> · {a.description}
                     </span>
-                    <span className="ml-2 shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1'))}</span>
+                    <span className="ml-2 shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1', selectedPriceList))}</span>
                   </button>
                 ))}
               </div>
@@ -1013,6 +1105,24 @@ function PDV() {
               )}
             </>
           )}
+
+          {/* Detalle de comisión del medio de pago (SOLO para el vendedor).
+              El comercio absorbe la comisión; el cliente paga el TOTAL normal. */}
+          {!accountSale && commissionTotal > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs dark:border-amber-700 dark:bg-amber-950">
+              <div className="flex justify-between text-amber-700 dark:text-amber-300">
+                <span>Comisión del medio de pago</span>
+                <span className="tabular-nums">− {formatCurrency(commissionTotal.toFixed(4))}</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>Neto que entra a caja</span>
+                <span className="tabular-nums">{formatCurrency(netToCash.toFixed(4))}</span>
+              </div>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                El cliente paga el total; la comisión la absorbe el comercio (no se discrimina en el ticket).
+              </p>
+            </div>
+          )}
         </div>
 
         {/* confirmar */}
@@ -1026,6 +1136,15 @@ function PDV() {
               Cobrar con QR MercadoPago — {formatCurrency(totals.total)}
             </Button>
           )}
+          <label className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input"
+              checked={autoPrintOnSale}
+              onChange={(e) => toggleAutoPrint(e.target.checked)}
+            />
+            <span>Imprimir ticket automáticamente</span>
+          </label>
           <Button
             variant="success"
             className="h-14 text-lg"
@@ -1034,6 +1153,16 @@ function PDV() {
           >
             {createSale.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
             Confirmar venta (F2) — {formatCurrency(totals.total)}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!lastSaleResult}
+            onClick={() => void imprimirUltimoTicket()}
+            title={lastSaleResult ? undefined : 'Todavía no hay ninguna venta confirmada en esta sesión'}
+          >
+            <Printer className="h-4 w-4" />
+            Imprimir último ticket
           </Button>
           {cart.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearSale} disabled={createSale.isPending}>

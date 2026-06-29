@@ -38,6 +38,10 @@ export interface FinancialSummary {
   cmv: { total: string; calculatedFromCurrent: boolean };
   grossResult: string;
   grossMarginPct: string;
+  /** Costos financieros del período: comisiones por medio de pago (las absorbe el comercio). */
+  financialCosts: string;
+  /** Resultado neto = resultado bruto − costos financieros. */
+  netResult: string;
   vatPosition: string;
 }
 
@@ -197,6 +201,11 @@ export class AccountingService {
       ? ((Number(grossResult) / salesNum) * 100).toFixed(2)
       : '0.00';
 
+    // 5b) Costos financieros (comisiones por medio de pago de ventas completadas).
+    // El comercio las ABSORBE: reducen el resultado neto del período.
+    const financialCosts = await this.ctx.repos.salePayments.getCommissionByDateRange(from, to);
+    const netResult = subDecimal(grossResult, financialCosts);
+
     // 6) Posición IVA
     const vatPosition = subDecimal(salesVat, purchasesVat);
 
@@ -214,6 +223,8 @@ export class AccountingService {
       cmv: { total: cmv, calculatedFromCurrent: true },
       grossResult,
       grossMarginPct,
+      financialCosts,
+      netResult,
       vatPosition,
     };
   }

@@ -268,6 +268,11 @@ function CajaAbierta({ registerId }: { registerId: string }) {
 
   const closeDiff = closeAmount ? (Number(parseCurrencyInput(closeAmount)) - Number(expected)).toFixed(4) : null
   const breakdown = r?.byPaymentMethod ?? []
+  // Comisión total descontada de los medios de pago (FEATURE #1). Si el backend
+  // todavía no envía el campo, se infiere sumando las comisiones por medio.
+  const commissionTotal =
+    r?.commissionTotal ?? breakdown.reduce((acc, b) => acc + Number(b.commissionTotal ?? '0'), 0).toFixed(4)
+  const hasCommission = Number(commissionTotal) > 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -306,6 +311,7 @@ function CajaAbierta({ registerId }: { registerId: string }) {
                   <TableHead>Medio</TableHead>
                   <TableHead className="text-right">Ingresos</TableHead>
                   <TableHead className="text-right">Egresos</TableHead>
+                  {hasCommission && <TableHead className="text-right">Comisión</TableHead>}
                   <TableHead className="text-right">Neto</TableHead>
                 </TableRow>
               </TableHeader>
@@ -318,11 +324,34 @@ function CajaAbierta({ registerId }: { registerId: string }) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-success">{formatCurrency(b.incomeTotal)}</TableCell>
                     <TableCell className="text-right tabular-nums text-destructive">{formatCurrency(b.expenseTotal)}</TableCell>
+                    {hasCommission && (
+                      <TableCell className="text-right tabular-nums text-amber-600 dark:text-amber-400">
+                        {Number(b.commissionTotal ?? '0') > 0 ? `− ${formatCurrency(b.commissionTotal ?? '0')}` : '—'}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right tabular-nums font-medium">{formatCurrency(b.net)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            {hasCommission && (
+              <div className="flex items-center justify-between border-t px-4 py-2 text-sm">
+                <span className="text-muted-foreground">
+                  Comisión total descontada de los medios de pago
+                </span>
+                <div className="flex items-center gap-6">
+                  <span className="tabular-nums text-amber-600 dark:text-amber-400">
+                    − {formatCurrency(commissionTotal)}
+                  </span>
+                  <span className="font-medium">
+                    Neto:{' '}
+                    <span className="tabular-nums">
+                      {formatCurrency((Number(r?.salesTotal ?? '0') - Number(commissionTotal)).toFixed(4))}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

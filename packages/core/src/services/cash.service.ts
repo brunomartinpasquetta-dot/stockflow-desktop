@@ -34,6 +34,8 @@ export interface PaymentMethodBreakdown {
   incomeTotal: string;
   expenseTotal: string;
   net: string;
+  /** Comisión absorbida por el comercio en las ventas completadas con este medio. */
+  commissionTotal: string;
 }
 
 export interface HistoricalCashRegisterSummary {
@@ -78,6 +80,8 @@ export interface CashReport {
   expenseTotal: string;
   salesCount: number;
   salesTotal: string;
+  /** Comisión total absorbida por el comercio en las ventas completadas de esta caja. */
+  commissionTotal: string;
   /** efectivo físico esperado = apertura + ingresos en efectivo − egresos en efectivo */
   expectedCash: string;
   /** monto declarado al cerrar (null si la caja sigue abierta) */
@@ -260,9 +264,10 @@ export class CashService {
 
   private async buildReport(register: CashRegister): Promise<CashReport> {
     const { repos } = this.ctx;
-    const [rawMovements, pmById] = await Promise.all([
+    const [rawMovements, pmById, commission] = await Promise.all([
       repos.cashMovements.findByRegister(register.id),
       repos.paymentMethods.byId(),
+      repos.salePayments.getCommissionByRegister(register.id),
     ]);
     const saleIds = [
       ...new Set(rawMovements.filter((m) => m.relatedSaleId).map((m) => m.relatedSaleId as string)),
@@ -301,6 +306,9 @@ export class CashService {
           incomeTotal: '0.0000',
           expenseTotal: '0.0000',
           net: '0.0000',
+          commissionTotal: m.paymentMethodId
+            ? commission.byMethod.get(m.paymentMethodId) ?? '0.0000'
+            : '0.0000',
         };
         byPmMap.set(key, b);
       }
@@ -330,6 +338,7 @@ export class CashService {
       expenseTotal,
       salesCount: completedSales.length,
       salesTotal,
+      commissionTotal: commission.total,
       expectedCash,
       closingAmount: register.closingAmount ?? null,
       difference,
