@@ -95,10 +95,10 @@ const GROUPS: MenuGroup[] = [
     name: 'Gestión',
     items: [
       { pageKey: 'articulos', label: 'Artículos', icon: Package, shortcut: 'F1', requires: 'view_articles' },
-      { pageKey: 'proveedores', label: 'Proveedores', icon: Truck, shortcut: 'F2', requires: 'manage_suppliers' },
-      { pageKey: 'clientes', label: 'Clientes', icon: Users, shortcut: 'F3' },
+      { pageKey: 'proveedores', label: 'Proveedores', icon: Truck, shortcut: 'F3', requires: 'manage_suppliers' },
+      { pageKey: 'clientes', label: 'Clientes', icon: Users, shortcut: 'F6' },
       { pageKey: 'familias', label: 'Familias', icon: Tags },
-      { pageKey: 'usuarios', label: 'Usuarios', icon: ShieldCheck, shortcut: 'F4', roles: ['admin'], requires: 'manage_users' },
+      { pageKey: 'usuarios', label: 'Usuarios', icon: ShieldCheck, shortcut: 'F12', roles: ['admin'], requires: 'manage_users' },
       { separator: true, label: '' },
       { pageKey: 'medios-de-pago', label: 'Medios de Pago', icon: CreditCard, roles: ['admin', 'manager'], requires: 'manage_payment_methods' },
       { separator: true, label: '' },
@@ -108,15 +108,15 @@ const GROUPS: MenuGroup[] = [
   {
     name: 'Operaciones',
     items: [
-      { pageKey: 'ventas', label: 'Ventas', icon: Receipt, shortcut: 'F6', requires: 'create_sale' },
-      { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F5', requires: 'manage_purchases' },
-      { pageKey: 'caja', label: 'Caja', icon: Wallet, shortcut: 'F7' },
+      { pageKey: 'ventas', label: 'Ventas', icon: Receipt, shortcut: 'F5', requires: 'create_sale' },
+      { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F2', requires: 'manage_purchases' },
+      { pageKey: 'caja', label: 'Caja', icon: Wallet, shortcut: 'F4' },
     ],
   },
   {
     name: 'Cobros y Pagos',
     items: [
-      { pageKey: 'cuentas-corrientes', label: 'Cuentas Corrientes — Clientes', icon: Landmark },
+      { pageKey: 'cuentas-corrientes', label: 'Cuentas Corrientes — Clientes', icon: Landmark, shortcut: 'F9' },
       { pageKey: 'cuentas-corrientes-proveedores', label: 'Cuentas Corrientes — Proveedores', icon: Truck },
       { separator: true, label: '' },
       { pageKey: 'configuracion-mp', label: 'MercadoPago QR (configuración)', icon: CreditCard, roles: ['admin'], requires: 'manage_mp_qr' },
@@ -132,14 +132,14 @@ const GROUPS: MenuGroup[] = [
   {
     name: 'Consultas',
     items: [
-      { pageKey: 'historial-ventas', label: 'Historial de Ventas', icon: Receipt, shortcut: 'F8' },
+      { pageKey: 'historial-ventas', label: 'Historial de Ventas', icon: Receipt, shortcut: 'F7' },
       { pageKey: 'historial-compras', label: 'Historial de Compras', icon: History },
-      { pageKey: 'historial-cajas', label: 'Historial de Cajas', icon: History, shortcut: 'F9', requires: 'view_reports' },
+      { pageKey: 'historial-cajas', label: 'Historial de Cajas', icon: History, shortcut: 'F8', requires: 'view_reports' },
       { separator: true, label: '' },
       { pageKey: 'generador-compras', label: 'Generador de Compras', icon: PackagePlus, requires: 'view_reports' },
       { pageKey: 'inventario-articulos', label: 'Inventario de Artículos', icon: Boxes, requires: 'view_reports' },
       { pageKey: 'ventas-vendedor', label: 'Ventas por Vendedor', icon: ArrowLeftRight, requires: 'view_reports' },
-      { pageKey: 'estadisticas', label: 'Estadísticas', icon: BarChart3, requires: 'view_reports' },
+      { pageKey: 'estadisticas', label: 'Estadísticas', icon: BarChart3, shortcut: 'F11', requires: 'view_reports' },
     ],
   },
   {

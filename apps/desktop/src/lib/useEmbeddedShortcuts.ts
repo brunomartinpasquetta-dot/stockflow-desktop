@@ -4,7 +4,7 @@
  * Corre dentro de cada `BrowserWindow` embedded (no tiene WindowManager).
  * - Cmd/Ctrl+W → cierra esta ventana nativa.
  * - Cmd/Ctrl+M → minimiza esta ventana nativa.
- * - F1..F10 → abre la ventana nativa mapeada en el registry (vía IPC).
+ * - F1..F12 → abre la ventana nativa mapeada en el registry (vía IPC).
  *
  * Respeta inputs activos (no dispara en input/textarea/select/contenteditable),
  * excepto los atajos de ventana (Cmd+W / Cmd+M).
@@ -57,8 +57,8 @@ export function useEmbeddedShortcuts(): void {
 
       if (isEditingTarget()) return
 
-      // F1..F10 → abrir ventana nativa por fKey.
-      const m = /^F([1-9]|10)$/.exec(e.key)
+      // F1..F12 → abrir ventana nativa por fKey.
+      const m = /^F(1[0-2]|[1-9])$/.exec(e.key)
       if (m) {
         const fnum = Number(m[1])
         const entry = Object.values(WINDOWS).find((w) => w.fKey === fnum)

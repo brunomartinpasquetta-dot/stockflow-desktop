@@ -1,8 +1,9 @@
 /**
  * QuickAccessToolbar (P-MDI-TOOLBAR).
  *
- * Barra horizontal con 10 botones grandes de acceso rápido a las pantallas
+ * Barra horizontal con 13 botones grandes de acceso rápido a las pantallas
  * más usadas. Cada botón abre la window correspondiente vía WindowManager.
+ * F-keys secuenciales F1..F12 en orden de la barra (Configuración sin atajo).
  *
  * Atajos F-keys mostrados como chip text-[10px]. Items deshabilitados (no
  * ocultos) cuando el usuario no tiene permisos.
@@ -18,6 +19,8 @@ import {
   Calculator,
   History,
   Package,
+  Settings,
+  ShieldCheck,
   ShoppingBag,
   ShoppingCart,
   Truck,
@@ -42,15 +45,18 @@ interface QuickButton {
 
 const BUTTONS: QuickButton[] = [
   { pageKey: 'articulos', label: 'Artículos', fKey: 'F1', Icon: Package },
-  { pageKey: 'proveedores', label: 'Proveedores', fKey: 'F2', Icon: Truck },
-  { pageKey: 'clientes', label: 'Clientes', fKey: 'F3', Icon: Users },
-  { pageKey: 'ventas', label: 'Ventas', fKey: 'F6', Icon: ShoppingCart },
-  { pageKey: 'compras', label: 'Compras', fKey: 'F5', Icon: ShoppingBag },
-  { pageKey: 'caja', label: 'Caja', fKey: 'F7', Icon: Wallet },
-  { pageKey: 'historial-ventas', label: 'Historial Ventas', fKey: 'F8', Icon: History },
-  { pageKey: 'cuentas-corrientes', label: 'Ctas. Cte.', Icon: BookUser },
-  { pageKey: 'estadisticas', label: 'Estadísticas', Icon: BarChart3 },
+  { pageKey: 'compras', label: 'Compras', fKey: 'F2', Icon: ShoppingBag },
+  { pageKey: 'proveedores', label: 'Proveedores', fKey: 'F3', Icon: Truck },
+  { pageKey: 'caja', label: 'Caja', fKey: 'F4', Icon: Wallet },
+  { pageKey: 'ventas', label: 'Ventas', fKey: 'F5', Icon: ShoppingCart },
+  { pageKey: 'clientes', label: 'Clientes', fKey: 'F6', Icon: Users },
+  { pageKey: 'historial-ventas', label: 'Historial Ventas', fKey: 'F7', Icon: History },
+  { pageKey: 'historial-cajas', label: 'Historial Cajas', fKey: 'F8', Icon: History },
+  { pageKey: 'cuentas-corrientes', label: 'Ctas. Cte.', fKey: 'F9', Icon: BookUser },
   { pageKey: 'contabilidad', label: 'Contabilidad', fKey: 'F10', Icon: Calculator },
+  { pageKey: 'estadisticas', label: 'Estadísticas', fKey: 'F11', Icon: BarChart3 },
+  { pageKey: 'usuarios', label: 'Usuarios', fKey: 'F12', Icon: ShieldCheck },
+  { pageKey: 'configuracion', label: 'Configuración', Icon: Settings },
 ]
 
 export function QuickAccessToolbar() {
