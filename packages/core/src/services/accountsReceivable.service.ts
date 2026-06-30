@@ -31,6 +31,24 @@ export interface ReceivePaymentResult {
   account: AccountReceivable;
 }
 
+/** Cobranza a NIVEL CUENTA: se aplica al saldo total del cliente (FIFO). */
+export interface ReceivePaymentToCustomerInput {
+  customerId: string;
+  /** Una o más líneas de pago; la suma es lo cobrado. */
+  payments: PaymentDraft[];
+  /** Si se indica, la suma de los pagos debe coincidir EXACTAMENTE con este monto. */
+  expectedAmount?: string;
+  notes?: string | null;
+  cashRegisterId?: string;
+}
+
+export interface ReceivePaymentToCustomerResult {
+  payments: Payment[];
+  /** Comprobantes afectados, con su balance/status ya actualizados. */
+  accounts: AccountReceivable[];
+  totalApplied: string;
+}
+
 export interface StatementEntry {
   date: number;
   kind: 'sale' | 'payment';
@@ -141,6 +159,64 @@ export class AccountsReceivableService {
     const updatedAccount = await repos.accountsReceivable.findById(input.accountId);
     if (!updatedAccount) throw new NotFoundError('Cuenta corriente', input.accountId);
     return { payments, account: updatedAccount };
+  }
+
+  /**
+   * Registra una cobranza a NIVEL CUENTA: el monto se aplica al saldo total del
+   * cliente, distribuyéndose automáticamente entre sus comprobantes abiertos en
+   * orden FIFO (del más viejo al más nuevo). El repositorio hace la transacción
+   * atómica. No rompe la cobranza per-comprobante (`receivePayment`).
+   */
+  async receivePaymentToCustomer(
+    input: ReceivePaymentToCustomerInput,
+  ): Promise<ReceivePaymentToCustomerResult> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'receive_payment');
+
+    const customer = await repos.customers.findById(input.customerId);
+    if (!customer) throw new NotFoundError('Cliente', input.customerId);
+    if (input.payments.length === 0) {
+      throw new BusinessRuleError('no_payment_lines', 'Hay que registrar al menos un pago');
+    }
+    const totalPaid = sumDecimals(input.payments.map((p) => p.amount));
+    if (cmpDecimal(totalPaid, '0') <= 0) {
+      throw new BusinessRuleError('invalid_payment_amount', 'El monto cobrado debe ser positivo');
+    }
+    if (input.expectedAmount != null) {
+      const cmp = cmpDecimal(totalPaid, input.expectedAmount);
+      if (cmp > 0) throw new ValidationError('payments', 'Los pagos exceden el monto a cobrar');
+      if (cmp < 0) throw new ValidationError('payments', 'Los pagos no cubren el monto a cobrar');
+    }
+
+    const totalOpen = await repos.accountsReceivable.getTotalBalance(input.customerId);
+    if (cmpDecimal(totalPaid, totalOpen) > 0) {
+      throw new BusinessRuleError(
+        'payment_exceeds_balance',
+        `La cobranza (${totalPaid}) supera el saldo total del cliente (${totalOpen})`,
+      );
+    }
+
+    const cashRegisterId =
+      input.cashRegisterId ??
+      (this.ctx.currentCashRegister?.status === 'open'
+        ? this.ctx.currentCashRegister.id
+        : (await repos.cashRegisters.getCurrentOpen())?.id);
+    if (!cashRegisterId) {
+      throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el ingreso');
+    }
+
+    const result = await repos.payments.createAccountPayment({
+      customerId: input.customerId,
+      payments: input.payments.map((p) => ({
+        paymentMethodId: p.paymentMethodId,
+        amount: p.amount,
+        reference: p.reference ?? null,
+      })),
+      notes: input.notes ?? null,
+      cashRegisterId,
+      userId: currentUser.id,
+    });
+    return result;
   }
 
   /** Estado de cuenta cronológico de un cliente (ventas a cuenta + pagos). */

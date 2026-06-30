@@ -30,6 +30,23 @@ export interface PaySupplierInvoiceResult {
   account: SupplierAccountPayable;
 }
 
+/** Pago a NIVEL CUENTA de proveedor: se aplica al saldo total (FIFO). */
+export interface PayToSupplierInput {
+  supplierId: string;
+  payments: SupplierPaymentDraft[];
+  /** Si se indica, la suma de los pagos debe coincidir exactamente con este monto. */
+  expectedAmount?: string;
+  notes?: string | null;
+  cashRegisterId?: string;
+}
+
+export interface PayToSupplierResult {
+  payments: SupplierPayment[];
+  /** Comprobantes afectados, con su balance/status ya actualizados. */
+  accounts: SupplierAccountPayable[];
+  totalApplied: string;
+}
+
 export interface SupplierStatementEntry {
   date: number;
   kind: 'purchase' | 'payment';
@@ -157,6 +174,62 @@ export class SupplierAccountsService {
     const updatedAccount = await repos.supplierAccountsPayable.findById(input.accountId);
     if (!updatedAccount) throw new NotFoundError('Cuenta de proveedor', input.accountId);
     return { payments, account: updatedAccount };
+  }
+
+  /**
+   * Registra un pago a NIVEL CUENTA de proveedor: el monto se aplica al saldo
+   * total del proveedor, distribuyéndose automáticamente entre sus comprobantes
+   * abiertos en orden FIFO (del más viejo al más nuevo). El repositorio hace la
+   * transacción atómica. No rompe el pago per-comprobante (`payInvoice`).
+   */
+  async payToSupplier(input: PayToSupplierInput): Promise<PayToSupplierResult> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'manage_supplier_accounts');
+
+    const supplier = await repos.suppliers.findById(input.supplierId);
+    if (!supplier) throw new NotFoundError('Proveedor', input.supplierId);
+    if (input.payments.length === 0) {
+      throw new BusinessRuleError('no_payment_lines', 'Hay que registrar al menos un pago');
+    }
+    const totalPaid = sumDecimals(input.payments.map((p) => p.amount));
+    if (cmpDecimal(totalPaid, '0') <= 0) {
+      throw new BusinessRuleError('invalid_payment_amount', 'El monto pagado debe ser positivo');
+    }
+    if (input.expectedAmount != null) {
+      const cmp = cmpDecimal(totalPaid, input.expectedAmount);
+      if (cmp > 0) throw new ValidationError('payments', 'Los pagos exceden el monto a pagar');
+      if (cmp < 0) throw new ValidationError('payments', 'Los pagos no cubren el monto a pagar');
+    }
+
+    const totalOpen = await repos.supplierAccountsPayable.getTotalBalance(input.supplierId);
+    if (cmpDecimal(totalPaid, totalOpen) > 0) {
+      throw new BusinessRuleError(
+        'payment_exceeds_balance',
+        `El pago (${totalPaid}) supera el saldo total del proveedor (${totalOpen})`,
+      );
+    }
+
+    const cashRegisterId =
+      input.cashRegisterId ??
+      (this.ctx.currentCashRegister?.status === 'open'
+        ? this.ctx.currentCashRegister.id
+        : (await repos.cashRegisters.getCurrentOpen())?.id);
+    if (!cashRegisterId) {
+      throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el egreso');
+    }
+
+    const result = await repos.supplierPayments.createAccountPayment({
+      supplierId: input.supplierId,
+      payments: input.payments.map((p) => ({
+        paymentMethodId: p.paymentMethodId,
+        amount: p.amount,
+        reference: p.reference ?? null,
+      })),
+      notes: input.notes ?? null,
+      cashRegisterId,
+      userId: currentUser.id,
+    });
+    return result;
   }
 
   /**

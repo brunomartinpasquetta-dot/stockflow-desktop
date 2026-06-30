@@ -470,6 +470,21 @@ export interface PaySupplierInvoiceResultDTO {
   account: SupplierAccountPayableDTO;
 }
 
+/** Pago a nivel cuenta de proveedor (se distribuye FIFO entre comprobantes). */
+export interface PayToSupplierInputDTO {
+  supplierId: string;
+  payments: PaymentInputDTO[];
+  expectedAmount?: string;
+  notes?: string | null;
+  cashRegisterId?: string;
+}
+
+export interface PayToSupplierResultDTO {
+  payments: SupplierPaymentDTO[];
+  accounts: SupplierAccountPayableDTO[];
+  totalApplied: string;
+}
+
 export interface SupplierStatementEntryDTO {
   date: number;
   kind: 'purchase' | 'payment';
@@ -611,6 +626,22 @@ export interface ReceivePaymentInputDTO {
 export interface ReceivePaymentResultDTO {
   payments: PaymentDTO[];
   account: AccountReceivableDTO;
+}
+
+/** Cobranza a nivel cuenta de cliente (se distribuye FIFO entre comprobantes). */
+export interface ReceivePaymentToCustomerInputDTO {
+  customerId: string;
+  payments: PaymentInputDTO[];
+  /** Si se indica, la suma de los pagos debe coincidir exactamente con este monto. */
+  expectedAmount?: string;
+  notes?: string | null;
+  cashRegisterId?: string;
+}
+
+export interface ReceivePaymentToCustomerResultDTO {
+  payments: PaymentDTO[];
+  accounts: AccountReceivableDTO[];
+  totalApplied: string;
 }
 
 export interface StatementEntryDTO {
@@ -1278,6 +1309,7 @@ export interface ApiSurface {
   supplierAccounts: {
     listBalances(): Res<SupplierBalanceDTO[]>;
     payInvoice(payload: PaySupplierInvoiceInputDTO): Res<PaySupplierInvoiceResultDTO>;
+    payToSupplier(payload: PayToSupplierInputDTO): Res<PayToSupplierResultDTO>;
     getStatement(payload: { supplierId: string; dateRange?: DateRangeDTO }): Res<SupplierStatementDTO>;
     listOpenBySupplier(payload: { supplierId: string }): Res<SupplierAccountPayableDTO[]>;
     getAccountDetail(payload: { accountId: string }): Res<SupplierAccountPayableDetailDTO>;
@@ -1333,6 +1365,7 @@ export interface ApiSurface {
   };
   accounts: {
     receivePayment(payload: ReceivePaymentInputDTO): Res<ReceivePaymentResultDTO>;
+    receivePaymentToCustomer(payload: ReceivePaymentToCustomerInputDTO): Res<ReceivePaymentToCustomerResultDTO>;
     getStatement(payload: { customerId: string; dateRange?: DateRangeDTO }): Res<CustomerStatementDTO>;
     getTotalReceivables(): Res<{ total: string }>;
     listBalances(): Res<CustomerBalanceDTO[]>;

@@ -4,6 +4,8 @@ import { type HandlerDeps, type HandlerMap, withSession } from '../handler-conte
 import type {
   PaySupplierInvoiceInputDTO,
   PaySupplierInvoiceResultDTO,
+  PayToSupplierInputDTO,
+  PayToSupplierResultDTO,
   SupplierAccountPayableDetailDTO,
   SupplierAccountPayableDTO,
   SupplierBalanceDTO,
@@ -23,6 +25,11 @@ export function buildSupplierAccountsHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: PaySupplierInvoiceInputDTO, ctx): Promise<PaySupplierInvoiceResultDTO> =>
         new SupplierAccountsService(ctx).payInvoice(payload),
+    ),
+    'supplierAccounts:payToSupplier': withSession(
+      deps,
+      (payload: PayToSupplierInputDTO, ctx): Promise<PayToSupplierResultDTO> =>
+        new SupplierAccountsService(ctx).payToSupplier(payload),
     ),
     'supplierAccounts:getStatement': withSession(
       deps,

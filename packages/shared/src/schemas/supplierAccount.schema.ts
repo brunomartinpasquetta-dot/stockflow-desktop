@@ -50,7 +50,24 @@ export const CreateSupplierPaymentSchema = z.object({
   userId: idSchema,
 });
 
+/**
+ * Input para registrar un pago a NIVEL CUENTA de proveedor: un monto (posiblemente
+ * mixto) que se aplica al saldo total del proveedor distribuyéndose entre sus
+ * comprobantes abiertos (FIFO, del más viejo al más nuevo).
+ */
+export const CreateSupplierAccountPaymentSchema = z.object({
+  supplierId: idSchema,
+  payments: z.array(PaymentInputSchema).min(1, 'Debe registrarse al menos un pago'),
+  date: timestampSchema.optional(),
+  notes: z.string().nullish(),
+  /** Caja donde impacta el egreso. */
+  cashRegisterId: idSchema,
+  /** Usuario que registra el pago. */
+  userId: idSchema,
+});
+
 export type SupplierAccountPayableOutput = z.infer<typeof SupplierAccountPayableSchema>;
 export type CreateSupplierAccountPayableInput = z.infer<typeof CreateSupplierAccountPayableSchema>;
 export type SupplierPaymentOutput = z.infer<typeof SupplierPaymentSchema>;
 export type CreateSupplierPaymentInput = z.infer<typeof CreateSupplierPaymentSchema>;
+export type CreateSupplierAccountPaymentInput = z.infer<typeof CreateSupplierAccountPaymentSchema>;

@@ -97,6 +97,92 @@ function PagoDialog({
   )
 }
 
+/**
+ * Pago a NIVEL CUENTA: un monto (parcial o total) que se aplica al saldo total
+ * del proveedor, distribuyéndose automáticamente entre los comprobantes abiertos
+ * (FIFO, del más viejo al más nuevo).
+ */
+function PagoCuentaDialog({
+  supplierId,
+  totalBalance,
+  onClose,
+}: {
+  supplierId: string
+  totalBalance: string
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const methodsQuery = usePaymentMethods()
+  const activeMethods = useMemo(() => (methodsQuery.data ?? []).filter((m) => m.active), [methodsQuery.data])
+  const [monto, setMonto] = useState<string>(totalBalance)
+  const montoNum = monto ? Number(parseCurrencyInput(monto)) : 0
+  const balanceNum = Number(totalBalance)
+  const split = usePaymentSplit(activeMethods, montoNum)
+
+  const overBalance = montoNum > balanceNum + 0.005
+  const canConfirm = montoNum > 0 && !overBalance && split.isComplete && activeMethods.length > 0
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      api.supplierAccounts.payToSupplier({
+        supplierId,
+        payments: split.payments,
+        expectedAmount: montoNum.toFixed(4),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['supplierBalances'] })
+      void qc.invalidateQueries({ queryKey: ['supplierStatement', supplierId] })
+      void qc.invalidateQueries({ queryKey: ['supplierOpen', supplierId] })
+      void qc.invalidateQueries({ queryKey: ['supplierAccountDetail'] })
+      void qc.invalidateQueries({ queryKey: ['cash'] })
+      toast.success(`Pago registrado — ${formatCurrency(montoNum)}`)
+      onClose()
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo registrar el pago'),
+  })
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Registrar pago a la cuenta</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="rounded-md bg-muted px-3 py-2 text-sm">
+            Saldo total del proveedor: <span className="font-semibold tabular-nums">{formatCurrency(totalBalance)}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            El monto se aplicará a los comprobantes abiertos del más antiguo al más reciente.
+          </p>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="pago-cuenta-monto">Monto a pagar</Label>
+            <CurrencyInput
+              id="pago-cuenta-monto"
+              autoFocus
+              value={monto}
+              onChange={setMonto}
+            />
+            {overBalance && <span className="text-xs text-destructive">No puede superar el saldo total del proveedor.</span>}
+          </div>
+          <div className="border-t pt-2">
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Composición del pago</p>
+            <PaymentSplitInput methods={activeMethods} split={split} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>
+            Cancelar
+          </Button>
+          <Button onClick={() => mutation.mutate()} disabled={!canConfirm || mutation.isPending}>
+            {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Confirmar pago
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 /** Detalle expandible de un comprobante: productos + pagos aplicados. */
 function ComprobanteDetalle({ accountId }: { accountId: string }) {
   const detailQuery = useQuery({
@@ -197,11 +283,13 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
     queryFn: () => api.supplierAccounts.listOpenBySupplier(supplierId),
   })
   const [pagando, setPagando] = useState<SupplierAccountPayableDTO | null>(null)
+  const [pagandoCuenta, setPagandoCuenta] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const supplier = statementQuery.data?.supplier
   const name = supplier ? `${supplier.code} — ${supplier.name}` : '…'
   const balance = statementQuery.data?.currentBalance ?? '0'
+  const hasBalance = Number(balance) > 0.005
 
   return (
     <div className="flex flex-col gap-4">
@@ -217,11 +305,26 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
             )}
           </div>
         </div>
-        <Card>
-          <CardContent className="px-4 py-2 text-sm">
-            Saldo: <span className="text-lg font-bold tabular-nums">{formatCurrency(balance)}</span>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2">
+          <Card>
+            <CardContent className="px-4 py-2 text-sm">
+              Saldo: <span className="text-lg font-bold tabular-nums">{formatCurrency(balance)}</span>
+            </CardContent>
+          </Card>
+          <Button
+            disabled={!canPagar || !hasBalance}
+            title={
+              !canPagar
+                ? 'Requiere permiso para pagar'
+                : !hasBalance
+                  ? 'El proveedor no tiene saldo pendiente'
+                  : undefined
+            }
+            onClick={() => setPagandoCuenta(true)}
+          >
+            Registrar pago
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -334,6 +437,13 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
       </Card>
 
       {pagando && <PagoDialog account={pagando} supplierId={supplierId} onClose={() => setPagando(null)} />}
+      {pagandoCuenta && (
+        <PagoCuentaDialog
+          supplierId={supplierId}
+          totalBalance={balance}
+          onClose={() => setPagandoCuenta(false)}
+        />
+      )}
     </div>
   )
 }

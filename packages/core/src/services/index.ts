@@ -58,12 +58,16 @@ export {
   type PaymentDraft,
   type ReceivePaymentInput,
   type ReceivePaymentResult,
+  type ReceivePaymentToCustomerInput,
+  type ReceivePaymentToCustomerResult,
   type StatementEntry,
 } from './accountsReceivable.service';
 export {
   SupplierAccountsService,
   type PaySupplierInvoiceInput,
   type PaySupplierInvoiceResult,
+  type PayToSupplierInput,
+  type PayToSupplierResult,
   type SupplierAccountDetailLine,
   type SupplierAccountDetailPayment,
   type SupplierAccountPayableDetail,

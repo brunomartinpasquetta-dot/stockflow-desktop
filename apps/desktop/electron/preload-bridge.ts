@@ -300,6 +300,7 @@ export function createApiBridge(
     supplierAccounts: {
       listBalances: () => c<never>('supplierAccounts:listBalances'),
       payInvoice: (p) => c<never>('supplierAccounts:payInvoice', p),
+      payToSupplier: (p) => c<never>('supplierAccounts:payToSupplier', p),
       getStatement: (p) => c<never>('supplierAccounts:getStatement', p),
       listOpenBySupplier: (p) =>
         c<never>('supplierAccounts:listOpenBySupplier', p),
@@ -330,6 +331,7 @@ export function createApiBridge(
     },
     accounts: {
       receivePayment: (p) => c<never>('accounts:receivePayment', p),
+      receivePaymentToCustomer: (p) => c<never>('accounts:receivePaymentToCustomer', p),
       getStatement: (p) => c<never>('accounts:getStatement', p),
       getTotalReceivables: () => c<never>('accounts:getTotalReceivables'),
       listBalances: () => c<never>('accounts:listBalances'),

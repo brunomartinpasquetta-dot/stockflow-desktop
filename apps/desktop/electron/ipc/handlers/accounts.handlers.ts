@@ -8,6 +8,8 @@ import type {
   CustomerStatementDTO,
   ReceivePaymentInputDTO,
   ReceivePaymentResultDTO,
+  ReceivePaymentToCustomerInputDTO,
+  ReceivePaymentToCustomerResultDTO,
 } from '../types';
 
 export function buildAccountsHandlers(deps: HandlerDeps): HandlerMap {
@@ -16,6 +18,11 @@ export function buildAccountsHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: ReceivePaymentInputDTO, ctx): Promise<ReceivePaymentResultDTO> =>
         new AccountsReceivableService(ctx).receivePayment(payload),
+    ),
+    'accounts:receivePaymentToCustomer': withSession(
+      deps,
+      (payload: ReceivePaymentToCustomerInputDTO, ctx): Promise<ReceivePaymentToCustomerResultDTO> =>
+        new AccountsReceivableService(ctx).receivePaymentToCustomer(payload),
     ),
     'accounts:getStatement': withSession(
       deps,

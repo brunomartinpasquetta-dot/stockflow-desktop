@@ -41,6 +41,8 @@ import type {
   LowStockEntryDTO,
   PaySupplierInvoiceInputDTO,
   PaySupplierInvoiceResultDTO,
+  PayToSupplierInputDTO,
+  PayToSupplierResultDTO,
   PaymentMethodDTO,
   PriceUpdateApplyResultDTO,
   PriceUpdateBatchDTO,
@@ -53,6 +55,8 @@ import type {
   PurchaseLineDTO,
   ReceivePaymentInputDTO,
   ReceivePaymentResultDTO,
+  ReceivePaymentToCustomerInputDTO,
+  ReceivePaymentToCustomerResultDTO,
   RolesConfigDTO,
   RolesSetConfigPayload,
   GlobalSearchCategoryDTO,
@@ -194,6 +198,7 @@ export const api = {
   supplierAccounts: {
     listBalances: (): Promise<SupplierBalanceDTO[]> => unwrap(sf().supplierAccounts.listBalances()),
     payInvoice: (input: PaySupplierInvoiceInputDTO): Promise<PaySupplierInvoiceResultDTO> => unwrap(sf().supplierAccounts.payInvoice(input)),
+    payToSupplier: (input: PayToSupplierInputDTO): Promise<PayToSupplierResultDTO> => unwrap(sf().supplierAccounts.payToSupplier(input)),
     getStatement: (supplierId: string): Promise<SupplierStatementDTO> => unwrap(sf().supplierAccounts.getStatement({ supplierId })),
     listOpenBySupplier: (supplierId: string): Promise<SupplierAccountPayableDTO[]> => unwrap(sf().supplierAccounts.listOpenBySupplier({ supplierId })),
     getAccountDetail: (accountId: string): Promise<SupplierAccountPayableDetailDTO> => unwrap(sf().supplierAccounts.getAccountDetail({ accountId })),
@@ -238,6 +243,8 @@ export const api = {
   },
   accounts: {
     receivePayment: (input: ReceivePaymentInputDTO): Promise<ReceivePaymentResultDTO> => unwrap(sf().accounts.receivePayment(input)),
+    receivePaymentToCustomer: (input: ReceivePaymentToCustomerInputDTO): Promise<ReceivePaymentToCustomerResultDTO> =>
+      unwrap(sf().accounts.receivePaymentToCustomer(input)),
     getStatement: (customerId: string): Promise<CustomerStatementDTO> => unwrap(sf().accounts.getStatement({ customerId })),
     getTotalReceivables: (): Promise<{ total: string }> => unwrap(sf().accounts.getTotalReceivables()),
     listBalances: (): Promise<CustomerBalanceDTO[]> => unwrap(sf().accounts.listBalances()),
