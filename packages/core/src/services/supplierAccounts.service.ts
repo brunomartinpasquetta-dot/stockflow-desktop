@@ -54,6 +54,35 @@ export interface SupplierBalance {
   openInvoicesCount: number;
 }
 
+/** Una línea de la compra con la descripción/marca del artículo resueltas. */
+export interface SupplierAccountDetailLine {
+  id: string;
+  purchaseId: string;
+  articleId: string;
+  lineNumber: number;
+  quantity: string;
+  costPrice: string;
+  salePrice: string;
+  vatRate: string;
+  lineTotal: string;
+  createdAt: number;
+  description: string;
+  brand: string | null;
+}
+
+/** Un pago aplicado a la cuenta con el nombre del medio de pago. */
+export interface SupplierAccountDetailPayment extends SupplierPayment {
+  paymentMethodName: string;
+}
+
+/** Detalle completo de una cuenta de proveedor: compra, líneas y pagos. */
+export interface SupplierAccountPayableDetail {
+  account: SupplierAccountPayable;
+  purchase: Purchase | null;
+  lines: SupplierAccountDetailLine[];
+  payments: SupplierAccountDetailPayment[];
+}
+
 export class SupplierAccountsService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -128,6 +157,50 @@ export class SupplierAccountsService {
     const updatedAccount = await repos.supplierAccountsPayable.findById(input.accountId);
     if (!updatedAccount) throw new NotFoundError('Cuenta de proveedor', input.accountId);
     return { payments, account: updatedAccount };
+  }
+
+  /**
+   * Detalle de un comprobante de proveedor: la cuenta, la compra asociada, sus
+   * líneas (con descripción/marca del artículo) y los pagos aplicados a ESA
+   * cuenta (con el nombre del medio de pago).
+   */
+  async getAccountDetail(accountId: string): Promise<SupplierAccountPayableDetail> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'manage_supplier_accounts');
+
+    const account = await repos.supplierAccountsPayable.findById(accountId);
+    if (!account) throw new NotFoundError('Cuenta de proveedor', accountId);
+
+    const purchase = (await repos.purchases.findById(account.purchaseId)) ?? null;
+    const rawLines = await repos.purchaseLines.findByPurchase(account.purchaseId);
+
+    const articleIds = [...new Set(rawLines.map((l) => l.articleId))];
+    const articlesById = new Map<string, { description: string; brand: string | null }>();
+    for (const id of articleIds) {
+      const art = await repos.articles.findById(id);
+      if (art) articlesById.set(id, { description: art.description, brand: art.brand ?? null });
+    }
+
+    const lines: SupplierAccountDetailLine[] = rawLines
+      .slice()
+      .sort((a, b) => a.lineNumber - b.lineNumber)
+      .map((l) => ({
+        ...l,
+        description: articlesById.get(l.articleId)?.description ?? l.articleId,
+        brand: articlesById.get(l.articleId)?.brand ?? null,
+      }));
+
+    const pmById = await repos.paymentMethods.byId();
+    const rawPayments = await repos.supplierPayments.findByAccount(accountId);
+    const payments: SupplierAccountDetailPayment[] = rawPayments
+      .slice()
+      .sort((a, b) => a.date - b.date)
+      .map((p) => ({
+        ...p,
+        paymentMethodName: pmById.get(p.paymentMethodId)?.name ?? 'medio desconocido',
+      }));
+
+    return { account, purchase, lines, payments };
   }
 
   /** Estado de cuenta cronológico de un proveedor (compras a cuenta + pagos). */

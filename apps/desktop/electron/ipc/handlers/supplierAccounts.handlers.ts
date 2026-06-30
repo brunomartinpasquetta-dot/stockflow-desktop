@@ -4,6 +4,7 @@ import { type HandlerDeps, type HandlerMap, withSession } from '../handler-conte
 import type {
   PaySupplierInvoiceInputDTO,
   PaySupplierInvoiceResultDTO,
+  SupplierAccountPayableDetailDTO,
   SupplierAccountPayableDTO,
   SupplierBalanceDTO,
   SupplierStatementDTO,
@@ -39,6 +40,11 @@ export function buildSupplierAccountsHandlers(deps: HandlerDeps): HandlerMap {
         requirePermission(ctx.currentUser, 'manage_supplier_accounts');
         return new SupplierAccountsService(ctx).listOpenBySupplier(payload.supplierId);
       },
+    ),
+    'supplierAccounts:getAccountDetail': withSession(
+      deps,
+      (payload: { accountId: string }, ctx): Promise<SupplierAccountPayableDetailDTO> =>
+        new SupplierAccountsService(ctx).getAccountDetail(payload.accountId),
     ),
   };
 }

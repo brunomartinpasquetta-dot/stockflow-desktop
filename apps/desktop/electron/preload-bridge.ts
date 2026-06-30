@@ -303,6 +303,8 @@ export function createApiBridge(
       getStatement: (p) => c<never>('supplierAccounts:getStatement', p),
       listOpenBySupplier: (p) =>
         c<never>('supplierAccounts:listOpenBySupplier', p),
+      getAccountDetail: (p) =>
+        c<never>('supplierAccounts:getAccountDetail', p),
     },
     cash: {
       open: (p) => c<never>('cash:open', p),
@@ -333,6 +335,8 @@ export function createApiBridge(
       listBalances: () => c<never>('accounts:listBalances'),
       listOpenByCustomer: (p) =>
         c<never>('accounts:listOpenByCustomer', p),
+      getAccountDetail: (p) =>
+        c<never>('accounts:getAccountDetail', p),
     },
     search: {
       global: (p) => c<never>('search:global', p),

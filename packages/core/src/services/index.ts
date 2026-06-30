@@ -51,6 +51,9 @@ export {
 } from './inventory.service';
 export {
   AccountsReceivableService,
+  type AccountDetailLine,
+  type AccountDetailPayment,
+  type AccountReceivableDetail,
   type CustomerStatement,
   type PaymentDraft,
   type ReceivePaymentInput,
@@ -61,6 +64,9 @@ export {
   SupplierAccountsService,
   type PaySupplierInvoiceInput,
   type PaySupplierInvoiceResult,
+  type SupplierAccountDetailLine,
+  type SupplierAccountDetailPayment,
+  type SupplierAccountPayableDetail,
   type SupplierBalance,
   type SupplierPaymentDraft,
   type SupplierStatement,

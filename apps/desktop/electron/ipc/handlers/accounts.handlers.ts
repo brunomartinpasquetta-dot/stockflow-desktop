@@ -2,6 +2,7 @@ import { AccountsReceivableService, requirePermission } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
+  AccountReceivableDetailDTO,
   AccountReceivableDTO,
   CustomerBalanceDTO,
   CustomerStatementDTO,
@@ -46,6 +47,11 @@ export function buildAccountsHandlers(deps: HandlerDeps): HandlerMap {
         requirePermission(ctx.currentUser, 'receive_payment');
         return ctx.repos.accountsReceivable.findOpenByCustomer(payload.customerId);
       },
+    ),
+    'accounts:getAccountDetail': withSession(
+      deps,
+      (payload: { accountId: string }, ctx): Promise<AccountReceivableDetailDTO> =>
+        new AccountsReceivableService(ctx).getAccountDetail(payload.accountId),
     ),
   };
 }

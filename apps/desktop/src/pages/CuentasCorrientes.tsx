@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Landmark, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useCustomerBalances } from '@/lib/hooks'
@@ -97,6 +97,94 @@ function CobranzaDialog({
   )
 }
 
+/** Detalle expandible de un comprobante: productos + cobranzas aplicadas. */
+function ComprobanteDetalle({ accountId }: { accountId: string }) {
+  const detailQuery = useQuery({
+    queryKey: ['accountDetail', accountId],
+    queryFn: () => api.accounts.getAccountDetail(accountId),
+  })
+
+  if (detailQuery.isLoading) {
+    return <div className="px-4 py-3 text-sm text-muted-foreground">Cargando detalle…</div>
+  }
+  if (detailQuery.isError || !detailQuery.data) {
+    return <div className="px-4 py-3 text-sm text-destructive">No se pudo cargar el detalle.</div>
+  }
+
+  const { lines, payments, account } = detailQuery.data
+
+  return (
+    <div className="flex flex-col gap-4 bg-muted/40 px-4 py-3">
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Productos</p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Descripción</TableHead>
+              <TableHead className="text-right">Cantidad</TableHead>
+              <TableHead className="text-right">Precio unit.</TableHead>
+              <TableHead className="text-right">Subtotal</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-4 text-center text-sm text-muted-foreground">Sin líneas</TableCell>
+              </TableRow>
+            ) : (
+              lines.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell className="text-sm">
+                    {l.description}
+                    {l.brand && <span className="ml-1 text-xs text-muted-foreground">({l.brand})</span>}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{l.quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(l.unitPrice)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(l.lineTotal)}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cobranzas aplicadas</p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Medio de pago</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {payments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="py-4 text-center text-sm text-muted-foreground">Sin cobranzas aplicadas</TableCell>
+              </TableRow>
+            ) : (
+              payments.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
+                  <TableCell className="text-sm">{p.paymentMethodName}</TableCell>
+                  <TableCell className="text-right tabular-nums text-success">{formatCurrency(p.amount)}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex justify-end text-sm">
+        <span className="rounded-md bg-background px-3 py-1">
+          Saldo del comprobante: <span className="font-semibold tabular-nums">{formatCurrency(account.balance)}</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: () => void }) {
   const canWrite = useCanWrite()
   const canCobrar = usePermission('receive_payment') && canWrite
@@ -109,6 +197,7 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
     queryFn: () => api.accounts.listOpenByCustomer(customerId),
   })
   const [cobrando, setCobrando] = useState<AccountReceivableDTO | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const customer = statementQuery.data?.customer
   const name = customer ? (customer.firstName ? `${customer.lastName}, ${customer.firstName}` : customer.lastName) : '…'
@@ -145,6 +234,7 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8" />
                 <TableHead>Fecha</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
@@ -155,34 +245,52 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
             <TableBody>
               {openQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Cargando…</TableCell>
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">Cargando…</TableCell>
                 </TableRow>
               ) : (openQuery.data ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Sin comprobantes pendientes</TableCell>
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">Sin comprobantes pendientes</TableCell>
                 </TableRow>
               ) : (
-                (openQuery.data ?? []).map((ar) => (
-                  <TableRow key={ar.id}>
-                    <TableCell className="text-sm">{formatDate(ar.createdAt)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(ar.total)}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatCurrency(ar.balance)}</TableCell>
-                    <TableCell>
-                      <Badge variant={ar.status === 'partial' ? 'warning' : 'outline'}>{ar.status === 'partial' ? 'Parcial' : 'Abierto'}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!canCobrar}
-                        title={canCobrar ? undefined : 'Requiere permiso para cobrar'}
-                        onClick={() => setCobrando(ar)}
+                (openQuery.data ?? []).map((ar) => {
+                  const isOpen = expandedId === ar.id
+                  return (
+                    <Fragment key={ar.id}>
+                      <TableRow
+                        className="cursor-pointer"
+                        onClick={() => setExpandedId(isOpen ? null : ar.id)}
                       >
-                        Cobrar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        <TableCell className="text-muted-foreground">
+                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </TableCell>
+                        <TableCell className="text-sm">{formatDate(ar.createdAt)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(ar.total)}</TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">{formatCurrency(ar.balance)}</TableCell>
+                        <TableCell>
+                          <Badge variant={ar.status === 'partial' ? 'warning' : 'outline'}>{ar.status === 'partial' ? 'Parcial' : 'Abierto'}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!canCobrar}
+                            title={canCobrar ? undefined : 'Requiere permiso para cobrar'}
+                            onClick={(e) => { e.stopPropagation(); setCobrando(ar) }}
+                          >
+                            Cobrar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {isOpen && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={6} className="p-0">
+                            <ComprobanteDetalle accountId={ar.id} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  )
+                })
               )}
             </TableBody>
           </Table>

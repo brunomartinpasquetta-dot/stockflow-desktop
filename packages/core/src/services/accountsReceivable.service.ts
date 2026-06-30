@@ -57,6 +57,35 @@ export interface CustomerBalance {
   lastPaymentDate: number | null;
 }
 
+/** Una línea de la venta con la descripción/marca del artículo resueltas. */
+export interface AccountDetailLine {
+  id: string;
+  saleId: string;
+  articleId: string;
+  lineNumber: number;
+  quantity: string;
+  unitPrice: string;
+  discount: string;
+  vatRate: string;
+  lineTotal: string;
+  createdAt: number;
+  description: string;
+  brand: string | null;
+}
+
+/** Una cobranza aplicada a la cuenta con el nombre del medio de pago. */
+export interface AccountDetailPayment extends Payment {
+  paymentMethodName: string;
+}
+
+/** Detalle completo de una cuenta corriente: venta, líneas y cobranzas. */
+export interface AccountReceivableDetail {
+  account: AccountReceivable;
+  sale: Sale | null;
+  lines: AccountDetailLine[];
+  payments: AccountDetailPayment[];
+}
+
 export class AccountsReceivableService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -172,6 +201,50 @@ export class AccountsReceivableService {
 
     const currentBalance = sumDecimals(accounts.map((a) => a.balance));
     return { customer, entries: filtered, currentBalance };
+  }
+
+  /**
+   * Detalle de un comprobante en cuenta corriente: la cuenta, la venta asociada,
+   * sus líneas (con descripción/marca del artículo) y las cobranzas aplicadas a
+   * ESA cuenta (con el nombre del medio de pago).
+   */
+  async getAccountDetail(accountId: string): Promise<AccountReceivableDetail> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'receive_payment');
+
+    const account = await repos.accountsReceivable.findById(accountId);
+    if (!account) throw new NotFoundError('Cuenta corriente', accountId);
+
+    const sale = (await repos.sales.findById(account.saleId)) ?? null;
+    const rawLines = await repos.saleLines.findBySale(account.saleId);
+
+    const articleIds = [...new Set(rawLines.map((l) => l.articleId))];
+    const articlesById = new Map<string, { description: string; brand: string | null }>();
+    for (const id of articleIds) {
+      const art = await repos.articles.findById(id);
+      if (art) articlesById.set(id, { description: art.description, brand: art.brand ?? null });
+    }
+
+    const lines: AccountDetailLine[] = rawLines
+      .slice()
+      .sort((a, b) => a.lineNumber - b.lineNumber)
+      .map((l) => ({
+        ...l,
+        description: articlesById.get(l.articleId)?.description ?? l.articleId,
+        brand: articlesById.get(l.articleId)?.brand ?? null,
+      }));
+
+    const pmById = await repos.paymentMethods.byId();
+    const rawPayments = await repos.payments.findByAccount(accountId);
+    const payments: AccountDetailPayment[] = rawPayments
+      .slice()
+      .sort((a, b) => a.date - b.date)
+      .map((p) => ({
+        ...p,
+        paymentMethodName: pmById.get(p.paymentMethodId)?.name ?? 'medio desconocido',
+      }));
+
+    return { account, sale, lines, payments };
   }
 
   /** Total adeudado por todos los clientes. */

@@ -3,6 +3,7 @@
  * uniforme `{ ok, data } | { ok:false, code, ... }` y, en error, lanza `ApiError`.
  */
 import type {
+  AccountReceivableDetailDTO,
   AccountReceivableDTO,
   ArticleDTO,
   BackupConfigDTO,
@@ -61,6 +62,7 @@ import type {
   SalePaymentDTO,
   StockAdjustmentDTO,
   StockCheckDTO,
+  SupplierAccountPayableDetailDTO,
   SupplierAccountPayableDTO,
   SupplierBalanceDTO,
   SupplierDTO,
@@ -194,6 +196,7 @@ export const api = {
     payInvoice: (input: PaySupplierInvoiceInputDTO): Promise<PaySupplierInvoiceResultDTO> => unwrap(sf().supplierAccounts.payInvoice(input)),
     getStatement: (supplierId: string): Promise<SupplierStatementDTO> => unwrap(sf().supplierAccounts.getStatement({ supplierId })),
     listOpenBySupplier: (supplierId: string): Promise<SupplierAccountPayableDTO[]> => unwrap(sf().supplierAccounts.listOpenBySupplier({ supplierId })),
+    getAccountDetail: (accountId: string): Promise<SupplierAccountPayableDetailDTO> => unwrap(sf().supplierAccounts.getAccountDetail({ accountId })),
   },
   cash: {
     open: (openingAmount: string): Promise<CashRegisterDTO> => unwrap(sf().cash.open({ openingAmount })),
@@ -239,6 +242,7 @@ export const api = {
     getTotalReceivables: (): Promise<{ total: string }> => unwrap(sf().accounts.getTotalReceivables()),
     listBalances: (): Promise<CustomerBalanceDTO[]> => unwrap(sf().accounts.listBalances()),
     listOpenByCustomer: (customerId: string): Promise<AccountReceivableDTO[]> => unwrap(sf().accounts.listOpenByCustomer({ customerId })),
+    getAccountDetail: (accountId: string): Promise<AccountReceivableDetailDTO> => unwrap(sf().accounts.getAccountDetail({ accountId })),
   },
   search: {
     global: (payload: { query: string; limitPerCategory?: number; categories?: GlobalSearchCategoryDTO[] }): Promise<GlobalSearchResultDTO> =>

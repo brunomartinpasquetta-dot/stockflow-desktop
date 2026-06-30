@@ -485,6 +485,14 @@ export interface SupplierStatementDTO {
   currentBalance: string;
 }
 
+/** Detalle de un comprobante de cuenta corriente de proveedor. */
+export interface SupplierAccountPayableDetailDTO {
+  account: SupplierAccountPayableDTO;
+  purchase: PurchaseDTO | null;
+  lines: (PurchaseLineDTO & { description: string; brand: string | null })[];
+  payments: (SupplierPaymentDTO & { paymentMethodName: string })[];
+}
+
 export interface PaymentMethodBreakdownDTO {
   paymentMethodId: string | null;
   name: string;
@@ -626,6 +634,14 @@ export interface CustomerBalanceDTO {
   totalDebt: string;
   openInvoicesCount: number;
   lastPaymentDate: number | null;
+}
+
+/** Detalle de un comprobante de cuenta corriente de cliente. */
+export interface AccountReceivableDetailDTO {
+  account: AccountReceivableDTO;
+  sale: SaleDTO | null;
+  lines: (SaleLineDTO & { description: string; brand: string | null })[];
+  payments: (PaymentDTO & { paymentMethodName: string })[];
 }
 
 export interface DateRangeDTO {
@@ -1264,6 +1280,7 @@ export interface ApiSurface {
     payInvoice(payload: PaySupplierInvoiceInputDTO): Res<PaySupplierInvoiceResultDTO>;
     getStatement(payload: { supplierId: string; dateRange?: DateRangeDTO }): Res<SupplierStatementDTO>;
     listOpenBySupplier(payload: { supplierId: string }): Res<SupplierAccountPayableDTO[]>;
+    getAccountDetail(payload: { accountId: string }): Res<SupplierAccountPayableDetailDTO>;
   };
   cash: {
     open(payload: { openingAmount: string }): Res<CashRegisterDTO>;
@@ -1320,6 +1337,7 @@ export interface ApiSurface {
     getTotalReceivables(): Res<{ total: string }>;
     listBalances(): Res<CustomerBalanceDTO[]>;
     listOpenByCustomer(payload: { customerId: string }): Res<AccountReceivableDTO[]>;
+    getAccountDetail(payload: { accountId: string }): Res<AccountReceivableDetailDTO>;
   };
   search: {
     global(payload: GlobalSearchPayloadDTO): Res<GlobalSearchResultDTO>;
