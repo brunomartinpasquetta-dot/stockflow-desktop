@@ -384,6 +384,7 @@ export function createApiBridge(
       activate: (p) => c<never>('license:activate', p),
       heartbeat: () => c<never>('license:heartbeat'),
       deactivate: () => c<never>('license:deactivate'),
+      onChanged: (cb) => on('license:changed', () => cb()),
     },
     hardware: {
       listUsbDevices: () => c<never>('hardware:printer:list-usb'),

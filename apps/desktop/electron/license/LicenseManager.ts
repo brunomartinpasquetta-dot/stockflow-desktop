@@ -379,14 +379,75 @@ export class LicenseManager {
     return { ...state, plan: data.plan };
   }
 
+  /**
+   * Re-activación AUTOMÁTICA (sin intervención del usuario). Si el JWT guardado
+   * venció —la app estuvo cerrada/offline más que su vigencia de 7 días— pero
+   * conocemos la clave (viaja dentro del propio JWT, campo `lk`), re-activamos
+   * contra el cloud usando esa clave + el `machineId` YA vinculado. Como el
+   * machineId coincide con el de la licencia, el cloud devuelve un JWT nuevo sin
+   * pedir nada: la licencia "queda fija" entre reinicios y updates.
+   *
+   * No-op si: no hay JWT, el JWT sigue válido, es master, el JWT está corrupto/
+   * con firma inválida (no re-activamos a ciegas), o estamos offline (se deja como
+   * está y se reintenta en el próximo arranque/heartbeat). Devuelve true si renovó.
+   */
+  async attemptSilentReactivation(): Promise<boolean> {
+    if (this.hasMasterLicense()) return false;
+    const jwt = this.readStoredJwt();
+    if (!jwt) return false;
+    const { ok, payload } = this.verifyJwtOffline(jwt);
+    if (ok) return false; // todavía válido, nada que renovar
+    const expired = !!payload && typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now();
+    const key = payload?.lk;
+    // Sólo re-activamos si el motivo del rechazo es EXPIRACIÓN y tenemos la clave.
+    if (!expired || !key) return false;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      let res: Response;
+      try {
+        res = await fetch(`${this.apiUrl}/api/licenses/activate`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ licenseKey: key, machineId: this.machineId }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!res.ok) {
+        // 403 (revocada/suspendida/cancelada) / 404 / 409: NO renovamos en silencio
+        // → cae al flujo normal (pantalla de activación / estado revocado).
+        console.warn(`[license] re-activación automática rechazada (HTTP ${res.status})`);
+        return false;
+      }
+      const data = (await res.json()) as ActivateResponse;
+      this.storeJwt(data.jwt);
+      this.runtimeStatus = 'active';
+      await this.fetchTenantName(data.jwt);
+      console.info('[license] re-activación automática OK — licencia renovada con la clave guardada');
+      return true;
+    } catch {
+      return false; // offline / abort: queda como está, se reintenta luego
+    }
+  }
+
   /* ------------------------------------------------------------------ */
   /* Heartbeat                                                           */
   /* ------------------------------------------------------------------ */
 
   async heartbeat(): Promise<void> {
     try {
-      const jwt = this.readStoredJwt();
+      let jwt = this.readStoredJwt();
       if (!jwt) return;
+
+      // Si el token venció (offline > vigencia), renovarlo solo con la clave
+      // guardada ANTES de mandar el heartbeat: un JWT vencido daría 401 = revoked.
+      if (!this.verifyJwtOffline(jwt).ok) {
+        const renewed = await this.attemptSilentReactivation();
+        if (!renewed) return; // sigue vencido (offline/rechazado): no mandar token muerto
+        jwt = this.readStoredJwt() ?? jwt;
+      }
 
       let res: Response;
       try {

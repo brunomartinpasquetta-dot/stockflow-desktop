@@ -1,5 +1,5 @@
-import { createContext, useContext, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { createContext, useContext, useEffect, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
 import { useLanContext } from '@/contexts/LanContext'
@@ -14,12 +14,22 @@ interface LicenseContextValue {
 const LicenseContext = createContext<LicenseContextValue | null>(null)
 
 export function LicenseProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: ['license'],
     queryFn: api.license.getState,
     staleTime: 60_000,
     retry: 0,
   })
+
+  // El main avisa cuando renovó/cambió la licencia (heartbeat o re-activación
+  // automática tras un período offline) → refrescamos el estado sin recargar.
+  useEffect(() => {
+    const off = api.license.onChanged(() => {
+      void queryClient.invalidateQueries({ queryKey: ['license'] })
+    })
+    return off
+  }, [queryClient])
 
   const value: LicenseContextValue = {
     state: query.data,

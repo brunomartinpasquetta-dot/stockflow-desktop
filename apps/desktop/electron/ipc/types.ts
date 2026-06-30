@@ -1420,6 +1420,8 @@ export interface ApiSurface {
     /** Saca la licencia de esta máquina (borra markers locales) → sin licencia. */
     deactivate(): Res<LicenseStateDTO>;
     heartbeat(): Res<LicenseStateDTO>;
+    /** El main avisó que cambió el estado de licencia (heartbeat / re-activación automática). */
+    onChanged(cb: () => void): () => void;
   };
   hardware: {
     listUsbDevices(): Res<UsbDeviceInfoDTO[]>;

@@ -229,7 +229,13 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
     };
   }
 
-  autoUpdater.autoDownload = true;
+  // En macOS sin firma/notarización, Squirrel.Mac NO puede reemplazar el .app:
+  // `quitAndInstall` falla y el banner "Reiniciar e instalar" no hace nada. Por eso
+  // en mac NO auto-descargamos (no se dispara `updater:downloaded`) y dejamos sólo
+  // el aviso manual (`updater:outdated` → banner "Bajar instalador" → .dmg, que sí
+  // funciona). En Windows el auto-update de un clic queda intacto.
+  const isMac = process.platform === 'darwin';
+  autoUpdater.autoDownload = !isMac;
   autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('update-available', (info: { version: string }) => {
@@ -243,6 +249,7 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   });
 
   function checkInternal(): void {
+    if (isMac) return; // en mac sólo vale el chequeo manual (updater:outdated)
     if (!prefs.autoCheck) return;
     autoUpdater.checkForUpdates().catch((err: Error) => {
       console.warn('[updater] checkForUpdates falló:', err?.message ?? err);
@@ -256,10 +263,13 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
     checkNow: async () => {
       // Chequeo manual (banner "nueva versión disponible", igual que al arrancar).
       const r = await manualCheck();
-      // electron-updater (auto-descarga del .exe en Windows), best-effort.
-      autoUpdater.checkForUpdates().catch((err: Error) => {
-        console.warn('[updater] checkForUpdates falló:', err?.message ?? err);
-      });
+      // electron-updater (auto-descarga del .exe en Windows), best-effort. En mac
+      // no corre: Squirrel.Mac no puede aplicar el update sin firma.
+      if (!isMac) {
+        autoUpdater.checkForUpdates().catch((err: Error) => {
+          console.warn('[updater] checkForUpdates falló:', err?.message ?? err);
+        });
+      }
       return r;
     },
     quitAndInstall: () => autoUpdater.quitAndInstall(false, true),

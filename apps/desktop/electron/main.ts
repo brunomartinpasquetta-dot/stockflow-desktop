@@ -255,10 +255,13 @@ function bootstrap(): { lanArgs: string[] } {
 
 function startLicenseHeartbeat(): void {
   if (!licenseManager) return;
-  void licenseManager.heartbeat();
-  heartbeatTimer = setInterval(() => {
-    void licenseManager?.heartbeat();
-  }, HEARTBEAT_INTERVAL_MS);
+  const beat = (): void => {
+    // Tras cada heartbeat avisamos al renderer para que refresque el estado de
+    // licencia (renovación automática, suspensión o revocación se reflejan al instante).
+    void licenseManager?.heartbeat().finally(() => mainWindow?.webContents.send('license:changed'));
+  };
+  beat();
+  heartbeatTimer = setInterval(beat, HEARTBEAT_INTERVAL_MS);
 }
 
 // Nota impresión: la impresión silenciosa de tickets va por ESC/POS crudo al
@@ -277,8 +280,17 @@ if (!app.requestSingleInstanceLock()) {
 
   app
     .whenReady()
-    .then(() => {
+    .then(async () => {
       const { lanArgs } = bootstrap();
+      // Si el token de licencia venció estando offline, renovarlo SOLO con la clave
+      // guardada ANTES de mostrar la UI (timeout corto para no demorar el arranque
+      // si no hay red). Así el cliente nunca tiene que re-ingresar la clave.
+      if (licenseManager) {
+        await Promise.race([
+          licenseManager.attemptSilentReactivation().catch(() => false),
+          new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+        ]);
+      }
       createWindow(lanArgs);
       hardwareManager?.setEmitter((channel, payload) => {
         mainWindow?.webContents.send(channel, payload);

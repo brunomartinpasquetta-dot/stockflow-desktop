@@ -151,6 +151,67 @@ async function main(): Promise<void> {
     globalThis.fetch = realFetch;
   }
 
+  // --- attemptSilentReactivation: un JWT VENCIDO se renueva solo con la clave guardada ---
+  {
+    const reDir = mkdtempSync(join(tmpdir(), 'stockflow-license-react-'));
+    const realFetch2 = globalThis.fetch;
+    try {
+      // 1) Sembrar license.dat con un JWT VENCIDO (vía activate mockeado).
+      globalThis.fetch = (async (input: unknown): Promise<Response> => {
+        const url = String(input);
+        if (url.endsWith('/api/licenses/activate'))
+          return { ok: true, status: 200, json: async () => ({ jwt: expiredJwt, expiresAt: 0, plan: 'pro' }) } as unknown as Response;
+        if (url.endsWith('/api/me'))
+          return { ok: true, status: 200, json: async () => ({ tenant: { name: 'Demo', plan: 'pro' } }) } as unknown as Response;
+        throw new Error(`fetch no esperado: ${url}`);
+      }) as typeof fetch;
+      const mgr = new LicenseManager({ userDataDir: reDir, machineId: 'fake-machine', apiUrl: 'http://localhost:1', publicKeyPem: '' });
+      await mgr.activate('SF-AAAA-BBBB-CCCC-DDDD');
+      check('estado con JWT vencido → unlicensed', mgr.getState().status === 'unlicensed', mgr.getState().status);
+
+      // 2) Ahora el cloud responde con un JWT FRESCO → la re-activación debe renovar.
+      let sentBody: { licenseKey?: string; machineId?: string } | null = null;
+      globalThis.fetch = (async (input: unknown, init?: { body?: string }): Promise<Response> => {
+        const url = String(input);
+        if (url.endsWith('/api/licenses/activate')) {
+          sentBody = JSON.parse(init?.body ?? '{}') as { licenseKey?: string; machineId?: string };
+          return { ok: true, status: 200, json: async () => ({ jwt: validJwt, expiresAt: validPayload.exp * 1000, plan: 'pro' }) } as unknown as Response;
+        }
+        if (url.endsWith('/api/me'))
+          return { ok: true, status: 200, json: async () => ({ tenant: { name: 'Demo', plan: 'pro' } }) } as unknown as Response;
+        throw new Error(`fetch no esperado: ${url}`);
+      }) as typeof fetch;
+
+      const renewed = await mgr.attemptSilentReactivation();
+      check('attemptSilentReactivation(JWT vencido) → renovó', renewed === true);
+      check('re-activación usó la clave guardada (lk del JWT)', sentBody?.licenseKey === 'SF-AAAA-BBBB-CCCC-DDDD', String(sentBody?.licenseKey));
+      check('re-activación mandó el machineId vinculado', sentBody?.machineId === 'fake-machine');
+      check('getState() tras re-activación → active', mgr.getState().status === 'active', mgr.getState().status);
+
+      // 3) Con JWT válido NO debe re-activar (no-op).
+      const renewed2 = await mgr.attemptSilentReactivation();
+      check('attemptSilentReactivation(JWT válido) → no-op (false)', renewed2 === false);
+
+      // 4) Offline (fetch tira) con JWT vencido → false, sin romper.
+      const expDir = mkdtempSync(join(tmpdir(), 'stockflow-license-off-'));
+      globalThis.fetch = (async (input: unknown): Promise<Response> => {
+        const url = String(input);
+        if (url.endsWith('/api/licenses/activate')) return { ok: true, status: 200, json: async () => ({ jwt: expiredJwt, expiresAt: 0, plan: 'pro' }) } as unknown as Response;
+        if (url.endsWith('/api/me')) return { ok: true, status: 200, json: async () => ({ tenant: { name: 'Demo' } }) } as unknown as Response;
+        throw new Error(`fetch no esperado: ${url}`);
+      }) as typeof fetch;
+      const offMgr = new LicenseManager({ userDataDir: expDir, machineId: 'fake-machine', apiUrl: 'http://localhost:1', publicKeyPem: '' });
+      await offMgr.activate('SF-AAAA-BBBB-CCCC-DDDD'); // siembra vencido
+      globalThis.fetch = (async (): Promise<Response> => { throw new Error('offline'); }) as typeof fetch;
+      const renewedOffline = await offMgr.attemptSilentReactivation();
+      check('attemptSilentReactivation(offline) → false sin romper', renewedOffline === false);
+      rmSync(expDir, { recursive: true, force: true });
+    } finally {
+      globalThis.fetch = realFetch2;
+      rmSync(reDir, { recursive: true, force: true });
+    }
+  }
+
   // --- master key: persiste vía marker file (sin cloud ni safeStorage) ---
   // Usa su PROPIO dir para no chocar con el license.dat del bloque anterior.
   {
