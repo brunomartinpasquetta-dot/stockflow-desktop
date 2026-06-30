@@ -86,5 +86,7 @@ publish:
   - provider: github
     owner: brunomartinpasquetta-dot
     repo: stockflow-desktop
-    private: true
+    # Repo público: el updater baja latest.yml/.exe por URL directa SIN token.
+    # Con private:true el cliente necesitaría GH_TOKEN y el auto-download fallaba.
+    private: false
     releaseType: release
