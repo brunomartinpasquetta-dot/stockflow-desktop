@@ -343,6 +343,9 @@ function PDV() {
 
   const [cart, setCart] = useState<CartLine[]>([])
   const [globalDiscount, setGlobalDiscount] = useState('0')
+  // El descuento global puede ingresarse como importe ($) o como porcentaje (%).
+  // En modo %, se traduce a importe sobre el subtotal antes de calcular/enviar.
+  const [discountIsPct, setDiscountIsPct] = useState(false)
   const [isAccountSale, setIsAccountSale] = useState(false)
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [articlePickerOpen, setArticlePickerOpen] = useState(false)
@@ -398,11 +401,13 @@ function PDV() {
     setSelectedMethodId(fallback?.id ?? null)
   }
 
-  const totals = calculateSaleTotals(
-    cart.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, discount: l.discount, vatRate: l.article.vatRate })),
-    parseCurrencyInput(globalDiscount),
-    priceMode,
-  )
+  const lineInputs = cart.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, discount: l.discount, vatRate: l.article.vatRate }))
+  // Subtotal sin descuento global, base para traducir el % a importe.
+  const subtotalBase = Number(calculateSaleTotals(lineInputs, '0', priceMode).subtotal)
+  const globalDiscountAbs = discountIsPct
+    ? ((subtotalBase * (Number(parseCurrencyInput(globalDiscount)) || 0)) / 100).toFixed(4)
+    : parseCurrencyInput(globalDiscount)
+  const totals = calculateSaleTotals(lineInputs, globalDiscountAbs, priceMode)
   const totalNum = Number(totals.total)
 
   // cuenta corriente sólo disponible si el cliente no es Consumidor Final
@@ -470,6 +475,7 @@ function PDV() {
   function clearSale(): void {
     setCart([])
     setGlobalDiscount('0')
+    setDiscountIsPct(false)
     setIsAccountSale(false)
     setMixedMode(false)
     split.reset()
@@ -677,7 +683,7 @@ function PDV() {
         customerId: effectiveCustomerId,
         isAccountSale: accountSale,
         payments: paymentsToSend,
-        discount: parseCurrencyInput(globalDiscount),
+        discount: globalDiscountAbs,
         notes: null,
         lines: cart.map((l) => ({
           articleId: l.article.id,
@@ -745,7 +751,7 @@ function PDV() {
         customerId: effectiveCustomerId,
         isAccountSale: false,
         payments: [{ paymentMethodId: mpMethod.id, amount: totalNum.toFixed(4) }],
-        discount: parseCurrencyInput(globalDiscount),
+        discount: globalDiscountAbs,
         notes: mpPaymentId ? `MP Payment ID: ${mpPaymentId}` : null,
         lines: cart.map((l) => ({
           articleId: l.article.id,
@@ -1012,12 +1018,40 @@ function PDV() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Descuento</span>
-            <CurrencyInput
-              className="h-7 w-28 text-right tabular-nums"
-              value={globalDiscount}
-              onChange={setGlobalDiscount}
-            />
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => { setDiscountIsPct((v) => !v); setGlobalDiscount('0') }}
+                className="h-7 w-7 shrink-0 rounded-md border text-xs font-semibold hover:bg-accent"
+                title={discountIsPct ? 'Cambiar a importe ($)' : 'Cambiar a porcentaje (%)'}
+              >
+                {discountIsPct ? '%' : '$'}
+              </button>
+              {discountIsPct ? (
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={globalDiscount}
+                  onChange={(e) => setGlobalDiscount(e.target.value)}
+                  className="h-7 w-28 rounded-md border bg-background px-2 text-right text-sm tabular-nums"
+                />
+              ) : (
+                <CurrencyInput
+                  className="h-7 w-28 text-right tabular-nums"
+                  value={globalDiscount}
+                  onChange={setGlobalDiscount}
+                />
+              )}
+            </div>
           </div>
+          {discountIsPct && (Number(parseCurrencyInput(globalDiscount)) || 0) > 0 && (
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{parseCurrencyInput(globalDiscount)}% sobre subtotal</span>
+              <span className="tabular-nums">−{formatCurrency(globalDiscountAbs)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{priceMode === 'gross' ? 'IVA contenido' : 'IVA'}</span>
             <span className="tabular-nums">{formatCurrency(totals.vatAmount)}</span>

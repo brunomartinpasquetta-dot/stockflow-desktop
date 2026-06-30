@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { printNode, widthFromPaperFormat, type PrintOptions, type PrintWidth } from '@/lib/printService'
 import { CashCloseReport, type CashCloseReportData } from '@/print/CashCloseReport'
+import { FormalDocA4, type FormalDocData } from '@/print/FormalDocA4'
 import { HistoricalCashReport, type HistoricalCashReportData } from '@/print/HistoricalCashReport'
 import { SaleTicket, type SaleTicketData } from '@/print/SaleTicket'
 import { AccountingSummaryReport, type AccountingSummaryReportData } from '@/print/AccountingSummaryReport'
@@ -85,6 +86,14 @@ export function usePrintVatBook() {
   // Libro IVA — siempre A4.
   return useCallback(
     (data: VatBookReportData) => printNode(createElement(VatBookReport, { data }), 'a4'),
+    [],
+  )
+}
+
+export function usePrintQuote() {
+  // Presupuesto — documento formal A4.
+  return useCallback(
+    (data: FormalDocData) => printNode(createElement(FormalDocA4, { data }), 'a4'),
     [],
   )
 }

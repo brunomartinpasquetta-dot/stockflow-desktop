@@ -29,6 +29,14 @@ export {
   type SalePaymentDraft,
 } from './sales.service';
 export {
+  QuotesService,
+  type CreateQuoteInput,
+  type CreateQuoteLineDraft,
+  type ConvertQuoteToSaleInput,
+  type QuoteWithLinesResult,
+  type QuoteConvertPreview,
+} from './quotes.service';
+export {
   PurchasesService,
   type CreatePurchaseInput,
   type CreatePurchaseResult,

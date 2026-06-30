@@ -419,6 +419,82 @@ export interface CreateSaleResultDTO {
   accountReceivable: AccountReceivableDTO | null;
 }
 
+/* ----------------------------------------------------------------------- */
+/* Presupuestos (quotes)                                                    */
+/* ----------------------------------------------------------------------- */
+
+export type QuoteStatus = 'pending' | 'accepted' | 'rejected' | 'converted';
+
+export interface QuoteDTO {
+  id: string;
+  number: number;
+  type: VoucherType;
+  date: number;
+  customerId: string;
+  sellerId: string;
+  validityDays: number;
+  subtotal: string;
+  discount: string;
+  vatAmount: string;
+  total: string;
+  status: QuoteStatus;
+  saleId: string | null;
+  notes: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface QuoteLineDTO {
+  id: string;
+  quoteId: string;
+  articleId: string;
+  lineNumber: number;
+  quantity: string;
+  unitPrice: string;
+  discount: string;
+  vatRate: string;
+  lineTotal: string;
+  createdAt: number;
+}
+
+export interface QuoteLineDraftDTO {
+  articleId: string;
+  /** Precio unitario CONGELADO (lo cotizado). */
+  unitPrice: string;
+  quantity: string;
+  discount?: string;
+  vatRate?: string;
+}
+
+export interface CreateQuoteInputDTO {
+  type?: VoucherType;
+  customerId: string;
+  validityDays?: number;
+  discount?: string;
+  notes?: string | null;
+  lines: QuoteLineDraftDTO[];
+}
+
+export interface QuoteWithLinesDTO {
+  quote: QuoteDTO;
+  lines: QuoteLineDTO[];
+}
+
+export interface QuoteConvertPreviewDTO {
+  subtotal: string;
+  discount: string;
+  vatAmount: string;
+  total: string;
+  priceMode: 'gross' | 'net';
+}
+
+export interface ConvertQuoteToSaleInputDTO {
+  quoteId: string;
+  isAccountSale?: boolean;
+  refreshPrices?: boolean;
+  payments?: PaymentInputDTO[];
+}
+
 export interface PurchaseLineDraftDTO {
   articleId: string;
   quantity: string;
@@ -1298,6 +1374,14 @@ export interface ApiSurface {
     get(payload: IdPayload): Res<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }>;
     listByDateRange(payload: DateRangeDTO): Res<SaleDTO[]>;
     getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;
+  };
+  quotes: {
+    create(payload: CreateQuoteInputDTO): Res<QuoteWithLinesDTO>;
+    get(payload: IdPayload): Res<QuoteWithLinesDTO>;
+    listByDateRange(payload: DateRangeDTO): Res<QuoteDTO[]>;
+    delete(payload: IdPayload): Res<{ ok: true }>;
+    previewConvert(payload: { quoteId: string; refreshPrices: boolean }): Res<QuoteConvertPreviewDTO>;
+    convertToSale(payload: ConvertQuoteToSaleInputDTO): Res<{ sale: SaleDTO; quoteId: string }>;
   };
   purchases: {
     create(payload: CreatePurchaseInputDTO): Res<CreatePurchaseResultDTO>;

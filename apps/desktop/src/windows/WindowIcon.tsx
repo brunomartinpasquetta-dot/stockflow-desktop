@@ -10,6 +10,7 @@ import {
   Calculator,
   CreditCard,
   FileSpreadsheet,
+  FileText,
   History,
   Info,
   Landmark,
@@ -35,6 +36,7 @@ export function WindowIcon({ name, className }: { name: string | undefined; clas
     case 'Calculator': return <Calculator className={className} />
     case 'CreditCard': return <CreditCard className={className} />
     case 'FileSpreadsheet': return <FileSpreadsheet className={className} />
+    case 'FileText': return <FileText className={className} />
     case 'History': return <History className={className} />
     case 'Info': return <Info className={className} />
     case 'Landmark': return <Landmark className={className} />

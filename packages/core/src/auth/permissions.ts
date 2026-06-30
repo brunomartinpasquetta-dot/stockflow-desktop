@@ -60,6 +60,8 @@ export const PERMISSION_ACTIONS = [
   'view_accounting',
   'manage_cash_general',
   'manage_customers',
+  'view_quotes',
+  'manage_quotes',
 ] as const;
 
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
@@ -120,6 +122,11 @@ export const PERMISSION_AREAS: readonly PermissionArea[] = [
     actions: ['create_sale', 'void_sale', 'view_articles'],
   },
   {
+    key: 'presupuestos',
+    label: 'Presupuestos',
+    actions: ['view_quotes', 'manage_quotes'],
+  },
+  {
     key: 'compras',
     label: 'Compras',
     actions: ['manage_purchases'],
@@ -157,6 +164,8 @@ const SELLER_ACTIONS: ReadonlySet<PermissionAction> = new Set([
   'view_articles',
   'open_cash',
   'receive_payment',
+  'view_quotes',
+  'manage_quotes',
 ]);
 
 /** Acciones que un manager NO puede ejecutar (admin sí). */

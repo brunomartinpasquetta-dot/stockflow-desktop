@@ -71,6 +71,13 @@
       "when": 1779200000000,
       "tag": "0010_sale_payment_commission",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1779300000000,
+      "tag": "0011_quotes",
+      "breakpoints": true
     }
   ]
 }

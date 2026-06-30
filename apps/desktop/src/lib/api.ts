@@ -29,6 +29,11 @@ import type {
   CreatePurchaseResultDTO,
   CreateSaleInputDTO,
   CreateSaleResultDTO,
+  CreateQuoteInputDTO,
+  QuoteDTO,
+  QuoteWithLinesDTO,
+  QuoteConvertPreviewDTO,
+  ConvertQuoteToSaleInputDTO,
   CustomerBalanceDTO,
   CustomerDTO,
   CustomerStatementDTO,
@@ -187,6 +192,16 @@ export const api = {
       unwrap(sf().sales.get({ id })),
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
+  },
+  quotes: {
+    create: (input: CreateQuoteInputDTO): Promise<QuoteWithLinesDTO> => unwrap(sf().quotes.create(input)),
+    get: (id: string): Promise<QuoteWithLinesDTO> => unwrap(sf().quotes.get({ id })),
+    listByDateRange: (from: number, to: number): Promise<QuoteDTO[]> => unwrap(sf().quotes.listByDateRange({ from, to })),
+    delete: (id: string): Promise<{ ok: true }> => unwrap(sf().quotes.delete({ id })),
+    previewConvert: (quoteId: string, refreshPrices: boolean): Promise<QuoteConvertPreviewDTO> =>
+      unwrap(sf().quotes.previewConvert({ quoteId, refreshPrices })),
+    convertToSale: (input: ConvertQuoteToSaleInputDTO): Promise<{ sale: SaleDTO; quoteId: string }> =>
+      unwrap(sf().quotes.convertToSale(input)),
   },
   purchases: {
     create: (input: CreatePurchaseInputDTO): Promise<CreatePurchaseResultDTO> => unwrap(sf().purchases.create(input)),

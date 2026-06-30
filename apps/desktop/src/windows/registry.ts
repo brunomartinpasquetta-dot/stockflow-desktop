@@ -88,6 +88,15 @@ export const WINDOWS: Record<string, WindowDef> = {
     minWidth: 800,
     minHeight: 500,
   },
+  presupuestos: {
+    pageKey: 'presupuestos',
+    title: 'Presupuestos',
+    iconName: 'FileText',
+    component: lazy(() => import('@/pages/Presupuestos').then((m) => ({ default: m.Presupuestos }))),
+    requires: 'view_quotes',
+    minWidth: 1000,
+    minHeight: 640,
+  },
   'historial-ventas': {
     pageKey: 'historial-ventas',
     title: 'Historial de Ventas',
@@ -266,6 +275,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/compras/historial': 'historial-compras',
   '/ventas': 'ventas',
   '/ventas/historial': 'historial-ventas',
+  '/presupuestos': 'presupuestos',
   '/caja': 'caja',
   '/consultas/caja': 'historial-cajas',
   '/consultas/generador-compras': 'generador-compras',

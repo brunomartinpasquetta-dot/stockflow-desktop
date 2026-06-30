@@ -20,6 +20,7 @@ import { PriceUpdateRepository } from './priceUpdate.repository';
 import { PurchaseRepository } from './purchase.repository';
 import { PurchaseLineRepository } from './purchaseLine.repository';
 import { RolePermissionRepository } from './rolePermission.repository';
+import { QuoteRepository } from './quote.repository';
 import { SaleRepository } from './sale.repository';
 import { SaleLineRepository } from './saleLine.repository';
 import { SalePaymentRepository } from './salePayment.repository';
@@ -58,6 +59,7 @@ export {
   RolePermissionRepository,
   type ConfigurableRole,
 } from './rolePermission.repository';
+export { QuoteRepository, type QuoteWithLines } from './quote.repository';
 export { SaleRepository, type SaleWithLines } from './sale.repository';
 export { SaleLineRepository } from './saleLine.repository';
 export { SalePaymentRepository, type SalePaymentInput } from './salePayment.repository';
@@ -78,6 +80,7 @@ export interface Repositories {
   sales: SaleRepository;
   saleLines: SaleLineRepository;
   salePayments: SalePaymentRepository;
+  quotes: QuoteRepository;
   purchases: PurchaseRepository;
   purchaseLines: PurchaseLineRepository;
   cashRegisters: CashRegisterRepository;
@@ -106,6 +109,7 @@ export function createRepositories(db: LocalDatabase): Repositories {
     sales: new SaleRepository(db),
     saleLines: new SaleLineRepository(db),
     salePayments: new SalePaymentRepository(db),
+    quotes: new QuoteRepository(db),
     purchases: new PurchaseRepository(db),
     purchaseLines: new PurchaseLineRepository(db),
     cashRegisters: new CashRegisterRepository(db),

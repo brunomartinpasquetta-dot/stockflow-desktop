@@ -90,7 +90,10 @@ body.printing #print-area { display: block; }
   }
   body.printing-a4 #print-area {
     width: auto !important;
-    padding: 12mm !important;
+    /* Margen de oficina (~18mm): antes 12mm dejaba el contenido muy pegado al
+       borde de la hoja. Aplica a todo lo que se imprime en A4 (tickets, Libro
+       IVA, presupuestos, cierres). */
+    padding: 18mm !important;
     font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     font-size: 11pt;
     font-weight: 400;
@@ -202,4 +205,30 @@ body.printing #print-area { display: block; }
     width: 100%;
     color: #000;
   }
+
+  /* Documentos formales A4 con marco (ticket A4 + presupuestos): a diferencia
+     del ticket térmico 58/80, ocupan el ancho completo de la hoja y llevan
+     recuadros, tabla con bordes y bloque de totales. */
+  .doc-a4 { width: 100%; color: #000; font-size: 10.5pt; line-height: 1.4; }
+  .doc-a4 .doc-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 8mm; border: 1.2pt solid #000; padding: 5mm 6mm;
+  }
+  .doc-a4 .doc-company-name { font-size: 15pt; font-weight: 700; text-transform: uppercase; }
+  .doc-a4 .doc-company-meta { font-size: 9pt; margin-top: 1.5mm; }
+  .doc-a4 .doc-title-box { border: 1.2pt solid #000; padding: 3mm 6mm; text-align: center; min-width: 40mm; }
+  .doc-a4 .doc-title { font-size: 16pt; font-weight: 700; letter-spacing: 1pt; }
+  .doc-a4 .doc-number { font-size: 11pt; margin-top: 1mm; }
+  .doc-a4 .doc-meta-row { display: flex; justify-content: space-between; gap: 6mm; margin-top: 5mm; font-size: 9.5pt; }
+  .doc-a4 .doc-party { border: 1pt solid #000; padding: 3mm 4mm; flex: 1; }
+  .doc-a4 .doc-party-label { font-size: 8pt; text-transform: uppercase; letter-spacing: .5pt; font-weight: 700; }
+  .doc-a4 table.doc-items { width: 100%; border-collapse: collapse; margin-top: 5mm; font-size: 9.5pt; }
+  .doc-a4 table.doc-items th, .doc-a4 table.doc-items td { border: 1pt solid #000; padding: 1.8mm 3mm; }
+  .doc-a4 table.doc-items th { font-weight: 700; text-align: left; }
+  .doc-a4 table.doc-items .num { text-align: right; white-space: nowrap; }
+  .doc-a4 .doc-totals { width: 78mm; margin-left: auto; margin-top: 4mm; border: 1pt solid #000; }
+  .doc-a4 .doc-totals .row { display: flex; justify-content: space-between; padding: 1.6mm 4mm; }
+  .doc-a4 .doc-totals .row.grand { border-top: 1.2pt solid #000; font-size: 13pt; font-weight: 700; }
+  .doc-a4 .doc-notes { margin-top: 5mm; font-size: 9.5pt; white-space: pre-wrap; }
+  .doc-a4 .doc-footer { margin-top: 8mm; text-align: center; font-size: 10pt; font-weight: 600; }
 }

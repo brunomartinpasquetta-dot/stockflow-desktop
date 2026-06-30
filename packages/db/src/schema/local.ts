@@ -439,6 +439,78 @@ export const saleLines = sqliteTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* quotes — presupuestos (cabecera). NO es comprobante fiscal: tiene su */
+/* propia numeración secuencial. No toca stock hasta convertirse en venta. */
+/* ------------------------------------------------------------------ */
+export const quotes = sqliteTable(
+  'quotes',
+  {
+    id: pk(),
+    number: integer('number').notNull(),
+    /** Tipo de comprobante que tendrá la venta al convertirse. */
+    type: text('type', { enum: ['A', 'B', 'C', 'X'] }).notNull().default('B'),
+    date: integer('date').notNull(),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    sellerId: text('seller_id')
+      .notNull()
+      .references(() => users.id),
+    /** Días de validez desde `date`; el estado 'vencido' se calcula en lectura. */
+    validityDays: integer('validity_days').notNull().default(30),
+    subtotal: text('subtotal').notNull(),
+    discount: text('discount').notNull().default('0.0000'),
+    vatAmount: text('vat_amount').notNull().default('0.0000'),
+    total: text('total').notNull(),
+    status: text('status', { enum: ['pending', 'accepted', 'rejected', 'converted'] })
+      .notNull()
+      .default('pending'),
+    /** Venta resultante al convertir (traza); null mientras no se convierte. */
+    saleId: text('sale_id').references(() => sales.id),
+    notes: text('notes'),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    dateIdx: index('idx_quotes_date').on(t.date),
+    customerIdx: index('idx_quotes_customer').on(t.customerId),
+    statusIdx: index('idx_quotes_status').on(t.status),
+    numberIdx: uniqueIndex('idx_quotes_number').on(t.number),
+    typeCheck: check('quotes_type_check', sql`${t.type} in ('A', 'B', 'C', 'X')`),
+    statusCheck: check(
+      'quotes_status_check',
+      sql`${t.status} in ('pending', 'accepted', 'rejected', 'converted')`,
+    ),
+  }),
+);
+
+/* ------------------------------------------------------------------ */
+/* quoteLines — líneas de presupuesto (precios congelados)             */
+/* ------------------------------------------------------------------ */
+export const quoteLines = sqliteTable(
+  'quote_lines',
+  {
+    id: pk(),
+    quoteId: text('quote_id')
+      .notNull()
+      .references(() => quotes.id, { onDelete: 'cascade' }),
+    articleId: text('article_id')
+      .notNull()
+      .references(() => articles.id),
+    lineNumber: integer('line_number').notNull(),
+    quantity: text('quantity').notNull(),
+    unitPrice: text('unit_price').notNull(),
+    discount: text('discount').notNull().default('0.0000'),
+    vatRate: text('vat_rate').notNull().default('21.00'),
+    lineTotal: text('line_total').notNull(),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    quoteIdx: index('idx_quote_lines_quote').on(t.quoteId),
+  }),
+);
+
+/* ------------------------------------------------------------------ */
 /* purchases — compras (cabecera)                                     */
 /* ------------------------------------------------------------------ */
 export const purchases = sqliteTable(
@@ -997,6 +1069,10 @@ export type SaleLine = typeof saleLines.$inferSelect;
 export type NewSaleLine = typeof saleLines.$inferInsert;
 export type SalePayment = typeof salePayments.$inferSelect;
 export type NewSalePayment = typeof salePayments.$inferInsert;
+export type Quote = typeof quotes.$inferSelect;
+export type NewQuote = typeof quotes.$inferInsert;
+export type QuoteLine = typeof quoteLines.$inferSelect;
+export type NewQuoteLine = typeof quoteLines.$inferInsert;
 export type Purchase = typeof purchases.$inferSelect;
 export type NewPurchase = typeof purchases.$inferInsert;
 export type PurchaseLine = typeof purchaseLines.$inferSelect;

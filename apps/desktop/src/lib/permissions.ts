@@ -34,6 +34,8 @@ export type PermissionAction =
   | 'view_accounting'
   | 'manage_cash_general'
   | 'manage_customers'
+  | 'view_quotes'
+  | 'manage_quotes'
 
 export const ALL_ACTIONS: readonly PermissionAction[] = [
   'manage_users',
@@ -62,6 +64,8 @@ export const ALL_ACTIONS: readonly PermissionAction[] = [
   'view_accounting',
   'manage_cash_general',
   'manage_customers',
+  'view_quotes',
+  'manage_quotes',
 ]
 
 /**

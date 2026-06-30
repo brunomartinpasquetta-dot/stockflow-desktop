@@ -170,11 +170,11 @@ async function main(): Promise<void> {
       check('estado con JWT vencido → unlicensed', mgr.getState().status === 'unlicensed', mgr.getState().status);
 
       // 2) Ahora el cloud responde con un JWT FRESCO → la re-activación debe renovar.
-      let sentBody: { licenseKey?: string; machineId?: string } | null = null;
+      const sentBodies: Array<{ licenseKey?: string; machineId?: string }> = [];
       globalThis.fetch = (async (input: unknown, init?: { body?: string }): Promise<Response> => {
         const url = String(input);
         if (url.endsWith('/api/licenses/activate')) {
-          sentBody = JSON.parse(init?.body ?? '{}') as { licenseKey?: string; machineId?: string };
+          sentBodies.push(JSON.parse(init?.body ?? '{}') as { licenseKey?: string; machineId?: string });
           return { ok: true, status: 200, json: async () => ({ jwt: validJwt, expiresAt: validPayload.exp * 1000, plan: 'pro' }) } as unknown as Response;
         }
         if (url.endsWith('/api/me'))
@@ -183,9 +183,10 @@ async function main(): Promise<void> {
       }) as typeof fetch;
 
       const renewed = await mgr.attemptSilentReactivation();
+      const sent = sentBodies[0];
       check('attemptSilentReactivation(JWT vencido) → renovó', renewed === true);
-      check('re-activación usó la clave guardada (lk del JWT)', sentBody?.licenseKey === 'SF-AAAA-BBBB-CCCC-DDDD', String(sentBody?.licenseKey));
-      check('re-activación mandó el machineId vinculado', sentBody?.machineId === 'fake-machine');
+      check('re-activación usó la clave guardada (lk del JWT)', sent?.licenseKey === 'SF-AAAA-BBBB-CCCC-DDDD', String(sent?.licenseKey));
+      check('re-activación mandó el machineId vinculado', sent?.machineId === 'fake-machine');
       check('getState() tras re-activación → active', mgr.getState().status === 'active', mgr.getState().status);
 
       // 3) Con JWT válido NO debe re-activar (no-op).
