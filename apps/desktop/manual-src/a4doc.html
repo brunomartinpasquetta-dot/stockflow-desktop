@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<style>
+  html,body { margin:0; background:#e9edf3; }
+  .paper {
+    width: 210mm; min-height: auto; margin: 10mm auto; padding: 18mm;
+    background:#fff; box-shadow: 0 4px 24px rgba(0,0,0,.18); box-sizing: border-box;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color:#000;
+  }
+  /* === .doc-a4 (copiado de index.css, fuera de @media print) === */
+  .doc-a4 { width: 100%; color: #000; font-size: 10.5pt; line-height: 1.4; }
+  .doc-a4 .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; border: 1.2pt solid #000; padding: 5mm 6mm; }
+  .doc-a4 .doc-company-name { font-size: 15pt; font-weight: 700; text-transform: uppercase; }
+  .doc-a4 .doc-company-meta { font-size: 9pt; margin-top: 1.5mm; }
+  .doc-a4 .doc-title-box { border: 1.2pt solid #000; padding: 3mm 6mm; text-align: center; min-width: 40mm; }
+  .doc-a4 .doc-title { font-size: 16pt; font-weight: 700; letter-spacing: 1pt; }
+  .doc-a4 .doc-number { font-size: 11pt; margin-top: 1mm; }
+  .doc-a4 .doc-meta-row { display: flex; justify-content: space-between; gap: 6mm; margin-top: 5mm; font-size: 9.5pt; }
+  .doc-a4 .doc-party { border: 1pt solid #000; padding: 3mm 4mm; flex: 1; }
+  .doc-a4 .doc-party-label { font-size: 8pt; text-transform: uppercase; letter-spacing: .5pt; font-weight: 700; }
+  .doc-a4 table.doc-items { width: 100%; border-collapse: collapse; margin-top: 5mm; font-size: 9.5pt; }
+  .doc-a4 table.doc-items th, .doc-a4 table.doc-items td { border: 1pt solid #000; padding: 1.8mm 3mm; }
+  .doc-a4 table.doc-items th { font-weight: 700; text-align: left; }
+  .doc-a4 table.doc-items .num { text-align: right; white-space: nowrap; }
+  .doc-a4 .doc-totals { width: 78mm; margin-left: auto; margin-top: 4mm; border: 1pt solid #000; }
+  .doc-a4 .doc-totals .row { display: flex; justify-content: space-between; padding: 1.6mm 4mm; }
+  .doc-a4 .doc-totals .row.grand { border-top: 1.2pt solid #000; font-size: 13pt; font-weight: 700; }
+  .doc-a4 .doc-notes { margin-top: 5mm; font-size: 9.5pt; white-space: pre-wrap; }
+  .doc-a4 .doc-footer { margin-top: 8mm; text-align: center; font-size: 10pt; font-weight: 600; }
+</style></head>
+<body>
+<div class="paper">
+  <div class="doc-a4">
+    <div class="doc-head">
+      <div>
+        <div class="doc-company-name">Distribuidora El Sol</div>
+        <div class="doc-company-meta">
+          <div>Av. San Martín 1234, Coronda, Santa Fe</div>
+          <div>Tel: 342 555-1234</div>
+          <div>CUIT: 30-12345678-9</div>
+          <div>Ing. Brutos: 021-998877-1</div>
+        </div>
+      </div>
+      <div class="doc-title-box">
+        <div class="doc-title">PRESUPUESTO</div>
+        <div class="doc-number">N° P-0001</div>
+      </div>
+    </div>
+
+    <div class="doc-meta-row">
+      <div class="doc-party">
+        <div class="doc-party-label">Cliente</div>
+        <div>Gómez, Ana</div>
+        <div>DNI 30.111.222</div>
+      </div>
+      <div class="doc-party" style="max-width:70mm">
+        <div style="display:flex;justify-content:space-between;gap:6mm"><span class="doc-party-label">Fecha</span><span>30/06/2026</span></div>
+        <div style="display:flex;justify-content:space-between;gap:6mm"><span class="doc-party-label">Vigencia</span><span>30 días</span></div>
+      </div>
+    </div>
+
+    <table class="doc-items">
+      <thead>
+        <tr><th style="width:50%">Descripción</th><th class="num">Cant.</th><th class="num">P. unit.</th><th class="num">Importe</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Gaseosa Cola 2.25L</td><td class="num">2</td><td class="num">$ 1.450,00</td><td class="num">$ 2.900,00</td></tr>
+        <tr><td>Arroz Largo Fino 1kg</td><td class="num">3</td><td class="num">$ 1.150,00</td><td class="num">$ 3.450,00</td></tr>
+        <tr><td>Aceite de Girasol 900ml</td><td class="num">1</td><td class="num">$ 2.300,00</td><td class="num">$ 2.300,00</td></tr>
+      </tbody>
+    </table>
+
+    <div class="doc-totals">
+      <div class="row"><span>Subtotal</span><span class="tabular-nums">$ 8.650,00</span></div>
+      <div class="row"><span>Descuento</span><span class="tabular-nums">−$ 432,50</span></div>
+      <div class="row grand"><span>TOTAL</span><span class="tabular-nums">$ 8.217,50</span></div>
+    </div>
+
+    <div class="doc-notes"><strong>Observaciones:</strong> Entrega a coordinar. Precios no incluyen flete.</div>
+    <div class="doc-footer">Presupuesto válido por 30 días. Los precios pueden variar sin previo aviso.</div>
+  </div>
+</div>
+</body></html>
