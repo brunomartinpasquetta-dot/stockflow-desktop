@@ -287,7 +287,8 @@ export function Compras() {
       const bc = a.barcode.toLowerCase()
       return bc === v ? 0 : bc.startsWith(v) ? 1 : 2
     }
-    return [...matches].sort((a, b) => rank(a) - rank(b)).slice(0, 8)
+    // Mostramos TODOS los que matchean (tope de seguridad alto); el desplegable scrollea.
+    return [...matches].sort((a, b) => rank(a) - rank(b)).slice(0, 300)
   }, [barcode, allArticles])
   function commitBarcode(): void {
     const v = barcode.trim()
@@ -437,7 +438,7 @@ export function Compras() {
             }}
           />
           {suggestions.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
+            <div className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
               {suggestions.map((a) => (
                 <button
                   key={a.id}

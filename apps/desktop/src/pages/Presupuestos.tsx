@@ -537,7 +537,7 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
     if (term.length < 2) return []
     return (articlesQuery.data ?? [])
       .filter((a) => a.description.toLowerCase().includes(term) || a.barcode.toLowerCase().includes(term))
-      .slice(0, 8)
+      .slice(0, 300)
   }, [articlesQuery.data, search])
 
   function addArticle(a: ArticleDTO): void {
@@ -645,7 +645,7 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
           onChange={(e) => setSearch(e.target.value)}
         />
         {suggestions.length > 0 && (
-          <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-md">
+          <div className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
             {suggestions.map((a) => (
               <button
                 key={a.id}
