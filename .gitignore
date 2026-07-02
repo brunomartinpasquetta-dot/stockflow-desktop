@@ -16,3 +16,4 @@ userData/
 # generate:icons → faltaban icon.ico (Windows usaba ícono default) y
 # dmg-background.png (el .dmg de macOS fallaba con ENOENT). Se commitean los
 # binarios reales generados con scripts/generate-icons.mjs.
+.claude/
