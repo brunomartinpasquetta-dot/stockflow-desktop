@@ -6,6 +6,7 @@ def b64(p): return base64.b64encode(open(p,'rb').read()).decode()
 def img(n): return f"data:image/png;base64,{b64(os.path.join(W,'img',n))}"
 def font(f): return base64.b64encode(open(os.path.join(W,'fonts',f),'rb').read()).decode()
 PDV=img('pdv.png'); ART=img('articulos.png'); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
+CAJA2=img('caja-abierta-resumen.png'); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
 LOGO=img('logo-full.png'); CUBE=img('cube-hd.png')
 WA="https://wa.me/543425847340?text=Hola!%20Quiero%20probar%20StockFlow%20en%20mi%20comercio"
 CUBE_HTML=("<div class='cube3d' aria-hidden='true'><div class='c-halo'></div>"
@@ -55,6 +56,13 @@ G={
  'a4':sic("<path d='M6.5 3.5h7L18 8v12.5H6.5V3.5Z'/><path d='M13.5 3.5V8H18M9 12h6M9 15h6'/>"),
  'wifi':sic("<path d='M5 12.5a10 10 0 0 1 14 0M8 16a5 5 0 0 1 8 0'/><circle cx='12' cy='19' r='1'/>"),
  'bolt':sic("<path d='M13 3 4 14h6l-1 7 9-11h-6l1-7Z'/>"),
+ 'lu_wrench':sic("<path d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'/>"),
+ 'lu_forklift':sic("<path d='M12 12H5a2 2 0 0 0-2 2v5'/><circle cx='13' cy='19' r='2'/><circle cx='5' cy='19' r='2'/><path d='M8 19h3m5-17v17h6M6 12V7c0-1.1.9-2 2-2h3l5 5'/>"),
+ 'lu_store':sic("<path d='m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7'/><path d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/><path d='M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4'/><path d='M2 7h20'/><path d='M22 7v3a2 2 0 0 1-2 2 2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12a2 2 0 0 1-2-2V7'/>"),
+ 'lu_boxes':sic("<path d='M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z'/><path d='m7 16.5-4.74-2.85'/><path d='m7 16.5 5-3'/><path d='M7 16.5v5.17'/><path d='M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z'/><path d='m17 16.5-5-3'/><path d='m17 16.5 4.74-2.85'/><path d='M17 16.5v5.17'/><path d='M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z'/><path d='M12 8 7.26 5.15'/><path d='m12 8 4.74-2.85'/><path d='M12 13.5V8'/>"),
+ 'lu_gear':sic("<path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/><circle cx='12' cy='12' r='3'/>"),
+ 'lu_truck':sic("<path d='M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2'/><path d='M15 18H9'/><path d='M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14'/><circle cx='7' cy='18' r='2'/><circle cx='17' cy='18' r='2'/>"),
+ 'lu_shirt':sic("<path d='M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z'/>"),
  'headset':sic("<path d='M4 13v-1a8 8 0 0 1 16 0v1'/><rect x='3' y='13' width='3.5' height='6' rx='1.4'/><rect x='17.5' y='13' width='3.5' height='6' rx='1.4'/><path d='M19 19a3 3 0 0 1-3 3h-3'/>"),
 }
 WA_SVG="<svg class='wai' viewBox='0 0 24 24' fill='currentColor'><path d='M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm5.8 14.1c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.5-1.2-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.5-.3.3c-.2.2-.4.4-.2.7.2.4.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.7 1.6.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.2.6-.1l2 .9c.2.1.4.2.4.3.1.2.1.6-.1 1.1Z'/></svg>"
@@ -103,7 +111,7 @@ p{{margin:0;}}
 
 /* HERO */
 .hero{{background:radial-gradient(120% 120% at 85% 0%,var(--blue-t) 0%,#fff 55%);overflow:hidden;}}
-.hero .wrap{{display:grid;grid-template-columns:1.05fr 1fr;gap:50px;align-items:start;padding:56px 24px 68px;}}
+.hero .wrap{{display:grid;grid-template-columns:1.05fr 1fr;gap:50px;align-items:start;padding:44px 24px 48px;}}
 .hero .wrap>div{{min-width:0;}}
 .badge{{display:inline-flex;align-items:center;gap:8px;background:var(--blue-t);color:var(--blue-d);font-weight:700;
  font-size:13.5px;padding:7px 14px;border-radius:999px;}}
@@ -113,6 +121,16 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
  font-size:clamp(40px,6.2vw,74px);line-height:1.0;letter-spacing:-.025em;margin:0 0 2px;text-wrap:balance;}}
 .hero-title b{{color:var(--blue);}}
 .hero-cube{{height:clamp(240px,30vw,360px);width:auto;display:block;margin:16px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
+/* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
+.rubros-hero{{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+ gap:12px 14px;margin:-0.5cm 0 4px;}}
+.rh{{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;
+ font-family:var(--disp);font-weight:700;font-size:15px;color:var(--ink);transition:color .15s;}}
+.rh:hover{{color:var(--blue);}}
+.rh i{{color:var(--blue);display:inline-flex;flex:none;}}
+.rh i svg{{width:31px;height:31px;stroke-width:2;}}
+@media(max-width:900px){{.rubros-hero{{justify-content:flex-start;gap:12px 22px;margin-top:-0.2cm;}} .rh{{font-size:14.5px;}} .rh i svg{{width:28px;height:28px;}}}}
+@media(max-width:480px){{.rubros-hero{{margin-top:6px;}} .rh{{font-size:14px;}}}}
 .sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}}
 .lead b{{color:var(--ink);font-weight:800;}}
 .hero .lead{{font-size:19px;margin-top:20px;max-width:40ch;}}
@@ -125,7 +143,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .trust .wa-c{{width:34px;height:34px;border-radius:50%;background:var(--wa);color:#053d1c;display:grid;place-items:center;}}
 .trust .wa-c svg{{width:19px;height:19px;}}
 .shot{{border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 60px rgba(20,40,80,.18);background:#fff;}}
-.hero .shotwrap{{position:relative;}}
+.hero .shotwrap{{position:relative;margin-top:-103px;}}
 .hero .ftag{{position:absolute;left:-14px;bottom:-16px;background:#fff;border:1px solid var(--line);border-radius:12px;
  box-shadow:0 14px 30px rgba(20,40,80,.16);padding:12px 16px;display:flex;align-items:center;gap:11px;}}
 .hero .ftag .ic{{width:38px;height:38px;border-radius:10px;background:var(--green);color:#fff;display:grid;place-items:center;}}
@@ -150,7 +168,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 @keyframes cfloat{{0%,100%{{transform:translateY(0);}}50%{{transform:translateY(-12px);}}}}
 @keyframes cspin{{from{{transform:rotateX(-24deg) rotateY(0);}}to{{transform:rotateX(-24deg) rotateY(360deg);}}}}
 @keyframes csh{{0%,100%{{transform:translateX(-50%) scale(1);opacity:.75;}}50%{{transform:translateX(-50%) scale(.85);opacity:.5;}}}}
-@media(max-width:960px){{.hero .wrap{{grid-template-columns:1fr;gap:40px;padding:44px 24px 60px;}} .cube3d{{transform:scale(.76);top:-38px;right:-6px;}}}}
+@media(max-width:960px){{.hero .wrap{{grid-template-columns:1fr;gap:40px;padding:44px 24px 60px;}} .cube3d{{transform:scale(.76);top:-38px;right:-6px;}} .hero .shotwrap{{margin-top:0;}}}}
 @media(prefers-reduced-motion:reduce){{.c-scene,.c-cube,.c-sh{{animation:none!important;}} .c-cube{{transform:rotateX(-24deg) rotateY(-34deg);}}}}
 
 /* STATS */
@@ -162,8 +180,8 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 @media(max-width:700px){{.stats .wrap{{grid-template-columns:1fr 1fr;gap:24px 12px;}} .stat:nth-child(3){{border-left:0;}}}}
 
 /* SECTION */
-.sec{{padding:88px 0;}}
-.sec-h{{text-align:center;max-width:660px;margin:0 auto 52px;}}
+.sec{{padding:52px 0;}}
+.sec-h{{text-align:center;max-width:660px;margin:0 auto 30px;}}
 .sec-h h2{{font-size:clamp(28px,3.5vw,40px);margin-top:12px;}}
 .sec-h p{{margin-top:14px;font-size:18px;}}
 
@@ -188,8 +206,8 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .fitem h4{{font-size:15.5px;font-weight:700;}} .fitem p{{font-size:13.5px;margin-top:2px;line-height:1.45;}}
 
 /* SHOWCASE */
-.show{{display:grid;grid-template-columns:1fr 1fr;gap:34px 50px;align-items:center;}}
-.show+.show{{margin-top:60px;}} .show.rev .st{{order:2;}} .show.rev .si{{order:1;}}
+.show{{display:grid;grid-template-columns:1fr 1fr;gap:26px 44px;align-items:center;}}
+.show+.show{{margin-top:44px;}} .show.rev .st{{order:2;}} .show.rev .si{{order:1;}}
 .show h3{{font-size:clamp(23px,2.6vw,30px);}} .show .k{{color:var(--blue);font-weight:700;font-size:14px;}}
 .show p{{margin-top:12px;font-size:16.5px;max-width:44ch;}}
 .show ul{{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:10px;}}
@@ -205,7 +223,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .cmp .y{{color:var(--green);font-weight:700;}} .cmp .n{{color:#c2453b;}} .cmp tr:last-child td{{border-bottom:0;}}
 
 /* PRECIO */
-.price{{background:var(--ink);color:#fff;border-radius:22px;padding:46px;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;}}
+.price{{background:var(--ink);color:#fff;border-radius:22px;padding:38px;display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;}}
 .price h2{{color:#fff;font-size:32px;}}
 .price .amt{{font-weight:800;font-size:60px;letter-spacing:-.02em;margin:14px 0 2px;}}
 .price .amt small{{font-size:20px;font-weight:600;color:#a9b6d6;}}
@@ -279,12 +297,86 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
  font-size:32px;width:52px;height:52px;border-radius:50%;cursor:pointer;display:grid;place-items:center;}}
 .lb-nav:hover{{background:rgba(255,255,255,.22);}} .lb-nav.prev{{left:18px;}} .lb-nav.next{{right:18px;}}
 @media(max-width:600px){{.lb-nav{{width:44px;height:44px;font-size:24px;}}}}
+/* ===== Rediseño debajo del hero ===== */
+.rubros2{{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}}
+.rubros2 .wrap{{display:grid;grid-template-columns:auto 1fr;gap:8px 28px;align-items:center;padding:20px 24px;}}
+.ru-t{{font-family:var(--disp);font-weight:800;font-size:19px;color:var(--ink);margin:0;}} .ru-t b{{color:var(--blue);}}
+.ru-chips{{display:flex;flex-wrap:wrap;gap:9px;justify-self:end;}} .ru-chips .pill{{font-size:14px;padding:8px 15px;font-weight:700;}}
+.ru-foot{{grid-column:1 / -1;color:var(--body);font-size:14px;margin:0;}}
+@media(max-width:860px){{.rubros2 .wrap{{grid-template-columns:1fr;}} .ru-chips{{justify-self:start;}}}}
+.pain-2col{{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:1fr 1.12fr;gap:46px;align-items:center;}}
+.pain-head h2{{font-size:clamp(25px,3vw,36px);}} .pain-head p{{color:var(--body);margin-top:12px;font-size:16.5px;max-width:40ch;}}
+.pain-sheet{{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 50px rgba(20,40,80,.18);background:#fff;text-align:left;}}
+@media(max-width:820px){{.pain-2col{{grid-template-columns:1fr;gap:26px;}} .pain-head p{{max-width:none;}}}}
+.pain-body{{padding:4px 26px 16px;}}
+.pain-row{{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line);font-size:15.5px;color:var(--ink);}}
+.pain-row>span:first-child{{max-width:72%;}}
+.pain-row .mny{{color:var(--coral);font-weight:600;font-size:19px;white-space:nowrap;}}
+.pain-total{{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:14px 0 2px;border-top:3px solid var(--coral);margin-top:2px;}}
+.pain-total>span:first-child{{font-family:var(--disp);font-weight:800;font-size:18px;color:var(--ink);line-height:1.2;}}
+.pain-total .mny{{font-family:var(--disp);font-weight:800;font-size:clamp(26px,3.6vw,34px);color:var(--coral);}}
+.pain-stamp{{display:inline-block;margin-top:16px;background:var(--blue-t);color:var(--blue-d);font-weight:700;padding:9px 17px;border-radius:10px;transform:rotate(-2deg);font-size:15px;}}
+.sc-intro{{max-width:680px;margin:0 auto 32px;text-align:center;}}
+.sc-intro h2{{font-size:clamp(26px,3.4vw,38px);}} .sc-intro h2 b{{color:var(--blue);}}
+.sc-intro p{{color:var(--body);font-size:17px;margin-top:10px;}}
+.anchors{{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;}}
+.anchors a{{font-family:var(--disp);font-weight:700;font-size:14px;color:var(--blue-d);background:var(--blue-t);padding:9px 17px;border-radius:999px;transition:background .15s,color .15s;}}
+.anchors a:hover{{background:var(--blue);color:#fff;}}
+.sc-wrap{{display:flex;flex-direction:column;gap:40px;}}
+.sc{{align-items:center;gap:40px;}}
+.sc-k{{display:inline-block;font-family:var(--disp);font-weight:700;font-size:12.5px;color:var(--blue);letter-spacing:.03em;margin-bottom:6px;text-transform:uppercase;}}
+.sc .st h3{{font-size:clamp(22px,2.6vw,29px);}} .sc .st>p{{color:var(--body);margin-top:10px;font-size:16px;max-width:46ch;}}
+.sc-solve{{display:inline-flex;align-items:center;gap:8px;margin-top:13px;background:#fdece0;color:#b4531a;font-weight:700;font-size:14px;padding:8px 14px;border-radius:10px;}}
+.sc-solve::before{{content:"✕";font-weight:800;font-size:12px;}}
+.sc-notes{{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-direction:column;gap:7px;}}
+.sc-notes li{{font-size:15px;color:var(--body);padding-left:20px;position:relative;line-height:1.45;}}
+.sc-notes li::before{{content:"";position:absolute;left:0;top:8px;width:9px;height:9px;border-radius:50%;background:var(--blue);}}
+.sc-notes b{{color:var(--ink);font-weight:700;}}
+.sc .cwin{{box-shadow:0 24px 50px rgba(20,40,80,.20);}}
+.a4sheet{{background:#fff;border:1px solid var(--line);box-shadow:0 30px 60px rgba(20,40,80,.22);border-radius:4px;overflow:hidden;transform:rotate(-1.6deg);max-width:400px;margin:0 auto;}}
+.a4sheet img{{width:100%;display:block;}}
+.mini3{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}}
+.mini3 .cwin{{box-shadow:0 14px 32px rgba(20,40,80,.14);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;}}
+.mini3 img{{cursor:zoom-in;display:block;width:100%;}}
+.incl2col{{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:13px 34px;max-width:780px;}}
+.incl2col li{{display:flex;gap:11px;align-items:center;font-size:16px;color:var(--ink);font-weight:500;}}
+.incl2col li svg{{width:20px;height:20px;color:var(--green);flex:none;}}
+@media(max-width:700px){{.mini3{{grid-template-columns:1fr;}} .incl2col{{grid-template-columns:1fr;}}}}
+.facturas{{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:880px;margin:0 auto;align-items:start;}}
+.fac{{border-radius:16px;padding:26px;}}
+.fac-bad{{background:#fff;border:1.5px dashed #cdd6e6;}}
+.fac-good{{background:var(--blue);color:#fff;box-shadow:0 22px 46px rgba(43,111,214,.30);}}
+.fac-h{{font-family:var(--disp);font-weight:800;font-size:18px;margin-bottom:12px;}}
+.fac-bad .fac-h{{color:var(--body);}}
+.fr{{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);color:var(--ink);font-size:15px;font-weight:600;}}
+.fr:last-child{{border-bottom:0;}}
+.fr span{{color:var(--coral);font-weight:700;font-size:13px;text-align:right;}}
+.fr2{{display:flex;gap:10px;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.18);font-size:15.5px;font-weight:600;}}
+.fr2 svg{{width:20px;height:20px;color:#9df0bb;flex:none;}}
+.fac-total{{display:flex;justify-content:space-between;align-items:baseline;margin-top:18px;padding-top:14px;border-top:1.5px solid rgba(255,255,255,.25);}}
+.fac-total>span:first-child{{font-weight:600;}} .fac-total .z{{font-family:var(--disp);font-weight:800;font-size:42px;line-height:1;}}
+.fac-foot{{text-align:center;color:var(--body);margin-top:24px;font-weight:600;font-size:16px;}}
+@media(max-width:700px){{.facturas{{grid-template-columns:1fr;}}}}
+.faq-grid{{display:grid;grid-template-columns:2fr 1fr;gap:30px;align-items:start;}}
+.faq-rail .rail-card{{position:sticky;top:88px;background:var(--blue-t2);border:1px solid var(--line);border-radius:16px;padding:24px;}}
+.rail-card h4{{font-family:var(--disp);font-size:18px;color:var(--ink);margin:0;}} .rail-card p{{color:var(--body);font-size:15px;margin:8px 0 16px;}}
+.faq-badge{{display:inline-block;background:var(--blue-t);color:var(--blue-d);font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;margin-left:10px;vertical-align:middle;}}
+@media(max-width:820px){{.faq-grid{{grid-template-columns:1fr;}} .faq-rail .rail-card{{position:static;}}}}
 .rv{{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s;}} .rv.in{{opacity:1;transform:none;}}
 @media(prefers-reduced-motion:reduce){{.rv{{opacity:1;transform:none;}} html{{scroll-behavior:auto;}}}}
 """
 
 def chk(): return "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12l4.5 4.5L19 7'/></svg>"
 def shot(t,s,a): return (f"<figure class='shot'><img loading='lazy' src='{s}' alt='{a}'/></figure>")
+def sc(sid,rev,klabel,title,body,solve,wtitle,src,notes):
+    n="".join(f"<li><b>{a}</b>{b}</li>" for a,b in notes)
+    r=" rev" if rev else ""
+    return (f"<div class='show sc{r} rv' id='{sid}'>"
+            f"<div class='st'><span class='sc-k'>{klabel}</span><h3>{title}</h3><p>{body}</p>"
+            f"<span class='sc-solve'>{solve}</span>"
+            f"<ul class='sc-notes'>{n}</ul></div>"
+            f"<div class='si'><figure class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span>"
+            f"<span class='gbt'>StockFlow — {wtitle}</span></div><img loading='lazy' src='{src}' alt='StockFlow {wtitle}'/></figure></div></div>")
 
 FEATURES=[('box','Gestión de artículos','Alta, baja y modificación completa.'),
  ('truck','Proveedores','Administrá compras y proveedores.'),
@@ -315,6 +407,15 @@ BODY=f"""
 
 <header class="hero" id="top"><div class="wrap">
  <h1 class="hero-title">Sistema de Gestión <b>Comercial</b></h1>
+ <div class="rubros-hero">
+  <span class="rh"><i>{G['lu_wrench']}</i>Ferreterías</span>
+  <span class="rh"><i>{G['lu_forklift']}</i>Corralones</span>
+  <span class="rh"><i>{G['lu_store']}</i>Autoservicios</span>
+  <span class="rh"><i>{G['lu_shirt']}</i>Indumentaria</span>
+  <span class="rh"><i>{G['lu_boxes']}</i>Mayoristas</span>
+  <span class="rh"><i>{G['lu_truck']}</i>Distribuidoras</span>
+  <span class="rh"><i>{G['lu_gear']}</i>Repuestos</span>
+ </div>
  <div>
   <img class="hero-cube" src="{CUBE}" alt="StockFlow — Sistema de Gestión Comercial"/>
   <p class="lead"><b>Controlá tu comercio de punta a punta.</b> Ventas, stock, caja, clientes y precios siempre al día, en una sola PC. Comprobantes en regla y todo funcionando aunque se corte internet.</p>
@@ -322,7 +423,7 @@ BODY=f"""
   <div class="pills"><span class="pill">{G['wifi']} Funciona sin internet</span><span class="pill">{G['refresh']} Se actualiza solo</span><span class="pill">{G['shield']} Al día con AFIP</span></div>
   <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 15 días en tu comercio.</span></div>
  </div>
- <div class="shotwrap rv">
+ <div class="shotwrap">
   <div class="cfbox">
    <div class="cfrow">
     <div class="cf" id="cf">{GAL_SLIDES}</div>
@@ -332,78 +433,114 @@ BODY=f"""
  </div>
 </div></header>
 
-<div class="stats"><div class="wrap">
- <div class="stat"><div class="n">100%</div><div class="l">Funciona sin internet</div></div>
- <div class="stat"><div class="n">1 clic</div><div class="l">Actualizás todos los precios</div></div>
- <div class="stat"><div class="n">A4</div><div class="l">Presupuestos y comprobantes</div></div>
- <div class="stat"><div class="n">$&#8202;5.000</div><div class="l">Probalo 15 días</div></div>
-</div></div>
+<section class="sec"><div class="wrap pain-2col">
+ <div class="pain-head">
+  <h2>Lo que cuesta trabajar sin un sistema.</h2>
+  <p>Sin una herramienta que ordene la operación, cada mes se pierden ingresos difíciles de detectar. Una estimación conservadora:</p>
+  <div class="pain-stamp">Equivale a más de un mes de StockFlow. El sistema lo evita.</div>
+ </div>
+ <figure class="cwin pain-sheet">
+  <div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">StockFlow — Pérdidas mensuales estimadas</span></div>
+  <div class="pain-body">
+   <div class="pain-row"><span>Listas desactualizadas · margen perdido en cada venta</span><span class="mny pc" data-count="28000" data-pre="$&#8202;">$&#8202;28.000</span></div>
+   <div class="pain-row"><span>Cuentas corrientes sin seguimiento · cobranzas que se escapan</span><span class="mny pc" data-count="22000" data-pre="$&#8202;">$&#8202;22.000</span></div>
+   <div class="pain-row"><span>Faltantes de stock · ventas perdidas y reposición tardía</span><span class="mny pc" data-count="18000" data-pre="$&#8202;">$&#8202;18.000</span></div>
+   <div class="pain-row"><span>Cierre de caja y actualización de precios a mano · 6&nbsp;h/mes</span><span class="mny pc" data-count="12000" data-pre="$&#8202;">$&#8202;12.000</span></div>
+   <div class="pain-total"><span>Pérdida estimada por mes</span><span class="mny pc" data-count="80000" data-pre="+$&#8202;">+$&#8202;80.000</span></div>
+  </div>
+ </figure>
+</div></section>
 
-<section class="sec" id="why"><div class="wrap">
- <div class="sec-h"><div class="eyebrow">Beneficios</div><h2>Diseñado para que vendas, no para pelearte con un sistema.</h2></div>
- <div class="whys">
-  <div class="why rv"><div class="ic" style="background:var(--blue)">{G['bolt']}</div><h3>Simple e intuitivo</h3><p>En minutos ya estás cargando productos y vendiendo. Pensado para el mostrador.</p></div>
-  <div class="why rv"><div class="ic" style="background:var(--green)">{G['wifi']}</div><h3>Funciona sin internet</h3><p>Vive en tu PC. Se corta la red y seguís vendiendo igual, sin frenar la caja.</p></div>
-  <div class="why rv"><div class="ic" style="background:var(--coral)">{G['tag']}</div><h3>Precios al día con la inflación</h3><p>Actualizás toda tu lista con un porcentaje, en un solo clic. Nunca más a mano.</p></div>
-  <div class="why rv"><div class="ic" style="background:var(--indigo)">{G['shield']}</div><h3>Todo incluido</h3><p>Actualizaciones, soporte y AFIP al día, siempre. Sin pagar extra por cada mejora.</p></div>
+<section class="sec"><div class="wrap">
+ <div class="sc-intro">
+  <h2>No lo contamos. <b>Lo mostramos.</b></h2>
+  <p>Cada captura es del sistema real, con datos reales. Mirá qué resuelve cada módulo.</p>
+  <nav class="anchors"><a href="#sc-ventas">Ventas</a><a href="#sc-precios">Precios</a><a href="#sc-cuentas">Cuentas</a><a href="#sc-caja">Caja</a><a href="#sc-presu">Presupuestos</a><a href="#sc-ganas">Rentabilidad</a></nav>
+ </div>
+ <div class="sc-wrap">
+ {sc('sc-ventas',False,'Punto de venta','Cobrá en segundos, con el IVA ya calculado.','Escaneás el código o escribís el nombre y el producto entra con su precio. Confirmás con F2 y el comprobante queda listo. Si se corta internet, seguís cobrando sin interrupciones.','Sin demoras en el mostrador','Ventas',PDV,[('$&#8202;763,64',' — IVA calculado automáticamente, sin cuentas manuales'),('$&#8202;4.400,00',' — total y vuelto en el momento'),('Pago mixto',' — efectivo y tarjeta en una misma operación')])}
+ {sc('sc-precios',True,'Actualización de precios','Actualizá toda la lista en un clic.','Seleccionás la lista, ingresás el porcentaje y se actualiza completa. Sin modificar producto por producto ni planillas manuales.','Sin repreciar artículo por artículo','Artículos',ART,[('+18% a toda la lista',' aplicado en segundos'),('Verde / ámbar',' — identificás qué reponer de un vistazo'),('Hasta 3 listas',' — mostrador, mayorista y especial')])}
+ {sc('sc-cuentas',False,'Cuentas corrientes','Sabés quién te debe, cuánto y desde cuándo.','Cada cliente con su saldo actualizado. Registrás la cobranza y la cuenta se ajusta automáticamente, sin deudas anotadas en papeles sueltos.','Sin cuadernos de deuda','Cuentas Corrientes',CTA_,[('$&#8202;7.500',' — el saldo de cada cliente, siempre a la vista'),('Pago parcial',' — registra abonos y lleva el saldo pendiente'),('Saldo corrido',' — cada venta y cada cobranza, en orden')])}
+ {sc('sc-caja',True,'Caja y arqueo','Al cierre sabés exactamente cuánto debe haber en caja.','Cada medio de pago discriminado, con la comisión de tarjeta ya descontada y el efectivo esperado calculado. Cerrás la caja con el monto exacto, sin estimaciones.','Sin descuadres al cierre','Caja diaria',CAJA2,[('Efectivo esperado',' — el monto que debe haber para el arqueo'),('Comisión descontada',' — el neto real de cada acreditación'),('Caja general',' — consolidás varias cajas en una')])}
+ <div class="show sc rv" id="sc-presu">
+  <div class="st"><span class="sc-k">Presupuestos</span><h3>Presupuestás formal y lo convertís en venta con un clic.</h3>
+   <p>PDF A4 con tu encabezado, tu CUIT y la vigencia. El cliente lo aprueba y lo convertís en venta sin volver a cargar los productos.</p>
+   <span class="sc-solve">Sin presupuestos armados en Word</span>
+   <ul class="sc-notes"><li><b>Membrete y CUIT</b> — impresos automáticamente en el PDF</li><li><b>Vigencia 30 días</b> — quedás cubierto ante un reprecio</li><li><b>Un clic</b> — presupuesto aprobado → venta registrada</li></ul></div>
+  <div class="si"><figure class="a4sheet"><img loading="lazy" src="{PRES}" alt="Presupuesto A4 de StockFlow"/></figure></div>
+ </div>
+ {sc('sc-ganas',True,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('38,5% de margen',' — tu rentabilidad real'),('Ticket $&#8202;5.832',' — el promedio de compra por cliente'),('Por período y medio de pago',' — el análisis que necesites')])}
  </div>
 </div></section>
 
-<section class="sec func" id="func"><div class="wrap">
- <div class="sec-h"><div class="eyebrow">Funcionalidades</div><h2>Todo tu negocio en un solo lugar.</h2><p>Un sistema completo para gestionar artículos, ventas, caja, clientes y estadísticas — sin complicarte.</p></div>
- <div class="fgrid">
-  {"".join(f'<div class="fitem rv"><span class="ic">{G[i]}</span><div><h4>{t}</h4><p>{d}</p></div></div>' for i,t,d in FEATURES)}
+<section class="sec func"><div class="wrap">
+ <div class="sec-h"><h2>Y todo esto <span style="color:var(--blue)">ya viene incluido</span>.</h2><p>Nada de esto es un módulo aparte ni un costo adicional. Tocá cualquier captura para ampliarla.</p></div>
+ <div class="mini3">
+  <figure class="cwin"><div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">Contabilidad y Libro IVA</span></div><img class="lbz" loading="lazy" src="{CONTA}" alt="Contabilidad y Libro IVA"/></figure>
+  <figure class="cwin"><div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">Compras y proveedores</span></div><img class="lbz" loading="lazy" src="{COMPRAS}" alt="Compras y proveedores"/></figure>
+  <figure class="cwin"><div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">Clientes</span></div><img class="lbz" loading="lazy" src="{CLIENTES}" alt="Clientes"/></figure>
  </div>
+ <ul class="incl2col">
+  <li>{chk()}Códigos de barras y etiquetas</li><li>{chk()}Importás tu catálogo desde Excel</li>
+  <li>{chk()}Backups de tus datos</li><li>{chk()}Usuarios y permisos por vendedor</li>
+  <li>{chk()}MercadoPago QR desde el sistema</li><li>{chk()}Ticket 58/80&nbsp;mm o comprobante A4</li>
+  <li>{chk()}Listas de precios por tipo de cliente</li><li>{chk()}Stock mínimo con alertas de reposición</li>
+ </ul>
 </div></section>
 
-<section class="sec func" id="comp"><div class="wrap">
- <div class="sec-h"><div class="eyebrow">La diferencia</div><h2>Pagás una vez… ¿y después quién lo mantiene?</h2><p>El “pago único” parece más barato hasta que queda viejo y AFIP cambia. Nosotros lo mantenemos siempre.</p></div>
- <div class="cmp rv"><table><thead><tr><th>Lo que necesitás</th><th class="us">StockFlow</th><th>Sistema pago único</th></tr></thead><tbody>
-  {"".join(f'<tr><td class="f">{f}</td><td class="us"><span class="y">{u}</span></td><td><span class="{c}">{t}</span></td></tr>' for f,u,t,c in [
-    ("Actualizaciones nuevas","Gratis, siempre","Se pagan aparte","n"),
-    ("Al día con AFIP cuando cambia","Incluido","Comprás la versión nueva","n"),
-    ("Soporte cuando lo necesitás","Incluido","Limitado o pago","n"),
-    ("Funciona sin internet","Sí","A veces","f"),
-    ("Actualización masiva de precios","Sí","Depende","f"),
-    ("Para arrancar","Probás por $ 5.000","Desembolso grande","n"),
-    ("Riesgo de quedar obsoleto","Ninguno","Alto","n"),
-  ])}
- </tbody></table></div>
-</div></section>
-
-<section class="sec" id="precio"><div class="wrap">
- <div class="sec-h"><div class="eyebrow">Precio claro</div><h2>Un precio, todo adentro.</h2></div>
- <div class="price rv">
+<section class="sec" id="comp"><div class="wrap">
+ <div class="sec-h"><h2>El pago único parece más económico… <span style="color:var(--coral)">hasta el próximo cambio de AFIP</span>.</h2><p>Se paga una vez, pero cada mejora, soporte o adecuación normativa se cobra por separado.</p></div>
+ <div class="facturas rv">
+  <div class="fac fac-bad">
+   <div class="fac-h">Sistema de pago único</div>
+   <div class="fr">Versión nueva por AFIP<span>se cobra aparte</span></div>
+   <div class="fr">Soporte<span>limitado o con costo</span></div>
+   <div class="fr">Actualizaciones y mejoras<span>no incluidas</span></div>
+   <div class="fr">Entre versiones<span>seguís con la anterior</span></div>
+  </div>
+  <div class="fac fac-good">
+   <div class="fac-h">StockFlow · cuota fija</div>
+   <div class="fr2">{chk()}Actualizaciones incluidas</div>
+   <div class="fr2">{chk()}Adecuación a AFIP, incluida</div>
+   <div class="fr2">{chk()}Soporte por WhatsApp, incluido</div>
+   <div class="fac-total"><span>Costos extra</span><span class="z">$0</span></div>
+  </div>
+ </div>
+ <div class="price rv" id="precio" style="margin-top:40px">
   <div><h2>Suscripción · todo incluido</h2>
    <div class="amt mny"><small>$</small>&#8202;70.000<small>/mes</small></div>
-   <div class="demo">Demo <b>$ 5.000</b> — prueba 15 días + instalación (se descuenta del primer mes).</div></div>
+   <div class="demo">Probalo por <b>$ 5.000</b> — 15 días + instalación asistida (se descuenta del primer mes).</div></div>
   <div><ul>
-    <li>{chk()}Actualizaciones y mejoras nuevas, gratis</li>
-    <li>{chk()}Soporte incluido por WhatsApp</li>
-    <li>{chk()}Siempre al día con AFIP</li>
-    <li>{chk()}Todos los módulos: ventas, stock, caja, cuentas corrientes, presupuestos</li></ul>
-   <div class="anchor">Un solo faltante de stock o una cuenta sin cobrar por mes ya cuesta más de $ 70.000.</div>
+    <li>{chk()}Todo lo de arriba: ventas y actualización masiva de precios</li>
+    <li>{chk()}Cuentas corrientes, caja y presupuestos A4</li>
+    <li>{chk()}Estadísticas, actualizaciones nuevas y AFIP al día</li>
+    <li>{chk()}Soporte por WhatsApp, de una persona</li></ul>
+   <div class="anchor">Con recuperar una sola de las pérdidas anteriores —una cobranza pendiente, una lista atrasada— la cuota queda amortizada.</div>
    <a class="btn btn-blue" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Empezar por {money("5.000")}</a></div>
  </div>
 </div></section>
 
 <section class="sec func" id="faq"><div class="wrap">
- <div class="sec-h"><div class="eyebrow">Preguntas frecuentes</div><h2>Lo que todos preguntan.</h2></div>
- <div class="faq rv">
-  {"".join(f'<details><summary>{q}</summary><div class="a">{a}</div></details>' for q,a in [
-   ("¿Necesito internet para usarlo?","No. StockFlow vive en tu PC y funciona 100% offline. Internet solo se usa para actualizaciones o AFIP. Si se corta, seguís vendiendo."),
-   ("¿Mis datos quedan en mi PC?","Sí. Tus datos son tuyos y viven en tu computadora. El sistema hace backups que guardás donde quieras."),
-   ("¿Por qué suscripción y no pago único?","Porque incluye todo: actualizaciones, soporte y estar al día con AFIP. El pago único te deja clavado en una versión vieja y, cuando cambian las reglas, pagás de nuevo."),
-   ("¿Incluye la instalación?","Sí. Te lo dejamos instalado y andando con tus productos. La prueba de $ 5.000 incluye la instalación asistida."),
-   ("¿Qué pasa si dejo de pagar?","El sistema pasa a solo lectura: ves tu información pero no cargás nuevas ventas. No perdés nada; al renovar vuelve a funcionar completo."),
-   ("¿Para qué comercios es?","Para comercios que facturan en serio: ferreterías, corralones, autoservicios, mayoristas, distribuidoras y repuestos."),
-  ])}
+ <div class="sec-h" style="text-align:left;max-width:none;margin:0 0 40px"><div class="eyebrow">Preguntas</div><h2>Preguntas frecuentes antes de empezar.</h2></div>
+ <div class="faq-grid">
+  <div class="faq rv">
+   <details open><summary>¿En cuánto tiempo recupero los $&#8202;70.000?<span class="faq-badge">la más consultada</span></summary><div class="a">Habitualmente en la primera semana: al actualizar la lista a tiempo y recuperar una cobranza pendiente, la cuota ya queda cubierta.</div></details>
+   {"".join(f'<details><summary>{q}</summary><div class="a">{a}</div></details>' for q,a in [
+    ("¿Necesito internet para usarlo?","No. StockFlow funciona en tu PC de forma 100% offline. La conexión solo se usa para actualizaciones o AFIP. Si se corta, seguís operando con normalidad."),
+    ("¿Mis datos quedan en mi PC?","Sí. Tus datos son tuyos y residen en tu computadora. El sistema genera copias de seguridad que guardás donde prefieras."),
+    ("¿Por qué suscripción y no pago único?","Porque incluye todo: actualizaciones, soporte y adecuación permanente a AFIP. El pago único deja el sistema en una versión fija y, ante cada cambio normativo, se vuelve a pagar."),
+    ("¿Incluye la instalación?","Sí. Lo dejamos instalado y en funcionamiento con tus productos cargados. La prueba de $ 5.000 incluye la instalación asistida."),
+    ("¿Qué pasa si dejo de pagar?","El sistema pasa a modo solo lectura: seguís consultando tu información, pero no cargás nuevas operaciones. No se pierde ningún dato y, al renovar, vuelve a funcionar de forma completa."),
+    ("¿Para qué comercios es?","Para comercios con volumen de operación: ferreterías, corralones, autoservicios, mayoristas, distribuidoras y casas de repuestos."),
+   ])}
+  </div>
+  <aside class="faq-rail rv"><div class="rail-card"><h4>¿Tenés otra consulta?</h4><p>Escribinos y te responde una persona, no un bot. Contestamos el mismo día.</p><a class="btn btn-wa" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Consultar por WhatsApp</a></div></aside>
  </div>
 </div></section>
 
 <section class="sec final"><div class="wrap">
- <h2>Probá StockFlow en tu comercio.</h2>
- <p>Instalación asistida, prueba completa por 15 días y soporte de verdad.</p>
+ <h2>Probalo en tu comercio esta semana.</h2>
+ <p>Instalación asistida, 15 días de prueba y soporte personal —atendido por una persona—. Contestamos el mismo día.</p>
  <div class="row"><a class="btn btn-wa" href="{WA}" target="_blank" rel="noopener" style="font-size:17px;padding:16px 30px">{WA_SVG}Escribinos por WhatsApp</a><span class="num">+54 342 584 7340</span></div>
 </div></section>
 
@@ -459,6 +596,21 @@ BODY=f"""
  cf.addEventListener('touchstart',ts,{{passive:true}}); cf.addEventListener('touchend',te);
  lb.addEventListener('touchstart',ts,{{passive:true}}); lb.addEventListener('touchend',te);
  if(rm){{ place(); }} else {{ raf=requestAnimationFrame(frame); }}
+}})();
+(function(){{
+ var els=[].slice.call(document.querySelectorAll('.pc[data-count]'));
+ if(!els.length||window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+ var io=new IntersectionObserver(function(es){{es.forEach(function(e){{
+  if(!e.isIntersecting)return; io.unobserve(e.target);
+  var el=e.target, to=+el.getAttribute('data-count'), pre=el.getAttribute('data-pre')||'', t0=null;
+  function step(ts){{if(!t0)t0=ts; var p=Math.min((ts-t0)/900,1); el.textContent=pre+Math.round(to*p).toLocaleString('es-AR'); if(p<1)requestAnimationFrame(step);}}
+  requestAnimationFrame(step);
+ }});}},{{threshold:.6}});
+ els.forEach(function(el){{io.observe(el);}});
+}})();
+(function(){{
+ var lb=document.getElementById('lb'), lbimg=document.getElementById('lbimg'); if(!lb)return;
+ [].slice.call(document.querySelectorAll('.lbz')).forEach(function(im){{im.onclick=function(){{lbimg.src=im.src;lb.classList.add('open');}};}});
 }})();
 </script>
 """
