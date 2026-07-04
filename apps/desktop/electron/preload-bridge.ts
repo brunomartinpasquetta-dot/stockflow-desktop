@@ -404,6 +404,8 @@ export function createApiBridge(
         test: () => c<never>('hardware:printer:test'),
         printSaleTicket: (p) =>
           c<never>('hardware:printer:print-sale-ticket', p),
+        printPaymentReceipt: (p) =>
+          c<never>('hardware:printer:print-payment-receipt', p),
         printCashClose: (p) =>
           c<never>('hardware:printer:print-cash-close', p),
         listSystem: () => c<never>('hardware:printer:list-system'),

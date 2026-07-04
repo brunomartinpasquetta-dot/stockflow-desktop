@@ -139,3 +139,21 @@ export interface CashCloseReportData {
   declaredClosing: string;
   difference: string;
 }
+
+/** Recibo de cobranza de cuenta corriente (importe entregado + saldos). */
+export interface PaymentReceiptData {
+  company: {
+    name: string;
+    cuit?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    ingBrutos?: string | null;
+  };
+  customer: { name: string; docNumber?: string | null } | null;
+  createdAt: number;
+  paymentMethod: string;
+  amount: string;
+  comprobanteRef: string | null;
+  comprobanteBalance: string | null;
+  accountBalance: string;
+}

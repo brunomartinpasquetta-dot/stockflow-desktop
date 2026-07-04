@@ -1,12 +1,15 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2, Printer, ReceiptText } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
-import { useCustomerBalances } from '@/lib/hooks'
-import { usePaymentMethods } from '@/lib/hooks'
+import { useArticles, useCompany, useCustomerBalances, usePaymentMethods } from '@/lib/hooks'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
+import { printSaleTicketSilent } from '@/lib/printSaleTicket'
+import { printPaymentReceiptSilent } from '@/lib/printPaymentReceipt'
+import type { SaleTicketData } from '@/print/SaleTicket'
+import type { PaymentReceiptData } from '@/print/PaymentReceipt'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
@@ -18,7 +21,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
-import type { AccountReceivableDTO } from '@/types/api'
+import type { AccountReceivableDTO, StatementEntryDTO } from '@/types/api'
 
 function CobranzaDialog({
   account,
@@ -286,10 +289,73 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
   const [cobrandoCuenta, setCobrandoCuenta] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  const companyQuery = useCompany()
+  const articlesQuery = useArticles()
+  const methodsQuery = usePaymentMethods()
+  const printerCfgQuery = useQuery({
+    queryKey: ['hardwarePrinterConfig'],
+    queryFn: () => api.hardware.printer.getConfig(),
+    staleTime: 30_000,
+  })
+  const descById = useMemo(
+    () => new Map((articlesQuery.data ?? []).map((a) => [a.id, a.description])),
+    [articlesQuery.data],
+  )
+  const pmNameById = useMemo(
+    () => new Map((methodsQuery.data ?? []).map((m) => [m.id, m.name])),
+    [methodsQuery.data],
+  )
+
   const customer = statementQuery.data?.customer
   const name = customer ? (customer.firstName ? `${customer.lastName}, ${customer.firstName}` : customer.lastName) : '…'
   const balance = statementQuery.data?.currentBalance ?? '0'
   const hasBalance = Number(balance) > 0.005
+
+  // Reimprime el ticket de una venta a cuenta (mismo camino que Historial de
+  // Ventas). Útil cuando la venta ya está saldada y quiere entregarse el ticket.
+  async function reprintSale(saleId: string): Promise<void> {
+    const company = companyQuery.data
+    if (!company) return
+    const d = await api.sales.get(saleId)
+    const ticketData: SaleTicketData = {
+      company,
+      sale: d.sale,
+      priceMode: company.priceMode,
+      lines: d.lines.map((l) => ({
+        description: descById.get(l.articleId) ?? '—',
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal,
+      })),
+      customerName: name !== '…' ? name : null,
+      customerDoc: customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
+      sellerName: null,
+      isAccountSale: d.sale.isAccountSale,
+      payments: d.payments.map((p) => ({
+        methodName: pmNameById.get(p.paymentMethodId) ?? 'Medio de pago',
+        amount: p.amount,
+      })),
+    }
+    await printSaleTicketSilent(ticketData, printerCfgQuery.data ?? null)
+  }
+
+  // Imprime el recibo de una cobranza (importe entregado + saldos).
+  function printReceipt(e: StatementEntryDTO): void {
+    const company = companyQuery.data
+    if (!company) return
+    const data: PaymentReceiptData = {
+      company,
+      customerName: name,
+      customerDoc: customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
+      date: e.date,
+      paymentMethod: e.paymentMethodName ?? 'Cobranza',
+      amount: e.credit,
+      comprobanteRef: e.saleType && e.saleNumber != null ? `Venta ${e.saleType} #${e.saleNumber}` : null,
+      comprobanteBalance: e.comprobanteBalance,
+      accountBalance: e.runningBalance,
+    }
+    void printPaymentReceiptSilent(data, printerCfgQuery.data ?? null)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -411,16 +477,17 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                 <TableHead className="text-right">Debe</TableHead>
                 <TableHead className="text-right">Haber</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
+                <TableHead className="text-right w-16" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {statementQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Cargando…</TableCell>
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">Cargando…</TableCell>
                 </TableRow>
               ) : (statementQuery.data?.entries ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Sin movimientos</TableCell>
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">Sin movimientos</TableCell>
                 </TableRow>
               ) : (
                 (statementQuery.data?.entries ?? []).map((e, i) => (
@@ -430,6 +497,31 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                     <TableCell className="text-right tabular-nums">{Number(e.debit) > 0 ? formatCurrency(e.debit) : ''}</TableCell>
                     <TableCell className="text-right tabular-nums text-success">{Number(e.credit) > 0 ? formatCurrency(e.credit) : ''}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(e.runningBalance)}</TableCell>
+                    <TableCell className="text-right">
+                      {e.kind === 'payment' ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          title="Imprimir recibo de cobranza"
+                          disabled={!companyQuery.data}
+                          onClick={() => printReceipt(e)}
+                        >
+                          <ReceiptText className="h-4 w-4" />
+                        </Button>
+                      ) : e.saleId ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          title="Reimprimir venta"
+                          disabled={!companyQuery.data}
+                          onClick={() => { void reprintSale(e.saleId!) }}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

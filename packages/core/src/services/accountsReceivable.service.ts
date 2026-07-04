@@ -59,6 +59,15 @@ export interface StatementEntry {
   credit: string;
   /** saldo acumulado luego de este movimiento */
   runningBalance: string;
+  /** id de la venta asociada al comprobante (para reimprimir el ticket). */
+  saleId: string | null;
+  /** tipo/número del comprobante (para mostrar/imprimir). */
+  saleType: string | null;
+  saleNumber: number | null;
+  /** nombre del medio de pago (sólo en entradas de cobranza). */
+  paymentMethodName: string | null;
+  /** saldo del comprobante luego de este pago (sólo en cobranzas). */
+  comprobanteBalance: string | null;
 }
 
 export interface CustomerStatement {
@@ -236,27 +245,42 @@ export class AccountsReceivableService {
     }
     const pmById = await repos.paymentMethods.byId();
 
-    type RawEntry = { date: number; kind: 'sale' | 'payment'; reference: string; debit: string; credit: string };
+    type RawEntry = Omit<StatementEntry, 'runningBalance'>;
     const raw: RawEntry[] = [];
     for (const ac of accounts) {
+      const sale = salesById.get(ac.saleId) ?? null;
       raw.push({
         date: ac.createdAt,
         kind: 'sale',
-        reference: salesById.get(ac.saleId)
-          ? `Venta ${salesById.get(ac.saleId)!.type} #${salesById.get(ac.saleId)!.number}`
-          : `Cuenta ${ac.id}`,
+        reference: sale ? `Venta ${sale.type} #${sale.number}` : `Cuenta ${ac.id}`,
         debit: ac.total,
         credit: '0.0000',
+        saleId: ac.saleId,
+        saleType: sale?.type ?? null,
+        saleNumber: sale?.number ?? null,
+        paymentMethodName: null,
+        comprobanteBalance: null,
       });
-      const payments = await repos.payments.findByAccount(ac.id);
+      // Cobranzas de este comprobante, en orden cronológico, acumulando lo pagado
+      // para poder informar el saldo del comprobante luego de cada pago.
+      const payments = (await repos.payments.findByAccount(ac.id))
+        .slice()
+        .sort((a, b) => a.date - b.date);
+      let paidSoFar = '0.0000';
       for (const p of payments) {
         const pmName = pmById.get(p.paymentMethodId)?.name ?? 'medio desconocido';
+        paidSoFar = addDecimal(paidSoFar, p.amount, 4);
         raw.push({
           date: p.date,
           kind: 'payment',
           reference: `Cobranza — ${pmName}`,
           debit: '0.0000',
           credit: p.amount,
+          saleId: ac.saleId,
+          saleType: sale?.type ?? null,
+          saleNumber: sale?.number ?? null,
+          paymentMethodName: pmName,
+          comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
         });
       }
     }

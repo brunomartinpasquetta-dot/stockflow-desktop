@@ -27,6 +27,7 @@ import net from 'node:net';
 
 import type {
   CashCloseReportData,
+  PaymentReceiptData,
   PrinterConfig,
   PrinterWidth,
   SaleTicketData,
@@ -512,6 +513,58 @@ export class PrinterService {
     parts.push(LF);
     parts.push(ALIGN_CENTER);
     push('¡Gracias por su compra!\n');
+    parts.push(LF, LF, LF, CUT);
+
+    await this.sendAll(parts);
+  }
+
+  /**
+   * Recibo de cobranza de cuenta corriente: en vez de artículos muestra el
+   * importe entregado y los saldos (comprobante y total de la cuenta).
+   */
+  async printPaymentReceipt(r: PaymentReceiptData): Promise<void> {
+    if (this.isA4()) {
+      throw new Error('A4_BROWSER_PRINT_REQUIRED');
+    }
+    const cols = this.cols;
+    const parts: Buffer[] = [];
+    const push = (s: string) => parts.push(encodeCp858(s));
+    parts.push(INIT, CODEPAGE_PC858);
+
+    parts.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
+    push(`${r.company.name}\n`);
+    parts.push(DOUBLE_OFF, BOLD_OFF);
+    if (r.company.cuit) push(`CUIT: ${r.company.cuit}\n`);
+    if (r.company.address) push(`${r.company.address}\n`);
+    if (r.company.phone) push(`Tel: ${r.company.phone}\n`);
+    parts.push(LF);
+
+    parts.push(BOLD_ON);
+    push(`${center('RECIBO DE COBRANZA', cols)}\n`);
+    parts.push(BOLD_OFF, ALIGN_LEFT);
+    push(`${center('DOCUMENTO NO FISCAL', cols)}\n`);
+    push(`${formatDateTime(r.createdAt)}\n`);
+    if (r.customer) {
+      push(`Cliente: ${r.customer.name}\n`);
+      if (r.customer.docNumber) push(`Doc: ${r.customer.docNumber}\n`);
+    }
+    if (r.comprobanteRef) push(`Comprobante: ${r.comprobanteRef}\n`);
+    push(`Medio: ${r.paymentMethod}\n`);
+    push(`${'-'.repeat(cols)}\n`);
+
+    parts.push(BOLD_ON, DOUBLE_ON);
+    push(`${leftRight('ENTREGADO', r.amount, Math.floor(cols / 2))}\n`);
+    parts.push(DOUBLE_OFF, BOLD_OFF);
+    push(`${'-'.repeat(cols)}\n`);
+    if (r.comprobanteBalance != null) {
+      push(`${leftRight('Saldo comprobante', r.comprobanteBalance, cols)}\n`);
+    }
+    parts.push(BOLD_ON);
+    push(`${leftRight('Saldo total cuenta', r.accountBalance, cols)}\n`);
+    parts.push(BOLD_OFF);
+
+    parts.push(LF, ALIGN_CENTER);
+    push('Comprobante de pago\n');
     parts.push(LF, LF, LF, CUT);
 
     await this.sendAll(parts);

@@ -727,6 +727,14 @@ export interface StatementEntryDTO {
   debit: string;
   credit: string;
   runningBalance: string;
+  /** id de la venta asociada al comprobante (para reimprimir el ticket). */
+  saleId: string | null;
+  saleType: string | null;
+  saleNumber: number | null;
+  /** nombre del medio de pago (sólo en cobranzas). */
+  paymentMethodName: string | null;
+  /** saldo del comprobante luego de este pago (sólo en cobranzas). */
+  comprobanteBalance: string | null;
 }
 
 export interface CustomerStatementDTO {
@@ -1515,6 +1523,7 @@ export interface ApiSurface {
       setConfig(payload: PrinterConfigDTO | null): Res<{ ok: true }>;
       test(): Res<{ ok: true }>;
       printSaleTicket(payload: SaleTicketDataDTO): Res<{ ok: true }>;
+      printPaymentReceipt(payload: PaymentReceiptDataDTO): Res<{ ok: true }>;
       printCashClose(payload: CashCloseReportDataDTO): Res<{ ok: true }>;
       listSystem(): Res<SystemPrinterDTO[]>;
     };
@@ -1716,6 +1725,28 @@ export interface SaleTicketDataDTO {
   total: string;
   payments: SaleTicketPaymentDataDTO[];
   accountSale?: boolean;
+}
+
+/** Recibo de cobranza de cuenta corriente (importe entregado + saldos). */
+export interface PaymentReceiptDataDTO {
+  company: {
+    name: string;
+    cuit?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    ingBrutos?: string | null;
+  };
+  customer: { name: string; docNumber?: string | null } | null;
+  createdAt: number;
+  paymentMethod: string;
+  /** importe entregado por el cliente */
+  amount: string;
+  /** "Venta X #12" del comprobante imputado, si aplica */
+  comprobanteRef: string | null;
+  /** saldo del comprobante luego del pago (null si no aplica) */
+  comprobanteBalance: string | null;
+  /** saldo total de la cuenta del cliente luego del pago */
+  accountBalance: string;
 }
 
 export interface CashCloseReportDataDTO {

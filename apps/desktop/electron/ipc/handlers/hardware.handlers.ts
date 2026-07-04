@@ -5,6 +5,7 @@ import { requirePermission } from '@stockflow/core';
 
 import type {
   CashCloseReportData,
+  PaymentReceiptData,
   PrinterConfig,
   SaleTicketData,
   ScaleConfig,
@@ -52,6 +53,15 @@ export function buildHardwareHandlers(deps: HandlerDeps): HandlerMap {
         const printer = deps.hardware.getPrinter();
         if (!printer) throw new Error('Impresora no configurada');
         await printer.printSaleTicket(payload);
+        return { ok: true };
+      },
+    ),
+    'hardware:printer:print-payment-receipt': withSession(
+      deps,
+      async (payload: PaymentReceiptData): Promise<{ ok: true }> => {
+        const printer = deps.hardware.getPrinter();
+        if (!printer) throw new Error('Impresora no configurada');
+        await printer.printPaymentReceipt(payload);
         return { ok: true };
       },
     ),
