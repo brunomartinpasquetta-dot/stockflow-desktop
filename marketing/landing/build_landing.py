@@ -75,7 +75,7 @@ CSS=f"""
  --blue:#2b6fd6; --blue-d:#1f57b5; --blue-t:#eaf1fd; --blue-t2:#f2f7fe;
  --ink:#14213d; --body:#586074; --paper:#ffffff; --soft:#eff4fb; --line:#e4eaf3;
  --green:#16a34a; --wa:#25d366; --coral:#f97316; --indigo:#4f46e5;
- --jak:'Jak',system-ui,sans-serif; --disp:'Mont','Jak',system-ui,sans-serif; --wrap:1180px;
+ --jak:'Jak',system-ui,sans-serif; --disp:'Mont','Jak',system-ui,sans-serif; --wrap:1280px;
 }}
 *{{box-sizing:border-box;}}
 html{{scroll-behavior:smooth;}}
@@ -134,11 +134,12 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}}
 .lead b{{color:var(--ink);font-weight:800;}}
 .hero .lead{{font-size:19px;margin-top:20px;max-width:40ch;}}
-.hcta{{display:flex;gap:13px;margin-top:30px;flex-wrap:wrap;}}
+.hcta{{display:flex;gap:7px;margin-top:30px;flex-wrap:wrap;align-items:center;}}
+.hcta .btn{{padding:11px 15px;font-size:14.5px;}}
 .pills{{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap;}}
-.pill{{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:999px;
- padding:9px 16px;font-weight:600;font-size:14px;color:var(--ink);}}
-.pill svg{{width:16px;height:16px;color:var(--blue);}}
+.pill{{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:999px;
+ padding:5px 9px;font-weight:600;font-size:11.5px;color:var(--ink);white-space:nowrap;}}
+.pill svg{{width:14px;height:14px;color:var(--blue);}}
 .trust{{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:14px;color:var(--body);}}
 .trust .wa-c{{width:34px;height:34px;border-radius:50%;background:var(--wa);color:#053d1c;display:grid;place-items:center;}}
 .trust .wa-c svg{{width:19px;height:19px;}}
@@ -304,18 +305,18 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .ru-chips{{display:flex;flex-wrap:wrap;gap:9px;justify-self:end;}} .ru-chips .pill{{font-size:14px;padding:8px 15px;font-weight:700;}}
 .ru-foot{{grid-column:1 / -1;color:var(--body);font-size:14px;margin:0;}}
 @media(max-width:860px){{.rubros2 .wrap{{grid-template-columns:1fr;}} .ru-chips{{justify-self:start;}}}}
-.pain-2col{{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:1fr 1.12fr;gap:46px;align-items:center;}}
-.pain-head h2{{font-size:clamp(25px,3vw,36px);}} .pain-head p{{color:var(--body);margin-top:12px;font-size:16.5px;max-width:40ch;}}
+.pain-2col{{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:0.82fr 1.3fr;gap:44px;align-items:center;}}
+.pain-head h2{{font-size:clamp(25px,3vw,36px);}} .pain-head p{{color:var(--body);margin-top:12px;font-size:16.5px;}}
 .pain-sheet{{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 50px rgba(20,40,80,.18);background:#fff;text-align:left;}}
 @media(max-width:820px){{.pain-2col{{grid-template-columns:1fr;gap:26px;}} .pain-head p{{max-width:none;}}}}
 .pain-body{{padding:4px 26px 16px;}}
 .pain-row{{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line);font-size:15.5px;color:var(--ink);}}
-.pain-row>span:first-child{{max-width:72%;}}
+.pain-row>span:first-child{{flex:1;padding-right:14px;}}
 .pain-row .mny{{color:var(--coral);font-weight:600;font-size:19px;white-space:nowrap;}}
 .pain-total{{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:14px 0 2px;border-top:3px solid var(--coral);margin-top:2px;}}
 .pain-total>span:first-child{{font-family:var(--disp);font-weight:800;font-size:18px;color:var(--ink);line-height:1.2;}}
 .pain-total .mny{{font-family:var(--disp);font-weight:800;font-size:clamp(26px,3.6vw,34px);color:var(--coral);}}
-.pain-stamp{{display:inline-block;margin-top:16px;background:var(--blue-t);color:var(--blue-d);font-weight:700;padding:9px 17px;border-radius:10px;transform:rotate(-2deg);font-size:15px;}}
+.pain-stamp{{display:inline-block;margin-top:20px;background:var(--blue-t);color:var(--blue-d);font-weight:700;padding:11px 18px;font-size:15px;}}
 .sc-intro{{max-width:680px;margin:0 auto 32px;text-align:center;}}
 .sc-intro h2{{font-size:clamp(26px,3.4vw,38px);}} .sc-intro h2 b{{color:var(--blue);}}
 .sc-intro p{{color:var(--body);font-size:17px;margin-top:10px;}}
@@ -364,6 +365,12 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 @media(max-width:820px){{.faq-grid{{grid-template-columns:1fr;}} .faq-rail .rail-card{{position:static;}}}}
 .rv{{opacity:0;transform:translateY(16px);transition:opacity .5s,transform .5s;}} .rv.in{{opacity:1;transform:none;}}
 @media(prefers-reduced-motion:reduce){{.rv{{opacity:1;transform:none;}} html{{scroll-behavior:auto;}}}}
+/* ===== Bordes rectos en todo (cards, botones, menús, pills, ventanas) ===== */
+.btn,.pill,.badge,.faq-badge,.why,.why .ic,.fitem,.fitem .ic,
+.shot,.cwin,.gvp,.mini3 .cwin,.a4sheet,.hero .ftag,.hero .ftag .ic,
+.price,.fac,.faq details,.faq-rail .rail-card,.cmp table,
+.pain-sheet,.pain-stamp,.anchors a,.sc-solve,.stat,
+.lb img{{border-radius:0 !important;}}
 """
 
 def chk(): return "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12l4.5 4.5L19 7'/></svg>"
@@ -419,8 +426,11 @@ BODY=f"""
  <div>
   <img class="hero-cube" src="{CUBE}" alt="StockFlow — Sistema de Gestión Comercial"/>
   <p class="lead"><b>Controlá tu comercio de punta a punta.</b> Ventas, stock, caja, clientes y precios siempre al día, en una sola PC. Comprobantes en regla y todo funcionando aunque se corte internet.</p>
-  <div class="hcta"><a class="btn btn-blue" href="#precio">Probar por {money("5.000")}</a><a class="btn btn-ghost" href="#func">Ver funciones</a></div>
-  <div class="pills"><span class="pill">{G['wifi']} Funciona sin internet</span><span class="pill">{G['refresh']} Se actualiza solo</span><span class="pill">{G['shield']} Al día con AFIP</span></div>
+  <div class="hcta">
+   <a class="btn btn-blue" href="#precio">Probar {money("5.000")}</a>
+   <a class="btn btn-ghost" href="#func">Ver funciones</a>
+   <span class="pill">{G['wifi']} Sin internet</span><span class="pill">{G['refresh']} Se actualiza</span><span class="pill">{G['shield']} AFIP al día</span>
+  </div>
   <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 15 días en tu comercio.</span></div>
  </div>
  <div class="shotwrap">
@@ -442,10 +452,10 @@ BODY=f"""
  <figure class="cwin pain-sheet">
   <div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">StockFlow — Pérdidas mensuales estimadas</span></div>
   <div class="pain-body">
-   <div class="pain-row"><span>Listas desactualizadas · margen perdido en cada venta</span><span class="mny pc" data-count="28000" data-pre="$&#8202;">$&#8202;28.000</span></div>
-   <div class="pain-row"><span>Cuentas corrientes sin seguimiento · cobranzas que se escapan</span><span class="mny pc" data-count="22000" data-pre="$&#8202;">$&#8202;22.000</span></div>
-   <div class="pain-row"><span>Faltantes de stock · ventas perdidas y reposición tardía</span><span class="mny pc" data-count="18000" data-pre="$&#8202;">$&#8202;18.000</span></div>
-   <div class="pain-row"><span>Cierre de caja y actualización de precios a mano · 6&nbsp;h/mes</span><span class="mny pc" data-count="12000" data-pre="$&#8202;">$&#8202;12.000</span></div>
+   <div class="pain-row"><span>Listas de precios desactualizadas</span><span class="mny pc" data-count="28000" data-pre="$&#8202;">$&#8202;28.000</span></div>
+   <div class="pain-row"><span>Cuentas corrientes sin seguimiento</span><span class="mny pc" data-count="22000" data-pre="$&#8202;">$&#8202;22.000</span></div>
+   <div class="pain-row"><span>Faltantes de stock y reposición tardía</span><span class="mny pc" data-count="18000" data-pre="$&#8202;">$&#8202;18.000</span></div>
+   <div class="pain-row"><span>Cierre de caja y precios a mano · 6&nbsp;h/mes</span><span class="mny pc" data-count="12000" data-pre="$&#8202;">$&#8202;12.000</span></div>
    <div class="pain-total"><span>Pérdida estimada por mes</span><span class="mny pc" data-count="80000" data-pre="+$&#8202;">+$&#8202;80.000</span></div>
   </div>
  </figure>
