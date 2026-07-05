@@ -39,6 +39,7 @@ import { buildSupplierAccountsHandlers } from './handlers/supplierAccounts.handl
 import { buildSuppliersHandlers } from './handlers/suppliers.handlers';
 import { buildSystemHandlers } from './handlers/system.handlers';
 import { buildUsersHandlers } from './handlers/users.handlers';
+import { buildWhatsAppHandlers } from './handlers/whatsapp.handlers';
 import type { HandlerBuilder, HandlerDeps, HandlerMap } from './handler-context';
 
 const BUILDERS: HandlerBuilder[] = [
@@ -74,6 +75,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildMpQrHandlers,
   buildAccountingHandlers,
   buildDesktopWindowsHandlers,
+  buildWhatsAppHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {

@@ -10,6 +10,7 @@ import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { Badge } from '@/components/ui/badge'
+import { WhatsAppButton } from '@/components/WhatsAppButton'
 import type { CustomerDTO } from '@/types/api'
 
 const DOC_OPTIONS = [
@@ -190,6 +191,7 @@ export function Clientes() {
         isLoading={customers.isLoading}
         searchFields={['lastName', 'firstName', 'docNumber']}
         searchPlaceholder="Buscar por apellido, nombre o documento…"
+        extraActions={(r) => <WhatsAppButton phone={r.mobile ?? r.phone} />}
         newLabel="Nuevo cliente"
         emptyMessage="No hay clientes cargados"
         canDelete={(r) => r.lastName.toUpperCase() !== CONSUMIDOR_FINAL}

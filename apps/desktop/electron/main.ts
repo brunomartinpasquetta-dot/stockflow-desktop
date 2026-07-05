@@ -70,11 +70,16 @@ function createWindow(extraArgs: string[]): void {
     height: 800,
     show: false,
     autoHideMenuBar: true,
+    // Barra de título propia (azul) SÓLO en macOS: ocultamos la nativa y dejamos
+    // los traffic lights inset; el título lo dibuja el renderer. En Windows/Linux
+    // NO se toca (hidden ocultaría los botones min/max/cerrar).
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true, // POC: panel de WhatsApp Web embebido en el home
       additionalArguments: extraArgs,
     },
   });
@@ -187,6 +192,10 @@ function bootstrap(): { lanArgs: string[] } {
     mpTokenStore,
     emit: (channel: string, payload: unknown) => {
       mainWindow?.webContents.send(channel, payload);
+    },
+    focusMainWindow: () => {
+      mainWindow?.show();
+      mainWindow?.focus();
     },
     updater: updaterController,
     desktopWindows,

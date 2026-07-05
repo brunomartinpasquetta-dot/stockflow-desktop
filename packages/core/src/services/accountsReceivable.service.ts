@@ -82,6 +82,7 @@ export interface CustomerBalance {
   totalDebt: string;
   openInvoicesCount: number;
   lastPaymentDate: number | null;
+  phone: string | null;
 }
 
 /** Una línea de la venta con la descripción/marca del artículo resueltas. */
@@ -364,6 +365,7 @@ export class AccountsReceivableService {
     const nameById = new Map(
       customers.map((c) => [c.id, c.firstName ? `${c.lastName}, ${c.firstName}` : c.lastName]),
     );
+    const phoneById = new Map(customers.map((c) => [c.id, c.mobile ?? c.phone ?? null]));
     return balances
       .filter((b) => Number(b.totalDebt) > 0)
       .map((b) => ({
@@ -372,6 +374,7 @@ export class AccountsReceivableService {
         totalDebt: b.totalDebt,
         openInvoicesCount: b.openInvoicesCount,
         lastPaymentDate: lastPayments.get(b.customerId) ?? null,
+        phone: phoneById.get(b.customerId) ?? null,
       }));
   }
 }

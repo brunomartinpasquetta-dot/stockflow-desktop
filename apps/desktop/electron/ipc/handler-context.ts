@@ -27,6 +27,8 @@ export interface HandlerDeps {
   backup: BackupService;
   importService: ExcelImportService;
   emit: (channel: string, payload: unknown) => void;
+  /** Trae al frente la ventana principal (para abrir el chat de WhatsApp ahí). */
+  focusMainWindow?: () => void;
   /** Solicitar al main process verificar actualizaciones (opcional). */
   updater?: {
     checkNow: () => Promise<{ status: string; version?: string }>;

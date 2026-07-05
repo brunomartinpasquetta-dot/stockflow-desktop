@@ -11,6 +11,13 @@ import { queryClient } from '@/lib/queryClient'
 import { router } from '@/router'
 import './index.css'
 
+// En Windows el puntero blanco del SO se pierde sobre el fondo claro. Marcamos
+// el <html> para aplicar un cursor de alto contraste sólo en esa plataforma
+// (en macOS dejamos el cursor nativo).
+if (navigator.userAgent.includes('Windows')) {
+  document.documentElement.classList.add('is-windows')
+}
+
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('No se encontró el elemento #root')
 

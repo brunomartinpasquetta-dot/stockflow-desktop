@@ -8,6 +8,7 @@ import { validateCUIT } from '@/lib/cuit'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
 import { useCanWrite } from '@/contexts/LicenseContext'
+import { WhatsAppButton } from '@/components/WhatsAppButton'
 import type { SupplierDTO } from '@/types/api'
 
 const supplierSchema = z.object({
@@ -102,6 +103,7 @@ export function Proveedores() {
         isLoading={suppliers.isLoading}
         searchFields={['code', 'name', 'cuit', 'city']}
         searchPlaceholder="Buscar por código, razón social o CUIT…"
+        extraActions={(r) => <WhatsAppButton phone={r.mobile ?? r.phone} />}
         newLabel="Nuevo proveedor"
         emptyMessage="No hay proveedores cargados"
         onNew={() => {

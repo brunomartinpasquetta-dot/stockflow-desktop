@@ -531,6 +531,7 @@ export interface SupplierBalanceDTO {
   supplierName: string;
   totalDebt: string;
   openInvoicesCount: number;
+  phone: string | null;
 }
 
 export interface PaySupplierInvoiceInputDTO {
@@ -568,6 +569,8 @@ export interface SupplierStatementEntryDTO {
   debit: string;
   credit: string;
   runningBalance: string;
+  paymentMethodName: string | null;
+  comprobanteBalance: string | null;
 }
 
 export interface SupplierStatementDTO {
@@ -749,6 +752,7 @@ export interface CustomerBalanceDTO {
   totalDebt: string;
   openInvoicesCount: number;
   lastPaymentDate: number | null;
+  phone: string | null;
 }
 
 /** Detalle de un comprobante de cuenta corriente de cliente. */
@@ -1317,6 +1321,10 @@ export interface ApiSurface {
     login(payload: { username: string; password: string }): Res<LoginResultDTO>;
     logout(): Res<{ loggedOut: true }>;
     getCurrentUser(): Res<UserDTO | null>;
+  };
+  whatsapp: {
+    openChat(payload: { phone: string }): Res<{ ok: true }>;
+    onNavigate(cb: (phone: string) => void): () => void;
   };
   articles: {
     list(): Res<ArticleDTO[]>;

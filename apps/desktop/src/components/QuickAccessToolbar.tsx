@@ -31,6 +31,8 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
+import { useWhatsAppPanel } from '@/contexts/WhatsAppPanelContext'
+import { WhatsAppGlyph } from '@/components/WhatsAppGlyph'
 import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
 import type { Role } from '@/types/api'
 import { WINDOWS } from '@/windows/registry'
@@ -62,6 +64,7 @@ const BUTTONS: QuickButton[] = [
 export function QuickAccessToolbar() {
   const { currentUser } = useAuth()
   const wm = useWindowManager()
+  const wa = useWhatsAppPanel()
   const focusedKey = wm.windows.find((w) => w.id === wm.focusedId)?.pageKey ?? null
 
   function isEnabled(pageKey: string): boolean {
@@ -101,14 +104,35 @@ export function QuickAccessToolbar() {
             <span className="text-center text-[11px] leading-tight text-foreground/90 [@media(max-width:899px)]:hidden">
               {btn.label}
             </span>
-            {btn.fKey && (
+            {btn.fKey ? (
               <span className="rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground">
                 {btn.fKey}
               </span>
+            ) : (
+              <span aria-hidden className="invisible rounded px-1 text-[10px] font-medium">F</span>
             )}
           </button>
         )
       })}
+
+      {/* Toggle del panel de WhatsApp (POC) */}
+      <button
+        type="button"
+        onClick={() => wa.toggle()}
+        title="WhatsApp"
+        className={cn(
+          'group flex h-full w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-1 transition-colors xl:w-20',
+          '[@media(max-width:1199px)]:w-16',
+          'hover:bg-accent focus:outline-none focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-primary/30',
+          wa.state !== 'hidden' && 'bg-accent ring-2 ring-primary/30',
+        )}
+      >
+        <WhatsAppGlyph className="h-7 w-7 text-foreground/80 group-hover:text-foreground" strokeWidth={1.75} />
+        <span className="text-center text-[11px] leading-tight text-foreground/90 [@media(max-width:899px)]:hidden">
+          WhatsApp
+        </span>
+        <span aria-hidden className="invisible rounded px-1 text-[10px] font-medium">F</span>
+      </button>
     </div>
   )
 }

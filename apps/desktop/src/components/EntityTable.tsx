@@ -41,6 +41,8 @@ interface EntityTableProps<T extends { id: string }> {
   emptyMessage?: string
   /** Si true, deshabilita los botones de alta/edición/borrado (modo sólo-lectura). */
   readOnly?: boolean
+  /** Acciones extra por fila (se muestran en la columna Acciones, antes de editar/borrar). */
+  extraActions?: (row: T) => ReactNode
 }
 
 const READ_ONLY_HINT = 'Suscripción suspendida — sólo lectura'
@@ -65,6 +67,7 @@ export function EntityTable<T extends { id: string }>({
   searchFields,
   emptyMessage = 'No hay registros aún',
   readOnly = false,
+  extraActions,
 }: EntityTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
@@ -144,7 +147,7 @@ export function EntityTable<T extends { id: string }>({
     }
   }
 
-  const hasActions = Boolean(onEdit || onDelete)
+  const hasActions = Boolean(onEdit || onDelete || extraActions)
 
   return (
     <div className="flex flex-col gap-3">
@@ -232,7 +235,8 @@ export function EntityTable<T extends { id: string }>({
                     ))}
                     {hasActions && (
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1">
+                          {extraActions?.(row)}
                           {onEdit && (
                             <Button
                               variant="ghost"

@@ -21,6 +21,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { WhatsAppButton } from '@/components/WhatsAppButton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { CuentasCorrientesProveedores } from './CuentasCorrientesProveedores'
 import type { AccountReceivableDTO, StatementEntryDTO } from '@/types/api'
 
 function CobranzaDialog({
@@ -365,7 +368,10 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-lg font-semibold">{name}</h1>
+            <h1 className="inline-flex items-center gap-1.5 text-lg font-semibold">
+              {name}
+              <WhatsAppButton phone={customer?.mobile ?? customer?.phone} />
+            </h1>
             {customer?.docNumber && (
               <p className="text-xs text-muted-foreground">
                 {customer.docType} {customer.docNumber}
@@ -474,10 +480,10 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Detalle</TableHead>
-                <TableHead className="text-right">Debe</TableHead>
-                <TableHead className="text-right">Haber</TableHead>
+                <TableHead>Medio de pago</TableHead>
+                <TableHead className="text-right">Importe</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
-                <TableHead className="text-right w-16" />
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -493,9 +499,17 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                 (statementQuery.data?.entries ?? []).map((e, i) => (
                   <TableRow key={i}>
                     <TableCell className="text-sm">{formatDate(e.date)}</TableCell>
-                    <TableCell>{e.reference}</TableCell>
-                    <TableCell className="text-right tabular-nums">{Number(e.debit) > 0 ? formatCurrency(e.debit) : ''}</TableCell>
-                    <TableCell className="text-right tabular-nums text-success">{Number(e.credit) > 0 ? formatCurrency(e.credit) : ''}</TableCell>
+                    <TableCell>
+                      {e.kind === 'sale'
+                        ? 'Venta'
+                        : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
+                          ? 'Cobranza total'
+                          : 'Cobranza parcial'}
+                    </TableCell>
+                    <TableCell className="text-sm">{e.kind === 'sale' ? 'Cuenta corriente' : (e.paymentMethodName ?? '—')}</TableCell>
+                    <TableCell className={`text-right tabular-nums ${e.kind === 'payment' ? 'text-success' : ''}`}>
+                      {formatCurrency(Number(e.debit) > 0 ? e.debit : e.credit)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(e.runningBalance)}</TableCell>
                     <TableCell className="text-right">
                       {e.kind === 'payment' ? (
@@ -542,7 +556,7 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
   )
 }
 
-export function CuentasCorrientes() {
+function ClientesTab() {
   const balances = useCustomerBalances()
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -552,7 +566,6 @@ export function CuentasCorrientes() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-lg font-semibold">Cuentas corrientes</h1>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -562,7 +575,7 @@ export function CuentasCorrientes() {
                 <TableHead className="text-right">Comprobantes</TableHead>
                 <TableHead className="text-right">Último pago</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
-                <TableHead className="text-right" />
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -585,9 +598,12 @@ export function CuentasCorrientes() {
                     <TableCell className="text-right text-sm text-muted-foreground">{b.lastPaymentDate ? formatDate(b.lastPaymentDate) : '—'}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{formatCurrency(b.totalDebt)}</TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedId(b.customerId) }}>
-                        Ver
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <WhatsAppButton phone={b.phone} />
+                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedId(b.customerId) }}>
+                          Ver
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -597,5 +613,18 @@ export function CuentasCorrientes() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export function CuentasCorrientes() {
+  return (
+    <Tabs defaultValue="clientes" className="flex flex-col gap-3">
+      <TabsList className="self-start">
+        <TabsTrigger value="clientes">Clientes</TabsTrigger>
+        <TabsTrigger value="proveedores">Proveedores</TabsTrigger>
+      </TabsList>
+      <TabsContent value="clientes"><ClientesTab /></TabsContent>
+      <TabsContent value="proveedores"><CuentasCorrientesProveedores /></TabsContent>
+    </Tabs>
   )
 }

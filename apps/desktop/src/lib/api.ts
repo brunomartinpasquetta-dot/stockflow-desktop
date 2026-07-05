@@ -125,6 +125,10 @@ export const api = {
     logout: (): Promise<{ loggedOut: true }> => unwrap(sf().auth.logout()),
     getCurrentUser: (): Promise<UserDTO | null> => unwrap(sf().auth.getCurrentUser()),
   },
+  whatsapp: {
+    openChat: (phone: string): Promise<{ ok: true }> => unwrap(sf().whatsapp.openChat({ phone })),
+    onNavigate: (cb: (phone: string) => void): (() => void) => sf().whatsapp.onNavigate(cb),
+  },
   articles: {
     list: (): Promise<ArticleDTO[]> => unwrap(sf().articles.list()),
     get: (id: string): Promise<ArticleDTO | null> => unwrap(sf().articles.get({ id })),

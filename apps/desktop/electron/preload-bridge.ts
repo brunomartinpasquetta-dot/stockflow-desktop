@@ -226,6 +226,10 @@ export function createApiBridge(
       logout: () => c<{ loggedOut: true }>('auth:logout'),
       getCurrentUser: () => c<never>('auth:getCurrentUser'),
     },
+    whatsapp: {
+      openChat: (p) => c<never>('whatsapp:open-chat', p),
+      onNavigate: (cb) => on('whatsapp:navigate', (phone) => cb(phone as string)),
+    },
     articles: {
       list: () => c<never>('articles:list'),
       get: (p) => c<never>('articles:get', p),

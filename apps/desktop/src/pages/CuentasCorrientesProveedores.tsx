@@ -18,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { WhatsAppButton } from '@/components/WhatsAppButton'
 import type { SupplierAccountPayableDTO } from '@/types/api'
 
 function PagoDialog({
@@ -299,7 +300,10 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-lg font-semibold">{name}</h1>
+            <h1 className="inline-flex items-center gap-1.5 text-lg font-semibold">
+              {name}
+              <WhatsAppButton phone={supplier?.mobile ?? supplier?.phone} />
+            </h1>
             {supplier?.cuit && (
               <p className="text-xs text-muted-foreground">CUIT: {supplier.cuit}</p>
             )}
@@ -406,8 +410,8 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Detalle</TableHead>
-                <TableHead className="text-right">Debe</TableHead>
-                <TableHead className="text-right">Haber</TableHead>
+                <TableHead>Medio de pago</TableHead>
+                <TableHead className="text-right">Importe</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
               </TableRow>
             </TableHeader>
@@ -424,9 +428,17 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
                 (statementQuery.data?.entries ?? []).map((e, i) => (
                   <TableRow key={i}>
                     <TableCell className="text-sm">{formatDate(e.date)}</TableCell>
-                    <TableCell>{e.reference}</TableCell>
-                    <TableCell className="text-right tabular-nums">{Number(e.debit) > 0 ? formatCurrency(e.debit) : ''}</TableCell>
-                    <TableCell className="text-right tabular-nums text-success">{Number(e.credit) > 0 ? formatCurrency(e.credit) : ''}</TableCell>
+                    <TableCell>
+                      {e.kind === 'purchase'
+                        ? 'Compra'
+                        : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
+                          ? 'Pago total'
+                          : 'Pago parcial'}
+                    </TableCell>
+                    <TableCell className="text-sm">{e.kind === 'purchase' ? 'Cuenta corriente' : (e.paymentMethodName ?? '—')}</TableCell>
+                    <TableCell className={`text-right tabular-nums ${e.kind === 'payment' ? 'text-success' : ''}`}>
+                      {formatCurrency(Number(e.debit) > 0 ? e.debit : e.credit)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(e.runningBalance)}</TableCell>
                   </TableRow>
                 ))
@@ -458,7 +470,6 @@ export function CuentasCorrientesProveedores() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-lg font-semibold">Cuentas corrientes de proveedores</h1>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -467,7 +478,7 @@ export function CuentasCorrientesProveedores() {
                 <TableHead>Proveedor</TableHead>
                 <TableHead className="text-right">Comprobantes</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
-                <TableHead className="text-right" />
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -489,9 +500,12 @@ export function CuentasCorrientesProveedores() {
                     <TableCell className="text-right tabular-nums">{b.openInvoicesCount}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{formatCurrency(b.totalDebt)}</TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedId(b.supplierId) }}>
-                        Ver
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <WhatsAppButton phone={b.phone} />
+                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedId(b.supplierId) }}>
+                          Ver
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

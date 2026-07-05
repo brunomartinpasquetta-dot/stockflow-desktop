@@ -56,6 +56,10 @@ export interface SupplierStatementEntry {
   /** importe que disminuye la deuda (pagos) */
   credit: string;
   runningBalance: string;
+  /** nombre del medio de pago (sólo en pagos). */
+  paymentMethodName: string | null;
+  /** saldo del comprobante luego de este pago (sólo en pagos). */
+  comprobanteBalance: string | null;
 }
 
 export interface SupplierStatement {
@@ -69,6 +73,7 @@ export interface SupplierBalance {
   supplierName: string;
   totalDebt: string;
   openInvoicesCount: number;
+  phone: string | null;
 }
 
 /** Una línea de la compra con la descripción/marca del artículo resueltas. */
@@ -111,6 +116,7 @@ export class SupplierAccountsService {
       repos.suppliers.findAll(),
     ]);
     const nameById = new Map(suppliers.map((s) => [s.id, `${s.code} — ${s.name}`]));
+    const phoneById = new Map(suppliers.map((s) => [s.id, s.mobile ?? s.phone ?? null]));
     return balances
       .filter((b) => Number(b.totalDebt) > 0)
       .map((b) => ({
@@ -118,6 +124,7 @@ export class SupplierAccountsService {
         supplierName: nameById.get(b.supplierId) ?? b.supplierId,
         totalDebt: b.totalDebt,
         openInvoicesCount: b.openInvoicesCount,
+        phone: phoneById.get(b.supplierId) ?? null,
       }));
   }
 
@@ -293,7 +300,7 @@ export class SupplierAccountsService {
     }
     const pmById = await repos.paymentMethods.byId();
 
-    type RawEntry = { date: number; kind: 'purchase' | 'payment'; reference: string; debit: string; credit: string };
+    type RawEntry = Omit<SupplierStatementEntry, 'runningBalance'>;
     const raw: RawEntry[] = [];
     for (const ac of accounts) {
       const p = purchasesById.get(ac.purchaseId);
@@ -303,16 +310,24 @@ export class SupplierAccountsService {
         reference: p ? `Compra ${p.type} #${p.number}` : `Cuenta ${ac.id}`,
         debit: ac.total,
         credit: '0.0000',
+        paymentMethodName: null,
+        comprobanteBalance: null,
       });
-      const pays = await repos.supplierPayments.findByAccount(ac.id);
+      const pays = (await repos.supplierPayments.findByAccount(ac.id))
+        .slice()
+        .sort((a, b) => a.date - b.date);
+      let paidSoFar = '0.0000';
       for (const pay of pays) {
         const pmName = pmById.get(pay.paymentMethodId)?.name ?? 'medio desconocido';
+        paidSoFar = addDecimal(paidSoFar, pay.amount, 4);
         raw.push({
           date: pay.date,
           kind: 'payment',
           reference: `Pago — ${pmName}`,
           debit: '0.0000',
           credit: pay.amount,
+          paymentMethodName: pmName,
+          comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
         });
       }
     }
