@@ -440,6 +440,7 @@
      ],
      "answer": "Sí. Cuando guardás un cliente o un proveedor con CUIT o CUIL, el sistema revisa que el número sea real (controla el dígito verificador, que es el último número). Si está mal, no te deja guardar y te avisa en rojo.",
      "steps": [
+      "Primero abrí la pantalla: para clientes apretá F6 (botón 'Clientes', ícono de dos personas); para proveedores apretá F3 (botón 'Proveedores', ícono de un camión), en la barra de íconos de arriba.",
       "Escribí el número completo, de 11 cifras. Podés ponerlo con guiones (30-12345678-9) o todo junto (30123456789): las dos formas sirven.",
       "Si al tocar 'Guardar' aparece abajo del casillero un texto en rojo que dice 'CUIT/CUIL inválido (revisá el dígito verificador)' (en clientes) o 'CUIT inválido' (en proveedores), es que algún número está mal copiado.",
       "Revisá cifra por cifra contra el papel o el comprobante de donde lo sacaste, corregilo y volvé a tocar 'Guardar'.",
@@ -462,6 +463,7 @@
      ],
      "answer": "En la ficha del cliente, el casillero 'Categoría fiscal' dice cómo está esa persona frente a la AFIP. Hay 4 opciones: Responsable Inscripto, Monotributo, Consumidor Final y Exento. Esto importa porque define cómo se le hace la factura y el IVA.",
      "steps": [
+      "Primero abrí Clientes: apretá la tecla F6, o hacé clic en el botón 'Clientes' (ícono de dos personas) en la barra de íconos de arriba. Se abre la pantalla de Clientes.",
       "Al crear o editar el cliente, buscá el casillero 'Categoría fiscal' y hacé clic para ver las opciones.",
       "Si es un cliente común, de mostrador, elegí 'Consumidor Final' (es lo que viene puesto de entrada).",
       "Si el cliente es un negocio o empresa, preguntale su condición: 'Responsable Inscripto', 'Monotributo' o 'Exento', y elegí esa.",
@@ -484,6 +486,7 @@
      ],
      "answer": "En la ficha del cliente, en 'Tipo de documento', podés elegir: DNI, CUIT, CUIL o Consumidor Final. Elegís el tipo y escribís el número al lado, en 'Número de documento'. El sistema controla solo que esté bien escrito.",
      "steps": [
+      "Primero abrí Clientes: apretá la tecla F6, o hacé clic en el botón 'Clientes' (ícono de dos personas) en la barra de íconos de arriba. Se abre la pantalla de Clientes.",
       "Al crear o editar el cliente, hacé clic en el casillero 'Tipo de documento' y elegí: DNI, CUIT, CUIL o Consumidor Final.",
       "En el casillero de al lado, 'Número de documento', escribí el número sin puntos: el DNI va con 7 u 8 números, y el CUIT/CUIL con 11 (con o sin guiones, da igual).",
       "Si el cliente no te dio documento, dejá 'Consumidor Final' y el número vacío: se puede guardar igual.",
@@ -716,6 +719,7 @@
      ],
      "answer": "Con el documento y la categoría fiscal bien cargados, las facturas y comprobantes salen con los datos correctos ante la AFIP. En los proveedores, el CUIT se puede dejar vacío, pero conviene completarlo para que los reportes de compras salgan completos.",
      "steps": [
+      "Primero abrí la pantalla: para clientes apretá F6 (botón 'Clientes', ícono de dos personas); para proveedores apretá F3 (botón 'Proveedores', ícono de un camión), en la barra de íconos de arriba.",
       "En cada cliente, cargá el 'Tipo de documento' y el 'Número de documento', y elegí bien la 'Categoría fiscal' (esto define cómo sale la factura).",
       "En cada proveedor, cargá el 'CUIT' (con o sin guiones, da igual) y, si corresponde, el número de 'Ingresos Brutos'.",
       "No te preocupes por equivocarte con el número: el sistema controla los CUIT y CUIL y te avisa en rojo si están mal.",
@@ -1120,6 +1124,7 @@
      ],
      "answer": "Arriba a la derecha hay un casillero que dice 'Buscar (Ctrl+F)…'. Escribí ahí y la lista se achica sola mientras tipeás. Busca por código, por nombre y por marca.",
      "steps": [
+      "Primero abrí Artículos: apretá la tecla F1, o hacé clic en el botón 'Artículos' (ícono de una caja) en la barra de íconos de arriba. Se abre la pantalla de Artículos.",
       "En la pantalla de Artículos, hacé clic en el casillero de arriba a la derecha que dice 'Buscar (Ctrl+F)…'. O presioná Ctrl+F y el cursor salta solo ahí.",
       "Escribí una parte del código, del nombre o de la marca. No hace falta apretar nada más.",
       "La lista del medio va mostrando solamente lo que coincide, letra por letra.",
@@ -1181,6 +1186,7 @@
      ],
      "answer": "Sí, funciona con cualquier lector de códigos que se enchufe por USB. En la pantalla de Ventas hay un casillero grande que dice 'Código o nombre del producto — escaneá o escribí y Enter': escaneás y el producto se suma solo al ticket.",
      "steps": [
+      "Primero abrí Artículos: apretá la tecla F1, o hacé clic en el botón 'Artículos' (ícono de una caja) en la barra de íconos de arriba. Se abre la pantalla de Artículos.",
       "Conectá la pistola (el lector) a un puerto USB de la computadora. No hay que instalar nada: funciona como si fuera un teclado.",
       "Abrí Ventas: presioná F5, o hacé clic en el botón 'Ventas' (el del carrito) en la barra de arriba.",
       "Apuntá la pistola al código de barras del producto y apretá el gatillo. El número aparece en el casillero de arriba y el producto se agrega solo a la venta.",
@@ -1352,6 +1358,7 @@
      ],
      "answer": "Sí, si tildás la opción 'Permitir vender sin stock'. Está en la pantalla 'Mi Empresa' y solo la puede tocar el administrador.",
      "steps": [
+      "Primero abrí Artículos: apretá la tecla F1, o hacé clic en el botón 'Artículos' (ícono de una caja) en la barra de íconos de arriba. Se abre la pantalla de Artículos.",
       "Entrá al sistema con un usuario administrador.",
       "Arriba a la izquierda, hacé clic en el menú 'Archivo' y elegí 'Mi Empresa'.",
       "Buscá el cuadradito para tildar que dice 'Permitir vender sin stock' y marcalo con un clic.",
@@ -1421,6 +1428,7 @@
      ],
      "answer": "Las familias son las categorías de tus productos ('Bebidas', 'Lácteos', etc.) y sirven para ordenar, filtrar y ver reportes por rubro. Las podés crear al vuelo desde el mismo formulario del artículo, o desde la pantalla Familias.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Gestión' (arriba, en la fila de palabras) y elegí 'Familias'. Se abre la pantalla de Familias.",
       "Forma rápida: en el formulario del artículo, al lado del casillero 'Familia' hay un botoncito con un signo +. Hacé clic ahí.",
       "Se abre una ventanita que dice 'Nueva familia': escribí el nombre (por ejemplo 'Bebidas') y tocá el botón 'Crear familia'. Queda elegida solita en el producto.",
       "Para verlas todas juntas: arriba, menú 'Gestión' → 'Familias'. Ahí tenés el botón 'Nueva familia' y un buscador que dice 'Buscar familia…'.",
@@ -1554,6 +1562,7 @@
      ],
      "answer": "Hacé clic en el título de la columna por la que querés ordenar ('Código', 'Detalle', 'Familia', 'P. Venta' o 'Stock') y la lista se acomoda sola. Otro clic en el mismo título y el orden se da vuelta.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Gestión' (arriba, en la fila de palabras) y elegí 'Familias'. Se abre la pantalla de Familias.",
       "En la lista de Artículos, hacé clic en el título de una columna: 'Código', 'Detalle', 'Familia', 'P. Venta' o 'Stock'. Aparece una flechita al lado del título y la lista se ordena.",
       "Hacé clic de nuevo en el mismo título para invertir el orden (de menor a mayor o al revés).",
       "Los números se ordenan bien: 1, 2, 10, 11 (y no 1, 10, 11, 2).",
@@ -1661,6 +1670,7 @@
      ],
      "answer": "Si los botones 'Nuevo', 'Modificar' y 'Borrar' se ven grises y no responden, es porque tu usuario no tiene el permiso para manejar artículos. No es una falla: es una protección para que no cualquiera toque los precios y el stock.",
      "steps": [
+      "Primero abrí Artículos: apretá la tecla F1, o hacé clic en el botón 'Artículos' (ícono de una caja) en la barra de íconos de arriba. Se abre la pantalla de Artículos.",
       "Fijate con qué usuario entraste al sistema (tu nombre aparece arriba a la derecha).",
       "Pedile al dueño o al administrador que te habilite el permiso de artículos: se hace desde la pantalla de Usuarios (tecla F12), en la parte de roles y permisos.",
       "Cerrá sesión y volvé a entrar: los botones ya van a estar de color y se van a poder tocar.",
@@ -1889,6 +1899,7 @@
      ],
      "answer": "Los presupuestos están adentro del menú 'Operaciones', que ves arriba de todo en la barra de la pantalla principal. No tiene tecla rápida propia (las teclas F5, F2 y F4 son de Ventas, Compras y Caja), así que se entra con el mouse.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "Mirá la barra de menús que está arriba de todo en la pantalla y hacé clic donde dice 'Operaciones'. Se despliega una listita hacia abajo.",
       "En esa listita, hacé clic en 'Presupuestos' (tiene un dibujito de una hoja de papel).",
       "Se abre la pantalla de Presupuestos: vas a ver una tabla con todos los presupuestos del último año, con su número, fecha, cliente, total y estado.",
@@ -1936,6 +1947,7 @@
      ],
      "answer": "Cada presupuesto tiene una etiquetita de estado en la última columna de la tabla. Te dice en qué situación está: si todavía espera respuesta del cliente, si ya pasó su fecha o si ya lo vendiste.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "'Pendiente': el presupuesto está vivo, esperando que el cliente decida. No toca el stock ni la caja.",
       "'Vencido' (etiqueta naranja): ya pasaron los días de validez que le pusiste al crearlo. Tranquilo: no se borra ni se convierte solo, es solo un aviso. Igual lo podés convertir en venta si el cliente acepta.",
       "'Convertido': ya lo pasaste a venta. Queda guardado como registro y no se puede borrar ni volver a convertir.",
@@ -1987,6 +1999,7 @@
      ],
      "answer": "Si el cliente no aparece en la lista, no hace falta salir del presupuesto: al lado del casillero de cliente hay un botoncito con un signo '+' que abre una ventanita para cargarlo en un minuto.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En el formulario del presupuesto, mirá el casillero 'Cliente' (arriba a la izquierda). Justo a su derecha hay un botoncito cuadrado con un signo '+'.",
       "Hacé clic en ese '+'. Se abre una ventanita que se llama 'Nuevo cliente'.",
       "Escribí el 'Nombre / Razón social' (este es el único obligatorio, tiene un asterisco *).",
@@ -2014,6 +2027,7 @@
      ],
      "answer": "Arriba del formulario tenés dos casilleros: 'Comprobante' y 'Validez (días)'. El comprobante es el tipo de factura que va a salir cuando lo conviertas en venta, y la validez es cuántos días le prometés el precio al cliente.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En 'Comprobante', hacé clic y elegí: 'Factura B' (viene elegida de entrada, es la común para consumidor final), 'Factura A' (para clientes con CUIT que piden IVA discriminado), 'Factura C' o 'Remito X'.",
       "En 'Validez (días)' viene puesto 30. Si querés otra cosa, hacé clic en el numerito y escribí los días: puede ser 1, 7, 90, lo que necesites (mínimo 1 día).",
       "Cuando pasen esos días, el presupuesto va a aparecer con la etiqueta naranja 'Vencido' en el listado. Es solo un aviso: no se borra y lo podés convertir igual."
@@ -2035,6 +2049,7 @@
      ],
      "answer": "En el formulario hay un casillero grande de búsqueda con el dibujito de un carrito. Escribís ahí y los productos aparecen en una listita para que los toques y se agreguen a la tabla del medio.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "Hacé clic en el casillero que dice 'Buscá un producto por nombre o código…' (está debajo de los datos del cliente).",
       "Escribí al menos DOS letras del nombre del producto, o el código de barras (podés pasarlo con la pistola lectora). Con una sola letra no aparece nada, es a propósito.",
       "Abajo del casillero se despliega una listita: cada renglón muestra el código, el nombre y el precio actual del producto.",
@@ -2059,6 +2074,7 @@
      ],
      "answer": "En la tabla de productos, cada renglón tiene sus casilleros de 'Cantidad' y 'P. unit.' (precio por unidad). Hacés clic sobre el numerito, escribís el nuevo valor y el 'Subtotal' de esa fila se recalcula solo.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En la tabla del medio, ubicá la fila del producto que querés cambiar.",
       "Para la cantidad: hacé clic en el numerito de la columna 'Cantidad', borralo y escribí la cantidad nueva.",
       "Para el precio: hacé clic en el numerito de la columna 'P. unit.' y escribí el precio que quieras. Podés ponerlo distinto al de lista: el presupuesto guarda el que escribas vos.",
@@ -2082,6 +2098,7 @@
      ],
      "answer": "Cada producto de la tabla tiene su propio descuento en la columna 'Desc.'. Al lado del numerito hay un botoncito chiquito que muestra '$' o '%': tocándolo cambiás entre descuento en plata o en porcentaje.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En la tabla de productos, ubicá la columna 'Desc.' del producto que querés rebajar.",
       "Mirá el botoncito chiquito que está a la izquierda del casillero: si muestra '$', el descuento es en plata; si muestra '%', es en porcentaje. Tocalo para cambiar de uno a otro.",
       "Ojo: cuando tocás ese botoncito, el descuento vuelve a 0 (para que no se mezclen plata y porcentaje). Es normal.",
@@ -2105,6 +2122,7 @@
      ],
      "answer": "Abajo a la derecha, en el recuadro donde está el TOTAL, hay una línea que dice 'Descuento' con su propio botoncito de '$' o '%'. Ese descuento rebaja todo el presupuesto de una, y se aplica antes del IVA.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "Mirá el recuadro de abajo a la derecha del formulario, donde ves 'Subtotal', 'Descuento' y 'TOTAL'.",
       "En la línea 'Descuento', tocá el botoncito chiquito que muestra '$' o '%' para elegir si rebajás en plata o en porcentaje. Al cambiarlo, el valor vuelve a 0: es normal.",
       "Escribí el descuento en el casillero de al lado. Si es %, va de 0 a 100 y se calcula sobre el subtotal.",
@@ -2127,6 +2145,7 @@
      ],
      "answer": "Sí. Abajo a la izquierda del formulario hay un recuadro grande que se llama 'Observaciones', con la ayudita 'Notas para el cliente (opcional)'. Lo que escribas ahí sale impreso en el PDF del presupuesto. Si no querés poner nada, lo dejás vacío y listo.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En el formulario del presupuesto, mirá abajo a la izquierda: hay un recuadro que dice 'Observaciones'.",
       "Hacé clic adentro y escribí la nota, por ejemplo 'Precio con entrega incluida' o 'No incluye instalación'.",
       "Es opcional: si lo dejás en blanco no pasa nada.",
@@ -2206,6 +2225,7 @@
      ],
      "answer": "Abrís el presupuesto y tocás 'Imprimir PDF'. Sale una hoja A4 prolija (no el ticket de la caja) y se abre la ventana de impresión de tu computadora, donde elegís tu impresora o 'Guardar como PDF' para mandarlo por mail o WhatsApp.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En el listado de Presupuestos, hacé clic sobre el presupuesto para abrir su ventanita de detalle.",
       "Abajo, hacé clic en el botón 'Imprimir PDF' (tiene el dibujito de una impresora).",
       "Se abre la ventana de impresión de tu computadora, con la vista previa de la hoja.",
@@ -2247,6 +2267,7 @@
      ],
      "answer": "Cuando el cliente te dice que sí, abrís el presupuesto y tocás 'Convertir en venta'. Se abre una ventanita donde elegís qué precios usar y cómo te paga, y al confirmar se genera la venta de verdad: se descuenta el stock y el presupuesto queda marcado 'Convertido'.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En el listado de Presupuestos, hacé clic sobre el presupuesto para abrir el detalle.",
       "Abajo, hacé clic en el botón 'Convertir en venta' (tiene el dibujito de un carrito). Se abre una ventanita que dice 'Convertir P-0001 en venta'.",
       "Arriba de la ventanita hay un cuadradito para tildar que dice 'Actualizar a los precios actuales (por defecto usa los precios congelados del presupuesto)'. Si no lo tocás, se respetan los precios que le prometiste al cliente. Si lo tildás, se recalcula con los precios de hoy.",
@@ -2291,6 +2312,7 @@
      ],
      "answer": "Al convertir, si el cliente tiene DNI o CUIT cargado, aparece un cuadradito que dice 'Cargar a cuenta corriente (sin cobro ahora)'. Lo tildás y la venta se hace sin cobrar: la deuda queda anotada en Cuentas Corrientes para cobrarla después, incluso en partes.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "Abrí el presupuesto desde el listado y tocá 'Convertir en venta'.",
       "En la ventanita, buscá el cuadradito que dice 'Cargar a cuenta corriente (sin cobro ahora)' y hacé clic para tildarlo. Vas a notar que desaparece la parte de 'Composición del pago': no hace falta, porque no cobrás ahora.",
       "Hacé clic en 'Confirmar venta'. La venta se genera, el stock se descuenta, y la deuda queda anotada a nombre del cliente.",
@@ -2314,6 +2336,7 @@
      ],
      "answer": "En la ventanita de conversión, la parte 'Composición del pago' te deja repartir el total entre efectivo, tarjeta, transferencia y los medios que tengas activos. La única regla: entre todos tienen que sumar justito el total.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En la ventanita 'Convertir P-0001 en venta', mirá el recuadro 'Composición del pago' (aparece siempre que NO hayas tildado cuenta corriente).",
       "Si el cliente paga todo en efectivo, tocá las letritas 'Todo en efectivo' (arriba a la derecha del recuadro) y los casilleros se completan solos. Es lo más rápido.",
       "Si paga mezclado (por ejemplo mitad efectivo, mitad tarjeta), hacé clic en el casillero de cada medio y escribí cuánto pone en cada uno.",
@@ -2337,6 +2360,7 @@
      ],
      "answer": "Abrís el presupuesto y tocás el botón 'Eliminar', que está en letras rojas abajo de la ventanita. Te pide confirmar y listo. Ojo: los presupuestos ya convertidos en venta no se pueden borrar, quedan como registro.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "En el listado, hacé clic sobre el presupuesto para abrir su ventanita de detalle.",
       "Abajo, hacé clic en el botón 'Eliminar' (está en letras rojas, con un tachito de basura).",
       "Aparece una pregunta: '¿Eliminar el presupuesto P-0001?'. Hacé clic en Aceptar para confirmar.",
@@ -2377,6 +2401,7 @@
      ],
      "answer": "Si entrás a Presupuestos y arriba a la derecha no está el botón 'Nuevo presupuesto' (y tampoco ves 'Eliminar' ni 'Convertir en venta' en el detalle), el sistema está en modo solo lectura: podés mirar pero no cargar. Eso pasa por dos motivos: la licencia del sistema no está activa (vencida o pendiente de activar) o, si tu computadora trabaja en red con otra, se cortó la conexión con la computadora principal.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Operaciones' (arriba, en la fila de palabras) y elegí 'Presupuestos'. Se abre la pantalla de Presupuestos.",
       "Fijate si el sistema te muestra algún aviso de licencia. Si la licencia está vencida o sin activar, hay que regularizarla: los botones vuelven solos apenas queda activa.",
       "Si tu PC trabaja en red (conectada a la computadora principal del negocio), fijate que la principal esté prendida y con el sistema abierto, y que el cable o el WiFi estén andando. Al volver la conexión, los botones reaparecen.",
       "Si directamente no ves 'Presupuestos' en el menú 'Operaciones', eso sí es un tema de permisos: pedile al dueño o encargado que le active a tu rol el área de Presupuestos desde la pestaña de Roles, cerrá sesión y volvé a entrar.",
@@ -3647,6 +3672,7 @@
      ],
      "answer": "Es como armar la lista de lo que te trajo el proveedor: elegís de quién compraste, cargás los productos uno por uno y al final apretás el botón verde para guardar. Te llevo paso a paso.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Arriba a la izquierda, hacé clic en el botón que dice 'Elegir proveedor…'. Se abre una ventanita llamada 'Seleccionar proveedor': escribí el nombre y hacé clic en el proveedor de la lista.",
       "Al lado, en 'Comprobante', elegí de la listita el tipo que te dio el proveedor: 'Factura A', 'Factura B', 'Factura C' o 'Comprobante X'.",
       "Si querés, en el casillero 'N° Factura' escribí el número que figura en el papel del proveedor (por ejemplo 0001-00012345). No es obligatorio.",
@@ -3673,6 +3699,7 @@
      ],
      "answer": "El proveedor se elige con el botón de arriba a la izquierda. Es obligatorio: sin proveedor elegido, el botón verde de pagar queda apagado y no te deja guardar la compra.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Arriba a la izquierda, hacé clic en el botón 'Elegir proveedor…'. Se abre una ventanita que dice 'Seleccionar proveedor'.",
       "En el casillero que dice 'Buscar por código, nombre o CUIT…', escribí una parte del nombre. La lista de abajo se va achicando mientras escribís.",
       "Hacé clic en el proveedor correcto. La ventanita se cierra y el código y el nombre quedan escritos en el botón de arriba.",
@@ -3694,6 +3721,7 @@
      ],
      "answer": "Mirá el papel que te dio el proveedor: arriba tiene una letra grande (A, B o C). Elegí esa misma letra en la listita 'Comprobante' que está arriba, al lado del proveedor. Si el proveedor no te dio factura (fue un ticket o nada), elegí 'Comprobante X'.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Arriba, al lado del proveedor, hacé clic en la listita que dice 'Comprobante'.",
       "Elegí la opción que coincide con el papel: 'Factura A' (la más común entre comercios), 'Factura B', 'Factura C' o 'Comprobante X' (compra sin factura o sin IVA discriminado)."
      ]
@@ -3728,6 +3756,7 @@
      ],
      "answer": "Usá el campo grande del medio que dice 'Código o nombre del producto — escaneá o escribí y Enter'. Podés buscar por código de barras, por nombre o por marca.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Hacé clic en el campo grande del medio (el que tiene el dibujito de un carrito) y escribí el código, el nombre o la marca del producto.",
       "Mientras escribís, aparece una lista desplegable con los productos que coinciden y su costo. Hacé clic en el que buscás y se agrega a la lista.",
       "Si preferís el teclado: presioná Enter y se agrega el primero de la lista (o el del código exacto si escaneaste).",
@@ -3749,6 +3778,7 @@
      ],
      "answer": "Si escribís algo y presionás Enter y sale un cartelito rojo que dice 'No se encontró el producto', es porque ese artículo todavía no está creado en el sistema (o está desactivado). Las compras solo aceptan productos que ya existen en la pantalla de Artículos.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Probá buscarlo de otra forma: por una parte del nombre, por la marca o por el código de barras.",
       "Si sigue sin aparecer, andá a la pantalla de Artículos (botón 'Artículos' de la barra de arriba, o tecla F1) y creá el producto nuevo ahí.",
       "Volvé a Compras (tecla F2 o el botón 'Compras' de la barra) y buscalo de nuevo: ahora sí va a aparecer."
@@ -3768,6 +3798,7 @@
      ],
      "answer": "Sí. Con el cursor en el campo grande del medio, apuntá la pistola al código y apretá el gatillo: el producto se agrega solo a la lista. Si escaneás el mismo producto varias veces, se va sumando la cantidad. Después con F2 pagás, sin tocar el mouse.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Fijate que el cursor esté parpadeando en el campo grande que dice 'Código o nombre del producto — escaneá o escribí y Enter' (al entrar a la pantalla ya queda ahí solo).",
       "Escaneá el código con la pistola. El producto aparece en la lista del medio con cantidad 1.",
       "Escaneá de nuevo el mismo producto si compraste más de uno: la cantidad sube sola de a 1.",
@@ -3789,6 +3820,7 @@
      ],
      "answer": "Cada fila de la lista tiene casilleros que se pueden tocar: hacé clic adentro y escribí el valor nuevo. El 'Subtotal' de la fila y el 'TOTAL' de abajo se recalculan solos al instante.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "En la fila del producto, hacé clic adentro del casillero de la columna 'Cantidad' y escribí cuántos compraste.",
       "Hacé clic en el casillero de la columna 'Costo' y escribí lo que te cobra el proveedor por cada unidad (el programa trae el costo guardado del artículo, pero lo podés pisar).",
       "Si esa compra tiene otro IVA, hacé clic en la listita de la columna 'IVA' y elegí: 0%, 10,5%, 21% o 27%.",
@@ -3809,6 +3841,7 @@
      ],
      "answer": "Cada fila tiene, bien a la derecha, un botoncito rojo con dibujito de tacho de basura. Hacé clic ahí y la fila desaparece al instante (no pregunta nada, así que fijate bien cuál tocás).",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Buscá la fila del producto equivocado en la lista del medio.",
       "Al final de esa fila, a la derecha del subtotal, hacé clic en el botoncito rojo del tachito de basura.",
       "La fila se borra al toque y el 'TOTAL' de abajo se recalcula solo."
@@ -3827,6 +3860,7 @@
      ],
      "answer": "Abajo a la derecha, debajo del botón verde grande, aparece un botón que dice 'Vaciar compra' (solo se ve cuando hay productos cargados). Un clic ahí y la pantalla queda en cero: se borran los productos, el descuento, el N° de factura y las opciones tildadas, y la fecha vuelve a hoy. Como la compra todavía no se guardó, no pasa nada con el stock ni con la caja.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Abajo a la derecha, hacé clic en el botón 'Vaciar compra' que está debajo del botón verde.",
       "La lista queda vacía y el cursor vuelve al campo de búsqueda, listo para arrancar de nuevo."
      ]
@@ -3861,6 +3895,7 @@
      ],
      "answer": "Si el proveedor te hizo una rebaja sobre el total, la cargás en pesos en el casillero 'Descuento' que está abajo a la izquierda, entre el 'Subtotal' y el 'TOTAL'. El total se recalcula solo mientras escribís.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Mirá el panel de abajo a la izquierda, donde están el 'Subtotal', el 'Descuento', el 'IVA' y el 'TOTAL'.",
       "Hacé clic adentro del casillero que está al lado de la palabra 'Descuento'.",
       "Escribí el monto de la rebaja EN PESOS (por ejemplo 5000), no en porcentaje.",
@@ -3882,6 +3917,7 @@
      ],
      "answer": "Podés remarcar los precios al público en el mismo momento en que cargás la compra, sin ir producto por producto. Se hace tildando un cuadradito que está abajo de la lista de productos.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Abajo de la lista de productos, hacé clic en el cuadradito que dice 'Actualizar costos y precios de venta de los artículos al guardar' para tildarlo.",
       "Vas a ver que en la lista aparece una columna nueva llamada 'Nuevo P. venta'.",
       "En cada producto que quieras remarcar, hacé clic en ese casillero y escribí el precio nuevo al que lo vas a vender.",
@@ -3975,6 +4011,7 @@
      ],
      "answer": "Si el proveedor te deja pagar más adelante, tildá el cuadradito 'Compra a cuenta del proveedor'. La compra queda anotada como deuda, no toca la caja (ni hace falta tenerla abierta) y la pagás cuando quieras desde Cuentas Corrientes de Proveedores.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "En el panel de abajo al medio, hacé clic en el cuadradito 'Compra a cuenta del proveedor' para tildarlo.",
       "Vas a ver la leyenda 'Queda como deuda con el proveedor. No requiere caja abierta.' y desaparece la elección de forma de pago.",
       "El botón verde de abajo a la derecha ahora dice 'Confirmar compra a cuenta (F2)'. Hacé clic ahí o presioná F2.",
@@ -4031,6 +4068,7 @@
      ],
      "answer": "Arriba del listado del historial hay una fila de filtros que podés combinar: fechas, proveedor, tipo de comprobante, estado y número. La lista se achica sola a medida que elegís.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "En 'Desde' y 'Hasta', poné el rango de fechas donde creés que está la compra (haciendo clic en cada casillero de fecha).",
       "En la listita 'Proveedor', elegí uno en vez de 'Todos' para ver solo sus compras.",
       "En 'Comprobante', elegí 'Factura A', 'Factura B', 'Factura C' o 'Comprobante X' si te acordás del tipo.",
@@ -4052,6 +4090,7 @@
      ],
      "answer": "Tranquilo, las compras no se borraron. El historial abre mostrando solo las compras de HOY: si hoy no compraste nada, vas a ver el mensaje 'No hay compras en el rango seleccionado.' La solución es cambiar la fecha del filtro 'Desde'.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Consultas' (arriba, en la fila de palabras) y elegí 'Historial de Compras'. Se abre el Historial de Compras.",
       "Arriba a la izquierda del historial, hacé clic en el casillero de fecha 'Desde'.",
       "Elegí una fecha anterior (por ejemplo, el primer día del mes, o de hace un año si buscás algo viejo).",
       "La lista se recarga sola y aparecen todas las compras entre esa fecha y la de 'Hasta'."
@@ -4070,6 +4109,7 @@
      ],
      "answer": "En el historial, hacé DOBLE clic (dos clics rápidos) sobre la fila de la compra. Se abre una ventanita con todo el detalle: fecha, proveedor, si fue contado o cuenta corriente, cada producto con su cantidad y costo, el descuento (si hubo), el IVA y el total.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Abrí el historial ('Ver historial' desde Compras) y encontrá la compra con los filtros.",
       "Hacé doble clic sobre la fila. Se abre la ventanita de detalle, con el tipo y número de comprobante en el título.",
       "Ahí ves fecha, proveedor, número de factura del proveedor, estado, modalidad de pago, si actualizó precios, y la lista de productos con cantidades y costos.",
@@ -4091,6 +4131,7 @@
      ],
      "answer": "Anular deshace todo lo que hizo la compra: el stock que había sumado se descuenta y la plata vuelve a la caja (o se borra la deuda con el proveedor). Se hace desde el detalle de la compra en el historial, y es definitivo: una compra anulada no se puede 'des-anular'.",
      "steps": [
+      "Primero abrí Compras: apretá la tecla F2, o hacé clic en el botón 'Compras' (ícono de una bolsa de compras) en la barra de íconos de arriba. Se abre la pantalla de Compras.",
       "Desde Compras, hacé clic en 'Ver historial' (arriba a la derecha).",
       "Buscá la compra con los filtros y hacé doble clic en su fila para abrir el detalle.",
       "Abajo a la derecha del detalle, hacé clic en el botón rojo 'Anular compra'. (Aparece solo si la compra está 'Completada' y tu usuario tiene permiso.)",
@@ -4177,6 +4218,7 @@
      ],
      "answer": "Sí, es muy útil para mandarle el pedido al proveedor o llevarlo en papel. Arriba a la derecha del Generador de compras hay dos botones: 'Excel' e 'Imprimir'. Se encienden después de que apretás 'Calcular' y aparece la lista.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Consultas' (arriba, en la fila de palabras) y elegí 'Generador de Compras'. Se abre el Generador de Compras.",
       "Primero armá la lista: elegí el criterio y los filtros, y hacé clic en 'Calcular'.",
       "Para la planilla: hacé clic en el botón 'Excel'. Se guarda un archivo con nombre 'generador-compras' y la fecha de hoy, con todas las columnas (código, descripción, familia, proveedor, stock, umbral, a pedir, costo y subtotal).",
       "Para el papel: hacé clic en el botón 'Imprimir' y se abre la ventana de impresión de siempre para elegir la impresora."
@@ -4464,6 +4506,7 @@
      ],
      "answer": "Tranquilo, no es un problema: para vender, StockFlow necesita que primero abras la caja del día. Es como abrir el negocio a la mañana. Se hace una sola vez por día.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Cuando entrás a Ventas sin caja abierta, ves un cartel en el medio que dice 'No hay caja abierta' y abajo explica: 'Para registrar ventas primero hay que abrir la caja.'",
       "Hacé clic en el botón 'Ir a Caja' de ese mismo cartel (o presioná la tecla F4, que también abre Caja).",
       "En la pantalla de Caja, escribí en el casillero 'Monto inicial' con cuánta plata en efectivo arranca el cajón, y hacé clic en el botón 'Abrir caja'.",
@@ -4485,6 +4528,7 @@
      ],
      "answer": "La pantalla de Ventas tiene tres partes, de arriba hacia abajo: arriba los datos de la venta (cliente y comprobante), en el medio los productos, y abajo los totales y el cobro. Tu nombre de vendedor aparece arriba, así queda registrado quién vendió.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "ARRIBA: el botón 'Cliente' (dice a quién le vendés, normalmente 'CONSUMIDOR FINAL'), el selector 'Lista de precios', el desplegable 'Comprobante', y los casilleros 'N°' y 'Fecha' que se llenan solos. Abajo de eso dice 'Vendedor:' con tu nombre.",
       "EN EL MEDIO: el casillero para buscar o escanear productos, el botón 'Ver todos', y la lista de los productos que va llevando el cliente (con cantidad, precio y descuento).",
       "ABAJO A LA IZQUIERDA: los números de la venta: Subtotal, Descuento, IVA y el TOTAL en grande.",
@@ -4508,6 +4552,7 @@
      ],
      "answer": "Las ventas salen a 'Consumidor Final' si no hacés nada, pero podés elegir un cliente con nombre y apellido. Se hace con el botón grande de arriba a la izquierda.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Arriba a la izquierda, debajo de la palabra 'Cliente', hacé clic en el botón ancho que muestra el nombre del cliente actual (normalmente dice 'CONSUMIDOR FINAL'). Se abre una ventanita que dice 'Seleccionar cliente'.",
       "En esa ventanita, escribí en el casillero que dice 'Buscar por apellido, nombre o documento…'. La lista de abajo se va achicando mientras escribís.",
       "Hacé clic en el cliente que buscás. La ventanita se cierra y su nombre queda escrito en el botón.",
@@ -4531,6 +4576,7 @@
      ],
      "answer": "Cada cliente tiene una lista de precios (1, 2 o 3) que se pone sola al elegirlo. Igual vos podés cambiarla a mano para esa venta, con el selector chiquito de arriba.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Arriba, a la derecha del botón del cliente, buscá el selector que dice 'Lista de precios' (muestra 'Lista 1', 'Lista 2' o 'Lista 3').",
       "Hacé clic y elegí la lista que quieras.",
       "Vas a ver que los precios de los productos que ya están en la venta se actualizan al instante.",
@@ -4552,6 +4598,7 @@
      ],
      "answer": "Ese cartelito amarillo que dice 'Saldo' con un monto significa que el cliente te debe plata en su cuenta corriente. Es solo un aviso para que lo sepas antes de venderle: no te impide hacer la venta.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Elegí un cliente con el botón 'Cliente' de arriba a la izquierda.",
       "Si debe plata, debajo del botón aparece el cartelito amarillo 'Saldo' con el monto exacto.",
       "Para ver el detalle de esa deuda o cobrarla, andá a 'Ctas. Cte.' (tecla F9 o el botón de la barra de arriba)."
@@ -4573,6 +4620,7 @@
      ],
      "answer": "Hay dos formas: pasar el producto por el lector de códigos de barras, o escribir su nombre en el casillero grande del medio. En los dos casos el producto se suma a la lista de la venta.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Fijate en el casillero grande del medio que dice 'Código o nombre del producto — escaneá o escribí y Enter'. El cursor ya está ahí cuando entrás a Ventas.",
       "CON LECTOR: pasá el producto por la pistola. Se agrega solo a la lista, con cantidad 1.",
       "SIN LECTOR: escribí parte del nombre, la marca o el código. Abajo del casillero aparece una listita con los productos que coinciden y su precio.",
@@ -4597,6 +4645,7 @@
      ],
      "answer": "No hace falta escribir el nombre completo: con un pedacito alcanza. Si escribís 'desc' encuentra 'descartable', y si escribís unos números encuentra los códigos que los contienen.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Escribí cualquier pedacito del nombre, la marca o el código en el casillero de búsqueda del medio.",
       "Abajo aparece la listita de coincidencias: primero el código exacto, después los que empiezan igual, y después los que lo contienen. Si son muchos, la listita tiene barra para deslizar.",
       "Apretá Enter para llevarte el primero, o hacé clic en el que corresponda.",
@@ -4619,6 +4668,7 @@
      ],
      "answer": "Si no te acordás el nombre del producto, usá el botón 'Ver todos': te abre una ventana con todos los productos, para mirarlos con calma y filtrarlos por familia, marca o proveedor.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Al lado del casillero de búsqueda, hacé clic en el botón 'Ver todos'. Se abre una ventana grande que dice 'Listado de artículos'.",
       "Arriba de la ventana tenés un casillero 'Buscar por código, descripción o marca…' y tres desplegables: 'Todas las familias', 'Todas las marcas' y 'Todos los proveedores'. Usalos para achicar la lista.",
       "Cuando encuentres el producto, hacé DOBLE clic en su fila (dos clics rápidos). El producto se suma a la venta.",
@@ -4642,6 +4692,7 @@
      ],
      "answer": "Cuando agregás un producto que se vende por peso, se abre solita una ventanita que dice 'Peso del producto' para que pongas los kilos. Si tenés balanza conectada, lee el peso directo de ahí.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Agregá el producto como siempre (escaneando o buscándolo). Se abre la ventanita 'Peso del producto'.",
       "SI TENÉS BALANZA CONECTADA: vas a ver el peso en números grandes que cambian en vivo. Esperá a que aparezca el cartelito verde 'Estable' y hacé clic en 'Confirmar peso'.",
       "SI NO TENÉS BALANZA: la ventanita muestra el casillero 'Cantidad (kg)'. Escribí el peso en kilos (por ejemplo 0.500 para medio kilo) y apretá Enter o hacé clic en 'Confirmar'.",
@@ -4665,6 +4716,7 @@
      ],
      "answer": "En la lista de productos del medio, cada fila tiene casilleros que podés tocar: la cantidad y el precio. Escribís el número nuevo y el subtotal se acomoda solo.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Buscá la fila del producto en la lista del medio.",
       "PARA LA CANTIDAD: hacé clic en el casillero de la columna 'Cantidad', borrá y escribí el número nuevo (acepta comas, por ejemplo 1,5 para productos por peso). El subtotal de la derecha se actualiza solo.",
       "PARA EL PRECIO: hacé clic en el casillero de la columna 'P. unit.' y escribí el precio nuevo. Ojo: ese precio queda 'congelado' a mano y ya no cambia aunque cambies la cantidad o la lista de precios.",
@@ -4687,6 +4739,7 @@
      ],
      "answer": "Cada fila de producto tiene su propio casillero de descuento, en la columna 'Desc.'. Ahí ponés cuántos pesos le rebajás a ese producto (es en plata, no en porcentaje).",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Buscá la fila del producto en la lista del medio.",
       "Hacé clic en el casillero de la columna 'Desc.' de esa fila.",
       "Escribí el descuento en pesos (por ejemplo 50 para rebajarle $50).",
@@ -4709,6 +4762,7 @@
      ],
      "answer": "Cada fila de producto termina con un tachito de basura rojo. Un clic ahí y el producto sale de la venta.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Buscá la fila del producto que el cliente no lleva.",
       "Al final de esa fila, a la derecha, hacé clic en el ícono del tachito de basura rojo.",
       "La fila desaparece y el total de abajo se recalcula solo."
@@ -4729,6 +4783,7 @@
      ],
      "answer": "Si el cliente se arrepintió o te equivocaste con todo, no hace falta borrar producto por producto: hay un botón que vacía la venta entera de una. No te preocupes, esto NO borra nada del sistema, solo limpia la pantalla.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Abajo a la derecha, debajo del botón verde, hacé clic en el botón 'Vaciar venta' (aparece solo cuando hay productos cargados).",
       "También podés apretar la tecla Escape con el casillero de búsqueda vacío: aparece una pregunta '¿Vaciar la venta actual?'. Hacé clic en Aceptar.",
       "La lista de productos queda vacía, los descuentos vuelven a cero y la pantalla queda lista para la próxima venta."
@@ -4751,6 +4806,7 @@
      ],
      "answer": "Abajo a la izquierda, en la fila que dice 'Descuento', podés rebajar toda la venta de una. Hay un botoncito cuadrado que cambia entre $ (pesos) y % (porcentaje): elegís cómo querés descontar y escribís el valor.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Mirá abajo a la izquierda, donde están los totales. Buscá la fila 'Descuento'.",
       "Al lado hay un botoncito cuadrado que muestra '$' o '%'. Hacé clic ahí para cambiar entre descontar en pesos o en porcentaje. Ojo: al cambiar de modo, el valor vuelve a 0.",
       "Escribí el descuento en el casillero de al lado (si está en %, un número de 0 a 100).",
@@ -4774,6 +4830,7 @@
      ],
      "answer": "Arriba, en el desplegable 'Comprobante', elegís qué papel sale: 'Remito X (no fiscal)' es el que viene puesto y sirve para el día a día. El número del comprobante se pone solo, no lo tenés que tocar.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Arriba, al lado del cliente, hacé clic en el desplegable que está debajo de la palabra 'Comprobante'.",
       "Elegí una opción: 'Remito X (no fiscal)', 'Factura A (requiere AFIP)', 'Factura B (requiere AFIP)' o 'Factura C (requiere AFIP)'.",
       "Fijate que el casillero 'N°' de al lado cambia solo: es el número que le toca a ese tipo de comprobante. No se puede escribir ahí, es automático.",
@@ -4858,6 +4915,7 @@
      ],
      "answer": "Ese recuadro amarillo te avisa cuánto te descuenta la tarjeta u otro medio de pago por esa venta. Es solo información para vos: al cliente NO se le cobra de más, paga el total normal.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Elegí una forma de pago que tenga comisión cargada (por ejemplo, una tarjeta con 2,5%).",
       "Abajo aparece el recuadro amarillo con dos líneas: 'Comisión del medio de pago' (lo que te descuentan) y 'Neto que entra a caja' (lo que te queda de verdad).",
       "El mismo recuadro aclara: 'El cliente paga el total; la comisión la absorbe el comercio (no se discrimina en el ticket).'",
@@ -4881,6 +4939,7 @@
      ],
      "answer": "Vender fiado es fácil: elegís al cliente por su nombre, cargás los productos y tildás el cuadradito 'Venta a cuenta corriente'. La deuda queda anotada en su cuenta y la cobrás cuando él pueda.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Primero elegí el cliente con el botón 'Cliente' de arriba. Tiene que ser un cliente con nombre (no sirve 'Consumidor Final') y tener documento cargado (DNI o CUIT).",
       "Cargá los productos como en cualquier venta.",
       "Abajo, en la columna del medio, tildá el cuadradito que dice 'Venta a cuenta corriente'. Vas a ver que desaparece la forma de pago (no se cobra nada ahora).",
@@ -4905,6 +4964,7 @@
      ],
      "answer": "El cuadradito 'Venta a cuenta corriente' aparece solo cuando elegiste un cliente con nombre (con 'Consumidor Final' no existe el fiado). Y aunque aparezca, el cliente necesita tener documento cargado y no pasarse de su límite de crédito.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Si NO ves el cuadradito: es porque la venta está a 'Consumidor Final'. Elegí un cliente de verdad con el botón 'Cliente' de arriba.",
       "Si al tildarlo aparece en rojo 'El cliente no puede operar en cuenta corriente (falta documento identificatorio)': andá a la pantalla de Clientes (tecla F6), abrí su ficha y cargale el DNI o CUIT.",
       "Si aparece en rojo 'Se supera el límite de crédito': la deuda que ya tiene más esta venta pasan el tope que le pusiste. Podés cobrarle algo de la deuda vieja primero, o subirle el límite en su ficha de Clientes.",
@@ -4927,6 +4987,7 @@
      ],
      "answer": "Si tenés MercadoPago conectado a StockFlow, aparece un botón celeste que dice 'Cobrar con QR MercadoPago' con el total. Lo tocás, aparece el código QR en pantalla, el cliente lo escanea con su celular y listo: cuando paga, la venta se registra sola.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Cargá los productos como siempre. El cuadradito 'Venta a cuenta corriente' tiene que estar SIN tildar (el QR es para cobrar ahora).",
       "Abajo a la derecha, arriba del botón verde, hacé clic en el botón celeste 'Cobrar con QR MercadoPago' (muestra el total al lado).",
       "Se abre una ventana con el código QR y el monto.",
@@ -4952,6 +5013,7 @@
      ],
      "answer": "Cuando ya cargaste todo, apretás F2 o el botón verde grande de abajo a la derecha. Con eso StockFlow guarda la venta, descuenta el stock, suma la plata a la caja e imprime el ticket. Todo en un solo toque.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Dale una última mirada a la pantalla: cliente, productos, cantidades, descuentos y forma de pago.",
       "Presioná la tecla F2, o hacé clic en el botón verde grande de abajo a la derecha que dice 'Confirmar venta (F2)' con el total.",
       "Arriba a la derecha aparece un cartelito verde: 'Venta X #123 registrada' con el total. Eso confirma que quedó guardada.",
@@ -4976,6 +5038,7 @@
      ],
      "answer": "Si aparece un cartel rojo al confirmar, quedate tranquilo: la venta NO se guardó, así que no hay nada duplicado. El mismo cartel te dice qué pasó; lo arreglás y volvés a apretar F2.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Leé el cartel rojo que aparece: explica el motivo (por ejemplo, que no hay stock suficiente y el sistema no permite stock negativo).",
       "Si el problema es de stock, revisá las cantidades: si en la fila del producto ves 'Stock:' en rojo, estás vendiendo más de lo que hay cargado.",
       "Si el botón verde directamente está gris y no se puede apretar: fijate que haya productos en la lista, que el total sea mayor a cero, y que esté elegida una forma de pago (o que el pago mixto diga 'Pagos completos').",
@@ -5018,6 +5081,7 @@
      ],
      "answer": "Si el ticket no salió (impresora apagada, sin papel, o el papel se trabó), no hace falta hacer la venta de nuevo: la venta ya está guardada. Hay un botón para volver a sacar el último ticket.",
      "steps": [
+      "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Primero arreglá la impresora: prendela o ponele papel.",
       "En la pantalla de Ventas, abajo a la derecha (debajo del botón verde), hacé clic en el botón 'Imprimir último ticket'.",
       "El ticket de la última venta sale de nuevo.",
@@ -5874,6 +5938,7 @@
      ],
      "answer": "Si tenés una impresora configurada, sí: al confirmar el cierre, el reporte sale solo, sin preguntarte nada. Y si no tenés impresora o algo falla, no te preocupes: la caja se cierra igual y podés imprimir el reporte cuando quieras.",
      "steps": [
+      "Primero abrí Caja: apretá la tecla F4, o hacé clic en el botón 'Caja' (ícono de una billetera) en la barra de íconos de arriba. Se abre la pantalla de Caja.",
       "Cerrá la caja normalmente con el botón rojo 'Cerrar caja' y después 'Confirmar cierre'.",
       "Si hay impresora configurada, el reporte se imprime solo. Si no hay, en el cartel verde de 'Caja cerrada' aparece un botón 'Imprimir reporte': tocalo cuando quieras imprimirlo.",
       "Si la impresora falló, vas a ver el aviso 'No se pudo imprimir el reporte — usá \"Imprimir reporte\" para reintentar': revisá que esté prendida y con papel, y tocá ese botón.",
@@ -6072,6 +6137,7 @@
      ],
      "answer": "Es muy fácil: la primera vez que abrís StockFlow te aparece sola una ventana que dice 'Activá tu licencia'. Ahí escribís la clave que te dieron cuando contrataste el sistema y ya quedás adentro. La clave queda guardada en esa computadora, no la vas a tener que escribir de nuevo.",
      "steps": [
+      "Esto no lo buscás: la pantalla de Activación aparece sola la primera vez que abrís StockFlow.",
       "Abrí StockFlow. Si todavía no tiene licencia, en el medio de la pantalla vas a ver una ventana con el logo y el título 'Activá tu licencia'.",
       "Buscá el campo que dice 'Clave de licencia'. Adentro, en gris clarito, muestra el ejemplo SF-XXXX-XXXX-XXXX-XXXX.",
       "Escribí ahí tu clave completa, tal cual te la mandaron, con los guiones. Abajo del campo te recuerda el formato: SF-XXXX-XXXX-XXXX-XXXX.",
@@ -6113,6 +6179,7 @@
      ],
      "answer": "No pasa nada. En la misma pantalla de activación, abajo del todo, hay un textito que dice '¿No tenés licencia? Comprar un plan'. Hacé clic ahí y se te abre la página web de StockFlow en el navegador para contratar tu plan. Cuando lo contrates te van a dar tu clave.",
      "steps": [
+      "Esto no lo buscás: la pantalla de Activación aparece sola la primera vez que abrís StockFlow.",
       "En la pantalla de activación, mirá abajo del botón 'Activar': hay un texto chiquito que dice '¿No tenés licencia? Comprar un plan'.",
       "Hacé clic en ese texto. Se abre la página web de StockFlow en tu navegador de internet.",
       "Contratá el plan que te sirva. Te van a entregar tu clave de licencia (la que empieza con SF-).",
@@ -6136,6 +6203,7 @@
      ],
      "answer": "Cuando la clave no pasa, StockFlow te muestra un mensaje en rojo abajo del campo explicando qué pasó. Casi siempre es un error de tipeo, así que primero revisá letra por letra. Si el mensaje dice que la clave ya está usada en otra computadora, hay que pedirle a soporte que la libere.",
      "steps": [
+      "Esto no lo buscás: la pantalla de Activación aparece sola la primera vez que abrís StockFlow.",
       "Leé el mensaje en rojo que aparece abajo del campo: te dice el motivo (por ejemplo, clave incorrecta o ya activada en otra PC).",
       "Si dejaste el campo vacío, te va a decir 'Ingresá tu clave de licencia.': escribí la clave y probá de nuevo.",
       "Borrá lo que escribiste y volvé a escribir la clave con calma, con los guiones, fijándote bien en letras parecidas (la letra O y el número 0, por ejemplo).",
@@ -6176,6 +6244,7 @@
      ],
      "answer": "Quedate tranquilo: podés seguir trabajando normal. Tu licencia queda guardada dentro de la computadora y aguanta hasta 7 días seguidos sin internet. Y si estuviste más tiempo desconectado, apenas vuelve el internet StockFlow la renueva solo, sin que toques nada.",
      "steps": [
+      "Esto no lo buscás: la pantalla de Activación aparece sola la primera vez que abrís StockFlow.",
       "Si se te cortó el internet, seguí usando StockFlow como siempre: la licencia guardada te cubre hasta 7 días.",
       "Si pasaron más de 7 días sin conexión, puede que la licencia figure vencida. No te asustes.",
       "Conectá la computadora a internet (enchufá el cable de red o prendé el wifi).",
@@ -6295,6 +6364,7 @@
      ],
      "answer": "No tenés que hacer casi nada: StockFlow busca versiones nuevas solo, cuando lo abrís y cada 4 horas. Cuando hay una lista, aparece una franja de color arriba de la ventana con un botón. Un solo clic y se instala.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Ayuda' (arriba, en la fila de palabras) y elegí 'Acerca de'. Se abre la ventana Acerca de (versión y actualizaciones).",
       "Trabajá normal. Cuando haya una versión nueva, StockFlow la descarga solo, por atrás, sin molestarte.",
       "Cuando terminó de descargar, arriba de la ventana aparece una franja verde que dice 'Se descargó la actualización (v...). Está lista para instalarse.'",
       "A la derecha de esa franja hay un botón que dice 'Reiniciar e instalar'. Hacé clic ahí cuando no estés en medio de una venta.",
@@ -6317,6 +6387,7 @@
      ],
      "answer": "Esa franja amarilla te avisa que salió una versión más nueva de StockFlow y que tu computadora sigue con la anterior. No es un error ni un peligro: es solo un recordatorio para actualizar cuando puedas.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Ayuda' (arriba, en la fila de palabras) y elegí 'Acerca de'. Se abre la ventana Acerca de (versión y actualizaciones).",
       "Leé la franja amarilla de arriba: te muestra qué versión nueva hay y en cuál estás vos.",
       "Cuando tengas un ratito libre, hacé clic en el botón 'Bajar instalador' que está a la derecha de la franja. Se abre tu navegador de internet y empieza a bajar un archivo.",
       "Cuando termine de bajar, abrí ese archivo (doble clic) y seguí los pasos, igual que cuando instalaste StockFlow por primera vez. Tus datos no se tocan.",
@@ -6353,6 +6424,7 @@
      ],
      "answer": "Podés fijarte vos mismo cuando quieras, desde la pantalla 'Acerca de'. Hay un botón que dice 'Verificar actualización ahora' y en segundos te contesta si estás al día o si hay algo nuevo.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Ayuda' (arriba, en la fila de palabras) y elegí 'Acerca de'. Se abre la ventana Acerca de (versión y actualizaciones).",
       "En la barra de menús de arriba, hacé clic en el último menú, que dice 'Ayuda'.",
       "Hacé clic en 'Acerca de'. Se abre la pantalla 'Acerca de StockFlow'.",
       "Bajá hasta el recuadro que se llama 'Actualizaciones' y hacé clic en el botón 'Verificar actualización ahora'.",
@@ -6434,6 +6506,7 @@
      ],
      "answer": "Todo está en la pantalla 'Acerca de'. Ahí ves tu versión, tu plan, el titular, la empresa y tu clave de licencia, todo junto en un recuadro.",
      "steps": [
+      "Esto no lo buscás: la pantalla de Activación aparece sola la primera vez que abrís StockFlow.",
       "En la barra de menús de arriba, hacé clic en el último menú, que dice 'Ayuda'.",
       "Hacé clic en 'Acerca de'. Se abre la pantalla 'Acerca de StockFlow'.",
       "Mirá el primer recuadro, que se llama 'Aplicación': ahí figuran Versión, Plan, Titular, Empresa y Licencia (la clave puede aparecer recortada con puntitos al final, es normal).",
@@ -6456,6 +6529,7 @@
      ],
      "answer": "Esa franja roja de arriba ('⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.') aparece cuando la suscripción quedó suspendida, casi siempre por un tema de pago. El sistema no se bloquea del todo: podés mirar toda tu información, pero los botones para agregar, cambiar o borrar quedan apagados hasta que se regularice.",
      "steps": [
+      "Esto no lo buscás: la pantalla de Activación aparece sola la primera vez que abrís StockFlow.",
       "No te preocupes, tus datos están todos ahí: podés seguir consultando ventas, artículos y clientes.",
       "Si pasás el mouse por un botón apagado, te muestra el motivo: 'Suscripción suspendida — sólo lectura'.",
       "Escribile a soporte por WhatsApp al +54 342 584 7340 o por email a bruno.martin.pasquetta@gmail.com para regularizar el pago. Pasale el nombre de tu empresa.",
@@ -6843,6 +6917,7 @@
      ],
      "answer": "Sí, tranquilo. En la ventanita de cobranza o pago, en el campo del monto, escribí solo lo que te dieron (o lo que pagaste). Podés repetirlo las veces que haga falta hasta cancelar todo.",
      "steps": [
+      "Primero abrí Cuentas Corrientes: apretá la tecla F9, o hacé clic en el botón 'Ctas. Cte.' (ícono de una libreta) en la barra de íconos de arriba. Se abre la pantalla de Cuentas Corrientes.",
       "Abrí la ventanita de cobro o pago como siempre (botón 'Cobrar' / 'Pagar' en la factura, o 'Registrar cobranza' / 'Registrar pago' arriba a la derecha).",
       "El campo del monto viene con el saldo completo ya escrito. Borralo y escribí solo la parte que te pagaron.",
       "Ojo: no podés poner MÁS que el saldo. Si te pasás, aparece un aviso rojo y no te deja confirmar.",
@@ -6866,6 +6941,7 @@
      ],
      "answer": "En toda ventanita de cobro o pago hay una parte que dice 'Composición del pago': es una lista con una fila por cada medio activo (Efectivo, Transferencia, etc.). Ahí escribís cuánto entró por cada uno; los que no usaste los dejás en blanco.",
      "steps": [
+      "Primero abrí Cuentas Corrientes: apretá la tecla F9, o hacé clic en el botón 'Ctas. Cte.' (ícono de una libreta) en la barra de íconos de arriba. Se abre la pantalla de Cuentas Corrientes.",
       "En la ventanita de cobranza o pago, mirá abajo del monto: está la sección 'Composición del pago'.",
       "Vas a ver una fila por cada medio de pago, cada una con el nombre a la izquierda y un casillero a la derecha (dice '0,00').",
       "Escribí en cada casillero lo que entró por ese medio. Ejemplo: si te pagaron $300 en efectivo y $200 por transferencia, poné 300 en la fila 'Efectivo' y 200 en la de 'Transferencia'.",
@@ -6889,6 +6965,7 @@
      ],
      "answer": "Para no tipear el número a mano, en la ventanita de cobro o pago hay un botoncito que dice 'Todo en Efectivo' (o 'Todo en' seguido del nombre de tu medio de efectivo). Con un clic carga todo el monto en esa fila.",
      "steps": [
+      "Primero abrí Cuentas Corrientes: apretá la tecla F9, o hacé clic en el botón 'Ctas. Cte.' (ícono de una libreta) en la barra de íconos de arriba. Se abre la pantalla de Cuentas Corrientes.",
       "En la ventanita de cobranza o pago, mirá la sección 'Composición del pago', abajo a la izquierda de las filas de medios.",
       "Hacé clic en el botoncito 'Todo en Efectivo'. El monto completo aparece solo en la fila del efectivo. (Este botoncito aparece únicamente si tenés un medio de pago de tipo efectivo activo.)",
       "Abajo va a decir 'Pagos completos' en verde y ya podés hacer clic en el botón de confirmar."
@@ -6911,6 +6988,7 @@
      ],
      "answer": "Acá no hay vuelto: lo que repartís entre los medios tiene que sumar EXACTAMENTE el monto que escribiste arriba. Hasta que no coincida, el botón de confirmar queda gris (apagado).",
      "steps": [
+      "Primero abrí Cuentas Corrientes: apretá la tecla F9, o hacé clic en el botón 'Ctas. Cte.' (ícono de una libreta) en la barra de íconos de arriba. Se abre la pantalla de Cuentas Corrientes.",
       "Mirá el avisito que está abajo a la derecha de la 'Composición del pago': te dice qué está pasando.",
       "Si dice 'Restante a cobrar: $...', falta repartir esa plata. Agregala en alguna fila de medio.",
       "Si dice en rojo 'Excede el total. Ajustá los montos.', pusiste de más. Bajá algún número.",
@@ -6933,6 +7011,7 @@
      ],
      "answer": "Si en la ventanita aparece en rojo 'No hay medios de pago activos. Configurá al menos uno en \"Medios de pago\"', es porque no tenés ningún medio prendido. Se arregla en un minuto desde el menú Gestión.",
      "steps": [
+      "Primero abrí Cuentas Corrientes: apretá la tecla F9, o hacé clic en el botón 'Ctas. Cte.' (ícono de una libreta) en la barra de íconos de arriba. Se abre la pantalla de Cuentas Corrientes.",
       "Cerrá la ventanita con el botón 'Cancelar'.",
       "Arriba, hacé clic en el menú 'Gestión' y elegí 'Medios de Pago'. (Esta opción la ven solo el dueño o el encargado; si no te aparece, pedile a alguno de ellos que lo haga.) Se abre la pantalla con la lista de medios.",
       "En la lista, cada medio tiene una etiqueta que dice 'Activo' o 'Inactivo'. Hacé clic en la etiqueta 'Inactivo' de los medios que usás en tu negocio para pasarlos a 'Activo'.",
@@ -6954,6 +7033,7 @@
      ],
      "answer": "En la lista de 'Comprobantes con saldo', la columna 'Estado' te dice cómo viene cada factura. 'Abierto' es que todavía no pagaron nada de esa factura; 'Parcial' (en amarillo) es que ya pagaron una parte pero falta el resto.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Cobros y Pagos' (arriba, en la fila de palabras) y elegí 'Cuentas Corrientes — Proveedores'. Se abre las Cuentas Corrientes de Proveedores.",
       "Entrá al detalle del cliente o proveedor y mirá la lista 'Comprobantes con saldo'.",
       "Fijate en la columna 'Estado': 'Abierto' = sin pagos todavía; 'Parcial' (etiqueta amarilla) = pagada a medias.",
       "La columna 'Saldo' te dice cuánto falta pagar de esa factura, y 'Total' cuánto era la factura completa.",
@@ -6976,6 +7056,7 @@
      ],
      "answer": "Cada fila de la lista 'Comprobantes con saldo' se puede desplegar con un clic: se abre abajo el detalle con los productos de esa factura y todos los pagos que ya le hicieron.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Cobros y Pagos' (arriba, en la fila de palabras) y elegí 'Cuentas Corrientes — Proveedores'. Se abre las Cuentas Corrientes de Proveedores.",
       "En el detalle del cliente o proveedor, mirá la lista 'Comprobantes con saldo'. Cada fila tiene una flechita chiquita a la izquierda.",
       "Hacé clic en cualquier parte de la fila (o en la flechita). La flecha apunta para abajo y la fila se despliega.",
       "Primero ves la tabla 'Productos': cada artículo con su cantidad, el precio de cada uno y el subtotal. (En proveedores dice 'Costo unit.' en vez de precio.) Si el producto tiene marca, aparece entre paréntesis.",
@@ -6999,6 +7080,7 @@
      ],
      "answer": "Abajo de todo, en el detalle del cliente o proveedor, hay una tabla que dice 'Movimientos': es la historia completa de la cuenta, anotación por anotación. Sirve para revisar qué pasó y cuándo.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Cobros y Pagos' (arriba, en la fila de palabras) y elegí 'Cuentas Corrientes — Proveedores'. Se abre las Cuentas Corrientes de Proveedores.",
       "Entrá al detalle del cliente (o proveedor) y bajá hasta la tabla 'Movimientos'.",
       "Cada fila muestra: la 'Fecha', el 'Detalle' (dice 'Venta' cuando se anotó deuda, o 'Cobranza parcial' / 'Cobranza total' cuando pagaron; en proveedores dice 'Compra', 'Pago parcial' o 'Pago total'), el 'Medio de pago', el 'Importe' y el 'Saldo' que quedó después de ese movimiento.",
       "Los pagos aparecen en verde; las ventas dicen 'Cuenta corriente' en la columna de medio de pago.",
@@ -7020,6 +7102,7 @@
      ],
      "answer": "El 'Saldo:' que ves arriba a la derecha es la suma de lo que falta pagar de todas las facturas abiertas. Es el mismo número que queda en la última fila de la tabla 'Movimientos'.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Cobros y Pagos' (arriba, en la fila de palabras) y elegí 'Cuentas Corrientes — Proveedores'. Se abre las Cuentas Corrientes de Proveedores.",
       "Entrá al detalle del cliente o proveedor: arriba a la derecha, el recuadro 'Saldo:' muestra la deuda total.",
       "Si querés controlarlo, sumá la columna 'Saldo' de cada fila de 'Comprobantes con saldo': tiene que dar lo mismo.",
       "También podés bajar a la tabla 'Movimientos' y mirar el 'Saldo' de la última fila: es el mismo número.",
@@ -7099,6 +7182,7 @@
      ],
      "answer": "Si el botón está gris (apagado), casi siempre es por una de dos cosas: tu usuario no tiene permiso para cobrar/pagar, o esa persona no tiene deuda. Dejando el mouse quieto sobre el botón, te dice el motivo.",
      "steps": [
+      "Primero abrí Cuentas Corrientes: apretá la tecla F9, o hacé clic en el botón 'Ctas. Cte.' (ícono de una libreta) en la barra de íconos de arriba. Se abre la pantalla de Cuentas Corrientes.",
       "Dejá el mouse quieto encima del botón gris, sin hacer clic. Aparece un textito con el motivo.",
       "Si dice 'Requiere permiso para cobrar' (o 'Requiere permiso para pagar'), tu usuario no tiene ese permiso: pedile al dueño o encargado que te lo active desde Usuarios (F12), en la pestaña de Roles.",
       "Si dice 'El cliente no tiene saldo pendiente' (o 'El proveedor no tiene saldo pendiente'), no hay nada que cobrar ni pagar: la cuenta está en cero."
@@ -7381,6 +7465,7 @@
      ],
      "answer": "Configuración es la pantalla donde se ajusta todo StockFlow: la impresora, la balanza, las copias de seguridad, la red para varias cajas y las actualizaciones. Solo puede entrar un usuario Administrador. Se abre con el botón de la ruedita que dice 'Configuración'.",
      "steps": [
+      "Primero abrí Configuración: hacé clic en el botón 'Configuración' (ícono de un engranaje) en la barra de íconos de arriba.",
       "Mirá la barra de botones grandes con dibujitos que está arriba de la pantalla. El último botón de la derecha tiene una ruedita y dice 'Configuración'. Hacé clic ahí (no tiene tecla rápida).",
       "Se abre la pantalla 'Configuración' con 5 pestañas arriba: 'Hardware' (impresora y balanza), 'Backup' (copias de seguridad), 'LAN' (varias cajas en red), 'Actualizaciones' y 'General' (datos de la empresa, medios de pago, usuarios e importar stock).",
       "Hacé clic en la pestaña que necesites y abajo aparecen sus opciones.",
@@ -7580,6 +7665,7 @@
      ],
      "answer": "Si tenés una balanza conectada por USB, se configura en Configuración, pestaña 'Hardware', recuadro 'Balanza'. Elegís el puerto, la velocidad y la marca (protocolo), guardás y hacés una prueba de lectura. Después StockFlow toma el peso solo, sin que lo escribas.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Archivo' (arriba, en la fila de palabras) y elegí 'Configuración Hardware'. Se abre la configuración de impresora y hardware.",
       "Enchufá la balanza a la computadora con el cable USB.",
       "Hacé clic en el botón 'Configuración' (la ruedita, al final de la barra de íconos de arriba). Se abre en la pestaña 'Hardware'. Bajá hasta el recuadro 'Balanza'.",
       "En 'Puerto serial' hacé clic en la lista (dice '— seleccioná —') y elegí el puerto de la balanza. Si la lista está vacía, escribilo a mano en el campo de abajo (el ejemplo gris muestra: /dev/tty.usbserial-XYZ; en Windows suele ser COM3). Si no aparece nada, falta instalar el driver USB de la balanza.",
@@ -7661,6 +7747,7 @@
      ],
      "answer": "Podés usar StockFlow en varias computadoras a la vez: una es la principal (Servidor) y las otras se conectan a ella (Cliente). Todas ven lo mismo al instante: stock, precios, clientes y la caja. Se arma en Configuración, pestaña 'LAN', primero en la PC principal y después en las otras.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Archivo' (arriba, en la fila de palabras) y elegí 'Configuración LAN'. Se abre la configuración de red (LAN).",
       "En la computadora PRINCIPAL: hacé clic en el botón 'Configuración' (la ruedita) y después en la pestaña 'LAN'. Vas a ver el recuadro 'Modo multi-caja (LAN)'.",
       "En 'Modo de operación' hay tres opciones: 'PC única' (trabaja sola, sin red), 'Servidor' (es la caja principal) y 'Cliente' (se conecta a otra). En la principal, hacé clic en 'Servidor'.",
       "Dejá el 'Puerto' como está (7777) y en 'PIN de seguridad' hacé clic en el botón 'Generar': te crea un número de 6 cifras. Anotalo en un papel, lo vas a necesitar en las otras computadoras.",
@@ -7689,6 +7776,7 @@
      ],
      "answer": "Si una caja secundaria pierde la conexión con la principal, pasa sola a modo 'solo lectura': podés mirar todo pero no vender, hasta que vuelva la conexión. No se pierde ningún dato.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Archivo' (arriba, en la fila de palabras) y elegí 'Configuración LAN'. Se abre la configuración de red (LAN).",
       "Primero revisá lo básico: que la computadora principal (el Servidor) esté prendida y con StockFlow abierto.",
       "Revisá que las dos computadoras estén en la misma red: mismo WiFi o mismo cable de red (router).",
       "Cuando la conexión vuelve, la caja secundaria se reconecta sola y podés vender de nuevo.",
@@ -7768,6 +7856,7 @@
      ],
      "answer": "La comisión es lo que la tarjeta o el banco te descuenta a vos por cada cobro. Se la ponés a cada medio de pago y StockFlow la calcula solo: el cliente paga el precio normal, y en tus reportes ves cuánto se fue en comisiones. Ejemplo: vendés $100 con tarjeta al 3%, te quedan $97 y $3 son comisión.",
      "steps": [
+      "Primero abrí Configuración: hacé clic en el botón 'Configuración' (ícono de un engranaje) en la barra de íconos de arriba.",
       "El porcentaje se carga una sola vez: en Configuración > pestaña 'General' > 'Medios de pago', editá el medio (doble clic en la fila) y completá el campo 'Comisión %'.",
       "Después vendés normal: en la venta elegís ese medio de pago y listo, no tenés que calcular nada.",
       "StockFlow resta la comisión solo, al momento de registrar la venta.",
@@ -7893,6 +7982,7 @@
      ],
      "answer": "Son los tres niveles de confianza del sistema. El Administrador puede todo (incluida Configuración). El Encargado es el nivel medio: le habilitás las áreas que quieras desde la pestaña Roles. El Vendedor es lo más básico: vender y cobrar. A tus empleados de caja, dales Vendedor.",
      "steps": [
+      "Primero abrí Usuarios: apretá la tecla F12, o hacé clic en el botón 'Usuarios' (ícono de un escudo) en la barra de íconos de arriba. Se abre la pantalla de Usuarios.",
       "'Administrador': entra a todo, siempre. Es el único que puede entrar a Configuración y crear usuarios. Guardá este rol para el dueño o la persona de máxima confianza.",
       "'Encargado': nivel intermedio. Vos decidís a qué pantallas entra, tildando cuadraditos en la pestaña 'Roles' (F12 > pestaña Roles).",
       "'Vendedor': el más limitado, pensado para cajeros. También ajustás sus áreas en la pestaña 'Roles'.",
@@ -7966,6 +8056,7 @@
      ],
      "answer": "Podés hacer dos tipos de descuento: uno general a toda la venta (por ejemplo 10% sobre el total) o uno a un artículo puntual del carrito. En los dos casos hay un botoncito que cambia entre % (porcentaje) y $ (pesos), para que lo pongas como te resulte más fácil.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Archivo' (arriba, en la fila de palabras) y elegí 'Configuración LAN'. Se abre la configuración de red (LAN).",
       "Primero armá la venta o el presupuesto normal: agregá los artículos al carrito.",
       "Para un descuento a TODO: buscá el campo 'Descuento global' que está abajo del carrito. Escribí el número y, si querés cambiar entre porcentaje y pesos, hacé clic en el botoncito que muestra % o $.",
       "Para un descuento a UN artículo: en la fila de ese artículo en el carrito, buscá la columna 'Descuento' y escribí ahí el número (también con % o $).",
@@ -8016,6 +8107,7 @@
      ],
      "answer": "Si la licencia (el abono de StockFlow) está vencida, el sistema pasa a 'solo lectura': podés mirar todo pero no vender ni cargar nada. Quedate tranquilo: no se pierde ningún dato. Se arregla renovando la licencia, y el sistema se destraba solo en minutos.",
      "steps": [
+      "Primero abrí Configuración: hacé clic en el botón 'Configuración' (ícono de un engranaje) en la barra de íconos de arriba.",
       "Comunicate con soporte de StockFlow para renovar o activar tu licencia.",
       "Una vez renovada, no tenés que hacer nada: StockFlow verifica solo cada tanto y se destraba en cuestión de minutos, sin cerrar el programa.",
       "Todos tus datos (ventas, artículos, clientes) quedan intactos; cuando se reactiva, seguís exactamente donde estabas.",
@@ -8366,6 +8458,7 @@
      ],
      "answer": "Son las tres formas de cambiar precios en 'Actualización Masiva'. 'Porcentaje' sube o baja un porcentaje (ponés 15 y sube 15%), 'Monto fijo' suma o resta pesos (ponés 500 y suma $500), y 'Valor absoluto' pone un precio exacto (ponés 1000 y el precio queda en $1000).",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Precios' (arriba, en la fila de palabras) y elegí 'Actualización Masiva'. Se abre la Actualización Masiva de precios.",
       "En el panel de abajo de la pantalla 'Actualización de Precios', buscá donde dice 'Modo:'.",
       "Marcá el circulito de la opción que quieras: 'Porcentaje', 'Monto fijo' o 'Valor absoluto'.",
       "Si elegiste 'Porcentaje' o 'Monto fijo', al lado aparece 'Dirección:': marcá 'Subir' o 'Bajar' según quieras aumentar o rebajar.",
@@ -8388,6 +8481,7 @@
      ],
      "answer": "En el panel de abajo de 'Actualización de Precios' hay una lista que dice 'Redondeo:'. Ahí elegís cómo querés que quede el número final para que no queden precios feos con centavos.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Precios' (arriba, en la fila de palabras) y elegí 'Actualización Masiva'. Se abre la Actualización Masiva de precios.",
       "En el panel de abajo, buscá donde dice 'Redondeo:'.",
       "Hacé clic en la listita y elegí una opción: 'Sin redondeo', 'Múltiplo de $10', 'Múltiplo de $50', 'Múltiplo de $100' o 'Terminado en 99'.",
       "El redondeo se hace DESPUÉS de la cuenta. Ejemplo: si el cálculo da $105,50 y elegiste 'Múltiplo de $10', el precio queda en $110.",
@@ -8408,6 +8502,7 @@
      ],
      "answer": "Sí. En el panel de abajo, donde dice 'Campo:', podés tildar varios cuadraditos a la vez: 'Costo', 'Venta (L1)', 'L2', 'L3' y 'Mayor'. La misma regla se aplica a todos los que tildes.",
      "steps": [
+      "Primero abrí la pantalla: hacé clic en el menú 'Precios' (arriba, en la fila de palabras) y elegí 'Actualización Masiva'. Se abre la Actualización Masiva de precios.",
       "En el panel de abajo de 'Actualización de Precios', buscá la fila que dice 'Campo:'.",
       "Tildá todos los cuadraditos que quieras cambiar (por ejemplo 'Venta (L1)' y 'L2').",
       "Armá la regla como siempre y hacé clic en 'Vista previa': vas a ver una fila por cada campo de cada artículo, así controlás todo antes de aplicar."
