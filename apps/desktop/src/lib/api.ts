@@ -3,6 +3,8 @@
  * uniforme `{ ok, data } | { ok:false, code, ... }` y, en error, lanza `ApiError`.
  */
 import type {
+  AssistantAskResultDTO,
+  AssistantMessageDTO,
   AccountReceivableDetailDTO,
   AccountReceivableDTO,
   ArticleDTO,
@@ -128,6 +130,10 @@ export const api = {
   whatsapp: {
     openChat: (phone: string): Promise<{ ok: true }> => unwrap(sf().whatsapp.openChat({ phone })),
     onNavigate: (cb: (phone: string) => void): (() => void) => sf().whatsapp.onNavigate(cb),
+  },
+  assistant: {
+    ask: (messages: AssistantMessageDTO[], conversationId?: string): Promise<AssistantAskResultDTO> =>
+      unwrap(sf().assistant.ask({ messages, conversationId })),
   },
   articles: {
     list: (): Promise<ArticleDTO[]> => unwrap(sf().articles.list()),

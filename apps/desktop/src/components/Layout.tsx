@@ -14,6 +14,8 @@ import { CommandPalette } from '@/components/CommandPalette'
 import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext'
 import { WindowManagerProvider } from '@/contexts/WindowManagerContext'
 import { WhatsAppPanelProvider } from '@/contexts/WhatsAppPanelContext'
+import { AssistantProvider } from '@/contexts/AssistantContext'
+import { AssistantPanel } from '@/components/AssistantPanel'
 import { useGlobalShortcuts } from '@/lib/useGlobalShortcuts'
 import { useMdiShortcuts } from '@/lib/useMdiShortcuts'
 import { useDeepLinkRouter } from '@/lib/useDeepLinkRouter'
@@ -29,7 +31,9 @@ export function Layout() {
     <WindowManagerProvider>
       <CommandPaletteProvider>
         <WhatsAppPanelProvider>
-          <LayoutInner />
+          <AssistantProvider>
+            <LayoutInner />
+          </AssistantProvider>
         </WhatsAppPanelProvider>
       </CommandPaletteProvider>
     </WindowManagerProvider>
@@ -74,6 +78,7 @@ function LayoutInner() {
       </div>
       <Taskbar />
       <CommandPalette />
+      <AssistantPanel />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "0.1.78",
+  "version": "0.1.79",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -27,7 +27,8 @@
     "publish:win": "node scripts/package.mjs --win --publish=always --config electron-builder.win.yml",
     "publish:mac": "node scripts/package.mjs --mac --publish=always",
     "package:dry": "node scripts/package.mjs --mac --dir",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:assistant": "tsx electron/__tests__/assistant.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

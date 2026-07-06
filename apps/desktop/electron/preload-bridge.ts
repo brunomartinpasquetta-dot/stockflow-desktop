@@ -15,6 +15,7 @@
  */
 import type {
   ApiSurface,
+  AssistantAskResultDTO,
   DesktopWindowInfoDTO,
   DesktopWindowOpenDTO,
   IpcResponse,
@@ -81,6 +82,9 @@ export const LOCAL_GROUPS = new Set([
   'license',
   'print',
   'desktopWindow',
+  // El asistente llama a la API de Claude desde el main de cada máquina (la key
+  // vive en el main, no viaja por LAN). Por eso es local, no ruteado al servidor.
+  'assistant',
 ]);
 
 interface LanState {
@@ -229,6 +233,9 @@ export function createApiBridge(
     whatsapp: {
       openChat: (p) => c<never>('whatsapp:open-chat', p),
       onNavigate: (cb) => on('whatsapp:navigate', (phone) => cb(phone as string)),
+    },
+    assistant: {
+      ask: (p) => c<AssistantAskResultDTO>('assistant:ask', p),
     },
     articles: {
       list: () => c<never>('articles:list'),

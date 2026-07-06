@@ -1310,6 +1310,18 @@ export interface UpdatePayload {
   data: EntityPayload;
 }
 
+/** Asistente virtual: un turno de la conversación. */
+export interface AssistantMessageDTO {
+  role: 'user' | 'assistant';
+  content: string;
+}
+/** Asistente virtual: respuesta a una consulta. */
+export interface AssistantAskResultDTO {
+  reply: string;
+  /** Preguntas sugeridas para mostrar como chips clickeables. */
+  suggestions: string[];
+}
+
 /* ----------------------------------------------------------------------- */
 /* Superficie de la API expuesta en window.stockflow                        */
 /* ----------------------------------------------------------------------- */
@@ -1325,6 +1337,9 @@ export interface ApiSurface {
   whatsapp: {
     openChat(payload: { phone: string }): Res<{ ok: true }>;
     onNavigate(cb: (phone: string) => void): () => void;
+  };
+  assistant: {
+    ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string }): Res<AssistantAskResultDTO>;
   };
   articles: {
     list(): Res<ArticleDTO[]>;

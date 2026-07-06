@@ -7,13 +7,16 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { User, Wallet } from 'lucide-react'
 
+import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
 import { GlobalSearchBar } from '@/components/GlobalSearchBar'
 import { LanStatusIndicator } from '@/components/LanStatusIndicator'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAssistant } from '@/contexts/AssistantContext'
 
 export function StatusBar() {
   const { currentUser } = useAuth()
+  const assistant = useAssistant()
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -36,8 +39,18 @@ export function StatusBar() {
 
   return (
     <div data-chrome="statusbar" className="flex h-10 shrink-0 items-center gap-3 border-b bg-background px-3 text-sm">
-      <div className="max-w-md flex-1">
+      <div className="flex max-w-md flex-1 items-center gap-2">
         <GlobalSearchBar />
+        <button
+          type="button"
+          onClick={assistant.toggle}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Abrir asistente"
+          title="Asistente — te ayudo a usar StockFlow"
+        >
+          <img src={BRANDING.iconSvg} alt="" className="h-4 w-4" draggable={false} />
+          <span className="hidden lg:inline">Asistente</span>
+        </button>
       </div>
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Wallet className="h-3.5 w-3.5" />
