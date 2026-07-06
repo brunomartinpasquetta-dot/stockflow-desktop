@@ -36,6 +36,7 @@ interface Intent {
   patterns: string[];
   answer: string;
   steps: string[];
+  image?: string | null;
 }
 interface Synonym {
   term: string;
@@ -50,6 +51,9 @@ interface AreaKB {
 export interface AssistantAnswer {
   reply: string;
   suggestions: string[];
+  image?: string | null;
+  /** Clasificación interna para logging (no se manda al renderer). */
+  kind?: 'intent' | 'manual' | 'meta' | 'fallback' | 'walk';
 }
 
 /* --------------------------- normalización --------------------------- */
@@ -156,7 +160,9 @@ const REEXPLAIN_PH = [
   'explicame mejor', 'explica de nuevo', 'de nuevo', 'otra vez', 'no cazo', 'no capto', 'mas despacio',
   'no se de computadora', 'no soy experto', 'no se nada de', 'no se entiende', 'explicalo bien',
 ];
-const NEXT_PH = ['y despues', 'y ahora', 'que sigue', 'siguiente', 'y luego', 'continua', 'segui', 'y eso', 'proximo paso'];
+const NEXT_PH = ['y despues', 'y ahora', 'que sigue', 'siguiente', 'y luego', 'continua', 'segui', 'y eso', 'proximo paso', 'ya esta', 'ya hice', 'hecho'];
+const GUIDE_PH = ['guiame', 'guia me', 'guiar', 'llevame paso', 'paso a paso', 'de a uno', 'uno por uno', 'acompaname', 'guiado', 'llevame de la mano'];
+const WALK_DONE_PH = ['listo', 'ya lo hice', 'hecho', 'ya esta', 'lo hice', 'ya', 'ok'];
 const AFFIRM = new Set(['si', 'sii', 'dale', 'ok', 'oka', 'okey', 'obvio', 'correcto', 'exacto', 'claro', 'sisi', 'buenisimo']);
 const DENY_PH = ['no era eso', 'nada que ver', 'no es eso', 'no, ', 'tampoco'];
 const HUMAN_PH = ['hablar con una persona', 'con un humano', 'llamar al tecnico', 'un tecnico', 'una persona real', 'atencion humana', 'hablar con alguien'];
@@ -180,6 +186,7 @@ interface IntentDoc {
   canonical: string;
   answer: string;
   steps: string[];
+  image: string | null;
   patternTokens: Set<string>;
   canonicalTokens: Set<string>;
   answerTokens: Set<string>;
@@ -259,6 +266,7 @@ function buildIndex(): Index {
         canonical: it.canonical,
         answer: it.answer,
         steps: it.steps ?? [],
+        image: it.image ?? null,
         patternTokens,
         canonicalTokens,
         answerTokens,
@@ -412,13 +420,14 @@ interface Convo {
   lastSteps: string[];
   offeredIdx: number[]; // relacionados ofrecidos ("¿querés ver X?")
   clarify: string[]; // dos ids en desambiguación
+  walkIdx: number; // índice del último paso entregado en modo "paso a paso" (-1 = no arrancó)
   turn: number;
 }
 const SESSIONS = new Map<string, Convo>();
 function convo(id: string): Convo {
   let c = SESSIONS.get(id);
   if (!c) {
-    c = { lastArea: null, lastIntentIdx: null, lastSteps: [], offeredIdx: [], clarify: [], turn: 0 };
+    c = { lastArea: null, lastIntentIdx: null, lastSteps: [], offeredIdx: [], clarify: [], walkIdx: -1, turn: 0 };
     SESSIONS.set(id, c);
   }
   // Poda simple para no crecer sin límite.
@@ -438,12 +447,15 @@ function leadIn(turn: number): string {
 
 function renderIntent(idx: Index, d: IntentDoc, c: Convo): string {
   let out = d.answer.trim();
-  if (d.steps.length) out += '\n\n' + d.steps.map((s, i) => `${i + 1}. ${s}`).join('\n');
+  if (d.steps.length) {
+    out += '\n\n' + d.steps.map((s, i) => `${i + 1}. ${s}`).join('\n');
+    if (d.steps.length >= 3) out += `\n\n¿Preferís que te lo lleve de a un paso a la vez? Decime "guiame" y arrancamos juntos.`;
+  }
   // Ofrecer un tema relacionado, como charla.
   c.offeredIdx = d.relatedIdx.slice(0, 2);
   if (c.offeredIdx.length) {
     const names = c.offeredIdx.map((j) => `«${idx.intents[j]!.canonical.replace(/^¿|\?$/g, '')}»`);
-    out += `\n\n¿Querés que también te muestre ${names.join(' o ')}? Decime "sí" y seguimos.`;
+    out += `\n\n(O si querés te muestro ${names.join(' o ')} — decime "sí".)`;
   }
   return out;
 }
@@ -452,9 +464,9 @@ function suggestionsFor(idx: Index, d: IntentDoc): string[] {
   return dedupe(d.relatedIdx.map((j) => idx.intents[j]!.canonical)).slice(0, 3);
 }
 
-function metaReply(idx: Index, id: string, fallback: string): { reply: string; suggestions: string[] } {
+function metaReply(idx: Index, id: string, fallback: string): AssistantAnswer {
   const m = idx.metaById.get(id);
-  return { reply: m ? m.answer : fallback, suggestions: idx.topSuggestions };
+  return { reply: m ? m.answer : fallback, suggestions: idx.topSuggestions, kind: 'meta' };
 }
 
 /* ------------------------------ API ------------------------------ */
@@ -477,7 +489,7 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   // ── 0) Saludo / vacío ──
   if (content.length === 0 || (raw.length <= 2 && has(raw, GREETING))) {
     if (raw.length && has(raw, GREETING)) c.lastArea = null;
-    return metaReply(idx, 'saludo', '¡Hola! Soy Sofía 👋 Te ayudo a usar StockFlow. Contame qué necesitás o elegí un tema.');
+    return metaReply(idx, 'saludo', '¡Hola! Soy Sofía, tu asistente de StockFlow. Escribime en qué te puedo ayudar.');
   }
 
   // ── 1) Desambiguación pendiente ──
@@ -498,15 +510,42 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   if (phraseHas(low, FRUSTRATION_PH)) return metaReply(idx, 'frustracion', '¡Tranqui, respirá que lo resolvemos juntos! Contame qué estabas haciendo y en qué momento se trabó, y lo vemos paso a paso.');
   if (phraseHas(low, OFFTOPIC_PH)) return metaReply(idx, 'charla-fuera-de-tema', '¡Jaja! De eso no sé, yo soy para ayudarte con StockFlow 😊 ¿Con qué parte del sistema te doy una mano?');
 
-  // ── 3) Reexplicar / próximo paso (necesitan lo último) ──
+  // ── 3) Modo PASO A PASO (walkthrough) + próximo paso ──
   const last = c.lastIntentIdx != null ? idx.intents[c.lastIntentIdx] : null;
-  if (phraseHas(low, NEXT_PH) && last) {
-    if (c.lastSteps.length) {
+  const walkStep = (): AssistantAnswer => {
+    if (c.walkIdx < c.lastSteps.length) {
       return {
-        reply: `Ya te dejé todos los pasos arriba 👆. Si te trabaste en alguno, decime el número (por ejemplo "el paso 3") y te lo explico más despacio. Y si ya está, ¡terminaste! 🎉`,
-        suggestions: suggestionsFor(idx, last),
+        reply: `Paso ${c.walkIdx + 1} de ${c.lastSteps.length}:\n${c.lastSteps[c.walkIdx]}\n\nAvisame con "listo" cuando lo hagas.`,
+        suggestions: [],
+        kind: 'walk',
       };
     }
+    c.walkIdx = -1;
+    return { reply: `¡Y con eso terminaste! 🎉 ¿Te ayudo con algo más?`, suggestions: last ? suggestionsFor(idx, last) : idx.topSuggestions, kind: 'walk' };
+  };
+  // "guiame" arranca el modo guiado desde el paso 1.
+  if (phraseHas(low, GUIDE_PH) && last && c.lastSteps.length) {
+    c.walkIdx = 0;
+    return {
+      reply: `¡Dale! Vamos de a uno, sin apuro 🙂\n\nPaso 1 de ${c.lastSteps.length}:\n${c.lastSteps[0]}\n\nCuando lo hagas, decime "listo" o "siguiente" y te doy el que sigue.`,
+      suggestions: [],
+      kind: 'walk',
+    };
+  }
+  // Modo guiado ACTIVO: "listo/dale/ok/siguiente/sí" avanza al próximo paso.
+  if (
+    last &&
+    c.lastSteps.length &&
+    c.walkIdx >= 0 &&
+    (phraseHas(low, NEXT_PH) || phraseHas(low, WALK_DONE_PH) || (raw.length <= 2 && has(raw, AFFIRM)))
+  ) {
+    c.walkIdx++;
+    return walkStep();
+  }
+  // "y después" fuera del modo guiado → dar directamente el paso 2.
+  if (phraseHas(low, NEXT_PH) && last && c.lastSteps.length) {
+    c.walkIdx = 1;
+    return walkStep();
   }
   if (phraseHas(low, REEXPLAIN_PH)) {
     if (last) {
@@ -547,6 +586,7 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
     return {
       reply: `Se me perdió un poco el hilo 😅 ¿Sobre «${last.canonical.replace(/^¿|\?$/g, '')}» querés otra cosa, o es de otro tema? Decímelo completo y te ayudo.`,
       suggestions: suggestionsFor(idx, last),
+      kind: 'meta',
     };
   }
 
@@ -563,6 +603,7 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
       return {
         reply: `Para no mandarte cualquiera: ¿te referís a **${best.d.canonical}** o a **${second.d.canonical}**? Decime "el primero" o "el segundo".`,
         suggestions: [best.d.canonical, second.d.canonical],
+        kind: 'meta',
       };
     }
     return answerIntent(idx, best.d.id, c);
@@ -573,24 +614,26 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   const sugg = dedupe(ranked.slice(0, 3).map((r) => r.d.canonical)).filter(Boolean);
   if (bestManual && bestManual.s >= MANUAL_THRESHOLD) {
     const body = bestManual.d.body.length > 650 ? bestManual.d.body.slice(0, 650).trimEnd() + '…' : bestManual.d.body;
-    return { reply: `${leadIn(c.turn)}sobre «${bestManual.d.heading}», el manual dice:\n\n${body}`, suggestions: sugg.length ? sugg : idx.topSuggestions };
+    return { reply: `${leadIn(c.turn)}sobre «${bestManual.d.heading}», el manual dice:\n\n${body}`, suggestions: sugg.length ? sugg : idx.topSuggestions, kind: 'manual' };
   }
 
-  // ── 7) No sé (honesto) + sugerencias ──
+  // ── 7) No sé (honesto) + sugerencias ──  → se registra como pregunta sin respuesta
   return {
     reply: 'Uy, eso no lo tengo claro y no quiero mandarte cualquiera. ¿Alguna de estas te sirve? Si no, escribímelo con otras palabras.',
     suggestions: sugg.length ? sugg : idx.topSuggestions,
+    kind: 'fallback',
   };
 }
 
 function answerIntent(idx: Index, id: string, c: Convo): AssistantAnswer {
   const j = idx.intents.findIndex((d) => d.id === id && d.area !== 'meta');
   const d = idx.intents[j];
-  if (!d) return { reply: 'Perdón, no encontré eso. ¿Lo reformulás?', suggestions: idx.topSuggestions };
+  if (!d) return { reply: 'Perdón, no encontré eso. ¿Lo reformulás?', suggestions: idx.topSuggestions, kind: 'fallback' };
   c.lastArea = d.area;
   c.lastIntentIdx = j;
   c.lastSteps = d.steps;
-  return { reply: renderIntent(idx, d, c), suggestions: suggestionsFor(idx, d) };
+  c.walkIdx = -1; // reinicia el modo paso a paso
+  return { reply: renderIntent(idx, d, c), suggestions: suggestionsFor(idx, d), image: d.image, kind: 'intent' };
 }
 
 /* --------------------------- utilidades test --------------------------- */

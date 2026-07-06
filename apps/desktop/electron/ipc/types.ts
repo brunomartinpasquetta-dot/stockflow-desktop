@@ -1320,6 +1320,8 @@ export interface AssistantAskResultDTO {
   reply: string;
   /** Preguntas sugeridas para mostrar como chips clickeables. */
   suggestions: string[];
+  /** Nombre de archivo de la captura de pantalla a mostrar (si aplica). */
+  image?: string | null;
 }
 
 /* ----------------------------------------------------------------------- */

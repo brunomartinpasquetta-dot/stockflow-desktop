@@ -14,12 +14,14 @@ import { GripHorizontal, Loader2, Send, X } from 'lucide-react'
 import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { shotUrl } from '@/lib/sofiaShots'
 import { Button } from '@/components/ui/button'
 import { useAssistant } from '@/contexts/AssistantContext'
 import type { AssistantMessageDTO } from '@/types/api'
 
 interface ChatMsg extends AssistantMessageDTO {
   suggestions?: string[]
+  image?: string | null
 }
 
 interface Rect {
@@ -78,16 +80,27 @@ export function AssistantPanel() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [greeted, setGreeted] = useState(false)
+  const [zoom, setZoom] = useState<string | null>(null)
   const [rect, setRect] = useState<Rect>(() => loadRect())
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Ref al último mensaje del bot: al responder, dejamos el foco en su INICIO.
+  const lastBotRef = useRef<HTMLDivElement>(null)
   // Id de conversación: mantiene el hilo/contexto en el motor durante esta charla.
   const convIdRef = useRef<string>((globalThis.crypto?.randomUUID?.() ?? String(Math.random())).slice(0, 24))
   // Datos del gesto en curso (drag o resize); null = sin gesto.
   const gestureRef = useRef<{ kind: 'move' | 'resize'; startX: number; startY: number; start: Rect } | null>(null)
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    const lastMsg = messages[messages.length - 1]
+    // Al llegar una respuesta del bot, dejamos su INICIO arriba (no el final),
+    // para que el cliente empiece a leer desde la primera línea.
+    if (!busy && lastMsg?.role === 'assistant' && lastBotRef.current) {
+      lastBotRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    } else {
+      // Mientras escribe el usuario / "Buscando…": bajamos para mostrarlo.
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    }
   }, [messages, busy])
 
   // Saludo inicial (viene del motor: incluye sugerencias reales).
@@ -97,9 +110,9 @@ export function AssistantPanel() {
     void (async () => {
       try {
         const res = await api.assistant.ask([], convIdRef.current)
-        setMessages([{ role: 'assistant', content: res.reply, suggestions: res.suggestions }])
+        setMessages([{ role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image }])
       } catch {
-        setMessages([{ role: 'assistant', content: '¡Hola! Soy Sofía 👋 ¿En qué te ayudo con StockFlow?' }])
+        setMessages([{ role: 'assistant', content: '¡Hola! Soy Sofía, tu asistente de StockFlow. Escribime en qué te puedo ayudar.' }])
       }
       setTimeout(() => inputRef.current?.focus(), 100)
     })()
@@ -155,7 +168,7 @@ export function AssistantPanel() {
     try {
       const payload: AssistantMessageDTO[] = next.map((m) => ({ role: m.role, content: m.content }))
       const res = await api.assistant.ask(payload, convIdRef.current)
-      setMessages((prev) => [...prev, { role: 'assistant', content: res.reply, suggestions: res.suggestions }])
+      setMessages((prev) => [...prev, { role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image }])
     } catch {
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Uy, algo falló. Probá de nuevo.' }])
     } finally {
@@ -200,7 +213,7 @@ export function AssistantPanel() {
       {/* Mensajes */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-muted/30 p-3">
         {messages.map((m, i) => (
-          <div key={i}>
+          <div key={i} ref={m.role === 'assistant' && i === lastIdx ? lastBotRef : undefined} className="scroll-mt-3">
             <div className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
               <div
                 className={cn(
@@ -213,21 +226,23 @@ export function AssistantPanel() {
                 {m.content}
               </div>
             </div>
-            {/* Chips de sugerencias — solo bajo el último mensaje del bot */}
-            {m.role === 'assistant' && i === lastIdx && !busy && m.suggestions && m.suggestions.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {m.suggestions.map((s) => (
+            {/* Captura de la pantalla (si la hay) — clic para agrandar */}
+            {m.role === 'assistant' &&
+              m.image &&
+              shotUrl(m.image) &&
+              (() => {
+                const url = shotUrl(m.image)!
+                return (
                   <button
-                    key={s}
                     type="button"
-                    onClick={() => void send(s)}
-                    className="rounded-full border bg-background px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-accent"
+                    onClick={() => setZoom(url)}
+                    className="mt-2 block overflow-hidden rounded-lg border transition hover:ring-2 hover:ring-primary"
+                    title="Clic para agrandar la imagen"
                   >
-                    {s}
+                    <img src={url} alt="Pantalla de StockFlow" className="max-h-40 w-full object-cover object-top" draggable={false} />
                   </button>
-                ))}
-              </div>
-            )}
+                )
+              })()}
           </div>
         ))}
         {busy && (
@@ -270,6 +285,18 @@ export function AssistantPanel() {
           <path d="M17 9v2h-2v2h-2v2h-2v2h2l6-6V9h-2zM17 3 3 17h2L19 3h-2z" fill="currentColor" opacity="0.35" />
         </svg>
       </div>
+
+      {/* Overlay de imagen a pantalla completa */}
+      {zoom && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6"
+          onClick={() => setZoom(null)}
+          role="dialog"
+          aria-label="Imagen ampliada"
+        >
+          <img src={zoom} alt="Pantalla de StockFlow" className="max-h-full max-w-full rounded-lg shadow-2xl" draggable={false} />
+        </div>
+      )}
     </div>
   )
 }

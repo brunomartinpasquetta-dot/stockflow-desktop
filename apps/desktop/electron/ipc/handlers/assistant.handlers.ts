@@ -6,6 +6,9 @@
  * manual). Este handler solo toma el último mensaje del usuario y devuelve la
  * respuesta + sugerencias.
  */
+import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { type HandlerDeps, type HandlerMap, unguarded } from '../handler-context';
 import { answerQuestion } from '../../assistant/engine';
 
@@ -16,6 +19,7 @@ export interface AssistantMessage {
 export interface AssistantAskResult {
   reply: string;
   suggestions: string[];
+  image?: string | null;
 }
 
 function lastUserMessage(messages: AssistantMessage[]): string {
@@ -26,13 +30,29 @@ function lastUserMessage(messages: AssistantMessage[]): string {
   return '';
 }
 
+/**
+ * Registra las preguntas que Sofía NO supo responder, en un archivo local
+ * (`<userData>/sofia-preguntas-sin-respuesta.jsonl`). Sirve para descubrir qué
+ * le falta con el uso real y alimentar futuras versiones. No sale de la máquina.
+ */
+function logMiss(userDataDir: string, question: string): void {
+  try {
+    const line = JSON.stringify({ q: question }) + '\n';
+    appendFileSync(join(userDataDir, 'sofia-preguntas-sin-respuesta.jsonl'), line);
+  } catch {
+    /* logging best-effort; no rompe la respuesta */
+  }
+}
+
 export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
   return {
     'assistant:ask': unguarded(
       deps,
-      (payload: { messages: AssistantMessage[]; conversationId?: string }): AssistantAskResult => {
+      (payload: { messages: AssistantMessage[]; conversationId?: string }, d): AssistantAskResult => {
         const question = lastUserMessage(payload?.messages ?? []);
-        return answerQuestion(question, payload?.conversationId ?? 'default');
+        const ans = answerQuestion(question, payload?.conversationId ?? 'default');
+        if (ans.kind === 'fallback' && question.trim()) logMiss(d.userDataDir, question.trim());
+        return { reply: ans.reply, suggestions: ans.suggestions, image: ans.image };
       },
     ),
   };
