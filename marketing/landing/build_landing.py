@@ -1,13 +1,34 @@
 #!/usr/bin/env python3
 # Landing StockFlow v3 — modelo StockFacil, colores del sistema (azul). Self-contained.
 import base64, os
+from io import BytesIO
+from PIL import Image
 W = os.path.dirname(os.path.abspath(__file__))
+ASSETS = os.path.join(W, 'assets')
+os.makedirs(ASSETS, exist_ok=True)
 def b64(p): return base64.b64encode(open(p,'rb').read()).decode()
-def img(n): return f"data:image/png;base64,{b64(os.path.join(W,'img',n))}"
+def img(n, maxw=1400, q=80, lossless=False):
+    """Optimiza la imagen (resize + WebP) y la escribe como ARCHIVO en assets/
+    en vez de embeberla en base64: el HTML queda liviano (carga instantánea en
+    celular) y el navegador cachea/lazy-loadea las imágenes de verdad.
+    Deploy: subir index.html + assets/ + og.jpg + favicon.png al docroot."""
+    im = Image.open(os.path.join(W, 'img', n))
+    if im.width > maxw:
+        im = im.resize((maxw, round(im.height * maxw / im.width)), Image.LANCZOS)
+    im = im.convert('RGBA' if im.mode in ('RGBA', 'LA', 'P') else 'RGB')
+    buf = BytesIO()
+    if lossless:
+        im.save(buf, 'WEBP', lossless=True, method=6)
+    else:
+        im.save(buf, 'WEBP', quality=q, method=6)
+    slug = os.path.splitext(n)[0].replace('.', '-')
+    fn = f"{slug}-{maxw}{'ll' if lossless else f'q{q}'}.webp"
+    open(os.path.join(ASSETS, fn), 'wb').write(buf.getvalue())
+    return f"assets/{fn}"
 def font(f): return base64.b64encode(open(os.path.join(W,'fonts',f),'rb').read()).decode()
 PDV=img('pdv.png'); ART=img('articulos.png'); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
 CAJA2=img('caja-abierta-resumen.png'); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
-LOGO=img('logo-full.png'); CUBE=img('cube-hd.png')
+LOGO=img('logo-full.png', maxw=760, lossless=True); CUBE=img('cube-hd.png', maxw=800, lossless=True)
 WA="https://wa.me/543425847340?text=Hola!%20Quiero%20probar%20StockFlow%20en%20mi%20comercio"
 CUBE_HTML=("<div class='cube3d' aria-hidden='true'><div class='c-halo'></div>"
  "<div class='c-scene'><div class='c-cube'>"
@@ -141,6 +162,11 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
  padding:5px 9px;font-weight:600;font-size:11.5px;color:var(--ink);white-space:nowrap;}}
 .pill svg{{width:14px;height:14px;color:var(--blue);}}
 .trust{{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:14px;color:var(--body);}}
+.hprice{{margin-top:12px;font-size:14.5px;color:var(--body);}}
+.proof{{background:var(--ink);color:#eaf1ff;}}
+.proof .wrap{{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;font-size:15px;text-align:center;flex-wrap:wrap;}}
+.proof b{{color:#fff;}}
+.proof .pdot{{width:9px;height:9px;border-radius:50%;background:#41d18b;box-shadow:0 0 0 4px rgba(65,209,139,.22);flex:none;}}
 .trust .wa-c{{width:34px;height:34px;border-radius:50%;background:var(--wa);color:#053d1c;display:grid;place-items:center;}}
 .trust .wa-c svg{{width:19px;height:19px;}}
 .shot{{border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 60px rgba(20,40,80,.18);background:#fff;}}
@@ -431,6 +457,7 @@ BODY=f"""
    <a class="btn btn-ghost" href="#func">Ver funciones</a>
    <span class="pill">{G['wifi']} Sin internet</span><span class="pill">{G['refresh']} Se actualiza</span><span class="pill">{G['shield']} AFIP al día</span>
   </div>
+  <div class="hprice">Prueba de <b>15 días por {money("5.000")}</b> con instalación incluida · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
   <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 15 días en tu comercio.</span></div>
  </div>
  <div class="shotwrap">
@@ -459,6 +486,11 @@ BODY=f"""
    <div class="pain-total"><span>Pérdida estimada por mes</span><span class="mny pc" data-count="80000" data-pre="+$&#8202;">+$&#8202;80.000</span></div>
   </div>
  </figure>
+</div></section>
+
+<section class="proof"><div class="wrap">
+ <span class="pdot"></span>
+ <span>En producción desde 2026: ventas, caja y cuentas corrientes <b>reales, registradas todos los días</b> — con soporte directo de quien lo desarrolla.</span>
 </div></section>
 
 <section class="sec"><div class="wrap">
@@ -625,8 +657,46 @@ BODY=f"""
 </script>
 """
 TITLE="StockFlow — Sistema de gestión comercial simple y completo (funciona sin internet)"
+DESC='StockFlow: sistema de gestión comercial para ferreterías, autoservicios y mayoristas. Stock, ventas, caja, cuentas corrientes y precios al día. Funciona sin internet. Probalo 15 días.'
+URL='https://bpsgsistemas.com/'
 HEAD=("<meta name='viewport' content='width=device-width,initial-scale=1'>"
- "<meta name='description' content='StockFlow: sistema de gestión comercial para ferreterías, autoservicios y mayoristas. Stock, ventas, caja, cuentas corrientes y precios al día. Funciona sin internet. Probalo 15 días.'>")
-open(os.path.join(W,'index3.html'),'w').write(f"<!doctype html><html lang='es'><head><meta charset='utf-8'>{HEAD}<title>{TITLE}</title><style>{CSS}</style></head><body>{BODY}</body></html>")
+ f"<meta name='description' content='{DESC}'>"
+ f"<link rel='canonical' href='{URL}'>"
+ "<link rel='icon' type='image/png' href='/favicon.png'>"
+ # Open Graph: la tarjetita con imagen cuando comparten el link por WhatsApp/redes.
+ f"<meta property='og:type' content='website'><meta property='og:url' content='{URL}'>"
+ f"<meta property='og:title' content='{TITLE}'>"
+ f"<meta property='og:description' content='{DESC}'>"
+ f"<meta property='og:image' content='{URL}og.jpg'>"
+ "<meta property='og:image:width' content='1200'><meta property='og:image:height' content='630'>"
+ "<meta property='og:locale' content='es_AR'>"
+ "<meta name='twitter:card' content='summary_large_image'>")
+
+# Medición mínima sin servicios externos: cada clic a WhatsApp manda un beacon a
+# /ev (no existe la ruta: nginx lo registra igual en el access.log del VPS).
+# Contar conversiones = grep "GET /ev" /var/log/nginx/access.log
+TRACK=("<script>document.querySelectorAll(\"a[href^='https://wa.me']\").forEach(function(a){"
+ "a.addEventListener('click',function(){try{var s=a.closest('section');"
+ "navigator.sendBeacon('/ev?e=wa&s='+encodeURIComponent((s&&s.id)||'top'))}catch(e){}})});</script>")
+
+# OG image (1200x630) + favicon, generados desde los assets reales.
+def make_og():
+    Wd, Hd = 1200, 630
+    cv = Image.new('RGB', (Wd, Hd), '#f6f9ff')
+    logo = Image.open(os.path.join(W, 'img', 'logo-full.png')).convert('RGBA')
+    lw = 520
+    logo2 = logo.resize((lw, round(logo.height * lw / logo.width)), Image.LANCZOS)
+    cv.paste(logo2, ((Wd - lw) // 2, 44), logo2)
+    shot = Image.open(os.path.join(W, 'img', 'pdv.png')).convert('RGB')
+    sw = 1020
+    shot2 = shot.resize((sw, round(shot.height * sw / shot.width)), Image.LANCZOS)
+    top = 44 + logo2.height + 34
+    cv.paste(shot2.crop((0, 0, sw, min(shot2.height, Hd - top))), ((Wd - sw) // 2, top))
+    cv.save(os.path.join(W, 'og.jpg'), 'JPEG', quality=86)
+    fav = Image.open(os.path.join(W, 'img', 'cube-hd.png')).convert('RGBA')
+    fav.resize((64, 64), Image.LANCZOS).save(os.path.join(W, 'favicon.png'))
+make_og()
+
+open(os.path.join(W,'index3.html'),'w').write(f"<!doctype html><html lang='es'><head><meta charset='utf-8'>{HEAD}<title>{TITLE}</title><style>{CSS}</style></head><body>{BODY}{TRACK}</body></html>")
 open(os.path.join(W,'artifact3.html'),'w').write(f"<title>{TITLE}</title><style>{CSS}</style>{BODY}")
 print("index3.html:", os.path.getsize(os.path.join(W,'index3.html'))//1024,"KB")
