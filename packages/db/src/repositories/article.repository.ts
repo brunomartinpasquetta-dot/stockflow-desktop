@@ -1,4 +1,4 @@
-import { and, eq, like, lt, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, lt, or, sql } from 'drizzle-orm';
 import {
   CreateArticleSchema,
   UpdateArticleSchema,
@@ -8,7 +8,7 @@ import {
 
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
-import { articles, type Article, type NewArticle } from '../schema/local';
+import { articles, families, suppliers, type Article, type NewArticle } from '../schema/local';
 import { BaseRepository } from './base.repository';
 
 export class ArticleRepository extends BaseRepository<Article, NewArticle> {
@@ -63,14 +63,21 @@ export class ArticleRepository extends BaseRepository<Article, NewArticle> {
     }
   }
 
-  /** Busca por texto en descripción o marca (LIKE, case-insensitive). */
+  /** Busca por texto en descripción, marca, familia o proveedor (LIKE, case-insensitive). */
   async searchByText(query: string): Promise<Article[]> {
     try {
       const term = `%${query.trim()}%`;
       return this.db
         .select()
         .from(articles)
-        .where(or(like(articles.description, term), like(articles.brand, term)))
+        .where(
+          or(
+            like(articles.description, term),
+            like(articles.brand, term),
+            inArray(articles.familyId, this.db.select({ id: families.id }).from(families).where(like(families.name, term))),
+            inArray(articles.supplierId, this.db.select({ id: suppliers.id }).from(suppliers).where(like(suppliers.name, term))),
+          ),
+        )
         .all();
     } catch (err) {
       return rethrowDbError(err);
@@ -94,6 +101,8 @@ export class ArticleRepository extends BaseRepository<Article, NewArticle> {
               like(articles.barcode, term),
               like(articles.description, term),
               like(articles.brand, term),
+              inArray(articles.familyId, this.db.select({ id: families.id }).from(families).where(like(families.name, term))),
+              inArray(articles.supplierId, this.db.select({ id: suppliers.id }).from(suppliers).where(like(suppliers.name, term))),
             ),
           ),
         )

@@ -540,17 +540,26 @@ export class PrinterService {
     parts.push(LF);
 
     parts.push(BOLD_ON);
-    push(`${center('RECIBO DE COBRANZA', cols)}\n`);
+    push(`${center(r.title ?? 'RECIBO DE COBRANZA', cols)}\n`);
     parts.push(BOLD_OFF, ALIGN_LEFT);
     push(`${center('DOCUMENTO NO FISCAL', cols)}\n`);
     push(`${formatDateTime(r.createdAt)}\n`);
     if (r.customer) {
-      push(`Cliente: ${r.customer.name}\n`);
+      push(`${r.partyLabel ?? 'Cliente'}: ${r.customer.name}\n`);
       if (r.customer.docNumber) push(`Doc: ${r.customer.docNumber}\n`);
     }
     if (r.comprobanteRef) push(`Comprobante: ${r.comprobanteRef}\n`);
     push(`Medio: ${r.paymentMethod}\n`);
     push(`${'-'.repeat(cols)}\n`);
+    if (r.period) {
+      parts.push(BOLD_ON);
+      push(`${center(r.period.title, cols)}\n`);
+      parts.push(BOLD_OFF);
+      for (const l of r.period.lines) push(`${leftRight(l.label, l.amount, cols)}\n`);
+      push(`${'-'.repeat(cols)}\n`);
+      for (const t of r.period.totals) push(`${leftRight(t.label, t.amount, cols)}\n`);
+      push(`${'-'.repeat(cols)}\n`);
+    }
 
     parts.push(BOLD_ON, DOUBLE_ON);
     push(`${leftRight('ENTREGADO', r.amount, Math.floor(cols / 2))}\n`);

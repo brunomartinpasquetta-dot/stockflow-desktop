@@ -12,10 +12,11 @@ import { toast } from 'sonner'
 import { FileText, Loader2, Plus, Printer, Search, ShoppingCart, Trash2, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
-import { useArticles, useCompany, useCustomers, usePaymentMethods } from '@/lib/hooks'
+import { useArticles, useCompany, useCustomers, useFamilies, usePaymentMethods, useSuppliers } from '@/lib/hooks'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { calculateSaleTotals, lineTotal, resolvePrice } from '@/lib/pricing'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
+import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { usePrintQuote } from '@/lib/usePrint'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
@@ -532,18 +533,19 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
   const [discountIsPct, setDiscountIsPct] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  const familiesQuery = useFamilies()
+  const suppliersQuery = useSuppliers()
+  const searchCtx = useMemo(
+    () => buildSearchContext(familiesQuery.data, suppliersQuery.data),
+    [familiesQuery.data, suppliersQuery.data],
+  )
   const suggestions = useMemo(() => {
-    const term = search.trim().toLowerCase()
+    const term = search.trim()
     if (term.length < 2) return []
     return (articlesQuery.data ?? [])
-      .filter(
-        (a) =>
-          a.description.toLowerCase().includes(term) ||
-          a.barcode.toLowerCase().includes(term) ||
-          (a.brand?.toLowerCase().includes(term) ?? false),
-      )
+      .filter((a) => articleMatches(a, term, searchCtx))
       .slice(0, 300)
-  }, [articlesQuery.data, search])
+  }, [articlesQuery.data, search, searchCtx])
 
   function addArticle(a: ArticleDTO): void {
     setCart((prev) => {
@@ -739,7 +741,7 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
                     {formatCurrency(lineTotal({ quantity: l.quantity, unitPrice: l.unitPrice, discount: lineDiscountAbs(l) }))}
                   </td>
                   <td className="px-2 py-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setCart((p) => p.filter((_, j) => j !== i))}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setCart((p) => p.filter((_, j) => j !== i))} title="Quitar producto del presupuesto">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </td>

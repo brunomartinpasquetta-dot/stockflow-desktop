@@ -11,6 +11,7 @@ import {
   useArticles,
   useCompany,
   useCurrentCash,
+  useFamilies,
   usePaymentMethods,
   useSuppliers,
 } from '@/lib/hooks'
@@ -19,6 +20,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
+import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
@@ -121,6 +123,11 @@ export function Compras() {
   const windowSelf = useWindowSelf()
   const articlesQuery = useArticles()
   const suppliersQuery = useSuppliers()
+  const familiesQuery = useFamilies()
+  const searchCtx = useMemo(
+    () => buildSearchContext(familiesQuery.data, suppliersQuery.data),
+    [familiesQuery.data, suppliersQuery.data],
+  )
   const paymentMethodsQuery = usePaymentMethods()
   const companyQuery = useCompany()
   const currentCash = useCurrentCash()
@@ -277,19 +284,14 @@ export function Compras() {
     // NÚMEROS deben verse los resultados, igual que el resto de los buscadores.
     // Match por SUBSTRING en código + descripción + marca; orden por relevancia.
     if (v.length < 1) return []
-    const matches = allArticles.filter(
-      (a) =>
-        a.barcode.toLowerCase().includes(v) ||
-        a.description.toLowerCase().includes(v) ||
-        (a.brand?.toLowerCase().includes(v) ?? false),
-    )
+    const matches = allArticles.filter((a) => articleMatches(a, v, searchCtx))
     const rank = (a: ArticleDTO): number => {
       const bc = a.barcode.toLowerCase()
       return bc === v ? 0 : bc.startsWith(v) ? 1 : 2
     }
     // Mostramos TODOS los que matchean (tope de seguridad alto); el desplegable scrollea.
     return [...matches].sort((a, b) => rank(a) - rank(b)).slice(0, 300)
-  }, [barcode, allArticles])
+  }, [barcode, allArticles, searchCtx])
   function commitBarcode(): void {
     const v = barcode.trim()
     if (!v) return
@@ -514,7 +516,7 @@ export function Compras() {
                       )}
                     </td>
                     <td className="px-2 py-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeLine(i)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeLine(i)} title="Quitar producto de la compra">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </td>

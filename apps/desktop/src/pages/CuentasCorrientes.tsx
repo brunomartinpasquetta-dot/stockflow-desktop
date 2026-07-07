@@ -15,6 +15,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -111,16 +112,25 @@ function CobranzaDialog({
 function CobranzaCuentaDialog({
   customerId,
   totalBalance,
+  initialAmount,
+  contextNote,
+  onPaid,
   onClose,
 }: {
   customerId: string
   totalBalance: string
+  /** Monto precargado (ej: neto del período filtrado). Default: saldo total. */
+  initialAmount?: string
+  /** Nota de contexto que se muestra en el diálogo (ej: "Período 01/06–30/06"). */
+  contextNote?: string
+  /** Callback tras registrar el pago (para imprimir el recibo del período). */
+  onPaid?: (info: { amount: number; payments: { paymentMethodId: string; amount: string }[] }) => void
   onClose: () => void
 }) {
   const qc = useQueryClient()
   const methodsQuery = usePaymentMethods()
   const activeMethods = useMemo(() => (methodsQuery.data ?? []).filter((m) => m.active), [methodsQuery.data])
-  const [monto, setMonto] = useState<string>(totalBalance)
+  const [monto, setMonto] = useState<string>(initialAmount ?? totalBalance)
   const montoNum = monto ? Number(parseCurrencyInput(monto)) : 0
   const balanceNum = Number(totalBalance)
   const split = usePaymentSplit(activeMethods, montoNum)
@@ -142,6 +152,7 @@ function CobranzaCuentaDialog({
       void qc.invalidateQueries({ queryKey: ['accountDetail'] })
       void qc.invalidateQueries({ queryKey: ['cash'] })
       toast.success(`Cobranza registrada — ${formatCurrency(montoNum)}`)
+      onPaid?.({ amount: montoNum, payments: split.payments })
       onClose()
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo registrar la cobranza'),
@@ -154,6 +165,9 @@ function CobranzaCuentaDialog({
           <DialogTitle>Registrar cobranza a la cuenta</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
+          {contextNote && (
+            <div className="rounded-md border border-primary/25 bg-primary/5 px-3 py-2 text-sm">{contextNote}</div>
+          )}
           <div className="rounded-md bg-muted px-3 py-2 text-sm">
             Saldo total del cliente: <span className="font-semibold tabular-nums">{formatCurrency(totalBalance)}</span>
           </div>
@@ -290,7 +304,11 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
   })
   const [cobrando, setCobrando] = useState<AccountReceivableDTO | null>(null)
   const [cobrandoCuenta, setCobrandoCuenta] = useState(false)
+  const [cobrandoPeriodo, setCobrandoPeriodo] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  // Filtro de movimientos por rango de fechas (YYYY-MM-DD; vacío = sin límite).
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const companyQuery = useCompany()
   const articlesQuery = useArticles()
@@ -313,6 +331,70 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
   const name = customer ? (customer.firstName ? `${customer.lastName}, ${customer.firstName}` : customer.lastName) : '…'
   const balance = statementQuery.data?.currentBalance ?? '0'
   const hasBalance = Number(balance) > 0.005
+
+  // ── Rango de fechas: movimientos filtrados + totales del período ──
+  const fromMs = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null
+  const toMs = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null
+  const rangeActive = fromMs != null || toMs != null
+  const filteredEntries = useMemo(() => {
+    const all = statementQuery.data?.entries ?? []
+    if (!rangeActive) return all
+    return all.filter((e) => (fromMs == null || e.date >= fromMs) && (toMs == null || e.date <= toMs))
+  }, [statementQuery.data, fromMs, toMs, rangeActive])
+  const periodCharges = useMemo(
+    () => filteredEntries.reduce((n, e) => n + Number(e.debit || 0), 0),
+    [filteredEntries],
+  )
+  const periodPayments = useMemo(
+    () => filteredEntries.reduce((n, e) => n + Number(e.credit || 0), 0),
+    [filteredEntries],
+  )
+  const periodNet = Math.max(0, periodCharges - periodPayments)
+  // Lo cobrable del período no puede superar el saldo actual de la cuenta.
+  const periodCobrable = Math.min(periodNet, Number(balance))
+
+  /** Recibo del período: se imprime tras registrar la cobranza del rango. */
+  function printPeriodReceipt(info: { amount: number; payments: { paymentMethodId: string; amount: string }[] }): void {
+    const company = companyQuery.data
+    if (!company || filteredEntries.length === 0) return
+    const methodLabel =
+      info.payments.length <= 1
+        ? (pmNameById.get(info.payments[0]?.paymentMethodId ?? '') ?? 'Cobranza')
+        : info.payments.map((p) => pmNameById.get(p.paymentMethodId) ?? '—').join(' + ')
+    // Tope de líneas para no escupir un rollo infinito en rangos largos.
+    const MAX_LINES = 40
+    const lines = filteredEntries.slice(0, MAX_LINES).map((e) => ({
+      date: e.date,
+      label:
+        e.kind === 'sale'
+          ? e.saleType && e.saleNumber != null
+            ? `Venta ${e.saleType} #${e.saleNumber}`
+            : 'Venta'
+          : `Pago ${e.paymentMethodName ?? ''}`.trim(),
+      amount: Number(e.debit) > 0 ? e.debit : e.credit,
+    }))
+    if (filteredEntries.length > MAX_LINES)
+      lines.push({ date: toMs ?? Date.now(), label: `… y ${filteredEntries.length - MAX_LINES} mov. más`, amount: '0' })
+    const data: PaymentReceiptData = {
+      company,
+      customerName: name,
+      customerDoc: customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
+      date: Date.now(),
+      paymentMethod: methodLabel,
+      amount: info.amount.toFixed(2),
+      comprobanteRef: null,
+      comprobanteBalance: null,
+      accountBalance: Math.max(0, Number(balance) - info.amount).toFixed(2),
+      period: {
+        from: fromMs ?? filteredEntries[0]!.date,
+        to: toMs ?? filteredEntries[filteredEntries.length - 1]!.date,
+        lines,
+        charges: periodCharges.toFixed(2),
+        payments: periodPayments.toFixed(2),
+      },
+    }
+    void printPaymentReceiptSilent(data, printerCfgQuery.data ?? null)
+  }
 
   // Reimprime el ticket de una venta a cuenta (mismo camino que Historial de
   // Ventas). Útil cuando la venta ya está saldada y quiere entregarse el ticket.
@@ -364,7 +446,7 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onBack}>
+          <Button variant="ghost" size="icon" onClick={onBack} title="Volver al listado">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -474,7 +556,44 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
 
       <Card>
         <CardContent className="p-0">
-          <div className="border-b px-4 py-2 text-sm font-medium">Movimientos</div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+            <span className="text-sm font-medium">Movimientos</span>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="cc-desde" className="text-xs text-muted-foreground">Desde</Label>
+              <Input id="cc-desde" type="date" className="h-7 w-[135px] px-2 text-xs" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              <Label htmlFor="cc-hasta" className="text-xs text-muted-foreground">Hasta</Label>
+              <Input id="cc-hasta" type="date" className="h-7 w-[135px] px-2 text-xs" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              {rangeActive && (
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setFromDate(''); setToDate('') }}>
+                  Todo
+                </Button>
+              )}
+            </div>
+          </div>
+          {rangeActive && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-primary/5 px-4 py-2 text-sm">
+              <div className="flex flex-wrap gap-x-5 gap-y-1 tabular-nums">
+                <span>Ventas del período: <b>{formatCurrency(periodCharges)}</b></span>
+                <span>Cobranzas: <b className="text-success">{formatCurrency(periodPayments)}</b></span>
+                <span>Total del período: <b>{formatCurrency(periodNet)}</b></span>
+              </div>
+              <Button
+                size="sm"
+                disabled={!canCobrar || periodCobrable <= 0.005 || filteredEntries.length === 0}
+                title={
+                  !canCobrar
+                    ? 'Requiere permiso para cobrar'
+                    : periodCobrable <= 0.005
+                      ? 'No hay importe pendiente en el período'
+                      : `Registrar una cobranza por ${formatCurrency(periodCobrable)} y emitir el ticket con el detalle`
+                }
+                onClick={() => setCobrandoPeriodo(true)}
+              >
+                <ReceiptText className="h-4 w-4" />
+                Cobrar período
+              </Button>
+            </div>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
@@ -491,12 +610,14 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                 <TableRow>
                   <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">Cargando…</TableCell>
                 </TableRow>
-              ) : (statementQuery.data?.entries ?? []).length === 0 ? (
+              ) : filteredEntries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">Sin movimientos</TableCell>
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                    {rangeActive ? 'Sin movimientos en el período seleccionado' : 'Sin movimientos'}
+                  </TableCell>
                 </TableRow>
               ) : (
-                (statementQuery.data?.entries ?? []).map((e, i) => (
+                filteredEntries.map((e, i) => (
                   <TableRow key={i}>
                     <TableCell className="text-sm">{formatDate(e.date)}</TableCell>
                     <TableCell>
@@ -550,6 +671,16 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
           customerId={customerId}
           totalBalance={balance}
           onClose={() => setCobrandoCuenta(false)}
+        />
+      )}
+      {cobrandoPeriodo && (
+        <CobranzaCuentaDialog
+          customerId={customerId}
+          totalBalance={balance}
+          initialAmount={periodCobrable.toFixed(2)}
+          contextNote={`Cobranza del período ${fromDate ? formatDate(fromMs!) : 'inicio'} al ${toDate ? formatDate(toMs!) : 'hoy'} — ${filteredEntries.length} movimiento(s). Al confirmar se imprime el ticket con el detalle.`}
+          onPaid={printPeriodReceipt}
+          onClose={() => setCobrandoPeriodo(false)}
         />
       )}
     </div>

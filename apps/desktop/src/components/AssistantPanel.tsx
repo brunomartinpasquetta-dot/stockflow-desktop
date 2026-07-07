@@ -291,7 +291,7 @@ export function AssistantPanel() {
           placeholder="Escribí tu pregunta…"
           className="h-9 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
-        <Button size="icon" className="h-9 w-9 shrink-0" onClick={() => void send()} disabled={busy || !input.trim()}>
+        <Button size="icon" className="h-9 w-9 shrink-0" onClick={() => void send()} disabled={busy || !input.trim()} title="Enviar pregunta">
           <Send className="h-4 w-4" />
         </Button>
       </div>

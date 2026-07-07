@@ -66,6 +66,7 @@ import {
 } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatCurrency, formatNumber } from '@/lib/format'
+import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ArticleDTO, FamilyDTO, SupplierDTO, Unit } from '@/types/api'
@@ -258,18 +259,13 @@ export function Articulos() {
     [articles.data],
   )
 
-  // Lista filtrada + ordenada.
+  const searchCtx = useMemo(() => buildSearchContext(families.data, suppliers.data), [families.data, suppliers.data])
+  // Lista filtrada + ordenada. El buscador matchea CUALQUIER propiedad
+  // (código, descripción, marca, familia, proveedor).
   const filtered = useMemo<ArticleDTO[]>(() => {
-    const q = search.trim().toLowerCase()
+    const q = search.trim()
     const base = articles.data ?? []
-    let filteredRows = q
-      ? base.filter(
-          (a) =>
-            a.barcode.toLowerCase().includes(q) ||
-            a.description.toLowerCase().includes(q) ||
-            (a.brand?.toLowerCase().includes(q) ?? false),
-        )
-      : base
+    let filteredRows = q ? base.filter((a) => articleMatches(a, q, searchCtx)) : base
     if (brandFilter) filteredRows = filteredRows.filter((a) => a.brand === brandFilter)
     const dir = sortDir === 'asc' ? 1 : -1
     // Valor a comparar (familyId → nombre de familia; el resto, el campo crudo).
@@ -290,7 +286,7 @@ export function Articulos() {
       if (bothNum) return (an - bn) * dir
       return av.localeCompare(bv, 'es', { numeric: true, sensitivity: 'base' }) * dir
     })
-  }, [articles.data, search, brandFilter, sortKey, sortDir, familyName])
+  }, [articles.data, search, brandFilter, sortKey, sortDir, familyName, searchCtx])
 
   function selectArticle(a: ArticleDTO): void {
     setSelectedId(a.id)

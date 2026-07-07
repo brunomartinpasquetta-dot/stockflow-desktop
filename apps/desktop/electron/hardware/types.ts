@@ -156,4 +156,14 @@ export interface PaymentReceiptData {
   comprobanteRef: string | null;
   comprobanteBalance: string | null;
   accountBalance: string;
+  /** Título del comprobante (default "RECIBO DE COBRANZA"). */
+  title?: string;
+  /** Rótulo de la contraparte (default "Cliente"). */
+  partyLabel?: string;
+  /** Bloque opcional con el detalle del período (líneas ya formateadas). */
+  period?: {
+    title: string;
+    lines: { label: string; amount: string }[];
+    totals: { label: string; amount: string }[];
+  };
 }

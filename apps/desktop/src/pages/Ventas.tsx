@@ -21,6 +21,7 @@ import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
+import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
@@ -153,25 +154,20 @@ function ArticlePicker({
     return [...set].sort((x, y) => x.localeCompare(y, 'es'))
   }, [articles])
 
+  const pickerSearchCtx = useMemo(() => buildSearchContext(families, suppliers), [families, suppliers])
   const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase()
+    const term = q.trim()
     return articles
       .filter((a) => {
         if (familyId && a.familyId !== familyId) return false
         if (brand && a.brand !== brand) return false
         if (supplierId && a.supplierId !== supplierId) return false
-        if (term) {
-          const hay =
-            a.barcode.toLowerCase().includes(term) ||
-            a.description.toLowerCase().includes(term) ||
-            (a.brand?.toLowerCase().includes(term) ?? false)
-          if (!hay) return false
-        }
+        if (term && !articleMatches(a, term, pickerSearchCtx)) return false
         return true
       })
       .sort((x, y) => x.description.localeCompare(y.description, 'es'))
       .slice(0, 300)
-  }, [articles, q, familyId, brand, supplierId])
+  }, [articles, q, familyId, brand, supplierId, pickerSearchCtx])
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -184,7 +180,7 @@ function ArticlePicker({
         <div className="grid grid-cols-4 gap-2">
           <Input
             autoFocus
-            placeholder="Buscar por código, descripción o marca…"
+            placeholder="Buscar por código, marca, familia, proveedor…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -484,9 +480,11 @@ function PDV() {
   function pickCustomer(c: CustomerDTO): void {
     setCustomerId(c.id)
     setCustomerPickerOpen(false)
-    // Autocompletar la lista de precios con la del cliente (CF / sin lista → Lista 1).
-    // Se puede cambiar manualmente después.
-    const list: 1 | 2 | 3 = isCfCustomer(c) ? 1 : (c.priceList as 1 | 2 | 3) ?? 1
+    // Autocompletar la lista de precios con la ASIGNADA al cliente (sin lista
+    // válida → Lista 1). Vale también para clientes con documento "Consumidor
+    // Final": si tienen lista asignada, esa manda. Se puede cambiar a mano después.
+    const rawList = Number(c.priceList)
+    const list: 1 | 2 | 3 = rawList === 2 ? 2 : rawList === 3 ? 3 : 1
     setSelectedPriceList(list)
     setCart((prev) => prev.map((l) => (l.priceManuallySet ? l : { ...l, unitPrice: resolvePrice(l.article, c, l.quantity, list) })))
     if (isCfCustomer(c)) setIsAccountSale(false)
@@ -500,6 +498,10 @@ function PDV() {
   }
 
   // --- búsqueda de productos ---
+  const pdvSearchCtx = useMemo(
+    () => buildSearchContext(familiesQuery.data, suppliersQuery.data),
+    [familiesQuery.data, suppliersQuery.data],
+  )
   const exactByBarcode = useMemo(() => {
     const v = barcode.trim()
     return v ? allArticles.find((a) => a.barcode === v) ?? null : null
@@ -511,12 +513,7 @@ function PDV() {
     // Match por SUBSTRING en código + descripción + marca (mismo criterio que el
     // buscador completo); orden por relevancia: exacto → empieza con → contiene.
     if (v.length < 1) return []
-    const matches = allArticles.filter(
-      (a) =>
-        a.barcode.toLowerCase().includes(v) ||
-        a.description.toLowerCase().includes(v) ||
-        (a.brand?.toLowerCase().includes(v) ?? false),
-    )
+    const matches = allArticles.filter((a) => articleMatches(a, v, pdvSearchCtx))
     const rank = (a: ArticleDTO): number => {
       const bc = a.barcode.toLowerCase()
       return bc === v ? 0 : bc.startsWith(v) ? 1 : 2
@@ -524,7 +521,7 @@ function PDV() {
     // Sin recorte agresivo: mostramos TODOS los que matchean (con tope de
     // seguridad alto, igual que "Ver todos") y el desplegable scrollea.
     return [...matches].sort((a, b) => rank(a) - rank(b)).slice(0, 300)
-  }, [barcode, allArticles])
+  }, [barcode, allArticles, pdvSearchCtx])
 
   function commitBarcode(): void {
     const v = barcode.trim()
@@ -998,7 +995,7 @@ function PDV() {
                         )}
                       </td>
                       <td className="px-2 py-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeLine(i)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeLine(i)} title="Quitar producto de la venta">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </td>

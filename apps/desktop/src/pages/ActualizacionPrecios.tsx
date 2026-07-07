@@ -36,6 +36,7 @@ import { FormShell } from '@/components/ui/form-shell'
 import { api } from '@/lib/api'
 import { useArticles, useFamilies, useSuppliers } from '@/lib/hooks'
 import { formatCurrency } from '@/lib/format'
+import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePermission } from '@/contexts/AuthContext'
@@ -135,9 +136,10 @@ export function ActualizacionPrecios() {
       ),
     [articlesQ.data],
   )
+  const searchCtx = useMemo(() => buildSearchContext(familiesQ.data, suppliersQ.data), [familiesQ.data, suppliersQ.data])
   const filtered = useMemo<ArticleDTO[]>(() => {
     const all = articlesQ.data ?? []
-    const term = search.trim().toLowerCase()
+    const term = search.trim()
     const min = minPrice ? Number(minPrice) : null
     const max = maxPrice ? Number(maxPrice) : null
     return all.filter((a) => {
@@ -148,13 +150,10 @@ export function ActualizacionPrecios() {
       if (onlyStock && Number(a.stock) <= 0) return false
       if (min != null && Number(a.listPrice1) < min) return false
       if (max != null && Number(a.listPrice1) > max) return false
-      if (term) {
-        const hay = `${a.barcode} ${a.description} ${a.brand ?? ''}`.toLowerCase()
-        if (!hay.includes(term)) return false
-      }
+      if (term && !articleMatches(a, term, searchCtx)) return false
       return true
     })
-  }, [articlesQ.data, search, familyIds, supplierIds, brands, onlyStock, minPrice, maxPrice])
+  }, [articlesQ.data, search, familyIds, supplierIds, brands, onlyStock, minPrice, maxPrice, searchCtx])
 
   const allSelected = filtered.length > 0 && filtered.every((a) => selected.has(a.id))
   const someSelected = filtered.some((a) => selected.has(a.id)) && !allSelected
@@ -307,7 +306,7 @@ export function ActualizacionPrecios() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por código, descripción o marca…"
+              placeholder="Buscar por código, marca, familia, proveedor…"
               className="pl-8"
             />
           </div>

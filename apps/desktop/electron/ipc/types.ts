@@ -1773,6 +1773,16 @@ export interface PaymentReceiptDataDTO {
   comprobanteBalance: string | null;
   /** saldo total de la cuenta del cliente luego del pago */
   accountBalance: string;
+  /** título del comprobante (default "RECIBO DE COBRANZA") */
+  title?: string;
+  /** rótulo de la contraparte (default "Cliente") */
+  partyLabel?: string;
+  /** detalle opcional del período (líneas ya formateadas para el ticket) */
+  period?: {
+    title: string;
+    lines: { label: string; amount: string }[];
+    totals: { label: string; amount: string }[];
+  };
 }
 
 export interface CashCloseReportDataDTO {

@@ -33,6 +33,7 @@ export function Taskbar() {
               type="button"
               onClick={() => wm.focusWindow(w.windowKey)}
               className="inline-flex flex-1 items-center gap-1.5 truncate"
+              title="Traer la ventana al frente"
             >
               <WindowIcon name={w.iconName} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate">{w.title}</span>
@@ -40,6 +41,7 @@ export function Taskbar() {
             <button
               type="button"
               aria-label="Cerrar"
+              title="Cerrar ventana"
               onClick={(e) => {
                 e.stopPropagation()
                 wm.closeWindow(w.windowKey)
