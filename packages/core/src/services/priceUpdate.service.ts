@@ -225,19 +225,28 @@ export class PriceUpdateService {
 
     for (const field of rule.fields) {
       const oldValue = article[field];
+      // Base de cálculo: el propio campo; pero las listas 2/3 vacías ($0) toman
+      // la LISTA 1 como base (la lista por defecto) — si no, un porcentaje sobre
+      // $0 queda en $0 y "no actualiza nada". OJO: el precio mayorista en $0 NO
+      // cae a Lista 1 ($0 = mayorista deshabilitado; llenarlo lo activaría en
+      // todas las ventas por el gate `wholesalePrice > 0`).
+      const baseValue =
+        (field === 'listPrice2' || field === 'listPrice3') && Number(oldValue) <= 0
+          ? article.listPrice1
+          : oldValue;
       let newValue: string;
       if (field === 'costPrice') {
         newValue = newCost ?? oldValue;
       } else if (useKeepUtility) {
         // Mantener utilidad: recalcular usando cost old → cost new.
         newValue = computeNewValue(
-          oldValue,
+          baseValue,
           { ...rule, type: 'recalculate_from_cost', rounding: rule.rounding },
           oldCost,
           newCost,
         );
       } else {
-        newValue = computeNewValue(oldValue, rule, oldCost, newCost);
+        newValue = computeNewValue(baseValue, rule, oldCost, newCost);
       }
       if (oldValue !== newValue) {
         out.push({ field, oldValue, newValue });

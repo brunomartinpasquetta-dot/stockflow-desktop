@@ -487,6 +487,7 @@ function RuleFooter(props: {
     <div className="flex w-full flex-col gap-2 px-1 py-1">
       <div className="text-xs font-medium text-muted-foreground">
         Aplicar a {props.selectedCount} artículos seleccionados:
+        <span className="ml-2 font-normal">L2/L3 en $0 toman la Lista 1 como base.</span>
       </div>
       <div className="grid grid-cols-[auto_1fr] items-center gap-2 text-sm">
         <span className="font-medium">Campo:</span>
