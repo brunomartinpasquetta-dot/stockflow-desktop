@@ -827,6 +827,7 @@ export interface InventoryArticleRowDTO {
   articleId: string;
   barcode: string;
   description: string;
+  brand: string | null;
   stock: string;
   costPrice: string;
   listPrice1: string;
@@ -1500,7 +1501,7 @@ export interface ApiSurface {
     topArticles(payload: DateRangeDTO & { limit?: number }): Res<TopArticleRowDTO[]>;
     cashRegisterReport(payload: { registerId: string }): Res<CashReportDTO>;
     getLowStock(payload: { supplierId?: string; familyId?: string; criteria?: 'min' | 'ideal' }): Res<LowStockReportRowDTO[]>;
-    getInventory(payload: { supplierId?: string; familyId?: string; includeZeroStock?: boolean }): Res<InventoryReportDTO>;
+    getInventory(payload: { supplierId?: string; familyId?: string; brand?: string; includeZeroStock?: boolean }): Res<InventoryReportDTO>;
     getSalesByVendor(payload: DateRangeDTO & { userId?: string }): Res<SalesByVendorReportDTO>;
   };
   system: {

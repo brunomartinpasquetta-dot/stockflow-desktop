@@ -536,7 +536,12 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
     const term = search.trim().toLowerCase()
     if (term.length < 2) return []
     return (articlesQuery.data ?? [])
-      .filter((a) => a.description.toLowerCase().includes(term) || a.barcode.toLowerCase().includes(term))
+      .filter(
+        (a) =>
+          a.description.toLowerCase().includes(term) ||
+          a.barcode.toLowerCase().includes(term) ||
+          (a.brand?.toLowerCase().includes(term) ?? false),
+      )
       .slice(0, 300)
   }, [articlesQuery.data, search])
 
@@ -640,7 +645,7 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
         <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="h-11 pl-10"
-          placeholder="Buscá un producto por nombre o código…"
+          placeholder="Buscá un producto por nombre, código o marca…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -651,10 +656,13 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
                 key={a.id}
                 type="button"
                 onClick={() => addArticle(a)}
-                className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent"
               >
-                <span className="truncate"><span className="font-mono text-xs text-muted-foreground">{a.barcode}</span> · {a.description}</span>
-                <span className="ml-2 shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1'))}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-mono text-xs text-muted-foreground">{a.barcode}</span> · {a.description}
+                </span>
+                {a.brand && <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">{a.brand}</span>}
+                <span className="shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1'))}</span>
               </button>
             ))}
           </div>
@@ -680,7 +688,10 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
               cart.map((l, i) => (
                 <tr key={l.article.id} className="border-t">
                   <td className="px-2 py-1">
-                    <div className="font-medium">{l.article.description}</div>
+                    <div className="font-medium">
+                      {l.article.description}
+                      {l.article.brand && <span className="ml-1.5 text-xs font-semibold text-primary">· {l.article.brand}</span>}
+                    </div>
                     <div className="font-mono text-xs text-muted-foreground">{l.article.barcode}</div>
                   </td>
                   <td className="px-2 py-1">

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,6 +70,12 @@ function createWindow(extraArgs: string[]): void {
     height: 800,
     show: false,
     autoHideMenuBar: true,
+    // La ventana arranca MAXIMIZADA y no se puede redimensionar/achicar (para que el
+    // usuario no la reduzca sin querer). Sí se puede minimizar.
+    resizable: false,
+    minimizable: true,
+    maximizable: true,
+    fullscreenable: false,
     // Barra de título propia (azul) SÓLO en macOS: ocultamos la nativa y dejamos
     // los traffic lights inset; el título lo dibuja el renderer. En Windows/Linux
     // NO se toca (hidden ocultaría los botones min/max/cerrar).
@@ -84,7 +90,17 @@ function createWindow(extraArgs: string[]): void {
     },
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.once('ready-to-show', () => {
+    if (!mainWindow) return;
+    mainWindow.maximize();
+    // Respaldo: si con `resizable:false` la plataforma no maximiza, encajamos la
+    // ventana al área de trabajo (pantalla menos la barra de tareas).
+    if (!mainWindow.isMaximized()) {
+      const { workArea } = screen.getPrimaryDisplay();
+      mainWindow.setBounds(workArea);
+    }
+    mainWindow.show();
+  });
   mainWindow.on('closed', () => {
     // Al cerrar la ventana principal forzamos el cierre TOTAL. Si quedara alguna
     // ventana OCULTA viva (un print/diagnóstico que no se destruyó),

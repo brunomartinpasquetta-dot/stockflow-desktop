@@ -9,7 +9,7 @@
  * (localStorage) y se re-encuadran si la ventana se achica.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GripHorizontal, Loader2, Send, X } from 'lucide-react'
+import { GripHorizontal, Loader2, Minus, Send, X } from 'lucide-react'
 
 import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
@@ -75,7 +75,8 @@ function saveRect(r: Rect): void {
 }
 
 export function AssistantPanel() {
-  const { open, setOpen } = useAssistant()
+  const { state, pending, hide, minimize, clearPending } = useAssistant()
+  const open = state === 'open'
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -103,9 +104,18 @@ export function AssistantPanel() {
     }
   }, [messages, busy])
 
-  // Saludo inicial (viene del motor: incluye sugerencias reales).
+  // Al abrir: si viene una pregunta desde el buscador, la mandamos directo;
+  // si no, saludo inicial (viene del motor, con sugerencias reales).
   useEffect(() => {
-    if (!open || greeted) return
+    if (!open) return
+    if (pending) {
+      const q = pending
+      clearPending()
+      setGreeted(true)
+      void send(q)
+      return
+    }
+    if (greeted) return
     setGreeted(true)
     void (async () => {
       try {
@@ -116,7 +126,8 @@ export function AssistantPanel() {
       }
       setTimeout(() => inputRef.current?.focus(), 100)
     })()
-  }, [open, greeted])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pending, greeted])
 
   // Si el usuario achica la ventana, el panel se re-encuadra solo.
   useEffect(() => {
@@ -202,9 +213,19 @@ export function AssistantPanel() {
         <GripHorizontal className="h-4 w-4 opacity-50" />
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={minimize}
+          className="rounded-md p-1 transition-colors hover:bg-primary-foreground/15"
+          aria-label="Minimizar asistente"
+          title="Minimizar"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={hide}
           className="rounded-md p-1 transition-colors hover:bg-primary-foreground/15"
           aria-label="Cerrar asistente"
+          title="Cerrar"
         >
           <X className="h-4 w-4" />
         </button>

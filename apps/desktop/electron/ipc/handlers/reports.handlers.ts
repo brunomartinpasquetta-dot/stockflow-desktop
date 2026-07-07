@@ -62,7 +62,7 @@ export function buildReportsHandlers(deps: HandlerDeps): HandlerMap {
     'reports:getInventory': withSession(
       deps,
       (
-        payload: { supplierId?: string; familyId?: string; includeZeroStock?: boolean },
+        payload: { supplierId?: string; familyId?: string; brand?: string; includeZeroStock?: boolean },
         ctx,
       ): Promise<InventoryReportDTO> => new ReportsService(ctx).getInventoryReport(payload ?? {}, ctx),
     ),

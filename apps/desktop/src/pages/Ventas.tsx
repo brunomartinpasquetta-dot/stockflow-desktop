@@ -910,12 +910,13 @@ function PDV() {
                       setBarcode('')
                       barcodeRef.current?.focus()
                     }}
-                    className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-accent"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent"
                   >
-                    <span className="truncate">
+                    <span className="min-w-0 flex-1 truncate">
                       <span className="font-mono text-xs text-muted-foreground">{a.barcode}</span> · {a.description}
                     </span>
-                    <span className="ml-2 shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1', selectedPriceList))}</span>
+                    {a.brand && <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">{a.brand}</span>}
+                    <span className="shrink-0 tabular-nums">{formatCurrency(resolvePrice(a, selectedCustomer, '1', selectedPriceList))}</span>
                   </button>
                 ))}
               </div>

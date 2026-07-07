@@ -242,9 +242,9 @@ export function useLowStockReport(input: { supplierId?: string; familyId?: strin
     enabled,
   })
 }
-export function useInventoryReport(input: { supplierId?: string; familyId?: string; includeZeroStock?: boolean }, enabled = true) {
+export function useInventoryReport(input: { supplierId?: string; familyId?: string; brand?: string; includeZeroStock?: boolean }, enabled = true) {
   return useQuery<InventoryReportDTO>({
-    queryKey: ['reports', 'inventory', input.supplierId ?? '', input.familyId ?? '', input.includeZeroStock ? '1' : '0'],
+    queryKey: ['reports', 'inventory', input.supplierId ?? '', input.familyId ?? '', input.brand ?? '', input.includeZeroStock ? '1' : '0'],
     queryFn: () => api.reports.getInventory(input),
     enabled,
   })

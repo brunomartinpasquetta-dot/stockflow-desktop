@@ -98,6 +98,7 @@ export function ActualizacionPrecios() {
   const [search, setSearch] = useState('')
   const [familyIds, setFamilyIds] = useState<Set<string>>(new Set())
   const [supplierIds, setSupplierIds] = useState<Set<string>>(new Set())
+  const [brands, setBrands] = useState<Set<string>>(new Set())
   const [onlyStock, setOnlyStock] = useState(false)
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
@@ -126,6 +127,14 @@ export function ActualizacionPrecios() {
     () => new Map((familiesQ.data ?? []).map((f) => [f.id, f.name])),
     [familiesQ.data],
   )
+  // Marcas distintas presentes en los artículos (para el filtro por marca).
+  const brandOptions = useMemo<string[]>(
+    () =>
+      [...new Set((articlesQ.data ?? []).map((a) => a.brand).filter((b): b is string => !!b))].sort((x, y) =>
+        x.localeCompare(y),
+      ),
+    [articlesQ.data],
+  )
   const filtered = useMemo<ArticleDTO[]>(() => {
     const all = articlesQ.data ?? []
     const term = search.trim().toLowerCase()
@@ -135,6 +144,7 @@ export function ActualizacionPrecios() {
       if (!a.active) return false
       if (familyIds.size > 0 && (!a.familyId || !familyIds.has(a.familyId))) return false
       if (supplierIds.size > 0 && (!a.supplierId || !supplierIds.has(a.supplierId))) return false
+      if (brands.size > 0 && (!a.brand || !brands.has(a.brand))) return false
       if (onlyStock && Number(a.stock) <= 0) return false
       if (min != null && Number(a.listPrice1) < min) return false
       if (max != null && Number(a.listPrice1) > max) return false
@@ -144,7 +154,7 @@ export function ActualizacionPrecios() {
       }
       return true
     })
-  }, [articlesQ.data, search, familyIds, supplierIds, onlyStock, minPrice, maxPrice])
+  }, [articlesQ.data, search, familyIds, supplierIds, brands, onlyStock, minPrice, maxPrice])
 
   const allSelected = filtered.length > 0 && filtered.every((a) => selected.has(a.id))
   const someSelected = filtered.some((a) => selected.has(a.id)) && !allSelected
@@ -194,10 +204,20 @@ export function ActualizacionPrecios() {
     })
   }
 
+  function toggleBrand(b: string): void {
+    setBrands((prev) => {
+      const next = new Set(prev)
+      if (next.has(b)) next.delete(b)
+      else next.add(b)
+      return next
+    })
+  }
+
   function clearFilters(): void {
     setSearch('')
     setFamilyIds(new Set())
     setSupplierIds(new Set())
+    setBrands(new Set())
     setOnlyStock(false)
     setMinPrice('')
     setMaxPrice('')
@@ -293,8 +313,8 @@ export function ActualizacionPrecios() {
           </div>
           <details className="relative">
             <summary className="list-none cursor-pointer rounded-md border bg-background px-3 py-2 text-sm select-none">
-              Filtros{(familyIds.size + supplierIds.size + (onlyStock ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0)) > 0
-                ? ` (${familyIds.size + supplierIds.size + (onlyStock ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0)})`
+              Filtros{(familyIds.size + supplierIds.size + brands.size + (onlyStock ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0)) > 0
+                ? ` (${familyIds.size + supplierIds.size + brands.size + (onlyStock ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0)})`
                 : ''}
             </summary>
             <div className="absolute right-0 top-full z-30 mt-1 w-[420px] rounded-md border bg-background p-3 shadow-lg">
@@ -321,11 +341,21 @@ export function ActualizacionPrecios() {
                     ))}
                   </div>
                 </div>
+                <div>
+                  <Label className="text-xs">Marcas</Label>
+                  <div className="max-h-32 overflow-auto rounded border p-1 text-xs">
+                    {brandOptions.map((b) => (
+                      <label key={b} className="flex items-center gap-1 py-0.5">
+                        <Checkbox checked={brands.has(b)} onCheckedChange={() => toggleBrand(b)} />
+                        <span>{b}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <label className="flex items-center gap-2 text-xs">
                   <Checkbox checked={onlyStock} onCheckedChange={(c) => setOnlyStock(!!c)} />
                   Sólo con stock
                 </label>
-                <div />
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs">Precio min</Label>
                   <CurrencyInput value={minPrice} onChange={setMinPrice} />

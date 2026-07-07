@@ -195,6 +195,7 @@ export function Articulos() {
   const [mode, setMode] = useState<Mode>('idle')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [search, setSearch] = useState('')
+  const [brandFilter, setBrandFilter] = useState<string>('')
   const [sortKey, setSortKey] = useState<SortKey>('description')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   // Imagen que el usuario eligió en `create` y todavía no se subió.
@@ -251,11 +252,17 @@ export function Articulos() {
     [articles.data, selectedId],
   )
 
+  // Marcas distintas (para el filtro).
+  const brandOptions = useMemo<string[]>(
+    () => [...new Set((articles.data ?? []).map((a) => a.brand).filter((b): b is string => !!b))].sort((x, y) => x.localeCompare(y)),
+    [articles.data],
+  )
+
   // Lista filtrada + ordenada.
   const filtered = useMemo<ArticleDTO[]>(() => {
     const q = search.trim().toLowerCase()
     const base = articles.data ?? []
-    const filteredRows = q
+    let filteredRows = q
       ? base.filter(
           (a) =>
             a.barcode.toLowerCase().includes(q) ||
@@ -263,6 +270,7 @@ export function Articulos() {
             (a.brand?.toLowerCase().includes(q) ?? false),
         )
       : base
+    if (brandFilter) filteredRows = filteredRows.filter((a) => a.brand === brandFilter)
     const dir = sortDir === 'asc' ? 1 : -1
     // Valor a comparar (familyId → nombre de familia; el resto, el campo crudo).
     const getVal = (a: ArticleDTO): string =>
@@ -282,7 +290,7 @@ export function Articulos() {
       if (bothNum) return (an - bn) * dir
       return av.localeCompare(bv, 'es', { numeric: true, sensitivity: 'base' }) * dir
     })
-  }, [articles.data, search, sortKey, sortDir, familyName])
+  }, [articles.data, search, brandFilter, sortKey, sortDir, familyName])
 
   function selectArticle(a: ArticleDTO): void {
     setSelectedId(a.id)
@@ -332,6 +340,7 @@ export function Articulos() {
     if (!form.barcode.trim()) return 'El código es obligatorio'
     if (form.description.trim().length < 2)
       return 'La descripción debe tener al menos 2 caracteres'
+    if (!form.brand.trim()) return 'La marca es obligatoria'
     if (Number(form.costPrice) < 0) return 'El costo no puede ser negativo'
     if (Number(form.listPrice1) < 0) return 'El precio de lista 1 no puede ser negativo'
     return null
@@ -349,7 +358,7 @@ export function Articulos() {
     const payload: Record<string, unknown> = {
       barcode: form.barcode.trim(),
       description: form.description.trim(),
-      brand: form.brand.trim() || null,
+      brand: form.brand.trim(),
       familyId: form.familyId || null,
       supplierId: form.supplierId || null,
       costPrice: form.costPrice || '0',
@@ -619,6 +628,19 @@ export function Articulos() {
           Excel
         </Button>
         <div className="flex-1" />
+        <select
+          value={brandFilter}
+          onChange={(e) => setBrandFilter(e.target.value)}
+          title="Filtrar por marca"
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <option value="">Todas las marcas</option>
+          {brandOptions.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
         <div className="relative w-72">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
           <Input
@@ -869,11 +891,12 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="Marca">
+        <Field className="col-span-3" label="Marca *">
           <Input
             value={form.brand}
             onChange={(e) => setField('brand', e.target.value)}
             disabled={inputsDisabled}
+            placeholder="Obligatoria"
           />
         </Field>
         <div className="col-span-2" />

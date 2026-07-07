@@ -2,12 +2,12 @@
  * P-CONSULTAS: Reporte de inventario agrupado por proveedor → familia.
  * Valuación al costo y a precio de venta + margen bruto teórico.
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Boxes, FileSpreadsheet, Printer } from 'lucide-react'
 
-import { useFamilies, useInventoryReport, useSuppliers } from '@/lib/hooks'
+import { useArticles, useFamilies, useInventoryReport, useSuppliers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { formatCurrency } from '@/lib/format'
 import { Card, CardContent } from '@/components/ui/card'
@@ -25,22 +25,35 @@ export function InventarioArticulos() {
   const canView = usePermission('view_reports')
   const suppliersQuery = useSuppliers()
   const familiesQuery = useFamilies()
+  const articlesQuery = useArticles()
 
   const [supplierId, setSupplierId] = useState('')
   const [familyId, setFamilyId] = useState('')
+  const [brand, setBrand] = useState('')
   const [includeZero, setIncludeZero] = useState(false)
   const [applied, setApplied] = useState<{
     supplierId?: string
     familyId?: string
+    brand?: string
     includeZeroStock?: boolean
   } | null>(null)
 
   const reportQuery = useInventoryReport(applied ?? {}, applied != null)
 
+  // Marcas distintas presentes en los artículos (para el filtro).
+  const brandOptions = useMemo<string[]>(
+    () =>
+      [...new Set((articlesQuery.data ?? []).map((a) => a.brand).filter((b): b is string => !!b))].sort((x, y) =>
+        x.localeCompare(y),
+      ),
+    [articlesQuery.data],
+  )
+
   function calcular(): void {
     setApplied({
       supplierId: supplierId || undefined,
       familyId: familyId || undefined,
+      brand: brand || undefined,
       includeZeroStock: includeZero,
     })
   }
@@ -57,6 +70,7 @@ export function InventarioArticulos() {
             Familia: f.familyName,
             Código: a.barcode,
             Descripción: a.description,
+            Marca: a.brand ?? '',
             Stock: Number(a.stock),
             Costo: Number(a.costPrice),
             'Precio venta': Number(a.listPrice1),
@@ -83,7 +97,7 @@ export function InventarioArticulos() {
       </div>
 
       <Card>
-        <CardContent className="grid grid-cols-1 items-end gap-3 pt-4 md:grid-cols-6">
+        <CardContent className="grid grid-cols-1 items-end gap-3 pt-4 md:grid-cols-7">
           <div className="flex flex-col gap-1">
             <Label>Proveedor</Label>
             <Select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
@@ -99,6 +113,15 @@ export function InventarioArticulos() {
               <option value="">Todas</option>
               {(familiesQuery.data ?? []).map((f) => (
                 <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Marca</Label>
+            <Select value={brand} onChange={(e) => setBrand(e.target.value)}>
+              <option value="">Todas</option>
+              {brandOptions.map((b) => (
+                <option key={b} value={b}>{b}</option>
               ))}
             </Select>
           </div>
@@ -157,6 +180,7 @@ export function InventarioArticulos() {
                               <TableRow>
                                 <TableHead>Código</TableHead>
                                 <TableHead>Descripción</TableHead>
+                                <TableHead>Marca</TableHead>
                                 <TableHead className="text-right">Stock</TableHead>
                                 <TableHead className="text-right">Costo</TableHead>
                                 <TableHead className="text-right">Precio venta</TableHead>
@@ -169,6 +193,7 @@ export function InventarioArticulos() {
                                 <TableRow key={a.articleId}>
                                   <TableCell className="font-mono text-xs">{a.barcode}</TableCell>
                                   <TableCell>{a.description}</TableCell>
+                                  <TableCell className="text-xs">{a.brand ?? '—'}</TableCell>
                                   <TableCell className="text-right tabular-nums">{Number(a.stock).toFixed(2)}</TableCell>
                                   <TableCell className="text-right tabular-nums">{formatCurrency(a.costPrice)}</TableCell>
                                   <TableCell className="text-right tabular-nums">{formatCurrency(a.listPrice1)}</TableCell>

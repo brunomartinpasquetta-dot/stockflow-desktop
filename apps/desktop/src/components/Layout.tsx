@@ -10,7 +10,6 @@
 import { type CSSProperties } from 'react'
 
 import { useLicenseStatus } from '@/contexts/LicenseContext'
-import { CommandPalette } from '@/components/CommandPalette'
 import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext'
 import { WindowManagerProvider } from '@/contexts/WindowManagerContext'
 import { WhatsAppPanelProvider } from '@/contexts/WhatsAppPanelContext'
@@ -77,7 +76,6 @@ function LayoutInner() {
         <WelcomeScreen />
       </div>
       <Taskbar />
-      <CommandPalette />
       <AssistantPanel />
     </div>
   )

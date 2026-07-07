@@ -85,8 +85,9 @@ export function WelcomeScreen() {
     wv?.reload?.()
   }
 
+  // 'normal' → visible; 'min' y 'hidden' → oculto (webview sigue montado). Minimizado
+  // se restaura desde el chip de la barra superior (StatusBar).
   const clipWidth = state === 'normal' ? PANEL_WIDTH : 0
-  const stripWidth = state === 'min' ? 46 : 0
 
   return (
     <div className="relative flex h-full overflow-hidden bg-gradient-to-br from-background to-muted/30">
@@ -123,20 +124,6 @@ export function WelcomeScreen() {
           <div ref={boxRef} className="min-h-0 flex-1" />
         </div>
       </div>
-
-      {/* Barra minimizada (costado DERECHO) */}
-      <button
-        onClick={() => set('normal')}
-        title="Abrir WhatsApp"
-        tabIndex={state === 'min' ? 0 : -1}
-        className="flex h-full shrink-0 flex-col items-center gap-3 overflow-hidden whitespace-nowrap bg-primary text-primary-foreground hover:brightness-110"
-        style={{ width: stripWidth, transition: TRANSITION }}
-      >
-        <span className="pt-4">
-          <WhatsAppGlyph className="h-6 w-6" strokeWidth={2} />
-        </span>
-        <span className="text-xs font-semibold tracking-wide [writing-mode:vertical-rl]">WhatsApp</span>
-      </button>
     </div>
   )
 }

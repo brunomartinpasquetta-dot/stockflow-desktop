@@ -284,7 +284,7 @@ export const api = {
   reports: {
     getLowStock: (input: { supplierId?: string; familyId?: string; criteria?: 'min' | 'ideal' }) =>
       unwrap(sf().reports.getLowStock(input)),
-    getInventory: (input: { supplierId?: string; familyId?: string; includeZeroStock?: boolean }) =>
+    getInventory: (input: { supplierId?: string; familyId?: string; brand?: string; includeZeroStock?: boolean }) =>
       unwrap(sf().reports.getInventory(input)),
     getSalesByVendor: (input: { from: number; to: number; userId?: string }) =>
       unwrap(sf().reports.getSalesByVendor(input)),

@@ -67,6 +67,7 @@ export interface InventoryArticleRow {
   articleId: string;
   barcode: string;
   description: string;
+  brand: string | null;
   stock: string;
   costPrice: string;
   listPrice1: string;
@@ -320,7 +321,7 @@ export class ReportsService {
   }
 
   async getInventoryReport(
-    input: { supplierId?: string; familyId?: string; includeZeroStock?: boolean },
+    input: { supplierId?: string; familyId?: string; brand?: string; includeZeroStock?: boolean },
     _ctx?: ServiceContext,
   ): Promise<InventoryReport> {
     this.requireReports();
@@ -340,6 +341,7 @@ export class ReportsService {
       if (!a.active) continue;
       if (input.supplierId && a.supplierId !== input.supplierId) continue;
       if (input.familyId && a.familyId !== input.familyId) continue;
+      if (input.brand && a.brand !== input.brand) continue;
       if (!includeZero && Number(a.stock) <= 0) continue;
       const sKey = a.supplierId ?? NULL_KEY;
       const fKey = a.familyId ?? NULL_KEY;
@@ -361,6 +363,7 @@ export class ReportsService {
         articleId: a.id,
         barcode: a.barcode,
         description: a.description,
+        brand: a.brand ?? null,
         stock: decimalString(a.stock, 3),
         costPrice: a.costPrice,
         listPrice1: a.listPrice1,
