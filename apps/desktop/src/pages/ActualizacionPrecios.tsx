@@ -9,6 +9,7 @@
  */
 import * as React from 'react'
 import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, Search, Tag } from 'lucide-react'
 
@@ -35,7 +36,7 @@ import {
 import { FormShell } from '@/components/ui/form-shell'
 import { api } from '@/lib/api'
 import { useArticles, useFamilies, useSuppliers } from '@/lib/hooks'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, parseCurrencyInput } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useCanWrite } from '@/contexts/LicenseContext'
@@ -91,6 +92,7 @@ function Checkbox({
 }
 
 export function ActualizacionPrecios() {
+  const qc = useQueryClient()
   const canWrite = useCanWrite()
   const canManage = usePermission('manage_prices')
   const canApply = canWrite && canManage
@@ -231,7 +233,9 @@ export function ActualizacionPrecios() {
       toast.error('Elegí al menos un campo')
       return null
     }
-    const n = Number(value)
+    // Normalizar el valor: coma decimal argentina y formato moneda.
+    const normValue = mode === 'percentage' ? value.replace(',', '.').trim() : parseCurrencyInput(value)
+    const n = Number(normValue)
     if (!Number.isFinite(n) || n === 0) {
       toast.error('El valor debe ser distinto de cero')
       return null
@@ -244,7 +248,7 @@ export function ActualizacionPrecios() {
     }
     const rule: PriceUpdateRuleDTO = {
       type: mode,
-      value,
+      value: normValue,
       fields,
       rounding,
       ...(mode !== 'set_value' ? { direction } : {}),
@@ -280,7 +284,11 @@ export function ActualizacionPrecios() {
     setApplying(true)
     try {
       const res = await api.priceUpdate.apply(payload.filter, payload.rule, payload.description)
-      toast.success(`Aplicado: ${res.articlesAffected} artículos modificados (${res.entries} cambios)`)
+      // Refrescar TODO lo que muestra precios: sin esto la grilla seguía
+      // mostrando los valores viejos y parecía que "no había andado".
+      void qc.invalidateQueries({ queryKey: ['articles'] })
+      void qc.invalidateQueries({ queryKey: ['priceUpdate'] })
+      toast.success(`Listo: ${res.articlesAffected} artículo(s) actualizados (${res.entries} precios). La grilla ya muestra los valores nuevos.`)
       setPreviewOpen(false)
       setPreviewEntries([])
       setSelected(new Set())
@@ -373,7 +381,7 @@ export function ActualizacionPrecios() {
       }
       bodyClassName="py-0"
       footer={
-        selected.size > 0 && (
+        (
           <RuleFooter
             selectedCount={selected.size}
             fields={fields}
@@ -485,10 +493,16 @@ function RuleFooter(props: {
 
   return (
     <div className="flex w-full flex-col gap-2 px-1 py-1">
-      <div className="text-xs font-medium text-muted-foreground">
-        Aplicar a {props.selectedCount} artículos seleccionados:
-        <span className="ml-2 font-normal">L2/L3 en $0 toman la Lista 1 como base.</span>
-      </div>
+      {props.selectedCount === 0 ? (
+        <div className="rounded-md border border-primary/25 bg-primary/5 px-3 py-1.5 text-sm">
+          <b>Paso 1:</b> marcá con el tilde (☑) los artículos de la lista que querés actualizar. Después definí acá abajo el cambio y tocá «Ver y aplicar».
+        </div>
+      ) : (
+        <div className="text-xs font-medium text-muted-foreground">
+          Vas a actualizar <b className="text-foreground">{props.selectedCount} artículo(s)</b> — definí el cambio y tocá «Ver y aplicar».
+          <span className="ml-2 font-normal">Las listas L2/L3 en $0 se calculan desde la Lista 1.</span>
+        </div>
+      )}
       <div className="grid grid-cols-[auto_1fr] items-center gap-2 text-sm">
         <span className="font-medium">Campo:</span>
         <div className="flex flex-wrap gap-3">
@@ -510,7 +524,7 @@ function RuleFooter(props: {
                 onChange={() => props.setMode(m)}
               />
               <span>
-                {m === 'percentage' ? 'Porcentaje' : m === 'fixed_amount' ? 'Monto fijo' : 'Valor absoluto'}
+                {m === 'percentage' ? 'Porcentaje (%)' : m === 'fixed_amount' ? 'Monto fijo ($ más/menos)' : 'Precio exacto (=$)'}
               </span>
             </label>
           ))}
@@ -526,7 +540,7 @@ function RuleFooter(props: {
                   checked={props.direction === 'increase'}
                   onChange={() => props.setDirection('increase')}
                 />
-                <span>⬆ Subir</span>
+                <span>⬆ Aumentar</span>
               </label>
               <label className="flex items-center gap-1">
                 <input
@@ -561,12 +575,14 @@ function RuleFooter(props: {
           ))}
         </Select>
       </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={props.onPreview} disabled={props.applying}>
-          Vista previa
-        </Button>
-        <Button onClick={props.onApply} disabled={!props.canApply || props.applying}>
-          {props.applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar cambios'}
+      <div className="flex items-center justify-end gap-2">
+        {!props.canApply && <span className="text-xs text-muted-foreground">Requiere permiso para actualizar precios.</span>}
+        <Button
+          onClick={props.onPreview}
+          disabled={props.applying || props.selectedCount === 0}
+          title={props.selectedCount === 0 ? 'Primero marcá artículos en la lista' : 'Muestra los cambios antes de aplicar — nada se guarda todavía'}
+        >
+          {props.applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Ver y aplicar cambios'}
         </Button>
       </div>
     </div>
@@ -587,7 +603,7 @@ function PreviewDialog(props: {
     <Dialog open onOpenChange={(o) => { if (!o) props.onClose() }}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Vista previa de cambios ({props.entries.length})</DialogTitle>
+          <DialogTitle>Revisá los cambios antes de aplicar ({props.entries.length})</DialogTitle>
         </DialogHeader>
         {props.loading ? (
           <div className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div>
@@ -629,7 +645,7 @@ function PreviewDialog(props: {
         <DialogFooter>
           <Button variant="outline" onClick={props.onClose} disabled={props.applying}>Volver</Button>
           <Button onClick={props.onApply} disabled={!props.canApply || props.applying || props.entries.length === 0}>
-            {props.applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar'}
+            {props.applying ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirmar y aplicar ${props.entries.length} cambio(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>
