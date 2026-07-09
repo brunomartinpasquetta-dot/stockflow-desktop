@@ -155,8 +155,9 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}}
 .lead b{{color:var(--ink);font-weight:800;}}
 .hero .lead{{font-size:19px;margin-top:20px;max-width:40ch;}}
-.hcta{{display:flex;gap:7px;margin-top:30px;flex-wrap:wrap;align-items:center;}}
-.hcta .btn{{padding:11px 15px;font-size:14.5px;}}
+.hcta{{display:flex;gap:16px;margin-top:30px;flex-wrap:wrap;align-items:center;}}
+.hcta .btn{{padding:11px 15px;font-size:14.5px;flex-shrink:0;}}
+.hcta .trust{{margin-top:0;flex:1;min-width:260px;}}
 .pills{{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap;}}
 .pill{{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:999px;
  padding:5px 9px;font-weight:600;font-size:11.5px;color:var(--ink);white-space:nowrap;}}
@@ -463,9 +464,9 @@ BODY=f"""
   <p class="lead"><b>Controlá tu comercio de punta a punta.</b> Ventas, stock, caja, clientes y precios siempre al día, en una sola PC. Comprobantes en regla y todo funcionando aunque se corte internet.</p>
   <div class="hcta">
    <a class="btn btn-blue" href="#precio">Descarga gratuita</a>
+   <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
   </div>
   <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> y con instalación incluida · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
-  <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
  </div>
  <div class="shotwrap">
   <div class="cfbox">
