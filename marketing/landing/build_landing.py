@@ -336,6 +336,12 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .pain-sheet{{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 50px rgba(20,40,80,.18);background:#fff;text-align:left;}}
 @media(max-width:820px){{.pain-2col{{grid-template-columns:1fr;gap:26px;}} .pain-head p{{max-width:none;}}}}
 .pain-body{{padding:4px 26px 16px;}}
+/* CARACTERÍSTICAS PRINCIPALES — 2 columnas compactas */
+.feats{{display:grid;grid-template-columns:1fr 1fr;gap:6px 44px;margin-top:26px;}}
+.feats ul{{list-style:none;margin:0;padding:0;}}
+.feats li{{position:relative;padding:8px 0 8px 26px;border-bottom:1px solid var(--line);font-size:15.5px;color:var(--ink);line-height:1.35;}}
+.feats li::before{{content:'✓';position:absolute;left:2px;top:7px;color:var(--blue);font-weight:800;}}
+@media(max-width:700px){{.feats{{grid-template-columns:1fr;gap:0 0;}}}}
 .pain-row{{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line);font-size:15.5px;color:var(--ink);}}
 .pain-row>span:first-child{{flex:1;padding-right:14px;}}
 .pain-row .mny{{color:var(--coral);font-weight:600;font-size:19px;white-space:nowrap;}}
@@ -470,22 +476,39 @@ BODY=f"""
  </div>
 </div></header>
 
-<section class="sec"><div class="wrap pain-2col">
- <div class="pain-head">
-  <h2>Lo que cuesta trabajar sin un sistema.</h2>
-  <p>Sin una herramienta que ordene la operación, cada mes se pierden ingresos difíciles de detectar. Una estimación conservadora:</p>
-  <div class="pain-stamp">Equivale a más de un mes de StockFlow. El sistema lo evita.</div>
+<section class="sec"><div class="wrap">
+ <div class="sc-intro">
+  <h2>Características <b>principales</b></h2>
+  <p>Todo lo que necesitás para manejar tu comercio, en un solo sistema.</p>
  </div>
- <figure class="cwin pain-sheet">
-  <div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">StockFlow — Pérdidas mensuales estimadas</span></div>
-  <div class="pain-body">
-   <div class="pain-row"><span>Listas de precios desactualizadas</span><span class="mny pc" data-count="28000" data-pre="$&#8202;">$&#8202;28.000</span></div>
-   <div class="pain-row"><span>Cuentas corrientes sin seguimiento</span><span class="mny pc" data-count="22000" data-pre="$&#8202;">$&#8202;22.000</span></div>
-   <div class="pain-row"><span>Faltantes de stock y reposición tardía</span><span class="mny pc" data-count="18000" data-pre="$&#8202;">$&#8202;18.000</span></div>
-   <div class="pain-row"><span>Cierre de caja y precios a mano · 6&nbsp;h/mes</span><span class="mny pc" data-count="12000" data-pre="$&#8202;">$&#8202;12.000</span></div>
-   <div class="pain-total"><span>Pérdida estimada por mes</span><span class="mny pc" data-count="80000" data-pre="+$&#8202;">+$&#8202;80.000</span></div>
-  </div>
- </figure>
+ <div class="feats">
+  <ul>
+   <li>Funciona sin internet — seguís vendiendo aunque se corte</li>
+   <li>Asistente virtual Sofía: ayuda 24/7 dentro del sistema</li>
+   <li>Soporte técnico directo por WhatsApp</li>
+   <li>Facturación electrónica ARCA (CAE)</li>
+   <li>Integración con Mercado Pago (QR) y WhatsApp</li>
+   <li>Punto de venta rápido con ticket térmico</li>
+   <li>Control de stock con alertas de reposición</li>
+   <li>Compras, ventas y presupuestos</li>
+   <li>Cuentas corrientes de clientes y proveedores</li>
+   <li>3 listas de precios + precio mayorista</li>
+   <li>Actualización masiva de precios con vista previa</li>
+  </ul>
+  <ul>
+   <li>Descuentos por producto y sobre el total</li>
+   <li>Caja diaria con apertura, cierre y arqueo</li>
+   <li>Estadísticas, contabilidad y Libro IVA</li>
+   <li>Importación de productos desde Excel</li>
+   <li>Buscador total: código, marca, familia o proveedor</li>
+   <li>Multiusuario con roles y permisos</li>
+   <li>Varias cajas conectadas en red local</li>
+   <li>Escáner, balanza electrónica y cajón de dinero</li>
+   <li>Reportes exportables a Excel y PDF</li>
+   <li>Backups automáticos: tus datos en tu PC</li>
+   <li>Actualizaciones automáticas incluidas</li>
+  </ul>
+ </div>
 </div></section>
 
 <section class="proof"><div class="wrap">
