@@ -78,6 +78,32 @@ const DIALOGS: { title: string; turns: Turn[] }[] = [
     ],
   },
   {
+    // REGRESIÓN (v0.1.86): "si" es stopword → tokeniza a vacío → devolvía el
+    // SALUDO en vez de aceptar la oferta pendiente (reportado por Bruno con
+    // "como conectar mercado pago" → oferta → "si" → "¡Hola! Soy Flowy…").
+    title: 'Oferta pendiente + "si" seco (stopword) NO debe saludar',
+    turns: [
+      { user: 'como conectar mercado pago', expect: (r) => /mercado ?pago|qr|token/i.test(r), why: 'responde conexión MP' },
+      { user: 'si', expect: (r) => !/soy flowy, tu asistente/i.test(r) && r.length > 15, why: 'acepta la oferta, no saluda' },
+    ],
+  },
+  {
+    title: 'Oferta pendiente + "no" seco suelta el contexto sin saludar',
+    turns: [
+      { user: 'como cobro con qr', expect: (r) => /qr|mercadopago|mercado pago/i.test(r), why: 'responde QR' },
+      { user: 'no', expect: (r) => /no hay drama|contame/i.test(r), why: 'rechaza la oferta amablemente' },
+    ],
+  },
+  {
+    title: 'Modo guiado avanza con "si" y con "ya" (stopwords)',
+    turns: [
+      { user: 'como hago una venta', expect: (r) => /1\.|paso|ventas/i.test(r), why: 'da pasos de venta' },
+      { user: 'guiame', expect: (r) => /paso 1/i.test(r), why: 'arranca guiado' },
+      { user: 'si', expect: (r) => /paso 2/i.test(r), why: '"si" avanza al paso 2' },
+      { user: 'ya', expect: (r) => /paso 3/i.test(r), why: '"ya" avanza al paso 3' },
+    ],
+  },
+  {
     title: 'Más simple',
     turns: [
       { user: 'como abro la caja', expect: (r) => /caja|abr|saldo|inicial/i.test(r), why: 'abre caja' },

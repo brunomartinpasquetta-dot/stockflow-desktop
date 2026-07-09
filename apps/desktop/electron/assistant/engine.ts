@@ -486,7 +486,22 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   const low = ' ' + stripAccents(question.toLowerCase()).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
 
   // ── 0) Saludo / vacío ──
-  if (content.length === 0 || (raw.length <= 2 && has(raw, GREETING))) {
+  // OJO: "si"/"ya" son STOPWORDS → `content` queda vacío y esto se comía la
+  // respuesta a una oferta/aclaración/modo guiado pendiente (el usuario decía
+  // "sí" y Flowy volvía a saludar). Si hay contexto pendiente y el mensaje es
+  // una afirmación, se deja pasar a los pasos 1/3/4.
+  const pendingCtx = c.clarify.length === 2 || c.offeredIdx.length > 0 || c.walkIdx >= 0;
+  const affirmish = has(raw, AFFIRM) || phraseHas(low, WALK_DONE_PH) || phraseHas(low, NEXT_PH);
+  // "no" seco a una oferta/aclaración pendiente: soltar el contexto, no saludar.
+  // Solo si el mensaje entero son stopwords ("no", "no se") — "no entendí",
+  // "no anda", etc. tienen contenido y deben seguir su flujo normal.
+  if (pendingCtx && content.length === 0 && raw.includes('no') && !affirmish) {
+    c.offeredIdx = [];
+    c.clarify = [];
+    c.walkIdx = -1;
+    return { reply: 'No hay drama 🙂 Contame qué otra cosa necesitás y lo vemos.', suggestions: idx.topSuggestions, kind: 'meta' };
+  }
+  if ((content.length === 0 || (raw.length <= 2 && has(raw, GREETING))) && !(pendingCtx && affirmish)) {
     if (raw.length && has(raw, GREETING)) c.lastArea = null;
     return metaReply(idx, 'saludo', '¡Hola! Soy Flowy, tu asistente de StockFlow. Escribime en qué te puedo ayudar.');
   }
