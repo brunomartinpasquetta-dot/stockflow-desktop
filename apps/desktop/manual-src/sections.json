@@ -145,6 +145,33 @@
       "Podés volver a ingresar con otro usuario si es necesario",
       "Cerrar sesión ≠ Salir de la aplicación. Para salir completamente, hacé clic en **Archivo → Salir** o presioná Cmd+Q (Mac)"
      ]
+    },
+    {
+     "heading": "La barra 'Preguntarle al asistente…' (búsqueda total)",
+     "paragraphs": [
+      "La barra de arriba unifica dos cosas: el asistente Sofía y la búsqueda global. Escribís UNA sola vez y el sistema entiende qué buscás: un producto (por código, descripción, marca, familia o proveedor), un cliente, una venta, una compra o una acción rápida ('nueva venta', 'abrir caja').",
+      "Los resultados aparecen en una lista desplegable debajo de la barra, sin tapar la pantalla. Cada producto muestra su marca en un chip azul, el precio y el stock, así distinguís de un vistazo el mismo producto entre distintos fabricantes."
+     ],
+     "steps": [
+      "Presioná Ctrl+K (⌘K en Mac) o hacé clic en la barra.",
+      "Escribí lo que sea: 'bateria 110', 'bosch', 'lácteos', el apellido de un cliente, o una pregunta para Sofía.",
+      "Bajá con las flechas y presioná Enter en el resultado (o hacé clic)."
+     ],
+     "tips": [
+      "Podés combinar palabras de distintas propiedades: 'bebidas bosch' filtra la familia Bebidas Y la marca Bosch a la vez.",
+      "No importan los acentos: 'lacteos' encuentra 'Lácteos'."
+     ]
+    },
+    {
+     "heading": "La ventana principal y los paneles",
+     "paragraphs": [
+      "StockFlow abre siempre MAXIMIZADO (pantalla completa útil) para que nada quede fuera de vista. La ventana se puede minimizar a la barra de tareas, pero no achicar ni redimensionar: así no se 'pierde' la pantalla por un arrastre sin querer.",
+      "Los paneles de Sofía y de WhatsApp se minimizan con su botón −: quedan como chips arriba a la derecha (junto al estado de la caja) y con un clic vuelven a abrirse donde estaban."
+     ],
+     "steps": [],
+     "tips": [
+      "¿No sabés qué hace un botón o un ícono? Dejá el mouse quieto encima un segundo: aparece un cartelito (tooltip) que explica qué es y qué hace. Funciona en todos los íconos del sistema."
+     ]
     }
    ],
    "screenshots": [
@@ -222,6 +249,54 @@
      "id": "cuentas-corrientes",
      "caption": "Pantalla de Cuentas Corrientes de Clientes mostrando saldo, opciones de cobranza parcial por monto, y registro de pagos con asignación FIFO.",
      "howToOpen": "Presioná F9 o Menú Cobros y Pagos → Cuentas Corrientes — Clientes."
+    }
+   ]
+  },
+  {
+   "id": "asistente",
+   "title": "Asistente virtual Sofía",
+   "overview": "Sofía es la asistente que vive adentro de StockFlow: le preguntás en tus palabras cómo hacer algo y te lo explica paso a paso, con imágenes de las pantallas. Funciona 100% dentro del programa, sin internet y sin costo: conoce todo el sistema porque fue entrenada con este mismo manual y con el programa real. Si no sabe algo, lo dice con sinceridad (no inventa).",
+   "screenshots": [
+    {
+     "id": "main-window",
+     "caption": "La barra 'Preguntarle al asistente…' está arriba, debajo de la fila de íconos. Desde ahí se abre Sofía y también se busca cualquier cosa del sistema.",
+     "howToOpen": "Pantalla principal"
+    }
+   ],
+   "subsections": [
+    {
+     "heading": "Cómo abrir a Sofía",
+     "paragraphs": [
+      "Arriba de la pantalla principal, debajo de la fila de íconos, está la barra que dice 'Preguntarle al asistente…' (tiene el cubo de StockFlow). Es una sola barra para todo: le preguntás a Sofía o buscás artículos, clientes, ventas y acciones.",
+      "Al hacer clic (o presionar Ctrl+K / ⌘K) se despliega una lista debajo. La primera opción, resaltada en azul, es 'Preguntarle al asistente Sofía'."
+     ],
+     "steps": [
+      "Hacé clic en la barra 'Preguntarle al asistente…' (o presioná Ctrl+K).",
+      "Escribí tu duda como se la dirías a una persona, por ejemplo: 'como hago una venta' o 'no me anda la impresora'.",
+      "Elegí la opción azul 'Preguntarle a Sofía' (Enter). Se abre el chat y te responde al instante.",
+      "Si en cambio escribís el nombre de un producto o cliente, la misma lista te muestra los resultados para ir directo."
+     ],
+     "tips": [
+      "No hace falta escribir perfecto: Sofía entiende errores de tipeo ('como ago una benta') y lenguaje coloquial ('fiado', 'de golpe').",
+      "El chat se puede mover arrastrándolo desde la barra azul del título, cambiar de tamaño desde la esquina inferior derecha, y minimizar con el botón −: queda como chip 'Sofía' arriba a la derecha y la conversación no se pierde."
+     ]
+    },
+    {
+     "heading": "Qué le podés preguntar (y cómo aprovecharla)",
+     "paragraphs": [
+      "Sofía cubre todas las áreas del sistema: ventas, caja, artículos, clientes, proveedores, cuentas corrientes, presupuestos, compras, precios, estadísticas, configuración, impresoras, licencia y actualizaciones.",
+      "Responde con pasos numerados que dicen dónde está cada botón y qué vas a ver al tocarlo, y en muchos temas muestra una imagen de la pantalla (clic sobre la imagen para agrandarla)."
+     ],
+     "steps": [
+      "Preguntá lo que necesites: '¿cómo registro una compra?', '¿cómo cobro con QR?', '¿cómo hago un backup?'.",
+      "Si la respuesta tiene muchos pasos, escribí 'guiame': Sofía te lleva DE A UN PASO por vez. Cuando termines cada paso escribí 'listo' o 'siguiente'.",
+      "¿No se entendió? Escribí 'más simple' y te lo explica más despacio, o 'el paso 3' para que repita un paso puntual.",
+      "Podés seguir la charla con frases cortas: '¿y para modificarlo?', '¿y después?' — Sofía mantiene el hilo de lo que venían hablando."
+     ],
+     "tips": [
+      "Si Sofía no encuentra la respuesta, te ofrece opciones parecidas para elegir con un clic.",
+      "Las preguntas que no supo responder quedan registradas (solo en tu PC) para mejorar el asistente en futuras versiones."
+     ]
     }
    ]
   },
@@ -487,6 +562,32 @@
       "Usá notas para alertas importantes (ej: 'Próximo vencimiento en 2026-12')",
       "Podés escribir varias líneas si necesitas más espacio"
      ]
+    },
+    {
+     "heading": "La marca es obligatoria (y para qué sirve)",
+     "paragraphs": [
+      "Desde la versión 0.1.82 todo artículo debe tener MARCA. Es lo que te permite distinguir el mismo producto entre distintos fabricantes: 'Batería 12V 110A — Bosch' y 'Batería 12V 110A — Moura' se ven y se filtran por separado en todos los buscadores del sistema.",
+      "Los artículos viejos que no tenían marca quedaron automáticamente con la marca 'S/M' (sin marca). Podés corregirlos cuando quieras editándolos y escribiendo la marca real."
+     ],
+     "steps": [
+      "Al crear o editar un artículo, completá el casillero 'Marca *' (está en la segunda fila del formulario).",
+      "Si intentás guardar sin marca, el sistema te avisa con el cartel 'La marca es obligatoria'."
+     ],
+     "tips": [
+      "Escribí la marca siempre igual (ej: 'Bosch', no 'BOSCH' una vez y 'bosch' otra): así el filtro por marca queda ordenado."
+     ]
+    },
+    {
+     "heading": "Filtrar por marca en la grilla",
+     "paragraphs": [
+      "Arriba de la grilla de artículos, al lado del buscador, hay un desplegable 'Todas las marcas'. Elegí una y la lista muestra solo los artículos de esa marca. Además, el buscador de texto ahora encuentra por CUALQUIER propiedad: código, descripción, marca, familia o proveedor."
+     ],
+     "steps": [
+      "Abrí Artículos (F1).",
+      "Hacé clic en el desplegable de marcas (junto al buscador) y elegí la marca.",
+      "Para volver a ver todo, elegí 'Todas las marcas'."
+     ],
+     "tips": []
     }
    ],
    "screenshots": [
@@ -933,6 +1034,33 @@
       "El ticket se puede reimprimir desde el modal de detalle (botón 'Reimprimir ticket').",
       "También está el botón 'Imprimir último ticket' en Ventas (pero solo la última de la sesión)."
      ]
+    },
+    {
+     "heading": "La lista de precios del cliente se carga sola",
+     "paragraphs": [
+      "Al elegir un cliente en la venta, el selector 'Lista de precios' toma automáticamente la lista que ese cliente tiene asignada en su ficha (Lista 1, 2 o 3) — incluso si su documento es 'Consumidor Final'. Los precios del carrito se recalculan al instante.",
+      "Igual podés cambiar la lista a mano con el selector para esa venta puntual."
+     ],
+     "steps": [
+      "Elegí el cliente con el botón 'Cliente'.",
+      "Mirá el selector 'LISTA DE PRECIOS' (a la derecha del cliente): ya muestra la lista asignada.",
+      "Si querés otra lista solo por esta vez, cambiala en el selector: los precios se actualizan al momento."
+     ],
+     "tips": [
+      "La lista asignada se configura en la ficha del cliente (Clientes → editar → 'Lista de precios')."
+     ]
+    },
+    {
+     "heading": "Buscar productos por marca, familia o proveedor",
+     "paragraphs": [
+      "El buscador del carrito (el casillero grande del medio) encuentra por código, nombre, MARCA, familia o proveedor, y cada sugerencia muestra la marca en un chip azul para distinguir fabricantes.",
+      "En 'Ver todos' además tenés desplegables de Familia, MARCA y Proveedor para filtrar el listado completo."
+     ],
+     "steps": [
+      "Escribí en el buscador, por ejemplo 'bateria bosch': salen solo las de esa marca.",
+      "O tocá 'Ver todos', elegí una marca en el desplegable 'Todas las marcas' y hacé doble clic en el producto."
+     ],
+     "tips": []
     }
    ],
    "screenshots": [
@@ -1703,6 +1831,24 @@
       "Es útil para auditoría: podés trazar exactamente cuándo se registró cada venta y cobranza.",
       "Si el saldo acumulado no coincide con el saldo total mostrado arriba, hay un error de datos (cosa rara pero posible)."
      ]
+    },
+    {
+     "heading": "Filtrar por fechas y cobrar (o pagar) el período",
+     "paragraphs": [
+      "En el detalle de un cliente (y también de un proveedor), la sección 'Movimientos' tiene filtros 'Desde' y 'Hasta'. Al elegir un rango, aparece una franja con los totales del período: cuánto se vendió (o compró), cuánto se cobró (o pagó) y el total neto.",
+      "Con el rango activo aparece el botón 'Cobrar período' (en proveedores, 'Pagar período'): abre la cobranza con el importe del período ya precargado y, al confirmar, imprime un ticket con el DETALLE de todos los movimientos del rango, el total y el saldo restante."
+     ],
+     "steps": [
+      "Abrí Cuentas Corrientes (F9) y entrá al cliente (o a la pestaña Proveedores y al proveedor).",
+      "En 'Movimientos', completá 'Desde' y 'Hasta' con las fechas del período (ej: del 1 al 30 del mes pasado).",
+      "Mirá la franja azul: 'Ventas del período', 'Cobranzas' y 'Total del período'.",
+      "Tocá 'Cobrar período'. El monto ya viene cargado con lo pendiente del rango (podés cambiarlo); elegí el medio de pago y confirmá.",
+      "Se imprime el ticket con el detalle del período. El botón 'Todo' limpia el filtro."
+     ],
+     "tips": [
+      "El cobro se imputa siempre a los comprobantes más viejos primero (igual que cualquier cobranza), y nunca puede superar el saldo real del cliente.",
+      "Sirve para el clásico 'te pago todo lo del mes': filtrás el mes, cobrás y le entregás el ticket detallado."
+     ]
     }
    ],
    "screenshots": [
@@ -1968,6 +2114,25 @@
       "La re-activación automática es transparente: no ves un diálogo, simplemente vuelves a poder escribir.",
       "Si la licencia está revocada (suspensión de pago), tendrás que contactar soporte para reactivar.",
       "El estado de la licencia está en la esquina superior: icono de candado = locked/readOnly, candado abierto = activa."
+     ]
+    },
+    {
+     "heading": "Actualización masiva: el flujo nuevo (Ver y aplicar)",
+     "paragraphs": [
+      "La pantalla de Actualización de Precios ahora te guía por pasos y SIEMPRE muestra los cambios antes de tocar nada. Abajo está el panel de la regla: si todavía no marcaste artículos, te lo indica ('Paso 1: marcá con el tilde los artículos…').",
+      "Modos disponibles: 'Porcentaje (%)' (sube o baja un %), 'Monto fijo ($ más/menos)' (suma o resta pesos) y 'Precio exacto (=$)' (pone ese precio). El valor acepta coma decimal ('10,5').",
+      "Regla importante: si la Lista 2 o la Lista 3 están en $0, el cálculo usa la LISTA 1 como base (así una lista vacía se llena a partir de la lista por defecto). El precio mayorista en $0 no se toca: $0 significa mayorista deshabilitado."
+     ],
+     "steps": [
+      "Abrí el menú 'Precios' → 'Actualización Masiva'.",
+      "Filtrá si querés (buscador por cualquier propiedad, familias, MARCAS, proveedores, precio min/max) y marcá con el tilde los artículos a actualizar (o 'Seleccionar todos los filtrados').",
+      "Abajo elegí los campos (Costo, Venta L1, L2, L3, Mayor), el modo, la dirección (Aumentar/Bajar), el valor y el redondeo.",
+      "Tocá 'Ver y aplicar cambios': se abre la vista previa con cada precio Actual → Nuevo y la diferencia.",
+      "Revisá y tocá 'Confirmar y aplicar N cambio(s)'. La grilla se actualiza al instante con los valores nuevos."
+     ],
+     "tips": [
+      "Nada se guarda hasta que confirmás en la vista previa.",
+      "Todo cambio queda registrado en 'Precios → Historial de Precios', desde donde también se puede revertir."
      ]
     }
    ],
