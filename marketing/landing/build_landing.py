@@ -444,7 +444,7 @@ BODY=f"""
 <nav class="nav"><div class="wrap">
  <a href="#top" aria-label="StockFlow"><img class="brand-img" src="{LOGO}" alt="StockFlow"/></a>
  <div class="nlinks"><a href="#why">Beneficios</a><a href="#func">Funciones</a><a href="#comp">Comparación</a><a href="#precio">Precio</a><a href="#faq">Preguntas</a></div>
- <div class="cta"><a class="btn btn-ghost" href="#precio">Probar</a><a class="btn btn-wa" href="{WA}" target="_blank" rel="noopener">{WA_SVG}WhatsApp</a></div>
+ <div class="cta"><a class="btn btn-ghost" href="#precio">Probar gratis</a><a class="btn btn-wa" href="{WA}" target="_blank" rel="noopener">{WA_SVG}WhatsApp</a></div>
 </div></nav>
 
 <header class="hero" id="top"><div class="wrap">
@@ -462,12 +462,10 @@ BODY=f"""
   <img class="hero-cube" src="{CUBE}" alt="StockFlow — Sistema de Gestión Comercial"/>
   <p class="lead"><b>Controlá tu comercio de punta a punta.</b> Ventas, stock, caja, clientes y precios siempre al día, en una sola PC. Comprobantes en regla y todo funcionando aunque se corte internet.</p>
   <div class="hcta">
-   <a class="btn btn-blue" href="#precio">Probar {money("5.000")}</a>
-   <a class="btn btn-ghost" href="#func">Ver funciones</a>
-   <span class="pill">{G['wifi']} Sin internet</span><span class="pill">{G['refresh']} Se actualiza</span><span class="pill">{G['shield']} AFIP al día</span>
+   <a class="btn btn-blue" href="#precio">Descarga gratuita</a>
   </div>
-  <div class="hprice">Prueba de <b>15 días por {money("5.000")}</b> con instalación incluida · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
-  <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 15 días en tu comercio.</span></div>
+  <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> y con instalación incluida · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
+  <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
  </div>
  <div class="shotwrap">
   <div class="cfbox">
@@ -577,14 +575,14 @@ BODY=f"""
  <div class="price rv" id="precio" style="margin-top:40px">
   <div><h2>Suscripción · todo incluido</h2>
    <div class="amt mny"><small>$</small>&#8202;70.000<small>/mes</small></div>
-   <div class="demo">Probalo por <b>$ 5.000</b> — 15 días + instalación asistida (se descuenta del primer mes).</div></div>
+   <div class="demo">Probalo <b>gratis por 30 días</b> — sin costo y con instalación asistida incluida.</div></div>
   <div><ul>
     <li>{chk()}Todo lo de arriba: ventas y actualización masiva de precios</li>
     <li>{chk()}Cuentas corrientes, caja y presupuestos A4</li>
     <li>{chk()}Estadísticas, actualizaciones nuevas y AFIP al día</li>
     <li>{chk()}Soporte por WhatsApp, de una persona</li></ul>
    <div class="anchor">Con recuperar una sola de las pérdidas anteriores —una cobranza pendiente, una lista atrasada— la cuota queda amortizada.</div>
-   <a class="btn btn-blue" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Empezar por {money("5.000")}</a></div>
+   <a class="btn btn-blue" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Empezar la prueba gratis</a></div>
  </div>
 </div></section>
 
@@ -597,7 +595,7 @@ BODY=f"""
     ("¿Necesito internet para usarlo?","No. StockFlow funciona en tu PC de forma 100% offline. La conexión solo se usa para actualizaciones o AFIP. Si se corta, seguís operando con normalidad."),
     ("¿Mis datos quedan en mi PC?","Sí. Tus datos son tuyos y residen en tu computadora. El sistema genera copias de seguridad que guardás donde prefieras."),
     ("¿Por qué suscripción y no pago único?","Porque incluye todo: actualizaciones, soporte y adecuación permanente a AFIP. El pago único deja el sistema en una versión fija y, ante cada cambio normativo, se vuelve a pagar."),
-    ("¿Incluye la instalación?","Sí. Lo dejamos instalado y en funcionamiento con tus productos cargados. La prueba de $ 5.000 incluye la instalación asistida."),
+    ("¿Incluye la instalación?","Sí. Lo dejamos instalado y en funcionamiento con tus productos cargados. La prueba gratuita de 30 días incluye la instalación asistida."),
     ("¿Qué pasa si dejo de pagar?","El sistema pasa a modo solo lectura: seguís consultando tu información, pero no cargás nuevas operaciones. No se pierde ningún dato y, al renovar, vuelve a funcionar de forma completa."),
     ("¿Para qué comercios es?","Para comercios con volumen de operación: ferreterías, corralones, autoservicios, mayoristas, distribuidoras y casas de repuestos."),
    ])}
@@ -608,7 +606,7 @@ BODY=f"""
 
 <section class="sec final"><div class="wrap">
  <h2>Probalo en tu comercio esta semana.</h2>
- <p>Instalación asistida, 15 días de prueba y soporte personal —atendido por una persona—. Contestamos el mismo día.</p>
+ <p>Instalación asistida, 30 días de prueba gratis y soporte personal —atendido por una persona—. Contestamos el mismo día.</p>
  <div class="row"><a class="btn btn-wa" href="{WA}" target="_blank" rel="noopener" style="font-size:17px;padding:16px 30px">{WA_SVG}Escribinos por WhatsApp</a><span class="num">+54 342 584 7340</span></div>
 </div></section>
 
@@ -683,7 +681,7 @@ BODY=f"""
 </script>
 """
 TITLE="StockFlow — Sistema de gestión comercial simple y completo (funciona sin internet)"
-DESC='StockFlow: sistema de gestión comercial para ferreterías, autoservicios y mayoristas. Stock, ventas, caja, cuentas corrientes y precios al día. Funciona sin internet. Probalo 15 días.'
+DESC='StockFlow: sistema de gestión comercial para ferreterías, autoservicios y mayoristas. Stock, ventas, caja, cuentas corrientes y precios al día. Funciona sin internet. Probalo gratis 30 días.'
 URL='https://bpsgsistemas.com/'
 HEAD=("<meta name='viewport' content='width=device-width,initial-scale=1'>"
  f"<meta name='description' content='{DESC}'>"
