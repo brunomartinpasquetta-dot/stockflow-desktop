@@ -1,5 +1,5 @@
 /**
- * Pruebas del motor conversacional de Sofía (offline). Corre con:
+ * Pruebas del motor conversacional de Flowy (offline). Corre con:
  *   pnpm --filter @stockflow/desktop test:assistant
  *
  * (1) Single-shot: preguntas típicas resuelven a respuesta útil (no fallback).
@@ -36,7 +36,7 @@ for (const q of SINGLE) {
 /* ---------- (2) charla ---------- */
 console.log('\n── Charla / meta ──')
 const META: [string, string][] = [
-  ['hola', 'Sofía'],
+  ['hola', 'Flowy'],
   ['gracias!', ''],
   ['sos un robot?', ''],
   ['en que me ayudas', ''],

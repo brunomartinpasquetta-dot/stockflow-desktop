@@ -486,7 +486,7 @@ BODY=f"""
  <div class="feats">
   <ul>
    <li>Funciona sin internet — seguís vendiendo aunque se corte</li>
-   <li>Asistente virtual Sofía: ayuda 24/7 dentro del sistema</li>
+   <li>Asistente virtual Flowy: ayuda 24/7 dentro del sistema</li>
    <li>Soporte técnico directo por WhatsApp</li>
    <li>Facturación electrónica ARCA (CAE)</li>
    <li>Integración con Mercado Pago (QR) y WhatsApp</li>

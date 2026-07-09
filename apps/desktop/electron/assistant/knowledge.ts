@@ -2,14 +2,13 @@
  * Base de conocimiento del Asistente virtual.
  *
  * Toma el manual de usuario versionado (`manual-src/sections.json`) y lo aplana a
- * texto plano para pasarlo como contexto (cacheado) al modelo. esbuild inlinea el
- * JSON dentro del bundle del main process, así no dependemos de rutas en runtime
- * ni de copiar archivos al `.asar`.
+ * texto plano para usarlo como red de contención del motor. Se carga en runtime
+ * vía kbLoader (inlinearlo como literal en main.mjs hacía crashear V8 empaquetado).
  *
  * El manual es la ÚNICA fuente de verdad del asistente: si algo no está acá, el
  * asistente no lo sabe y deriva a soporte humano.
  */
-import manualData from '../../manual-src/sections.json';
+import { manualData } from './kbLoader';
 
 interface Subsection {
   heading?: string;

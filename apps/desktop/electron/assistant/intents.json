@@ -3671,15 +3671,15 @@
       "boton asistente",
       "sofia",
       "quien me ayuda",
-      "hacer una pregunta al sistema"
+      "hacer una pregunta al sistema",
+      "flowy"
      ],
-     "answer": "En la barrita de arriba, al lado del buscador, hay un botón que dice 'Asistente' (tiene el dibujito del logo de StockFlow). Un clic ahí y se abre este panel de ayuda —me llamo Sofía—, donde podés escribir tu pregunta con tus palabras.",
+     "answer": "En la barra de arriba, al lado del buscador, está el botón azul que dice 'Flowy' (tiene el cubito del logo de StockFlow). Un clic ahí y se abre este chat de ayuda, donde podés escribir tu pregunta con tus palabras.",
      "steps": [
-      "Mirá la barrita fina de arriba, a la derecha del botón 'Buscar…'.",
-      "Hacé clic en el botón que dice 'Asistente'.",
-      "Se abre el panel de ayuda. Si te molesta dónde está, podés moverlo arrastrándolo desde su parte de arriba.",
-      "Escribí tu pregunta como se la dirías a una persona, por ejemplo 'como hago un descuento', y apretá Enter.",
-      "Para cerrarlo, volvé a hacer clic en el mismo botón 'Asistente', o usá la X del panel."
+      "Mirá la barra de arriba de la pantalla principal (debajo de la fila de íconos).",
+      "Al lado del cuadro de búsqueda vas a ver el botón azul 'Flowy', con el cubito del logo.",
+      "Hacé un clic en ese botón: se abre el chat del asistente.",
+      "Escribí tu pregunta con tus palabras y presioná Enter."
      ],
      "image": "main-window.png"
     },
@@ -11039,9 +11039,11 @@
       "que tal sofia",
       "qué tal",
       "buenas! como andas",
-      "hola como estas"
+      "hola como estas",
+      "hola flowy",
+      "que tal flowy"
      ],
-     "answer": "¡Hola! Soy Sofía, tu asistente de StockFlow. Escribime en qué te puedo ayudar.",
+     "answer": "¡Hola! Soy Flowy, tu asistente de StockFlow. Escribime en qué te puedo ayudar.",
      "steps": []
     },
     {
@@ -11063,7 +11065,8 @@
       "hasta luego",
       "chau sofia",
       "gracias chau",
-      "me voy"
+      "me voy",
+      "chau flowy"
      ],
      "answer": "¡Dale, un gusto! Cualquier cosa que necesites de StockFlow, me escribís. ¡Que te vaya bien!",
      "steps": []
@@ -11093,7 +11096,7 @@
     },
     {
      "id": "quien-sos",
-     "canonical": "El usuario pregunta quién o qué es Sofía",
+     "canonical": "El usuario pregunta quién o qué es Flowy",
      "patterns": [
       "quién sos",
       "quien sos",
@@ -11111,12 +11114,12 @@
       "sos una máquina",
       "hablo con una persona"
      ],
-     "answer": "Soy Sofía, un asistente virtual dentro de StockFlow. No soy una persona, pero conozco el sistema al detalle y estoy para ayudarte con lo que necesites.",
+     "answer": "Soy Flowy, un asistente virtual dentro de StockFlow. No soy una persona, pero conozco el sistema al detalle y estoy para ayudarte con lo que necesites.",
      "steps": []
     },
     {
      "id": "que-podes-hacer",
-     "canonical": "El usuario pregunta qué puede hacer Sofía o para qué sirve",
+     "canonical": "El usuario pregunta qué puede hacer Flowy o para qué sirve",
      "patterns": [
       "en qué me ayudás",
       "en que me ayudas",

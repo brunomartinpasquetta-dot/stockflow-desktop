@@ -74,5 +74,10 @@ if (existsSync(dbMigrations)) {
   cpSync(dbMigrations, join(outDir, 'migrations'), { recursive: true });
 }
 
+// JSON de conocimiento del asistente: se cargan en runtime (kbLoader) en vez de
+// inlinearse como literales — V8 crasheaba (SIGTRAP) compilando main.mjs empaquetado.
+cpSync(join(appRoot, 'electron', 'assistant', 'intents.json'), join(outDir, 'assistant-intents.json'));
+cpSync(join(appRoot, 'manual-src', 'sections.json'), join(outDir, 'manual-sections.json'));
+
 console.log(`[build-electron] externals: ${external.join(', ')}`);
-console.log('[build-electron] dist-electron/{main.mjs,preload.cjs,migrations} listo');
+console.log('[build-electron] dist-electron/{main.mjs,preload.cjs,migrations,kb} listo');

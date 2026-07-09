@@ -1,5 +1,5 @@
 /**
- * Mapa de capturas del sistema para el asistente Sofía.
+ * Mapa de capturas del sistema para el asistente Flowy.
  * Vite empaqueta cada PNG y devuelve su URL; armamos { nombre.png -> url }.
  */
 const modules = import.meta.glob<string>('../assets/sofia-shots/*.png', {

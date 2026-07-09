@@ -1,10 +1,10 @@
 /**
- * Barra unificada Asistente + Búsqueda, INLINE (no invasiva).
+ * Buscador global INLINE (no invasivo).
  *
- * Es un input en la barra superior con un desplegable justo debajo: le preguntás
- * al asistente Sofía y/o buscás artículos, clientes, ventas, compras y acciones.
- * Reemplaza al modal centrado anterior. Se abre al enfocar, se cierra al elegir,
- * con Escape o al hacer clic afuera.
+ * Input compacto en la barra superior con un desplegable justo debajo: busca
+ * artículos, clientes, proveedores, ventas, compras y acciones rápidas.
+ * El asistente Flowy vive en su propio botón, al lado (ver StatusBar).
+ * Se abre al enfocar, se cierra al elegir, con Escape o al hacer clic afuera.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -19,6 +19,7 @@ import {
   Package,
   Plus,
   Receipt,
+  Search,
   ShoppingCart,
   Tag,
   Truck,
@@ -26,11 +27,9 @@ import {
   Wallet,
 } from 'lucide-react'
 
-import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
 import { useGlobalSearch } from '@/lib/hooks'
 import { addRecent, getRecents, type RecentSearch } from '@/lib/recentSearches'
-import { useAssistant } from '@/contexts/AssistantContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/format'
@@ -50,7 +49,6 @@ const groupCls = 'px-1 py-1 text-[11px] font-medium uppercase tracking-wide text
 
 export function GlobalSearchBar() {
   const navigate = useNavigate()
-  const assistant = useAssistant()
   const { logout } = useAuth()
   const [input, setInput] = useState('')
   const [open, setOpen] = useState(false)
@@ -129,48 +127,26 @@ export function GlobalSearchBar() {
       }
     }
   }
-  function askSofia(): void {
-    const q = input.trim()
-    closeDropdown()
-    setTimeout(() => (q ? assistant.openWith(q) : assistant.show()), 0)
-  }
-
   return (
-    <div ref={containerRef} className="relative w-full max-w-md">
+    <div ref={containerRef} className="relative w-64 shrink-0">
       <Command shouldFilter={false} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
         {/* Barra */}
         <div className="relative flex items-center">
-          <img src={BRANDING.iconSvg} alt="" className="pointer-events-none absolute left-2 h-4 w-4" draggable={false} />
+          <Search className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-muted-foreground" />
           <Command.Input
             id="global-search-input"
             value={input}
             onValueChange={setInput}
             onFocus={() => setOpen(true)}
-            placeholder="Preguntarle al asistente…"
-            className="h-8 w-full rounded-md border bg-background pl-8 pr-12 text-xs outline-none transition-colors placeholder:text-muted-foreground hover:bg-accent/40 focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="Buscar…"
+            className="h-8 w-full rounded-md border bg-background pl-7 pr-11 text-xs outline-none transition-colors placeholder:text-muted-foreground hover:bg-accent/40 focus-visible:ring-1 focus-visible:ring-ring"
           />
           <span className="pointer-events-none absolute right-2 hidden rounded border px-1 text-[10px] text-muted-foreground lg:inline">{HOTKEY_LABEL}</span>
         </div>
 
-        {/* Desplegable */}
-        {open && (
+        {/* Desplegable (solo si hay algo para mostrar) */}
+        {open && (hasQuery || recents.length > 0) && (
           <Command.List className="absolute left-0 top-full z-50 mt-1 max-h-[65vh] w-[540px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
-            {/* Asistente primero */}
-            <Command.Item
-              value={`sofia-${input}`}
-              onSelect={askSofia}
-              className="mb-1 flex cursor-pointer items-center gap-2.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-2 text-sm text-foreground aria-selected:bg-primary/15"
-            >
-              <img src={BRANDING.iconSvg} alt="" className="h-5 w-5 shrink-0" draggable={false} />
-              {hasQuery ? (
-                <span className="min-w-0 flex-1 truncate">
-                  Preguntarle a Sofía: <span className="font-semibold">«{input.trim()}»</span>
-                </span>
-              ) : (
-                <span className="flex-1 truncate font-medium">Preguntarle al asistente Sofía</span>
-              )}
-            </Command.Item>
-
             {!hasQuery && recents.length > 0 && (
               <Command.Group heading="Recientes" className={groupCls}>
                 {recents.map((r) => (

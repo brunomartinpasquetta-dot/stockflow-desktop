@@ -1,5 +1,5 @@
 /**
- * Panel del Asistente virtual "Sofía" — chatbot INTERNO de StockFlow.
+ * Panel del Asistente virtual "Flowy" — chatbot INTERNO de StockFlow.
  *
  * 100% offline: la lógica vive en el main (`assistant:ask` → engine local, sin IA
  * externa ni costo). Acá va la conversación, los chips de sugerencias y el render.
@@ -122,7 +122,7 @@ export function AssistantPanel() {
         const res = await api.assistant.ask([], convIdRef.current)
         setMessages([{ role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image }])
       } catch {
-        setMessages([{ role: 'assistant', content: '¡Hola! Soy Sofía, tu asistente de StockFlow. Escribime en qué te puedo ayudar.' }])
+        setMessages([{ role: 'assistant', content: '¡Hola! Soy Flowy, tu asistente de StockFlow. Escribime en qué te puedo ayudar.' }])
       }
       setTimeout(() => inputRef.current?.focus(), 100)
     })()
@@ -207,7 +207,7 @@ export function AssistantPanel() {
           <img src={BRANDING.iconSvg} alt="StockFlow" className="h-6 w-6" draggable={false} />
         </div>
         <div className="flex-1 leading-tight">
-          <div className="text-sm font-semibold">Sofía</div>
+          <div className="text-sm font-semibold">Flowy</div>
           <div className="text-[11px] opacity-80">Asistente de StockFlow</div>
         </div>
         <GripHorizontal className="h-4 w-4 opacity-50" />

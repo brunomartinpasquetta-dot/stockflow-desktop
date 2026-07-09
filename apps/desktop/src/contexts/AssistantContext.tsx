@@ -5,7 +5,7 @@
  * (aunque esté cerrado/minimizado) para no perder la conversación.
  *
  * `openWith(pregunta)` abre el panel y le manda esa pregunta directo — lo usa el
- * buscador unificado para derivar una consulta a Sofía.
+ * botón "Flowy" de la barra superior (StatusBar) para abrir el asistente.
  */
 import { createContext, useContext, useState, type ReactNode } from 'react'
 

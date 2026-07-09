@@ -42,21 +42,21 @@ export function StatusBar() {
 
   return (
     <div data-chrome="statusbar" className="flex h-10 shrink-0 items-center gap-3 border-b bg-background px-3 text-sm">
-      <div className="flex max-w-md flex-1 items-center gap-2">
+      <div className="flex flex-1 items-center gap-2">
         <GlobalSearchBar />
-      </div>
-      {/* Chips de paneles MINIMIZADOS (lado derecho) — restauran al hacer clic */}
-      {assistant.state === 'min' && (
+        {/* Asistente virtual Flowy — botón propio, al lado del buscador */}
         <button
           type="button"
           onClick={assistant.show}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-primary/10 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/20"
-          title="Restaurar el asistente"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-primary/25 bg-primary/10 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-primary/20"
+          title="Abrir el asistente virtual Flowy"
         >
-          <img src={BRANDING.iconSvg} alt="" className="h-4 w-4" draggable={false} />
-          <span className="hidden md:inline">Sofía</span>
+          <img src={BRANDING.iconSvg} alt="" className="h-5 w-5" draggable={false} />
+          <span className="hidden md:inline">Flowy</span>
         </button>
-      )}
+      </div>
+      {/* Chip de panel MINIMIZADO (lado derecho) — restaura al hacer clic.
+          El asistente no necesita chip: su botón "Flowy" (izquierda) ya restaura. */}
       {wa.state === 'min' && (
         <button
           type="button"

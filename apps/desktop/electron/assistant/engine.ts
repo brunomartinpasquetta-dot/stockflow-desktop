@@ -1,5 +1,5 @@
 /**
- * Motor CONVERSACIONAL del chatbot interno de StockFlow ("Sofía") — 100% offline,
+ * Motor CONVERSACIONAL del chatbot interno de StockFlow ("Flowy") — 100% offline,
  * sin IA externa, sin clave, sin costo. Vive en el main process.
  *
  * A diferencia de un buscador de FAQ, mantiene una CONVERSACIÓN:
@@ -13,8 +13,7 @@
  * Fuentes: intents curados (intents.json, generados leyendo el manual Y el código
  * real de cada pantalla) + el manual completo como red de contención.
  */
-import manualData from '../../manual-src/sections.json';
-import intentsData from './intents.json';
+import { intentsData, manualData } from './kbLoader';
 
 /* ------------------------------- tipos ------------------------------- */
 
@@ -489,7 +488,7 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   // ── 0) Saludo / vacío ──
   if (content.length === 0 || (raw.length <= 2 && has(raw, GREETING))) {
     if (raw.length && has(raw, GREETING)) c.lastArea = null;
-    return metaReply(idx, 'saludo', '¡Hola! Soy Sofía, tu asistente de StockFlow. Escribime en qué te puedo ayudar.');
+    return metaReply(idx, 'saludo', '¡Hola! Soy Flowy, tu asistente de StockFlow. Escribime en qué te puedo ayudar.');
   }
 
   // ── 1) Desambiguación pendiente ──
@@ -504,7 +503,7 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   // ── 2) Charla / meta ──
   if (phraseHas(low, THANKS_PH) && content.length <= 3) return metaReply(idx, 'agradecimiento', '¡De nada! Si te surge otra duda, acá estoy 😊');
   if (phraseHas(low, BYE_PH)) return metaReply(idx, 'despedida', '¡Listo! Cualquier cosa me abrís de nuevo. Éxitos con el negocio 💪');
-  if (phraseHas(low, WHOAREYOU_PH)) return metaReply(idx, 'quien-sos', 'Soy Sofía, la asistente de StockFlow 🤖 Te enseño a usar cada parte del sistema, paso a paso.');
+  if (phraseHas(low, WHOAREYOU_PH)) return metaReply(idx, 'quien-sos', 'Soy Flowy, el asistente de StockFlow 🤖 Te enseño a usar cada parte del sistema, paso a paso.');
   if (phraseHas(low, WHATCANDO_PH)) return metaReply(idx, 'que-podes-hacer', 'Te ayudo con todo el sistema: ventas, caja, artículos, clientes, precios, presupuestos y más. Preguntame lo que quieras.');
   if (phraseHas(low, HUMAN_PH)) return metaReply(idx, 'pedir-humano', 'Puedo ayudarte con casi todo del uso del sistema. Si es algo que no logro resolver, anotá la duda y consultala con quien te instaló StockFlow.');
   if (phraseHas(low, FRUSTRATION_PH)) return metaReply(idx, 'frustracion', '¡Tranqui, respirá que lo resolvemos juntos! Contame qué estabas haciendo y en qué momento se trabó, y lo vemos paso a paso.');

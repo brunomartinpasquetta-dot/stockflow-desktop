@@ -1,5 +1,5 @@
 /**
- * Handler del Asistente virtual de StockFlow ("Sofía").
+ * Handler del Asistente virtual de StockFlow ("Flowy").
  *
  * Chatbot INTERNO: responde 100% offline, sin IA externa, sin clave y sin costo.
  * La lógica de búsqueda vive en `electron/assistant/engine.ts` (intents curados +
@@ -31,14 +31,14 @@ function lastUserMessage(messages: AssistantMessage[]): string {
 }
 
 /**
- * Registra las preguntas que Sofía NO supo responder, en un archivo local
- * (`<userData>/sofia-preguntas-sin-respuesta.jsonl`). Sirve para descubrir qué
+ * Registra las preguntas que Flowy NO supo responder, en un archivo local
+ * (`<userData>/flowy-preguntas-sin-respuesta.jsonl`). Sirve para descubrir qué
  * le falta con el uso real y alimentar futuras versiones. No sale de la máquina.
  */
 function logMiss(userDataDir: string, question: string): void {
   try {
     const line = JSON.stringify({ q: question }) + '\n';
-    appendFileSync(join(userDataDir, 'sofia-preguntas-sin-respuesta.jsonl'), line);
+    appendFileSync(join(userDataDir, 'flowy-preguntas-sin-respuesta.jsonl'), line);
   } catch {
     /* logging best-effort; no rompe la respuesta */
   }

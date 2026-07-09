@@ -147,14 +147,14 @@
      ]
     },
     {
-     "heading": "La barra 'Preguntarle al asistente…' (búsqueda total)",
+     "heading": "El buscador global y el botón Flowy",
      "paragraphs": [
-      "La barra de arriba unifica dos cosas: el asistente Sofía y la búsqueda global. Escribís UNA sola vez y el sistema entiende qué buscás: un producto (por código, descripción, marca, familia o proveedor), un cliente, una venta, una compra o una acción rápida ('nueva venta', 'abrir caja').",
-      "Los resultados aparecen en una lista desplegable debajo de la barra, sin tapar la pantalla. Cada producto muestra su marca en un chip azul, el precio y el stock, así distinguís de un vistazo el mismo producto entre distintos fabricantes."
+      "Arriba de la pantalla principal hay un cuadro de búsqueda compacto ('Buscar…') y, al lado, el botón azul 'Flowy' con el cubito del logo: ese botón abre el asistente virtual.",
+      "El buscador encuentra de todo escribiendo UNA sola vez: un producto (por código, descripción, marca, familia o proveedor), un cliente, un proveedor, una venta, una compra o una acción rápida ('nueva venta', 'abrir caja'). Los resultados aparecen en una lista desplegable debajo, sin tapar la pantalla. Cada producto muestra su marca en un chip azul, el precio y el stock, así distinguís de un vistazo el mismo producto entre distintos fabricantes."
      ],
      "steps": [
-      "Presioná Ctrl+K (⌘K en Mac) o hacé clic en la barra.",
-      "Escribí lo que sea: 'bateria 110', 'bosch', 'lácteos', el apellido de un cliente, o una pregunta para Sofía.",
+      "Presioná Ctrl+K (⌘K en Mac) o hacé clic en el cuadro 'Buscar…'.",
+      "Escribí lo que sea: 'bateria 110', 'bosch', 'lácteos' o el apellido de un cliente.",
       "Bajá con las flechas y presioná Enter en el resultado (o hacé clic)."
      ],
      "tips": [
@@ -166,7 +166,7 @@
      "heading": "La ventana principal y los paneles",
      "paragraphs": [
       "StockFlow abre siempre MAXIMIZADO (pantalla completa útil) para que nada quede fuera de vista. La ventana se puede minimizar a la barra de tareas, pero no achicar ni redimensionar: así no se 'pierde' la pantalla por un arrastre sin querer.",
-      "Los paneles de Sofía y de WhatsApp se minimizan con su botón −: quedan como chips arriba a la derecha (junto al estado de la caja) y con un clic vuelven a abrirse donde estaban."
+      "El panel de WhatsApp se minimiza con su botón −: queda como chip arriba a la derecha (junto al estado de la caja) y con un clic vuelve a abrirse. El chat de Flowy también se minimiza con −, y se reabre con su botón 'Flowy' de la barra superior."
      ],
      "steps": [],
      "tips": [
@@ -254,47 +254,46 @@
   },
   {
    "id": "asistente",
-   "title": "Asistente virtual Sofía",
-   "overview": "Sofía es la asistente que vive adentro de StockFlow: le preguntás en tus palabras cómo hacer algo y te lo explica paso a paso, con imágenes de las pantallas. Funciona 100% dentro del programa, sin internet y sin costo: conoce todo el sistema porque fue entrenada con este mismo manual y con el programa real. Si no sabe algo, lo dice con sinceridad (no inventa).",
+   "title": "Asistente virtual Flowy",
+   "overview": "Flowy es el asistente que vive adentro de StockFlow: le preguntás en tus palabras cómo hacer algo y te lo explica paso a paso, con imágenes de las pantallas. Funciona 100% dentro del programa, sin internet y sin costo: conoce todo el sistema porque fue entrenado con este mismo manual y con el programa real. Si no sabe algo, lo dice con sinceridad (no inventa).",
    "screenshots": [
     {
      "id": "main-window",
-     "caption": "La barra 'Preguntarle al asistente…' está arriba, debajo de la fila de íconos. Desde ahí se abre Sofía y también se busca cualquier cosa del sistema.",
+     "caption": "Arriba, debajo de la fila de íconos, están el cuadro de búsqueda y el botón azul 'Flowy' (con el cubito del logo), que abre el asistente.",
      "howToOpen": "Pantalla principal"
     }
    ],
    "subsections": [
     {
-     "heading": "Cómo abrir a Sofía",
+     "heading": "Cómo abrir a Flowy",
      "paragraphs": [
-      "Arriba de la pantalla principal, debajo de la fila de íconos, está la barra que dice 'Preguntarle al asistente…' (tiene el cubo de StockFlow). Es una sola barra para todo: le preguntás a Sofía o buscás artículos, clientes, ventas y acciones.",
-      "Al hacer clic (o presionar Ctrl+K / ⌘K) se despliega una lista debajo. La primera opción, resaltada en azul, es 'Preguntarle al asistente Sofía'."
+      "Arriba de la pantalla principal, debajo de la fila de íconos, al lado del cuadro de búsqueda, está el botón azul 'Flowy' (tiene el cubo de StockFlow). Un clic ahí y se abre el chat del asistente.",
+      "El buscador de al lado sigue siendo para artículos, clientes, ventas y acciones; Flowy es para PREGUNTAR cómo se hace algo."
      ],
      "steps": [
-      "Hacé clic en la barra 'Preguntarle al asistente…' (o presioná Ctrl+K).",
+      "Hacé clic en el botón azul 'Flowy' de la barra de arriba.",
       "Escribí tu duda como se la dirías a una persona, por ejemplo: 'como hago una venta' o 'no me anda la impresora'.",
-      "Elegí la opción azul 'Preguntarle a Sofía' (Enter). Se abre el chat y te responde al instante.",
-      "Si en cambio escribís el nombre de un producto o cliente, la misma lista te muestra los resultados para ir directo."
+      "Presioná Enter: te responde al instante, con los pasos y el nombre real de cada botón."
      ],
      "tips": [
-      "No hace falta escribir perfecto: Sofía entiende errores de tipeo ('como ago una benta') y lenguaje coloquial ('fiado', 'de golpe').",
-      "El chat se puede mover arrastrándolo desde la barra azul del título, cambiar de tamaño desde la esquina inferior derecha, y minimizar con el botón −: queda como chip 'Sofía' arriba a la derecha y la conversación no se pierde."
+      "No hace falta escribir perfecto: Flowy entiende errores de tipeo ('como ago una benta') y lenguaje coloquial ('fiado', 'de golpe').",
+      "El chat se puede mover arrastrándolo desde la barra azul del título, cambiar de tamaño desde la esquina inferior derecha, y minimizar con el botón −: la conversación no se pierde y se reabre con el mismo botón 'Flowy'."
      ]
     },
     {
      "heading": "Qué le podés preguntar (y cómo aprovecharla)",
      "paragraphs": [
-      "Sofía cubre todas las áreas del sistema: ventas, caja, artículos, clientes, proveedores, cuentas corrientes, presupuestos, compras, precios, estadísticas, configuración, impresoras, licencia y actualizaciones.",
+      "Flowy cubre todas las áreas del sistema: ventas, caja, artículos, clientes, proveedores, cuentas corrientes, presupuestos, compras, precios, estadísticas, configuración, impresoras, licencia y actualizaciones.",
       "Responde con pasos numerados que dicen dónde está cada botón y qué vas a ver al tocarlo, y en muchos temas muestra una imagen de la pantalla (clic sobre la imagen para agrandarla)."
      ],
      "steps": [
       "Preguntá lo que necesites: '¿cómo registro una compra?', '¿cómo cobro con QR?', '¿cómo hago un backup?'.",
-      "Si la respuesta tiene muchos pasos, escribí 'guiame': Sofía te lleva DE A UN PASO por vez. Cuando termines cada paso escribí 'listo' o 'siguiente'.",
+      "Si la respuesta tiene muchos pasos, escribí 'guiame': Flowy te lleva DE A UN PASO por vez. Cuando termines cada paso escribí 'listo' o 'siguiente'.",
       "¿No se entendió? Escribí 'más simple' y te lo explica más despacio, o 'el paso 3' para que repita un paso puntual.",
-      "Podés seguir la charla con frases cortas: '¿y para modificarlo?', '¿y después?' — Sofía mantiene el hilo de lo que venían hablando."
+      "Podés seguir la charla con frases cortas: '¿y para modificarlo?', '¿y después?' — Flowy mantiene el hilo de lo que venían hablando."
      ],
      "tips": [
-      "Si Sofía no encuentra la respuesta, te ofrece opciones parecidas para elegir con un clic.",
+      "Si Flowy no encuentra la respuesta, te ofrece opciones parecidas para elegir con un clic.",
       "Las preguntas que no supo responder quedan registradas (solo en tu PC) para mejorar el asistente en futuras versiones."
      ]
     }
