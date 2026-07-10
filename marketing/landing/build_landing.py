@@ -378,8 +378,12 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .sc-notes li::before{{content:"";position:absolute;left:0;top:8px;width:9px;height:9px;border-radius:50%;background:var(--blue);}}
 .sc-notes b{{color:var(--ink);font-weight:700;}}
 .sc .cwin{{box-shadow:0 24px 50px rgba(20,40,80,.20);}}
-.a4sheet{{background:#fff;border:1px solid var(--line);box-shadow:0 30px 60px rgba(20,40,80,.22);border-radius:4px;overflow:hidden;transform:rotate(-1.6deg);max-width:400px;margin:0 auto;}}
+.a4sheet{{background:#fff;border:1px solid var(--line);box-shadow:0 30px 60px rgba(20,40,80,.22);border-radius:4px;overflow:hidden;max-width:430px;margin:0;}}
 .a4sheet img{{width:100%;display:block;}}
+/* Presupuestos: la hoja A4 es más alta que el texto → alinear ambos ARRIBA
+   para que el título arranque a la altura de la imagen (como pidió Bruno). */
+#sc-presu{{align-items:start;}}
+#sc-presu .st{{padding-top:4px;}}
 .mini3{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}}
 .mini3 .cwin{{box-shadow:0 14px 32px rgba(20,40,80,.14);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;}}
 .mini3 img{{cursor:zoom-in;display:block;width:100%;}}
