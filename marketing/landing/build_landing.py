@@ -35,7 +35,7 @@ CUBE_HTML=("<div class='cube3d' aria-hidden='true'><div class='c-halo'></div>"
  + "".join(f"<div class='c-face {c}'><img class='c-lg' src='{CUBE}' alt=''/></div>" for c in ['cf-fr','cf-bk','cf-ri','cf-le','cf-tp','cf-bo'])
  + "</div></div><div class='c-sh'></div></div>")
 
-GAL=[('pdv.png','Ventas — Punto de venta'),('articulos.png','Artículos y precios'),
+GAL=[('panel-principal.png','Pantalla principal'),('pdv.png','Ventas — Punto de venta'),('articulos.png','Artículos y precios'),
  ('ctacte.png','Cuentas corrientes'),('presupuestos-crear.png','Presupuestos'),
  ('estadisticas.png','Estadísticas'),('caja-abierta-resumen.png','Caja diaria'),
  ('contabilidad-resumen.png','Contabilidad y Libro IVA'),('compras-principal.png','Compras'),
@@ -48,7 +48,9 @@ def face(w): return (f"@font-face{{font-family:'Jak';font-style:normal;font-weig
                      f"src:url(data:font/woff2;base64,{font(f'jakarta-{w}.woff2')}) format('woff2');}}")
 def face2(fam,fn,w): return (f"@font-face{{font-family:'{fam}';font-style:normal;font-weight:{w};font-display:swap;"
                      f"src:url(data:font/woff2;base64,{font(fn)}) format('woff2');}}")
-FONTS="".join(face(w) for w in (400,500,600,700,800))+face2('Mont','montserrat-700.woff2',700)+face2('Mont','montserrat-800.woff2',800)
+FONTS=(f"@font-face{{font-family:'Mont';font-style:normal;font-weight:400 600;font-display:swap;"
+       f"src:url(data:font/woff2;base64,{font('montserrat-var.woff2')}) format('woff2');}}"
+       +face2('Mont','montserrat-700.woff2',700)+face2('Mont','montserrat-800.woff2',800))
 
 # iconos line (24) currentColor
 def sic(p): return f"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'>{p}</svg>"
@@ -96,7 +98,7 @@ CSS=f"""
  --blue:#2b6fd6; --blue-d:#1f57b5; --blue-t:#eaf1fd; --blue-t2:#f2f7fe;
  --ink:#14213d; --body:#586074; --paper:#ffffff; --soft:#eff4fb; --line:#e4eaf3;
  --green:#16a34a; --wa:#25d366; --coral:#f97316; --indigo:#4f46e5;
- --jak:'Jak',system-ui,sans-serif; --disp:'Mont','Jak',system-ui,sans-serif; --wrap:1280px;
+ --jak:'Mont',system-ui,sans-serif; --disp:'Mont',system-ui,sans-serif; --wrap:1280px;
 }}
 *{{box-sizing:border-box;}}
 html{{scroll-behavior:smooth;}}
@@ -275,9 +277,10 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .faq details[open] summary::after{{content:'–';}} .faq .a{{padding:0 22px 20px;font-size:15.5px;}}
 
 /* CTA + FOOTER */
-.final{{background:linear-gradient(120% 120% at 100% 0%,var(--blue-d),var(--blue));color:#fff;text-align:center;}}
-.final h2{{color:#fff;font-size:clamp(28px,3.6vw,42px);}} .final p{{color:#dbe6fb;font-size:18px;margin:14px auto 0;max-width:48ch;}}
-.final .row{{display:flex;gap:13px;justify-content:center;margin-top:28px;flex-wrap:wrap;align-items:center;}}
+.final{{background:radial-gradient(120% 120% at 100% 0%,var(--blue-d),var(--blue));color:#fff;text-align:center;}}
+.sec.final{{padding:20px 0 26px;}}
+.final h2{{color:#fff;font-size:clamp(28px,3.6vw,42px);}} .final p{{color:#dbe6fb;font-size:18px;margin:8px auto 0;max-width:48ch;}}
+.final .row{{display:flex;gap:13px;justify-content:center;margin-top:14px;flex-wrap:wrap;align-items:center;}}
 .final .num{{font-weight:800;font-size:18px;}}
 .foot{{background:var(--ink);color:#9fb0d0;}} .foot .wrap{{display:flex;flex-wrap:wrap;gap:16px 26px;justify-content:space-between;align-items:center;padding:32px 24px;}}
 .foot .brand{{color:#fff;}} .foot .brand b{{color:#7fb0ff;}} .foot a{{color:#cdd8ee;font-weight:600;}}
@@ -552,20 +555,7 @@ BODY=f"""
  </div>
 </div></section>
 
-<section class="sec func"><div class="wrap">
- <div class="sec-h"><h2>Y todo esto <span style="color:var(--blue)">ya viene incluido</span>.</h2><p>Nada de esto es un módulo aparte ni un costo adicional. Tocá cualquier captura para ampliarla.</p></div>
- <div class="mini3">
-  <figure class="cwin"><div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">Contabilidad y Libro IVA</span></div><img class="lbz" loading="lazy" src="{CONTA}" alt="Contabilidad y Libro IVA"/></figure>
-  <figure class="cwin"><div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">Compras y proveedores</span></div><img class="lbz" loading="lazy" src="{COMPRAS}" alt="Compras y proveedores"/></figure>
-  <figure class="cwin"><div class="gbar"><span class="gdz"><i></i><i></i><i></i></span><span class="gbt">Clientes</span></div><img class="lbz" loading="lazy" src="{CLIENTES}" alt="Clientes"/></figure>
- </div>
- <ul class="incl2col">
-  <li>{chk()}Códigos de barras y etiquetas</li><li>{chk()}Importás tu catálogo desde Excel</li>
-  <li>{chk()}Backups de tus datos</li><li>{chk()}Usuarios y permisos por vendedor</li>
-  <li>{chk()}MercadoPago QR desde el sistema</li><li>{chk()}Ticket 58/80&nbsp;mm o comprobante A4</li>
-  <li>{chk()}Listas de precios por tipo de cliente</li><li>{chk()}Stock mínimo con alertas de reposición</li>
- </ul>
-</div></section>
+
 
 <section class="sec" id="comp"><div class="wrap">
  <div class="sec-h"><h2>El pago único parece más económico… <span style="color:var(--coral)">hasta el próximo cambio de AFIP</span>.</h2><p>Se paga una vez, pero cada mejora, soporte o adecuación normativa se cobra por separado.</p></div>
@@ -624,11 +614,7 @@ BODY=f"""
  <div class="row"><a class="btn btn-wa" href="{WA}" target="_blank" rel="noopener" style="font-size:17px;padding:16px 30px">{WA_SVG}Escribinos por WhatsApp</a><span class="num">+54 342 584 7340</span></div>
 </div></section>
 
-<footer class="foot"><div class="wrap">
- <a href="#top" aria-label="StockFlow"><img class="brand-img foot-logo" src="{LOGO}" alt="StockFlow"/></a>
- <small>Un producto de BPSG Sistemas · Santa Fe, Argentina · Windows · funciona sin internet</small>
- <div style="display:flex;gap:20px"><a href="{WA}" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:bruno.martin.pasquetta@gmail.com">Email</a></div>
-</div></footer>
+
 
 <div class="mbar"><a class="btn btn-ghost" href="#precio">Precio</a><a class="btn btn-wa" href="{WA}" target="_blank" rel="noopener">{WA_SVG}WhatsApp</a></div>
 
