@@ -158,6 +158,8 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hcta{{display:flex;gap:16px;margin-top:30px;flex-wrap:wrap;align-items:center;}}
 .hcta .btn{{padding:11px 15px;font-size:14.5px;flex-shrink:0;}}
 .hcta .trust{{margin-top:0;flex:1;min-width:260px;}}
+.dl-alt{{margin-top:10px;font-size:13.5px;color:var(--body);}}
+.dl-alt a{{color:var(--blue);font-weight:700;text-decoration:underline;}}
 .pills{{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap;}}
 .pill{{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:999px;
  padding:5px 9px;font-weight:600;font-size:11.5px;color:var(--ink);white-space:nowrap;}}
@@ -463,9 +465,10 @@ BODY=f"""
   <img class="hero-cube" src="{CUBE}" alt="StockFlow — Sistema de Gestión Comercial"/>
   <p class="lead"><b>Controlá tu comercio de punta a punta.</b> Ventas, stock, caja, clientes y precios siempre al día, en una sola PC. Comprobantes en regla y todo funcionando aunque se corte internet.</p>
   <div class="hcta">
-   <a class="btn btn-blue" href="#precio">Descarga gratuita</a>
+   <a class="btn btn-blue" id="dl-btn" href="/dl/StockFlow-Setup.exe">Descargar gratis para Windows</a>
    <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
   </div>
+  <div class="dl-alt">¿Usás otra computadora? <a id="dl-alt-link" href="/dl/StockFlow.dmg">Descargar para Mac</a><span id="mac-hint" style="display:none"> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</span></div>
   <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> y con instalación incluida · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
  </div>
  <div class="shotwrap">
@@ -700,7 +703,13 @@ HEAD=("<meta name='viewport' content='width=device-width,initial-scale=1'>"
 # Medición mínima sin servicios externos: cada clic a WhatsApp manda un beacon a
 # /ev (no existe la ruta: nginx lo registra igual en el access.log del VPS).
 # Contar conversiones = grep "GET /ev" /var/log/nginx/access.log
-TRACK=("<script>document.querySelectorAll(\"a[href^='https://wa.me']\").forEach(function(a){"
+TRACK=("<script>(function(){var m=/Mac/i.test(navigator.platform||navigator.userAgent);"
+ "var b=document.getElementById('dl-btn'),a=document.getElementById('dl-alt-link'),h=document.getElementById('mac-hint');"
+ "if(m&&b&&a){b.href='/dl/StockFlow.dmg';b.textContent='Descargar gratis para Mac';"
+ "a.href='/dl/StockFlow-Setup.exe';a.textContent='Descargar para Windows';if(h)h.style.display='inline';}"
+ "document.querySelectorAll(\"a[href^='/dl/']\").forEach(function(el){el.addEventListener('click',function(){"
+ "try{navigator.sendBeacon('/ev?e=dl&f='+encodeURIComponent((el.getAttribute('href')||'').split('/').pop()))}catch(e){}})});})();"
+ "document.querySelectorAll(\"a[href^='https://wa.me']\").forEach(function(a){"
  "a.addEventListener('click',function(){try{var s=a.closest('section');"
  "navigator.sendBeacon('/ev?e=wa&s='+encodeURIComponent((s&&s.id)||'top'))}catch(e){}})});</script>")
 
