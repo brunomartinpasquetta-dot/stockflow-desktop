@@ -29,7 +29,6 @@ def font(f): return base64.b64encode(open(os.path.join(W,'fonts',f),'rb').read()
 PDV=img('pdv.png'); ART=img('articulos.png'); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
 CAJA2=img('caja-abierta-resumen.png'); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
 LOGO=img('logo-full.png', maxw=760, lossless=True); CUBE=img('cube-hd.png', maxw=800, lossless=True)
-FLYER=img('flyer-hero.jpg', maxw=1400, q=84)
 WA="https://wa.me/543425847340?text=Hola!%20Quiero%20probar%20StockFlow%20en%20mi%20comercio"
 CUBE_HTML=("<div class='cube3d' aria-hidden='true'><div class='c-halo'></div>"
  "<div class='c-scene'><div class='c-cube'>"
@@ -307,8 +306,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero-gal .gbar{{height:34px;font-size:12px;}} .hero-gal .gdots{{margin-top:14px;}}
 /* Coverflow 3D */
 .cfbox{{width:100%;}}
-.cfrow{{position:relative;height:480px;margin-top:14px;display:flex;align-items:center;justify-content:center;}}
-.hero-flyer{{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:16px;box-shadow:0 28px 70px -18px rgba(2,32,71,.35);}}
+.cfrow{{position:relative;height:480px;margin-top:14px;}}
 .cf{{position:relative;width:100%;height:100%;perspective:1700px;}}
 .cf-card{{position:absolute;top:50%;left:50%;width:min(90%,560px);
  transform:translate(-50%,-50%);transform-origin:center center;backface-visibility:hidden;cursor:pointer;
@@ -485,8 +483,9 @@ BODY=f"""
  <div class="shotwrap">
   <div class="cfbox">
    <div class="cfrow">
-    <img class="hero-flyer" src="{FLYER}" alt="StockFlow — Todo tu negocio, bajo control: ventas, stock, caja, clientes y reportes"/>
+    <div class="cf" id="cf">{GAL_SLIDES}</div>
    </div>
+   <div class="gdots" id="gdots">{GAL_DOTS}</div>
   </div>
  </div>
 </div></header>
