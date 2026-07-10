@@ -29,6 +29,7 @@ def font(f): return base64.b64encode(open(os.path.join(W,'fonts',f),'rb').read()
 PDV=img('pdv.png'); ART=img('articulos.png'); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
 CAJA2=img('caja-abierta-resumen.png'); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
 LOGO=img('logo-full.png', maxw=760, lossless=True); CUBE=img('cube-hd.png', maxw=800, lossless=True)
+FLYER=img('flyer-hero.jpg', maxw=1400, q=84)
 WA="https://wa.me/543425847340?text=Hola!%20Quiero%20probar%20StockFlow%20en%20mi%20comercio"
 CUBE_HTML=("<div class='cube3d' aria-hidden='true'><div class='c-halo'></div>"
  "<div class='c-scene'><div class='c-cube'>"
@@ -302,7 +303,8 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero-gal .gbar{{height:34px;font-size:12px;}} .hero-gal .gdots{{margin-top:14px;}}
 /* Coverflow 3D */
 .cfbox{{width:100%;}}
-.cfrow{{position:relative;height:480px;margin-top:14px;}}
+.cfrow{{position:relative;height:480px;margin-top:14px;display:flex;align-items:center;justify-content:center;}}
+.hero-flyer{{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:16px;box-shadow:0 28px 70px -18px rgba(2,32,71,.35);}}
 .cf{{position:relative;width:100%;height:100%;perspective:1700px;}}
 .cf-card{{position:absolute;top:50%;left:50%;width:min(90%,560px);
  transform:translate(-50%,-50%);transform-origin:center center;backface-visibility:hidden;cursor:pointer;
@@ -465,18 +467,18 @@ BODY=f"""
   <img class="hero-cube" src="{CUBE}" alt="StockFlow — Sistema de Gestión Comercial"/>
   <p class="lead"><b>Controlá tu comercio de punta a punta.</b> Ventas, stock, caja, clientes y precios siempre al día, en una sola PC. Comprobantes en regla y todo funcionando aunque se corte internet.</p>
   <div class="hcta">
-   <a class="btn btn-blue" id="dl-btn" href="/dl/StockFlow-Setup.exe">Descargar gratis para Windows</a>
-   <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
+   <a class="btn btn-blue" href="/dl/StockFlow-Setup.exe">Descargar gratis para Windows</a>
+   <a class="btn btn-ghost" href="/dl/StockFlow.dmg">Descargar para Mac</a>
   </div>
-  <div class="dl-alt">¿Usás otra computadora? <a id="dl-alt-link" href="/dl/StockFlow.dmg">Descargar para Mac</a><span id="mac-hint" style="display:none"> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</span></div>
+  <div class="dl-alt">En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
+  <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
   <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> — se activa sola al instalar, sin tarjeta · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
  </div>
  <div class="shotwrap">
   <div class="cfbox">
    <div class="cfrow">
-    <div class="cf" id="cf">{GAL_SLIDES}</div>
+    <img class="hero-flyer" src="{FLYER}" alt="StockFlow — Todo tu negocio, bajo control: ventas, stock, caja, clientes y reportes"/>
    </div>
-   <div class="gdots" id="gdots">{GAL_DOTS}</div>
   </div>
  </div>
 </div></header>
@@ -704,10 +706,7 @@ HEAD=("<meta name='viewport' content='width=device-width,initial-scale=1'>"
 # Medición mínima sin servicios externos: cada clic a WhatsApp manda un beacon a
 # /ev (no existe la ruta: nginx lo registra igual en el access.log del VPS).
 # Contar conversiones = grep "GET /ev" /var/log/nginx/access.log
-TRACK=("<script>(function(){var m=/Mac/i.test(navigator.platform||navigator.userAgent);"
- "var b=document.getElementById('dl-btn'),a=document.getElementById('dl-alt-link'),h=document.getElementById('mac-hint');"
- "if(m&&b&&a){b.href='/dl/StockFlow.dmg';b.textContent='Descargar gratis para Mac';"
- "a.href='/dl/StockFlow-Setup.exe';a.textContent='Descargar para Windows';if(h)h.style.display='inline';}"
+TRACK=("<script>(function(){"
  "document.querySelectorAll(\"a[href^='/dl/']\").forEach(function(el){el.addEventListener('click',function(){"
  "try{navigator.sendBeacon('/ev?e=dl&f='+encodeURIComponent((el.getAttribute('href')||'').split('/').pop()))}catch(e){}})});})();"
  "document.querySelectorAll(\"a[href^='https://wa.me']\").forEach(function(a){"
