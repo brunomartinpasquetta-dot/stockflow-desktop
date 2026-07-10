@@ -48,9 +48,9 @@ def face(w): return (f"@font-face{{font-family:'Jak';font-style:normal;font-weig
                      f"src:url(data:font/woff2;base64,{font(f'jakarta-{w}.woff2')}) format('woff2');}}")
 def face2(fam,fn,w): return (f"@font-face{{font-family:'{fam}';font-style:normal;font-weight:{w};font-display:swap;"
                      f"src:url(data:font/woff2;base64,{font(fn)}) format('woff2');}}")
-FONTS=(f"@font-face{{font-family:'Mont';font-style:normal;font-weight:400 600;font-display:swap;"
-       f"src:url(data:font/woff2;base64,{font('montserrat-var.woff2')}) format('woff2');}}"
-       +face2('Mont','montserrat-700.woff2',700)+face2('Mont','montserrat-800.woff2',800))
+# Tipografía ÚNICA de la página = la del logo StockFlow: Plus Jakarta Sans
+# (logo-full.svg: 'Stock' en 800, 'Flow' en 600). Sin Montserrat.
+FONTS="".join(face(w) for w in (400,500,600,700,800))
 
 # iconos line (24) currentColor
 def sic(p): return f"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'>{p}</svg>"
@@ -98,7 +98,7 @@ CSS=f"""
  --blue:#2b6fd6; --blue-d:#1f57b5; --blue-t:#eaf1fd; --blue-t2:#f2f7fe;
  --ink:#14213d; --body:#586074; --paper:#ffffff; --soft:#eff4fb; --line:#e4eaf3;
  --green:#16a34a; --wa:#25d366; --coral:#f97316; --indigo:#4f46e5;
- --jak:'Mont',system-ui,sans-serif; --disp:'Mont',system-ui,sans-serif; --wrap:1280px;
+ --jak:'Jak',system-ui,sans-serif; --disp:'Jak',system-ui,sans-serif; --wrap:1280px;
 }}
 *{{box-sizing:border-box;}}
 html{{scroll-behavior:smooth;}}
