@@ -243,6 +243,10 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .show p{{margin-top:12px;font-size:16.5px;max-width:44ch;}}
 .show ul{{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:10px;}}
 .show li{{display:flex;gap:10px;font-size:15.5px;color:var(--ink);}} .show li svg{{width:20px;height:20px;color:var(--green);flex:none;}}
+/* La captura SIEMPRE entra completa en su columna (nada de desbordes cortados). */
+.show .st,.show .si{{min-width:0;}}
+.show .si .cwin{{max-width:100%;}}
+.show .si .cwin img{{width:100%;height:auto;display:block;}}
 @media(max-width:840px){{.show{{grid-template-columns:1fr;gap:22px;}} .show.rev .st{{order:1;}} .show.rev .si{{order:2;}}}}
 
 /* COMPARATIVA */
@@ -531,9 +535,9 @@ BODY=f"""
  </div>
  <div class="sc-wrap">
  {sc('sc-ventas',False,'Punto de venta','Cobrá en segundos, con el IVA ya calculado.','Escaneás el código o escribís el nombre y el producto entra con su precio. Confirmás con F2 y el comprobante queda listo. Si se corta internet, seguís cobrando sin interrupciones.','Sin demoras en el mostrador','Ventas',PDV,[('$&#8202;763,64',' — IVA calculado automáticamente, sin cuentas manuales'),('$&#8202;4.400,00',' — total y vuelto en el momento'),('Pago mixto',' — efectivo y tarjeta en una misma operación')])}
- {sc('sc-precios',True,'Actualización de precios','Actualizá toda la lista en un clic.','Seleccionás la lista, ingresás el porcentaje y se actualiza completa. Sin modificar producto por producto ni planillas manuales.','Sin repreciar artículo por artículo','Artículos',ART,[('+18% a toda la lista',' aplicado en segundos'),('Verde / ámbar',' — identificás qué reponer de un vistazo'),('Hasta 3 listas',' — mostrador, mayorista y especial')])}
+ {sc('sc-precios',False,'Actualización de precios','Actualizá toda la lista en un clic.','Seleccionás la lista, ingresás el porcentaje y se actualiza completa. Sin modificar producto por producto ni planillas manuales.','Sin repreciar artículo por artículo','Artículos',ART,[('+18% a toda la lista',' aplicado en segundos'),('Verde / ámbar',' — identificás qué reponer de un vistazo'),('Hasta 3 listas',' — mostrador, mayorista y especial')])}
  {sc('sc-cuentas',False,'Cuentas corrientes','Sabés quién te debe, cuánto y desde cuándo.','Cada cliente con su saldo actualizado. Registrás la cobranza y la cuenta se ajusta automáticamente, sin deudas anotadas en papeles sueltos.','Sin cuadernos de deuda','Cuentas Corrientes',CTA_,[('$&#8202;7.500',' — el saldo de cada cliente, siempre a la vista'),('Pago parcial',' — registra abonos y lleva el saldo pendiente'),('Saldo corrido',' — cada venta y cada cobranza, en orden')])}
- {sc('sc-caja',True,'Caja y arqueo','Al cierre sabés exactamente cuánto debe haber en caja.','Cada medio de pago discriminado, con la comisión de tarjeta ya descontada y el efectivo esperado calculado. Cerrás la caja con el monto exacto, sin estimaciones.','Sin descuadres al cierre','Caja diaria',CAJA2,[('Efectivo esperado',' — el monto que debe haber para el arqueo'),('Comisión descontada',' — el neto real de cada acreditación'),('Caja general',' — consolidás varias cajas en una')])}
+ {sc('sc-caja',False,'Caja y arqueo','Al cierre sabés exactamente cuánto debe haber en caja.','Cada medio de pago discriminado, con la comisión de tarjeta ya descontada y el efectivo esperado calculado. Cerrás la caja con el monto exacto, sin estimaciones.','Sin descuadres al cierre','Caja diaria',CAJA2,[('Efectivo esperado',' — el monto que debe haber para el arqueo'),('Comisión descontada',' — el neto real de cada acreditación'),('Caja general',' — consolidás varias cajas en una')])}
  <div class="show sc rv" id="sc-presu">
   <div class="st"><span class="sc-k">Presupuestos</span><h3>Presupuestás formal y lo convertís en venta con un clic.</h3>
    <p>PDF A4 con tu encabezado, tu CUIT y la vigencia. El cliente lo aprueba y lo convertís en venta sin volver a cargar los productos.</p>
@@ -541,7 +545,7 @@ BODY=f"""
    <ul class="sc-notes"><li><b>Membrete y CUIT</b> — impresos automáticamente en el PDF</li><li><b>Vigencia 30 días</b> — quedás cubierto ante un reprecio</li><li><b>Un clic</b> — presupuesto aprobado → venta registrada</li></ul></div>
   <div class="si"><figure class="a4sheet"><img loading="lazy" src="{PRES}" alt="Presupuesto A4 de StockFlow"/></figure></div>
  </div>
- {sc('sc-ganas',True,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('38,5% de margen',' — tu rentabilidad real'),('Ticket $&#8202;5.832',' — el promedio de compra por cliente'),('Por período y medio de pago',' — el análisis que necesites')])}
+ {sc('sc-ganas',False,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('38,5% de margen',' — tu rentabilidad real'),('Ticket $&#8202;5.832',' — el promedio de compra por cliente'),('Por período y medio de pago',' — el análisis que necesites')])}
  </div>
 </div></section>
 
