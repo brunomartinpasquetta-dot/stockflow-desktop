@@ -469,7 +469,7 @@ BODY=f"""
    <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
   </div>
   <div class="dl-alt">¿Usás otra computadora? <a id="dl-alt-link" href="/dl/StockFlow.dmg">Descargar para Mac</a><span id="mac-hint" style="display:none"> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</span></div>
-  <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> y con instalación incluida · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
+  <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> — se activa sola al instalar, sin tarjeta · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
  </div>
  <div class="shotwrap">
   <div class="cfbox">
@@ -579,7 +579,7 @@ BODY=f"""
  <div class="price rv" id="precio" style="margin-top:40px">
   <div><h2>Suscripción · todo incluido</h2>
    <div class="amt mny"><small>$</small>&#8202;70.000<small>/mes</small></div>
-   <div class="demo">Probalo <b>gratis por 30 días</b> — sin costo y con instalación asistida incluida.</div></div>
+   <div class="demo">Probalo <b>gratis por 30 días</b> — descargás, instalás y la prueba se activa sola, sin tarjeta.</div></div>
   <div><ul>
     <li>{chk()}Todo lo de arriba: ventas y actualización masiva de precios</li>
     <li>{chk()}Cuentas corrientes, caja y presupuestos A4</li>
@@ -599,7 +599,8 @@ BODY=f"""
     ("¿Necesito internet para usarlo?","No. StockFlow funciona en tu PC de forma 100% offline. La conexión solo se usa para actualizaciones o AFIP. Si se corta, seguís operando con normalidad."),
     ("¿Mis datos quedan en mi PC?","Sí. Tus datos son tuyos y residen en tu computadora. El sistema genera copias de seguridad que guardás donde prefieras."),
     ("¿Por qué suscripción y no pago único?","Porque incluye todo: actualizaciones, soporte y adecuación permanente a AFIP. El pago único deja el sistema en una versión fija y, ante cada cambio normativo, se vuelve a pagar."),
-    ("¿Incluye la instalación?","Sí. Lo dejamos instalado y en funcionamiento con tus productos cargados. La prueba gratuita de 30 días incluye la instalación asistida."),
+    ("¿Cómo funciona la prueba gratis?","Descargás el instalador, lo instalás y al abrir StockFlow completás tu nombre, comercio y WhatsApp: la prueba de 30 días se activa sola, sin tarjeta. Es el sistema completo. Al finalizar, tus datos quedan intactos y activás tu licencia por WhatsApp."),
+    ("¿Incluye la instalación?","Sí. Si la necesitás, lo dejamos instalado y en funcionamiento con tus productos cargados. La prueba gratuita de 30 días incluye la instalación asistida."),
     ("¿Qué pasa si dejo de pagar?","El sistema pasa a modo solo lectura: seguís consultando tu información, pero no cargás nuevas operaciones. No se pierde ningún dato y, al renovar, vuelve a funcionar de forma completa."),
     ("¿Para qué comercios es?","Para comercios con volumen de operación: ferreterías, corralones, autoservicios, mayoristas, distribuidoras y casas de repuestos."),
    ])}
