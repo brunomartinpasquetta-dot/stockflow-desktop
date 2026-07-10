@@ -973,7 +973,16 @@ export interface LicenseStateDTO {
   fullName: string | null;
   /** ID del tenant según JWT (`tid`); `'OWNER'` en master/dev; `null` si no hay licencia. */
   tenantId: string | null;
+  /** true si es una PRUEBA GRATIS (30 días); expiresAt = fin de la prueba. */
+  trial?: boolean;
   lastError: string | null;
+}
+
+/** Datos para arrancar la prueba gratis autoservicio. */
+export interface TrialInputDTO {
+  fullName: string;
+  companyName: string;
+  phone: string;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1535,6 +1544,8 @@ export interface ApiSurface {
   license: {
     getState(): Res<LicenseStateDTO>;
     activate(payload: { licenseKey: string }): Res<LicenseStateDTO>;
+    /** Prueba gratis 30 días: crea y activa una licencia trial para esta PC. */
+    activateTrial(payload: TrialInputDTO): Res<LicenseStateDTO>;
     /** Saca la licencia de esta máquina (borra markers locales) → sin licencia. */
     deactivate(): Res<LicenseStateDTO>;
     heartbeat(): Res<LicenseStateDTO>;

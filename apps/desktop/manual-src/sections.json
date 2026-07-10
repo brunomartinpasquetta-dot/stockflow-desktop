@@ -2610,6 +2610,24 @@
    "overview": "Gestioná tu licencia StockFlow, activála en tu PC, recibí actualizaciones automáticas del sistema y contactá soporte. Tu licencia queda vinculada a esta máquina y se renueva sola si perdés conexión internet, sin necesidad de hacer nada.",
    "subsections": [
     {
+     "heading": "Prueba gratis de 30 días (sin clave)",
+     "paragraphs": [
+      "Si todavía no tenés una licencia, podés usar StockFlow COMPLETO y gratis por 30 días. No hace falta tarjeta ni hablar con nadie: se activa al instante desde la misma pantalla de activación.",
+      "La prueba vale para UNA computadora, una sola vez. Al cumplirse los 30 días el sistema pasa a solo lectura: podés entrar y ver todo lo que cargaste (artículos, ventas, clientes), pero no registrar operaciones nuevas. No se pierde ningún dato."
+     ],
+     "steps": [
+      "Al abrir StockFlow sin licencia aparece la pantalla 'Empezá a usar StockFlow'.",
+      "En el recuadro azul 'Probá GRATIS por 30 días', escribí tu nombre, el nombre de tu comercio y tu número de WhatsApp.",
+      "Hacé clic en 'Empezar mi prueba gratis'. Listo: el sistema queda activado en el momento (necesitás internet solo para este paso).",
+      "Arriba a la derecha vas a ver cuántos días de prueba te quedan (ej: 'Prueba: 25 día(s)').",
+      "Cuando quieras pasarte a la licencia definitiva, escribinos por WhatsApp: se activa con una clave y seguís con todos tus datos tal como están."
+     ],
+     "tips": [
+      "Si la pantalla dice que esta computadora ya usó una licencia, escribinos por WhatsApp y lo resolvemos.",
+      "Al vencer la prueba no se borra nada: tus datos quedan intactos esperando la activación."
+     ]
+    },
+    {
      "heading": "Cómo activar tu licencia",
      "paragraphs": [
       "Cuando abrís StockFlow por primera vez, te muestra la pantalla de Activación. Necesitás la clave de licencia que recibiste al contratar tu plan.",

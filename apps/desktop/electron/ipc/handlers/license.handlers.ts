@@ -4,7 +4,7 @@
  * previa al login).
  */
 import { type HandlerDeps, type HandlerMap, unguarded } from '../handler-context';
-import type { LicenseStateDTO } from '../types';
+import type { LicenseStateDTO, TrialInputDTO } from '../types';
 
 export function buildLicenseHandlers(deps: HandlerDeps): HandlerMap {
   return {
@@ -15,6 +15,15 @@ export function buildLicenseHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       async (payload: { licenseKey: string }): Promise<LicenseStateDTO> =>
         deps.licenseManager.activate(payload.licenseKey),
+    ),
+    'license:activateTrial': unguarded(
+      deps,
+      async (payload: TrialInputDTO): Promise<LicenseStateDTO> =>
+        deps.licenseManager.activateTrial({
+          fullName: String(payload?.fullName ?? '').trim(),
+          companyName: String(payload?.companyName ?? '').trim(),
+          phone: String(payload?.phone ?? '').trim(),
+        }),
     ),
     'license:heartbeat': unguarded(deps, async (): Promise<LicenseStateDTO> => {
       await deps.licenseManager.heartbeat();

@@ -72,12 +72,17 @@ export const licenses = pgTable(
     activatedAt: timestamp('activated_at'),
     lastHeartbeat: timestamp('last_heartbeat'),
     status: varchar('status', { length: 16 }).notNull().default('pending'),
+    /** 'paid' = licencia normal; 'trial' = prueba gratis autoservicio (30 días). */
+    kind: varchar('kind', { length: 8 }).notNull().default('paid'),
+    /** Fin de la prueba (solo kind='trial'). Las pagas no vencen por acá. */
+    expiresAt: timestamp('expires_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (t) => ({
     machineIdx: index('idx_license_machine').on(t.machineId),
     tenantIdx: index('idx_license_tenant').on(t.tenantId),
     statusCheck: check('licenses_status_check', sql`${t.status} in ('pending', 'active', 'revoked')`),
+    kindCheck: check('licenses_kind_check', sql`${t.kind} in ('paid', 'trial')`),
   }),
 );
 

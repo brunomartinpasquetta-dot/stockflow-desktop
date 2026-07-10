@@ -81,7 +81,13 @@ export async function buildServer(opts?: BuildServerOptions): Promise<FastifyIns
 
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, { origin: CORS_ORIGINS ? CORS_ORIGINS.split(',').map((s) => s.trim()) : true });
-  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  // En tests (app.inject: una sola IP) los límites por ruta dan falsos 429.
+  const skipLimits = IS_TEST || process.env.NODE_ENV === 'test';
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    ...(skipLimits ? { allowList: () => true } : {}),
+  });
 
   const keys = getJwtKeys();
   await app.register(jwt, {

@@ -14,13 +14,21 @@ import { LanStatusIndicator } from '@/components/LanStatusIndicator'
 import { WhatsAppGlyph } from '@/components/WhatsAppGlyph'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAssistant } from '@/contexts/AssistantContext'
+import { useLicense } from '@/contexts/LicenseContext'
 import { useWhatsAppPanel } from '@/contexts/WhatsAppPanelContext'
 
 export function StatusBar() {
   const { currentUser } = useAuth()
   const assistant = useAssistant()
   const wa = useWhatsAppPanel()
+  const { state: license } = useLicense()
   const [now, setNow] = useState(() => new Date())
+
+  // Prueba gratis: días que le quedan (mínimo 0). null si no es trial.
+  const trialDaysLeft =
+    license?.trial && license.expiresAt
+      ? Math.max(0, Math.ceil((license.expiresAt - Date.now()) / 86_400_000))
+      : null
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000)
@@ -55,6 +63,21 @@ export function StatusBar() {
           <span className="hidden md:inline">Flowy</span>
         </button>
       </div>
+      {/* Prueba gratis: días restantes, siempre a la vista */}
+      {trialDaysLeft !== null && (
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${
+            trialDaysLeft <= 5 ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-primary/25 bg-primary/10 text-foreground'
+          }`}
+          title={
+            trialDaysLeft > 0
+              ? `Tu prueba gratis vence en ${trialDaysLeft} día(s). Para seguir después, escribinos por WhatsApp.`
+              : 'Tu prueba gratis terminó. Escribinos por WhatsApp para activar tu licencia.'
+          }
+        >
+          {trialDaysLeft > 0 ? `Prueba: ${trialDaysLeft} día(s)` : 'Prueba vencida'}
+        </span>
+      )}
       {/* Chip de panel MINIMIZADO (lado derecho) — restaura al hacer clic.
           El asistente no necesita chip: su botón "Flowy" (izquierda) ya restaura. */}
       {wa.state === 'min' && (

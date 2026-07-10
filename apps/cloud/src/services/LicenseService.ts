@@ -13,6 +13,8 @@ import { licenses, tenants, type License, type Tenant, type CloudDatabase } from
 const KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O/1/I ambiguos
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+/** Duración de la prueba gratis autoservicio. */
+export const TRIAL_DAYS = 30;
 
 function httpError(message: string, statusCode: number): Error & { statusCode: number } {
   return Object.assign(new Error(message), { statusCode });
@@ -30,6 +32,18 @@ export interface JwtPayload {
   tid: string;
   plan: string;
   lk: string;
+  /** 'trial' cuando la licencia es una prueba gratis. Ausente = paga. */
+  kind?: 'trial';
+  /** Fin de la PRUEBA en epoch-segundos (independiente del exp del JWT, que es
+   *  corto y se renueva por heartbeat). El desktop lo verifica offline. */
+  texp?: number;
+}
+
+export interface TrialInput {
+  machineId: string;
+  companyName: string;
+  fullName: string;
+  phone: string;
 }
 
 export class LicenseService {
@@ -45,7 +59,87 @@ export class LicenseService {
 
   /** Construye el payload del JWT para una licencia activa. */
   static jwtPayloadFor(license: License, tenant: Tenant): JwtPayload {
-    return { sub: license.id, tid: license.tenantId, plan: tenant.plan, lk: license.licenseKey };
+    const base: JwtPayload = { sub: license.id, tid: license.tenantId, plan: tenant.plan, lk: license.licenseKey };
+    if (license.kind === 'trial' && license.expiresAt) {
+      base.kind = 'trial';
+      base.texp = Math.floor(license.expiresAt.getTime() / 1000);
+    }
+    return base;
+  }
+
+  /** ¿La prueba gratis de esta licencia ya venció? (falso para licencias pagas). */
+  static trialExpired(license: License): boolean {
+    return license.kind === 'trial' && !!license.expiresAt && license.expiresAt.getTime() <= Date.now();
+  }
+
+  /**
+   * PRUEBA GRATIS autoservicio: crea tenant + licencia 'trial' (30 días) y la
+   * activa en el momento, vinculada a `machineId`. Regla: UNA licencia por
+   * máquina en toda la historia — si esa PC ya tuvo cualquier licencia (de
+   * prueba o paga), se rechaza con 409.
+   */
+  async createTrial(
+    db: CloudDatabase,
+    input: TrialInput,
+    signJwt: (payload: object) => string,
+  ): Promise<ActivateResult & { licenseKey: string; trialEndsAt: number }> {
+    const machineId = input.machineId.trim();
+    const [prev] = await db
+      .select({ id: licenses.id })
+      .from(licenses)
+      .where(eq(licenses.machineId, machineId))
+      .limit(1);
+    if (prev) {
+      throw httpError(
+        'Esta computadora ya usó una licencia de StockFlow (de prueba o definitiva). Escribinos por WhatsApp y te ayudamos a seguir.',
+        409,
+      );
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + TRIAL_DAYS * ONE_DAY_MS);
+    const licenseKey = LicenseService.generateLicenseKey();
+    // El email es NOT NULL UNIQUE en tenants y en la prueba no lo pedimos:
+    // se sintetiza uno determinístico a partir de la clave (contacto real = phone).
+    const syntheticEmail = `trial-${licenseKey.replace(/-/g, '').toLowerCase()}@trial.stockflow.local`;
+
+    const [tenant] = await db
+      .insert(tenants)
+      .values({
+        email: syntheticEmail,
+        fullName: input.fullName.trim(),
+        phone: input.phone.trim(),
+        companyName: input.companyName.trim(),
+        plan: 'pro', // la prueba muestra el sistema completo
+        status: 'active',
+      })
+      .returning();
+    if (!tenant) throw httpError('No se pudo crear la cuenta de prueba.', 500);
+
+    const [license] = await db
+      .insert(licenses)
+      .values({
+        tenantId: tenant.id,
+        licenseKey,
+        machineId,
+        activatedAt: now,
+        lastHeartbeat: now,
+        status: 'active',
+        kind: 'trial',
+        expiresAt,
+      })
+      .returning();
+    if (!license) throw httpError('No se pudo crear la licencia de prueba.', 500);
+
+    const jwt = signJwt(LicenseService.jwtPayloadFor(license, tenant));
+    return {
+      jwt,
+      expiresAt: Date.now() + SEVEN_DAYS_MS,
+      plan: tenant.plan,
+      tenantName: tenant.companyName,
+      licenseKey,
+      trialEndsAt: expiresAt.getTime(),
+    };
   }
 
   /**
@@ -140,13 +234,15 @@ export class LicenseService {
     if (!tenant || (tenant.status !== 'active' && tenant.status !== 'suspended')) {
       throw httpError('Suscripción cancelada', 401);
     }
-    const suspended = tenant.status === 'suspended';
+    // Prueba gratis vencida → mismo tratamiento que suspendido: el desktop
+    // queda en sólo-lectura (ve sus datos, no opera) y el token sigue vivo.
+    const suspended = tenant.status === 'suspended' || LicenseService.trialExpired(license);
 
     // Renovación deslizante: si al JWT le quedan <24h, emitimos uno nuevo.
     // Cuando está suspendido renovamos siempre para mantener vivo el token
     // (la app sigue abierta en sólo-lectura).
     if (suspended || currentExpMs - Date.now() < ONE_DAY_MS) {
-      const jwt = signJwt({ sub: licenseId, tid, plan, lk } satisfies JwtPayload);
+      const jwt = signJwt(LicenseService.jwtPayloadFor(license, tenant));
       return suspended ? { jwt, suspended: true } : { jwt };
     }
     return { jwt: null };

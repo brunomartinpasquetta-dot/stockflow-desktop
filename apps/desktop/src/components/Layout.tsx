@@ -9,7 +9,7 @@
  */
 import { type CSSProperties } from 'react'
 
-import { useLicenseStatus } from '@/contexts/LicenseContext'
+import { useLicense, useLicenseStatus } from '@/contexts/LicenseContext'
 import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext'
 import { WindowManagerProvider } from '@/contexts/WindowManagerContext'
 import { WhatsAppPanelProvider } from '@/contexts/WhatsAppPanelContext'
@@ -44,6 +44,8 @@ function LayoutInner() {
   useMdiShortcuts()
   useDeepLinkRouter()
   const licenseStatus = useLicenseStatus()
+  const { state: licenseState } = useLicense()
+  const isTrial = licenseState?.trial === true
   // Barra de título propia SÓLO en macOS (en Windows queda la nativa, con sus
   // botones de min/max/cerrar).
   const isMac = navigator.userAgent.includes('Mac')
@@ -65,7 +67,9 @@ function LayoutInner() {
       )}
       {licenseStatus === 'readOnly' && (
         <div data-chrome="readonly-banner" className="shrink-0 bg-destructive px-4 py-1.5 text-center text-xs font-medium text-destructive-foreground">
-          ⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.
+          {isTrial
+            ? '⏳ Tu prueba gratis de 30 días terminó — tus datos están intactos, pero el sistema quedó en sólo lectura. Escribinos por WhatsApp al +54 342 584 7340 y lo activamos en el día.'
+            : '⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.'}
         </div>
       )}
       <OutdatedBanner />

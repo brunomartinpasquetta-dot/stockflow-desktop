@@ -36,7 +36,7 @@ function check(label: string, ok: boolean, detail?: unknown): void {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const migrationDir = path.resolve(here, '..', '..', '..', '..', 'packages', 'db', 'migrations', 'cloud');
-const MIGRATIONS = ['0000_cloud_init.sql', '0001_licenses_quota.sql'];
+const MIGRATIONS = ['0000_cloud_init.sql', '0001_licenses_quota.sql', '0002_trial_licenses.sql'];
 
 async function main(): Promise<void> {
   const pg = new PGlite();
@@ -198,6 +198,91 @@ async function main(): Promise<void> {
   // --- generateLicenseKey ---
   const key = LicenseService.generateLicenseKey();
   check('generateLicenseKey con formato válido', /^SF-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(key), key);
+
+  // ============ PRUEBA GRATIS (trial autoservicio) ============
+
+  // --- crear trial en máquina virgen → 200, activada al instante ---
+  const tr1 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/trial',
+    payload: { machineId: 'trial-machine-1', companyName: 'Kiosco Demo', fullName: 'Ana Prueba', phone: '342 5551234' },
+  });
+  check('trial máquina virgen → 200', tr1.statusCode === 200, tr1.body);
+  const trBody = tr1.json() as { jwt?: string; licenseKey?: string; trialEndsAt?: number; plan?: string };
+  check('trial devuelve jwt', (trBody.jwt ?? '').split('.').length === 3, trBody.jwt?.slice(0, 12));
+  check('trial devuelve licenseKey SF-…', /^SF-/.test(trBody.licenseKey ?? ''), trBody.licenseKey);
+  const days = trBody.trialEndsAt ? (trBody.trialEndsAt - Date.now()) / 86_400_000 : 0;
+  check('trialEndsAt ≈ 30 días', days > 29 && days < 31, days);
+  const trPayload = JSON.parse(Buffer.from((trBody.jwt ?? '..').split('.')[1]!, 'base64url').toString()) as {
+    kind?: string;
+    texp?: number;
+    plan?: string;
+  };
+  check("jwt trial lleva kind='trial'", trPayload.kind === 'trial', trPayload.kind);
+  check('jwt trial lleva texp (fin de prueba)', typeof trPayload.texp === 'number' && trPayload.texp * 1000 > Date.now(), trPayload.texp);
+  const [trTenant] = await cloudDb.select().from(tenants).where(eq(tenants.companyName, 'Kiosco Demo')).limit(1);
+  check('tenant trial creado con phone', trTenant?.phone === '342 5551234', trTenant?.phone);
+  check('tenant trial plan pro y active', trTenant?.plan === 'pro' && trTenant?.status === 'active', `${trTenant?.plan}/${trTenant?.status}`);
+
+  // --- misma máquina pide OTRO trial → 409 ---
+  const tr2 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/trial',
+    payload: { machineId: 'trial-machine-1', companyName: 'Otro Kiosco', fullName: 'Otro', phone: '111' },
+  });
+  check('trial repetido misma máquina → 409', tr2.statusCode === 409, tr2.statusCode);
+
+  // --- máquina que ya tiene licencia PAGA pide trial → 409 ---
+  const tr3 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/trial',
+    payload: { machineId: 'machine-1', companyName: 'Vivo', fullName: 'Cliente Pago', phone: '222' },
+  });
+  check('trial en máquina con licencia paga → 409', tr3.statusCode === 409, tr3.statusCode);
+
+  // --- datos incompletos → 400 ---
+  const tr4 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/trial',
+    payload: { machineId: 'trial-machine-2', companyName: '', fullName: 'X', phone: '' },
+  });
+  check('trial sin datos → 400', tr4.statusCode === 400, tr4.statusCode);
+
+  // --- heartbeat de trial VIGENTE → 200 sin suspended ---
+  const hb1 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/heartbeat',
+    headers: { authorization: `Bearer ${trBody.jwt}` },
+  });
+  check('heartbeat trial vigente → 200', hb1.statusCode === 200, hb1.statusCode);
+  check('heartbeat trial vigente sin suspended', (hb1.json() as { suspended?: boolean }).suspended !== true, hb1.body);
+
+  // --- trial VENCIDO → heartbeat responde suspended:true (solo lectura) ---
+  await cloudDb
+    .update(licenses)
+    .set({ expiresAt: new Date(Date.now() - 86_400_000) })
+    .where(eq(licenses.licenseKey, trBody.licenseKey ?? ''));
+  const hb2 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/heartbeat',
+    headers: { authorization: `Bearer ${trBody.jwt}` },
+  });
+  check('heartbeat trial vencido → 200', hb2.statusCode === 200, hb2.statusCode);
+  const hb2Body = hb2.json() as { suspended?: boolean; jwt?: string };
+  check('heartbeat trial vencido → suspended:true', hb2Body.suspended === true, hb2.body);
+  check('heartbeat trial vencido renueva jwt (app abierta en solo-lectura)', (hb2Body.jwt ?? '').split('.').length === 3, hb2Body.jwt?.slice(0, 12));
+
+  // --- re-activate de trial vencido (re-activación silenciosa del desktop) → 200 con texp pasado ---
+  const tr5 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/activate',
+    payload: { licenseKey: trBody.licenseKey, machineId: 'trial-machine-1' },
+  });
+  check('re-activate trial vencido → 200 (desktop queda readOnly por texp)', tr5.statusCode === 200, tr5.statusCode);
+  const tr5Payload = JSON.parse(
+    Buffer.from(((tr5.json() as { jwt?: string }).jwt ?? '..').split('.')[1]!, 'base64url').toString(),
+  ) as { kind?: string; texp?: number };
+  check('re-activate trial vencido: jwt con texp en el pasado', tr5Payload.kind === 'trial' && (tr5Payload.texp ?? 0) * 1000 < Date.now(), tr5Payload.texp);
 
   await app.close();
   await pg.close();

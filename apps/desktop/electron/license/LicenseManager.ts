@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import type { LicenseJwtPayload, LicensePlan, LicenseState, LicenseStatus } from './types';
+import type { LicenseJwtPayload, LicensePlan, LicenseState, LicenseStatus, TrialInput } from './types';
 
 interface LicenseManagerOptions {
   userDataDir: string;
@@ -32,6 +32,13 @@ interface ActivateResponse {
   jwt: string;
   expiresAt: number;
   plan: LicensePlan;
+}
+
+interface TrialResponse extends ActivateResponse {
+  tenantName?: string;
+  licenseKey?: string;
+  /** Fin de la prueba (epoch ms). */
+  trialEndsAt?: number;
 }
 
 interface HeartbeatResponse {
@@ -262,6 +269,26 @@ export class LicenseManager {
     if (!ok || !payload) {
       const expired =
         payload && typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now();
+      // PRUEBA GRATIS con JWT vencido (offline demasiado tiempo): no volvemos a
+      // "sin licencia" — sólo-lectura con sus datos a la vista. Si la prueba
+      // sigue vigente, la re-activación silenciosa lo renueva al reconectar.
+      if (expired && payload?.kind === 'trial' && typeof payload.texp === 'number' && this.runtimeStatus !== 'revoked') {
+        const endsAt = payload.texp * 1000;
+        const trialOver = endsAt <= Date.now();
+        return {
+          status: 'readOnly',
+          plan: payload.plan ?? null,
+          expiresAt: endsAt,
+          licenseKey: payload.lk ?? null,
+          tenantName: this.tenantName,
+          fullName: this.clientName,
+          tenantId: payload.tid ?? null,
+          trial: true,
+          lastError: trialOver
+            ? 'Tu prueba gratis de 30 días terminó. Escribinos por WhatsApp para activar tu licencia — tus datos están intactos.'
+            : 'No se pudo renovar la prueba (sin conexión). Conectate a internet para seguir operando.',
+        };
+      }
       return {
         status: this.runtimeStatus === 'revoked' ? 'revoked' : 'unlicensed',
         plan: null,
@@ -271,6 +298,26 @@ export class LicenseManager {
         fullName: this.clientName,
         tenantId: payload?.tid ?? null,
         lastError: expired ? 'La licencia expiró. Volvé a conectarte para renovarla.' : 'No hay licencia válida',
+      };
+    }
+    // PRUEBA GRATIS vigente o vencida: el fin de la prueba viaja en `texp`
+    // (el `exp` del JWT es corto y se renueva por heartbeat). Vencida →
+    // sólo-lectura, incluso sin internet.
+    if (payload.kind === 'trial' && typeof payload.texp === 'number') {
+      const endsAt = payload.texp * 1000;
+      const trialOver = endsAt <= Date.now();
+      return {
+        status: trialOver ? 'readOnly' : (this.runtimeStatus ?? 'active'),
+        plan: payload.plan,
+        expiresAt: endsAt,
+        licenseKey: payload.lk,
+        tenantName: this.tenantName,
+        fullName: this.clientName,
+        tenantId: payload.tid,
+        trial: true,
+        lastError: trialOver
+          ? 'Tu prueba gratis de 30 días terminó. Escribinos por WhatsApp para activar tu licencia — tus datos están intactos.'
+          : null,
       };
     }
     return {
@@ -377,6 +424,60 @@ export class LicenseManager {
     await this.fetchTenantName(data.jwt);
     const state = this.getState();
     return { ...state, plan: data.plan };
+  }
+
+  /**
+   * PRUEBA GRATIS autoservicio: pide al cloud una licencia trial de 30 días
+   * para ESTA máquina (una sola por computadora, para siempre) y la deja
+   * activada. No requiere clave: solo nombre, comercio y WhatsApp.
+   */
+  async activateTrial(input: TrialInput): Promise<LicenseState> {
+    console.info('[license] creando prueba gratis de 30 días…');
+    let res: Response;
+    try {
+      res = await fetch(`${this.apiUrl}/api/licenses/trial`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          machineId: this.machineId,
+          fullName: input.fullName,
+          companyName: input.companyName,
+          phone: input.phone,
+        }),
+      });
+    } catch {
+      const base = this.getState();
+      return { ...base, lastError: 'No se pudo conectar con el servidor. Revisá tu internet y probá de nuevo.' };
+    }
+
+    if (!res.ok) {
+      let serverMsg: string | undefined;
+      try {
+        serverMsg = ((await res.json()) as { error?: string })?.error;
+      } catch {
+        serverMsg = undefined;
+      }
+      const base = this.getState();
+      return {
+        ...base,
+        lastError: serverMsg && serverMsg.trim().length > 0 ? serverMsg : 'No se pudo crear la prueba gratis. Probá de nuevo en un rato.',
+      };
+    }
+
+    let data: TrialResponse;
+    try {
+      data = (await res.json()) as TrialResponse;
+    } catch {
+      const base = this.getState();
+      return { ...base, lastError: 'Respuesta inválida del servidor de licencias.' };
+    }
+
+    this.storeJwt(data.jwt);
+    this.runtimeStatus = 'active';
+    if (data.tenantName) this.tenantName = data.tenantName;
+    this.clientName = input.fullName;
+    console.info(`[license] prueba gratis activada (key=${(data.licenseKey ?? '').slice(0, 7)}…, vence=${data.trialEndsAt ? new Date(data.trialEndsAt).toISOString() : '?'})`);
+    return this.getState();
   }
 
   /**

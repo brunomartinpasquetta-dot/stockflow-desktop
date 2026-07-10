@@ -16,6 +16,13 @@ interface ActivateBody {
   machineId?: string;
 }
 
+interface TrialBody {
+  machineId?: string;
+  companyName?: string;
+  fullName?: string;
+  phone?: string;
+}
+
 function statusOf(err: unknown): number {
   if (err && typeof err === 'object' && 'statusCode' in err && typeof err.statusCode === 'number') {
     return err.statusCode;
@@ -47,6 +54,44 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
           (payload) => app.jwt.sign(payload),
         );
         return reply.send({ jwt: result.jwt, expiresAt: result.expiresAt, plan: result.plan });
+      } catch (err) {
+        return reply.code(statusOf(err)).send({ error: messageOf(err) });
+      }
+    },
+  );
+
+  // PRUEBA GRATIS autoservicio (30 días): crea tenant+licencia trial y activa
+  // en el momento. Una sola prueba por máquina, para siempre.
+  app.post(
+    '/api/licenses/trial',
+    { config: { rateLimit: { max: 3, timeWindow: '1 hour' } } },
+    async (req: FastifyRequest<{ Body: TrialBody }>, reply: FastifyReply) => {
+      const b = req.body ?? {};
+      const machineId = typeof b.machineId === 'string' ? b.machineId.trim() : '';
+      const companyName = typeof b.companyName === 'string' ? b.companyName.trim() : '';
+      const fullName = typeof b.fullName === 'string' ? b.fullName.trim() : '';
+      const phone = typeof b.phone === 'string' ? b.phone.trim() : '';
+      if (!machineId || !companyName || !fullName || !phone) {
+        return reply.code(400).send({ error: 'Completá nombre, comercio y WhatsApp para empezar la prueba.' });
+      }
+      if (companyName.length > 255 || fullName.length > 255 || phone.length > 64 || machineId.length > 128) {
+        return reply.code(400).send({ error: 'Datos demasiado largos.' });
+      }
+      try {
+        const result = await licenseService.createTrial(
+          app.cloudDb,
+          { machineId, companyName, fullName, phone },
+          (payload) => app.jwt.sign(payload),
+        );
+        req.log.info({ companyName, phone, licenseKey: result.licenseKey }, 'trial creado');
+        return reply.send({
+          jwt: result.jwt,
+          expiresAt: result.expiresAt,
+          plan: result.plan,
+          tenantName: result.tenantName,
+          licenseKey: result.licenseKey,
+          trialEndsAt: result.trialEndsAt,
+        });
       } catch (err) {
         return reply.code(statusOf(err)).send({ error: messageOf(err) });
       }

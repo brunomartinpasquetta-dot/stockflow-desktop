@@ -7796,6 +7796,52 @@
       "Hacé clic en la opción que necesites y se abre la pantalla correspondiente."
      ],
      "image": "acerca-de-licencia.png"
+    },
+    {
+     "id": "prueba-gratis-30-dias",
+     "canonical": "¿Cómo empiezo la prueba gratis de 30 días sin licencia?",
+     "patterns": [
+      "prueba gratis",
+      "probar gratis",
+      "30 dias gratis",
+      "no tengo licencia quiero probar",
+      "como pruebo el sistema",
+      "version de prueba",
+      "trial",
+      "demo gratis",
+      "empezar prueba",
+      "probar sin pagar",
+      "usar sin licencia"
+     ],
+     "answer": "Podés usar StockFlow completo y GRATIS por 30 días, sin tarjeta y sin clave: se activa solo desde la pantalla de activación. Vale para una computadora, una sola vez.",
+     "steps": [
+      "Abrí StockFlow sin licencia: aparece la pantalla 'Empezá a usar StockFlow'.",
+      "En el recuadro azul 'Probá GRATIS por 30 días', escribí tu nombre, el nombre de tu comercio y tu WhatsApp.",
+      "Hacé clic en 'Empezar mi prueba gratis'. El sistema queda activado al instante (hace falta internet solo para este paso).",
+      "Arriba a la derecha vas a ver los días que te quedan (ej: 'Prueba: 25 día(s)')."
+     ]
+    },
+    {
+     "id": "prueba-vencida",
+     "canonical": "¿Qué pasa cuando se vence la prueba gratis? (solo lectura)",
+     "patterns": [
+      "se vencio la prueba",
+      "prueba vencida",
+      "termino la prueba",
+      "se me acabo la prueba",
+      "solo lectura prueba",
+      "no puedo cargar ventas prueba",
+      "vencio el periodo de prueba",
+      "quiero seguir despues de la prueba",
+      "comprar despues de la prueba"
+     ],
+     "answer": "Al cumplirse los 30 días el sistema pasa a SOLO LECTURA: entrás y ves todo lo que cargaste, pero no podés registrar operaciones nuevas. Tus datos NO se borran. Para seguir usándolo, escribinos por WhatsApp al +54 342 584 7340: te damos la clave definitiva, la ponés en la pantalla de activación y seguís con todos tus datos tal como estaban.",
+     "steps": [
+      "Escribinos por WhatsApp al +54 342 584 7340 para contratar tu licencia.",
+      "Te mandamos una clave con formato SF-XXXX-XXXX-XXXX-XXXX.",
+      "En StockFlow, la ponés donde dice '¿Ya tenés una clave de licencia?' y tocás 'Activar con mi clave'.",
+      "Listo: el sistema vuelve a funcionar completo, con todos los datos que cargaste en la prueba."
+     ]
     }
    ]
   },

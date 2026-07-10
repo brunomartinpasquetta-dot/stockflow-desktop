@@ -371,6 +371,8 @@ export const api = {
   license: {
     getState: (): Promise<LicenseStateDTO> => unwrap(sf().license.getState()),
     activate: (key: string): Promise<LicenseStateDTO> => unwrap(sf().license.activate({ licenseKey: key })),
+    activateTrial: (input: { fullName: string; companyName: string; phone: string }): Promise<LicenseStateDTO> =>
+      unwrap(sf().license.activateTrial(input)),
     heartbeat: (): Promise<LicenseStateDTO> => unwrap(sf().license.heartbeat()),
     deactivate: (): Promise<LicenseStateDTO> => unwrap(sf().license.deactivate()),
     onChanged: (cb: () => void): (() => void) => sf().license.onChanged(cb),

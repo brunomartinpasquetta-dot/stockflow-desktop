@@ -28,7 +28,16 @@ export interface LicenseState {
    * de MercadoPago.
    */
   tenantId: string | null;
+  /** true si es una PRUEBA GRATIS (30 días). expiresAt = fin de la prueba. */
+  trial?: boolean;
   lastError: string | null;
+}
+
+/** Datos que el usuario carga para arrancar la prueba gratis. */
+export interface TrialInput {
+  fullName: string;
+  companyName: string;
+  phone: string;
 }
 
 /** Payload del JWT de licencia (firmado RS256 por el cloud). */
@@ -37,6 +46,10 @@ export interface LicenseJwtPayload {
   tid: string;
   plan: LicensePlan;
   lk: string;
+  /** 'trial' cuando la licencia es una prueba gratis. Ausente = paga. */
+  kind?: 'trial';
+  /** Fin de la PRUEBA en epoch-segundos (el exp del JWT es corto y renovable). */
+  texp?: number;
   iat: number;
   exp: number;
 }

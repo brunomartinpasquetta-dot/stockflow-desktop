@@ -402,6 +402,7 @@ export function createApiBridge(
     license: {
       getState: () => c<never>('license:getState'),
       activate: (p) => c<never>('license:activate', p),
+      activateTrial: (p) => c<never>('license:activateTrial', p),
       heartbeat: () => c<never>('license:heartbeat'),
       deactivate: () => c<never>('license:deactivate'),
       onChanged: (cb) => on('license:changed', () => cb()),

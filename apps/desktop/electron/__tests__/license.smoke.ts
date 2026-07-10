@@ -10,7 +10,7 @@
  *  - `heartbeat()` con `fetch` devolviendo 401 → estado 'revoked'.
  */
 import { generateKeyPairSync, createSign } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -97,6 +97,35 @@ async function main(): Promise<void> {
     });
     const st = mgr.getState();
     check('getState() sin license.dat → unlicensed', st.status === 'unlicensed' && st.plan === null);
+  }
+
+  // --- PRUEBA GRATIS: estados offline según texp (fin de la prueba) ---
+  {
+    const mkTrialMgr = (texpOffsetSec: number, jwtExpOffsetSec: number): LicenseManager => {
+      const dir = mkdtempSync(join(tmpdir(), 'stockflow-trial-smoke-'));
+      const jwt = makeJwt(privateKeyPem, {
+        ...validPayload,
+        kind: 'trial',
+        texp: now + texpOffsetSec,
+        exp: now + jwtExpOffsetSec,
+      });
+      writeFileSync(join(dir, 'license.dat'), jwt); // texto plano (fallback sin safeStorage)
+      return new LicenseManager({ userDataDir: dir, machineId: 'fake-machine', apiUrl: 'http://localhost:1', publicKeyPem });
+    };
+    // Prueba VIGENTE (quedan ~10 días, JWT sano) → active + trial + expiresAt = fin de prueba.
+    const st1 = mkTrialMgr(10 * 86_400, 7 * 86_400).getState();
+    check('trial vigente → active', st1.status === 'active', st1.status);
+    check('trial vigente → trial:true y expiresAt=texp', st1.trial === true && Math.abs((st1.expiresAt ?? 0) - (now + 10 * 86_400) * 1000) < 2000);
+    // Prueba VENCIDA (texp pasado, JWT todavía sano por renovaciones) → readOnly, NO unlicensed.
+    const st2 = mkTrialMgr(-86_400, 7 * 86_400).getState();
+    check('trial vencida (offline) → readOnly', st2.status === 'readOnly', st2.status);
+    check('trial vencida → mensaje de prueba terminada', (st2.lastError ?? '').includes('prueba gratis'), st2.lastError ?? '');
+    // Prueba vencida Y JWT vencido (mucho tiempo sin abrir) → sigue readOnly con datos a la vista.
+    const st3 = mkTrialMgr(-86_400, -60).getState();
+    check('trial vencida + jwt vencido → readOnly (no unlicensed)', st3.status === 'readOnly', st3.status);
+    // Prueba VIGENTE pero JWT vencido (offline >7 días) → readOnly pidiendo conexión (la re-activación silenciosa lo renueva al conectar).
+    const st4 = mkTrialMgr(10 * 86_400, -60).getState();
+    check('trial vigente + jwt vencido → readOnly pidiendo internet', st4.status === 'readOnly' && (st4.lastError ?? '').includes('onectate'), `${st4.status} / ${st4.lastError ?? ''}`);
   }
 
   // --- activate() con fetch monkeypatcheado ---
