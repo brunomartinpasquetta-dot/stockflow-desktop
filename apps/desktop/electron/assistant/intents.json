@@ -1200,13 +1200,14 @@
       "registrar un producto",
       "agregar un producto al catalogo"
      ],
-     "answer": "Cargar un producto es fácil: entrás a Artículos, tocás el botón 'Nuevo' y completás como mínimo el Código y la Descripción. Después 'Guardar' y ya lo tenés en la lista.",
+     "answer": "Cargar un producto es fácil: entrás a Artículos, tocás el botón 'Nuevo' y completás como mínimo el Código, la Descripción y la Marca. Después 'Guardar' y ya lo tenés en la lista.",
      "steps": [
       "Abrí la pantalla de Artículos: presioná F1, o hacé clic en el botón 'Artículos' de la barra de arriba.",
       "Arriba a la izquierda, hacé clic en el botón 'Nuevo' (tiene un signo +). También podés presionar Ctrl+N. Abajo se abre un formulario que dice 'Nuevo artículo'.",
       "En el casillero 'Código' escribí un código corto que elijas vos (por ejemplo '001' o 'CAFE-500'), o el número del código de barras del envase. No se puede repetir con otro producto.",
       "En 'Descripción' escribí el nombre del producto tal como querés que salga en el ticket (mínimo 2 letras).",
-      "Si querés, completá también 'Marca', 'Familia', 'Proveedor', los precios y el stock. Nada de eso es obligatorio para empezar.",
+      "En 'Marca' escribí la marca del producto — es OBLIGATORIA, sirve para distinguir el mismo producto entre distintos fabricantes. Si no tiene marca, escribí 'S/M' (sin marca).",
+      "Si querés, completá también 'Familia', 'Proveedor', los precios y el stock. Eso sí es opcional.",
       "Abajo del formulario, hacé clic en el botón 'Guardar'. Aparece un cartelito que dice 'Artículo creado' y el producto ya figura en la lista.",
       "Si en cambio salta un cartel rojo tipo 'Código ya existe' o 'El costo no puede ser negativo', el artículo NO se guardó: corregí ese dato (el código no se puede repetir con otro producto y los precios no pueden ser negativos) y volvé a tocar 'Guardar'.",
       "Si sale un cartel rojo que dice 'El código es obligatorio' o 'La descripción debe tener al menos 2 caracteres', completá ese dato y volvé a tocar 'Guardar'."
@@ -2018,6 +2019,30 @@
       "Después, en el buscador de arriba a la derecha (Ctrl+F) podés escribir la marca y la lista te muestra solo esos productos."
      ],
      "image": "articulos-listado.png"
+    },
+    {
+     "id": "buscar-multi-propiedad",
+     "canonical": "¿Cómo busco artículos por marca, familia o proveedor?",
+     "patterns": [
+      "buscar por marca",
+      "filtrar por marca",
+      "buscar por familia",
+      "buscar por proveedor",
+      "filtro de marcas",
+      "no encuentro por marca",
+      "buscar articulos de una familia",
+      "buscar por marca y familia",
+      "buscar bosch",
+      "el buscador no encuentra la marca",
+      "como filtro los articulos por marca"
+     ],
+     "answer": "Todos los buscadores de artículos del sistema (Artículos, Ventas, Compras, Presupuestos, Actualización de precios y el buscador de arriba) entienden CUALQUIER dato del producto: código, descripción, marca, familia o proveedor. Y podés combinar palabras: 'bebidas bosch' filtra la familia Bebidas Y la marca Bosch a la vez. No importan los acentos.",
+     "steps": [
+      "Escribí en el buscador lo que sepas del producto: la marca ('bosch'), la familia ('lácteos'), el proveedor o una parte del nombre. Podés combinar varias palabras.",
+      "En la pantalla de Artículos (F1) además tenés un filtro desplegable de marcas: arriba de la lista, donde dice 'Todas las marcas', elegí una y la lista muestra solo esa marca.",
+      "En los resultados, cada artículo muestra su marca en un chip azul, junto al precio y el stock — así distinguís el mismo producto entre distintos fabricantes."
+     ],
+     "image": "articulos-listado"
     }
    ]
   },
@@ -3337,7 +3362,7 @@
      "steps": [
       "Arriba de todo está el MENÚ: palabras como 'Archivo', 'Gestión', 'Operaciones'. Hacé clic en una y se despliega una lista de opciones.",
       "Debajo del menú está la BARRA DE ACCESOS RÁPIDOS: botones grandes con dibujito, nombre y una tecla (F1, F2...). Un clic en cualquiera abre esa pantalla en una ventana nueva.",
-      "Debajo hay una barrita fina con el buscador ('Buscar…'), el botón 'Asistente' (que abre esta ayuda), si la caja está abierta o cerrada, la hora y tu nombre.",
+      "Debajo hay una barrita fina con el buscador ('Buscar…'), el botón azul 'Flowy' (que abre esta ayuda), si la caja está abierta o cerrada, la hora y tu nombre.",
       "Abajo de todo está la BARRA DE TAREAS: por cada ventana abierta aparece una pastillita con su nombre. Hacé clic en una para traerla al frente.",
       "Para cerrar una ventana de trabajo, hacé clic en la X de esa ventana (arriba). La pantalla principal siempre queda abierta de fondo."
      ],
@@ -3695,9 +3720,9 @@
       "barrita de arriba",
       "que significa lo de arriba"
      ],
-     "answer": "Esa barrita fina te muestra de un vistazo: el buscador y el botón 'Asistente' a la izquierda, y después si la caja está abierta ('Caja: abierta') o cerrada ('Caja cerrada'), el estado de la conexión de red, la hora y tu nombre de usuario.",
+     "answer": "Esa barrita fina te muestra de un vistazo: el buscador y el botón azul 'Flowy' a la izquierda, y después si la caja está abierta ('Caja: abierta') o cerrada ('Caja cerrada'), el estado de la conexión de red, la hora y tu nombre de usuario.",
      "steps": [
-      "A la izquierda está el botón 'Buscar…' (la lupita) y al lado el botón 'Asistente' (con el logo de StockFlow).",
+      "A la izquierda está el botón 'Buscar…' (la lupita) y al lado el botón 'Flowy' (con el cubito del logo de StockFlow).",
       "Después, junto al dibujito de una billetera, dice 'Caja: abierta' o 'Caja cerrada'. Si dice cerrada y necesitás vender, abrí la caja: apretá F4 o hacé clic en el botón 'Caja'.",
       "Al lado se ve la hora actual.",
       "A la derecha, junto al dibujito de una personita, está tu nombre: así sabés con qué usuario estás trabajando."
@@ -6138,6 +6163,29 @@
       "Si igual no abre, probá la impresión de prueba desde Configuración para verificar que la impresora responde."
      ],
      "image": "pdv-principal.png"
+    },
+    {
+     "id": "lista-precios-automatica-cliente",
+     "canonical": "¿Por qué se cambia sola la lista de precios al elegir un cliente?",
+     "patterns": [
+      "lista de precios del cliente",
+      "se cambia sola la lista",
+      "lista automatica cliente",
+      "el cliente tiene otra lista",
+      "asignar lista de precios a un cliente",
+      "no me toma la lista del cliente",
+      "porque me cobra con lista 2",
+      "porque cambia la lista de precios",
+      "cliente con lista 2",
+      "lista asignada"
+     ],
+     "answer": "Cada cliente puede tener asignada una lista de precios (1, 2 o 3). Cuando lo cargás en Ventas, el sistema pone SOLO la lista que ese cliente tiene asignada — no hace falta cambiarla a mano. Si el cliente no tiene lista asignada, queda la Lista 1 (la de siempre).",
+     "steps": [
+      "La lista se asigna en la ficha del cliente: presioná F6 (o menú 'Gestión' → 'Clientes'), elegí el cliente, tocá 'Modificar' y en 'Lista de precios' elegí 1, 2 o 3. Guardá.",
+      "Después, en Ventas (F5), cuando cargues ese cliente, mirá el selector 'Lista de precios' (arriba): se cambia solo a la lista asignada y los productos salen con esos precios.",
+      "Si para una venta puntual querés otra lista, cambiala a mano en ese selector — vale solo para esa venta."
+     ],
+     "image": "pdv-principal"
     }
    ]
   },
@@ -8573,6 +8621,60 @@
       "A la derecha, en 'Acciones', tenés el botón de WhatsApp y el botón 'Ver' para entrar al detalle. También podés hacer clic en cualquier parte de la fila para entrar."
      ],
      "image": "cuentas-corrientes-listado-clientes.png"
+    },
+    {
+     "id": "cc-filtrar-periodo",
+     "canonical": "¿Cómo veo los movimientos de la cuenta corriente entre dos fechas (período)?",
+     "patterns": [
+      "filtrar por fecha cuenta corriente",
+      "movimientos desde hasta",
+      "resumen del periodo",
+      "ver movimientos de un mes",
+      "cuanto me debe del mes",
+      "filtrar fechas cta cte",
+      "rango de fechas cuenta corriente",
+      "movimientos del periodo",
+      "estado de cuenta por fechas",
+      "total del periodo",
+      "ver lo del mes pasado cliente",
+      "filtrar movimientos proveedor por fecha"
+     ],
+     "answer": "Podés filtrar los movimientos de la cuenta de un cliente (o proveedor) entre dos fechas y ver cuánto suma ese período: las ventas, las cobranzas y el total que quedó pendiente del rango.",
+     "steps": [
+      "Presioná F9, o hacé clic en el menú 'Cobros y Pagos' y elegí 'Cuentas Corrientes'. Arriba tenés las pestañas 'Clientes' y 'Proveedores' — elegí la que necesites.",
+      "Hacé clic en el cliente (o proveedor) de la lista para abrir su cuenta.",
+      "En la parte de 'Movimientos' hay dos casilleros de fecha: 'Desde' y 'Hasta'. Elegí el rango que quieras (por ejemplo, del 1 al 30 del mes pasado).",
+      "La lista muestra solo los movimientos de ese rango, y al lado ves los totales: 'Ventas del período', las cobranzas y el 'Total del período' (lo que quedó sin pagar de ese rango).",
+      "Para volver a ver todos los movimientos, borrá las dos fechas."
+     ],
+     "image": "cuentas-corrientes-detalle-cliente"
+    },
+    {
+     "id": "cc-cobrar-periodo",
+     "canonical": "¿Cómo cobro el total de un período y le doy un ticket con el detalle?",
+     "patterns": [
+      "cobrar el periodo",
+      "cobrar el mes",
+      "cobrarle todo el mes al cliente",
+      "ticket del periodo",
+      "recibo con el detalle del mes",
+      "cobrar rango de fechas",
+      "cobrar lo del mes",
+      "pagar el periodo al proveedor",
+      "pagar el mes al proveedor",
+      "cobrar todo lo pendiente del mes",
+      "recibo del periodo"
+     ],
+     "answer": "Podés cobrarle a un cliente todo lo pendiente de un período (por ejemplo, el mes pasado) de una sola vez, y entregarle un ticket con el detalle de los movimientos de ese rango. Con proveedores es igual, pero el botón dice 'Pagar período'.",
+     "steps": [
+      "Presioná F9, o hacé clic en el menú 'Cobros y Pagos' y elegí 'Cuentas Corrientes'. Elegí la pestaña 'Clientes' (o 'Proveedores').",
+      "Hacé clic en el cliente para abrir su cuenta.",
+      "En 'Movimientos', completá las fechas 'Desde' y 'Hasta' del período que le querés cobrar.",
+      "Tocá el botón 'Cobrar período'. Se abre el diálogo de cobranza con el monto ya cargado: el total del período (si ese total es más que el saldo actual de la cuenta, se carga el saldo).",
+      "Elegí el medio de pago y confirmá.",
+      "Al confirmar se imprime solo el ticket con el detalle del período (cada venta y cobranza del rango, con los totales). El dinero se asigna a las ventas más viejas primero, como siempre."
+     ],
+     "image": "cuentas-corrientes-dialogo-cobranza-fifo"
     }
    ]
   },
@@ -9955,19 +10057,16 @@
       "tengo que remarcar todo como hago",
       "aumento general de precios"
      ],
-     "answer": "Con esta pantalla cambiás el precio de muchos artículos de una sola vez (por ejemplo, subir todo un 15%). Está en el menú de arriba, en 'Precios'. Quedate tranquilo: antes de cambiar nada, el sistema te muestra una vista previa con el antes y el después.",
+     "answer": "Con esta pantalla cambiás el precio de muchos artículos de una sola vez (por ejemplo, subir todo un 15%). Es en 2 pasos y sin riesgo: marcás los artículos con el tilde, definís el cambio abajo y tocás 'Ver y aplicar cambios' — el sistema SIEMPRE te muestra el antes y el después para que confirmes.",
      "steps": [
-      "En la barra de menú de arriba, hacé clic en 'Precios' y después en 'Actualización Masiva'. Se abre la pantalla 'Actualización de Precios' con la lista de tus artículos.",
-      "Si querés cambiar solo algunos, escribí en el buscador de arriba que dice 'Buscar por código, descripción o marca…'. También podés hacer clic en 'Filtros' (a la derecha del buscador): ahí podés elegir familias, proveedores, tildar 'Sólo con stock' o poner un precio mínimo y máximo.",
-      "Tildá el cuadradito de la izquierda de cada artículo que quieras cambiar. Para marcar todos juntos, tildá el cuadradito de arriba de la lista que dice 'Seleccionar todos los filtrados'.",
-      "Apenas marcás un artículo, abajo del todo aparece un panel que dice 'Aplicar a X artículos seleccionados'. Ahí se arma el cambio.",
-      "En 'Campo:' tildá qué precios querés tocar: 'Costo', 'Venta (L1)', 'L2', 'L3' o 'Mayor'. Podés tildar varios a la vez.",
-      "En 'Modo:' elegí una de las tres opciones: 'Porcentaje' (subir o bajar un porcentaje), 'Monto fijo' (sumar o restar pesos) o 'Valor absoluto' (poner un precio exacto).",
-      "Si elegiste Porcentaje o Monto fijo, en 'Dirección:' marcá 'Subir' (flechita para arriba) o 'Bajar' (flechita para abajo).",
-      "En 'Valor:' escribí el número. Ejemplo: 15 para un 15%, o 500 para $500.",
-      "Hacé clic en el botón 'Vista previa'. Se abre una ventana que dice 'Vista previa de cambios' y muestra cada artículo con su precio 'Actual', el 'Nuevo' y la 'Diferencia' (en verde si sube, en rojo si baja).",
-      "Si está todo bien, hacé clic en 'Aplicar'. Vas a ver un cartelito verde que dice 'Aplicado: X artículos modificados'. Si algo no te gusta, hacé clic en 'Volver' y corregí la regla.",
-      "Si te aparece un cartel rojo que dice 'Seleccioná al menos un artículo', 'Elegí al menos un campo' o 'El valor debe ser distinto de cero', es porque falta completar algo: revisá los cuadraditos y el número que escribiste."
+      "En la barra de menú de arriba, hacé clic en 'Precios' y después en 'Actualización Masiva'. Se abre la pantalla con la lista de todos los artículos.",
+      "Si querés cambiar solo algunos, usá el buscador de arriba ('Buscar por código, marca, familia, proveedor…') o el filtro de marcas.",
+      "Paso 1: marcá con el tilde (☑) los artículos que quieras actualizar. Para marcar todos los de la lista, tildá el cuadradito de arriba de todo.",
+      "Abajo de la pantalla está el panel del cambio (siempre visible; te va guiando). En 'Campo:' tildá qué precios tocar: 'Costo', 'Venta (L1)', 'L2', 'L3' o 'Mayor'. Podés tildar varios a la vez.",
+      "En 'Modo:' elegí: 'Porcentaje (%)' (sube o baja un porcentaje), 'Monto fijo ($ más/menos)' (suma o resta pesos) o 'Precio exacto (=$)' (deja el precio en un número exacto).",
+      "Con porcentaje o monto, en 'Dirección:' marcá '⬆ Aumentar' o '⬇ Bajar'. Escribí el número en 'Valor:' (acepta coma, ej: 10,5) y si querés elegí un 'Redondeo:'.",
+      "Tocá el botón 'Ver y aplicar cambios'. Se abre una ventana con cada artículo y su precio ANTES y DESPUÉS — todavía no se guarda nada.",
+      "Revisá y tocá 'Confirmar y aplicar X cambio(s)'. La lista se actualiza al instante y todo queda registrado en el Historial de precios."
      ],
      "image": "contabilidad-resumen.png"
     },
@@ -9985,14 +10084,13 @@
       "subir por porcentaje o por monto",
       "como bajo los precios un 10"
      ],
-     "answer": "Son las tres formas de cambiar precios en 'Actualización Masiva'. 'Porcentaje' sube o baja un porcentaje (ponés 15 y sube 15%), 'Monto fijo' suma o resta pesos (ponés 500 y suma $500), y 'Valor absoluto' pone un precio exacto (ponés 1000 y el precio queda en $1000).",
+     "answer": "Son las tres formas de cambiar precios en 'Actualización Masiva'. 'Porcentaje (%)' sube o baja un porcentaje (ponés 15 y cambia 15%). 'Monto fijo ($ más/menos)' suma o resta pesos (ponés 500 y suma o resta $500 según la Dirección). 'Precio exacto (=$)' deja el precio exactamente en el número que escribas.",
      "steps": [
-      "Primero abrí la pantalla: hacé clic en el menú 'Precios' (arriba, en la fila de palabras) y elegí 'Actualización Masiva'. Se abre la Actualización Masiva de precios.",
-      "En el panel de abajo de la pantalla 'Actualización de Precios', buscá donde dice 'Modo:'.",
-      "Marcá el circulito de la opción que quieras: 'Porcentaje', 'Monto fijo' o 'Valor absoluto'.",
-      "Si elegiste 'Porcentaje' o 'Monto fijo', al lado aparece 'Dirección:': marcá 'Subir' o 'Bajar' según quieras aumentar o rebajar.",
-      "Con 'Valor absoluto' no hay dirección: el precio queda exactamente en el número que escribas en 'Valor:'.",
-      "Antes de confirmar, hacé clic en 'Vista previa' para ver cómo quedaría cada precio."
+      "Abrí la pantalla: hacé clic en el menú 'Precios' (arriba) y elegí 'Actualización Masiva'.",
+      "En el panel de abajo, buscá donde dice 'Modo:' y marcá el circulito de la opción que quieras: 'Porcentaje (%)', 'Monto fijo ($ más/menos)' o 'Precio exacto (=$)'.",
+      "Con porcentaje o monto fijo, al lado aparece 'Dirección:': elegí '⬆ Aumentar' o '⬇ Bajar'.",
+      "Con 'Precio exacto (=$)' no hay dirección: el precio queda en el número que escribas en 'Valor:'.",
+      "Escribí el 'Valor:' (acepta coma: 10,5) y tocá 'Ver y aplicar cambios' para ver el antes y el después antes de confirmar."
      ],
      "image": "contabilidad-resumen.png"
     },
@@ -10015,7 +10113,7 @@
       "En el panel de abajo, buscá donde dice 'Redondeo:'.",
       "Hacé clic en la listita y elegí una opción: 'Sin redondeo', 'Múltiplo de $10', 'Múltiplo de $50', 'Múltiplo de $100' o 'Terminado en 99'.",
       "El redondeo se hace DESPUÉS de la cuenta. Ejemplo: si el cálculo da $105,50 y elegiste 'Múltiplo de $10', el precio queda en $110.",
-      "Hacé clic en 'Vista previa' para ver los precios ya redondeados antes de aplicar."
+      "Hacé clic en 'Ver y aplicar cambios' para ver los precios ya redondeados antes de aplicar."
      ],
      "image": "contabilidad-resumen.png"
     },
@@ -10036,7 +10134,7 @@
       "Primero abrí la pantalla: hacé clic en el menú 'Precios' (arriba, en la fila de palabras) y elegí 'Actualización Masiva'. Se abre la Actualización Masiva de precios.",
       "En el panel de abajo de 'Actualización de Precios', buscá la fila que dice 'Campo:'.",
       "Tildá todos los cuadraditos que quieras cambiar (por ejemplo 'Venta (L1)' y 'L2').",
-      "Armá la regla como siempre y hacé clic en 'Vista previa': vas a ver una fila por cada campo de cada artículo, así controlás todo antes de aplicar."
+      "Armá la regla como siempre y tocá 'Ver y aplicar cambios': vas a ver una fila por cada campo de cada artículo, así controlás todo antes de aplicar."
      ],
      "image": "contabilidad-resumen.png"
     },
@@ -10738,7 +10836,7 @@
       "Si buscás una marca puntual, escribí el nombre en el buscador de arriba 'Buscar por código, descripción o marca…'. La lista se achica a lo que coincide.",
       "Tildá el cuadradito de arriba 'Seleccionar todos los filtrados' para marcar de una todos los que quedaron en pantalla (o tildá uno por uno).",
       "Abajo aparece el panel 'Aplicar a X artículos seleccionados': elegí el 'Campo' (por ejemplo 'Venta (L1)'), el 'Modo' (Porcentaje), la 'Dirección' ('Subir') y en 'Valor' el número, por ejemplo 10.",
-      "Hacé clic en 'Vista previa' para controlar que solo cambien los de esa familia o proveedor, y si está bien hacé clic en 'Aplicar'.",
+      "Hacé clic en 'Ver y aplicar cambios' para controlar que solo cambien los de esa familia o proveedor, y si está bien hacé clic en 'Aplicar'.",
       "Verificá el cartel verde 'Aplicado: X artículos modificados'. El resto de tus precios no se tocó."
      ],
      "image": "contabilidad-resumen.png"
@@ -10820,6 +10918,28 @@
       "Si querés el dato en planilla, hacé clic en 'Exportar Excel' arriba a la derecha: incluye la hoja 'Top Proveedores'."
      ],
      "image": "estadisticas-resumen.png"
+    },
+    {
+     "id": "masiva-base-lista1",
+     "canonical": "¿Qué pasa si actualizo la Lista 2 o 3 y están en $0? (toman como base la Lista 1)",
+     "patterns": [
+      "lista 2 en cero",
+      "lista 3 en cero",
+      "l2 cero",
+      "actualizar lista 2 vacia",
+      "base lista 1",
+      "lista de precios en cero no cambia",
+      "porque no me actualiza la lista 2",
+      "lista 2 no se actualiza",
+      "listas en cero",
+      "precio en cero no sube"
+     ],
+     "answer": "La Lista 1 es la base de todo el sistema. Si actualizás la Lista 2 o la Lista 3 con porcentaje o monto y un artículo las tiene en $0, el cálculo PARTE del precio de la Lista 1 (así no quedan en cero para siempre). Ojo: el precio 'Mayor' en $0 no se toca — en cero significa que ese artículo no maneja precio mayorista.",
+     "steps": [
+      "Abrí la pantalla: menú 'Precios' (arriba) → 'Actualización Masiva'.",
+      "Tildá los artículos, y en 'Campo:' marcá 'L2' o 'L3'. Elegí el modo y el valor.",
+      "Tocá 'Ver y aplicar cambios': en la vista previa vas a ver que los artículos con esa lista en $0 calculan el cambio desde el precio de la Lista 1. Confirmá y listo."
+     ]
     }
    ]
   },

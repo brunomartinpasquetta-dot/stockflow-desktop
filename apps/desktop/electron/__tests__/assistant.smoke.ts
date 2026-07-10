@@ -24,6 +24,10 @@ const SINGLE = [
   'como activo la licencia', 'backup de los datos',
   // typos:
   'como ago una benta', 'kiero cargar un articulo', 'imprimr un tiket',
+  // novedades v0.1.82-86:
+  'como cobro el mes de un cliente', 'filtrar la cuenta corriente por fechas',
+  'buscar articulos por marca', 'porque se cambia sola la lista de precios',
+  'lista 2 en cero no se actualiza',
 ]
 console.log('── Single-shot ──')
 for (const q of SINGLE) {
