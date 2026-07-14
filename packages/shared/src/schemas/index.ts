@@ -11,6 +11,7 @@ export * from './cashRegister.schema';
 export * from './cashMovement.schema';
 export * from './saleLine.schema';
 export * from './sale.schema';
+export * from './promotion.schema';
 export * from './quote.schema';
 export * from './purchaseLine.schema';
 export * from './purchase.schema';

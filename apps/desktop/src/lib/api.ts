@@ -42,6 +42,8 @@ import type {
   CustomerStatementDTO,
   EntityPayload,
   FamilyDTO,
+  PromotionDTO,
+  PromotionWritePayload,
   IpcErrorCode,
   IpcResponse,
   LicenseStateDTO,
@@ -203,6 +205,16 @@ export const api = {
       unwrap(sf().sales.get({ id })),
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
+  },
+  promotions: {
+    list: (): Promise<PromotionDTO[]> => unwrap(sf().promotions.list()),
+    get: (id: string): Promise<PromotionDTO | null> => unwrap(sf().promotions.get({ id })),
+    create: (data: PromotionWritePayload): Promise<PromotionDTO> => unwrap(sf().promotions.create(data)),
+    update: (id: string, data: PromotionWritePayload): Promise<PromotionDTO> =>
+      unwrap(sf().promotions.update({ id, data })),
+    setActive: (id: string, active: boolean): Promise<PromotionDTO> =>
+      unwrap(sf().promotions.setActive({ id, active })),
+    delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().promotions.delete({ id })),
   },
   quotes: {
     create: (input: CreateQuoteInputDTO): Promise<QuoteWithLinesDTO> => unwrap(sf().quotes.create(input)),

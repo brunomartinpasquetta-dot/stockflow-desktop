@@ -439,6 +439,61 @@ export const saleLines = sqliteTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* promotions — combos/promos. La promo se VENDE como un artículo       */
+/* "espejo" real (fila en `articles`, marca 'PROMO'): así el carrito,   */
+/* el ticket, el IVA y los reportes funcionan sin casos especiales.     */
+/* Esta tabla marca qué artículos son promos y sus componentes; al      */
+/* vender/anular, el stock se mueve sobre los COMPONENTES (el stock del */
+/* espejo no se toca). Nombre/precio/costo viven en el artículo espejo. */
+/* ------------------------------------------------------------------ */
+export const promotions = sqliteTable(
+  'promotions',
+  {
+    id: pk(),
+    /** Artículo espejo (uno por promo). Activar/desactivar = `articles.active`. */
+    articleId: text('article_id')
+      .notNull()
+      .references(() => articles.id),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    articleIdx: uniqueIndex('idx_promotions_article').on(t.articleId),
+  }),
+);
+
+export const promotionItems = sqliteTable(
+  'promotion_items',
+  {
+    id: pk(),
+    promotionId: text('promotion_id')
+      .notNull()
+      .references(() => promotions.id, { onDelete: 'cascade' }),
+    /** Componente real cuyo stock se descuenta al vender la promo. */
+    articleId: text('article_id')
+      .notNull()
+      .references(() => articles.id),
+    /** Unidades del componente por CADA promo vendida (3 decimales). */
+    quantity: text('quantity').notNull().default('1.000'),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    promotionIdx: index('idx_promotion_items_promotion').on(t.promotionId),
+    promotionArticleIdx: uniqueIndex('idx_promotion_items_promotion_article').on(t.promotionId, t.articleId),
+  }),
+);
+
+export const promotionsRelations = relations(promotions, ({ one, many }) => ({
+  article: one(articles, { fields: [promotions.articleId], references: [articles.id] }),
+  items: many(promotionItems),
+}));
+
+export const promotionItemsRelations = relations(promotionItems, ({ one }) => ({
+  promotion: one(promotions, { fields: [promotionItems.promotionId], references: [promotions.id] }),
+  article: one(articles, { fields: [promotionItems.articleId], references: [articles.id] }),
+}));
+
+/* ------------------------------------------------------------------ */
 /* quotes — presupuestos (cabecera). NO es comprobante fiscal: tiene su */
 /* propia numeración secuencial. No toca stock hasta convertirse en venta. */
 /* ------------------------------------------------------------------ */
@@ -1069,6 +1124,10 @@ export type SaleLine = typeof saleLines.$inferSelect;
 export type NewSaleLine = typeof saleLines.$inferInsert;
 export type SalePayment = typeof salePayments.$inferSelect;
 export type NewSalePayment = typeof salePayments.$inferInsert;
+export type Promotion = typeof promotions.$inferSelect;
+export type NewPromotion = typeof promotions.$inferInsert;
+export type PromotionItem = typeof promotionItems.$inferSelect;
+export type NewPromotionItem = typeof promotionItems.$inferInsert;
 export type Quote = typeof quotes.$inferSelect;
 export type NewQuote = typeof quotes.$inferInsert;
 export type QuoteLine = typeof quoteLines.$inferSelect;

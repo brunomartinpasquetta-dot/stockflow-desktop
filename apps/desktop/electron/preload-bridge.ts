@@ -51,6 +51,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'customers',
   'suppliers',
   'families',
+  'promotions',
   'users',
   'roles',
   'company',
@@ -294,6 +295,14 @@ export function createApiBridge(
     company: {
       get: () => c<never>('company:get'),
       upsert: (p) => c<never>('company:upsert', p),
+    },
+    promotions: {
+      list: () => c<never>('promotions:list'),
+      get: (p) => c<never>('promotions:get', p),
+      create: (p) => c<never>('promotions:create', p),
+      update: (p) => c<never>('promotions:update', p),
+      setActive: (p) => c<never>('promotions:setActive', p),
+      delete: (p) => c<never>('promotions:delete', p),
     },
     quotes: {
       create: (p) => c<never>('quotes:create', p),

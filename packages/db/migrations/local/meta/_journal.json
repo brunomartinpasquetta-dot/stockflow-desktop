@@ -78,6 +78,13 @@
       "when": 1779300000000,
       "tag": "0011_quotes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1779400000000,
+      "tag": "0012_promotions",
+      "breakpoints": true
     }
   ]
 }

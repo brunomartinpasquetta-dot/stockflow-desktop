@@ -425,6 +425,46 @@ export interface CreateSaleResultDTO {
 
 export type QuoteStatus = 'pending' | 'accepted' | 'rejected' | 'converted';
 
+/* ----------------------------------------------------------------------- */
+/* Promociones (combos con artículo espejo)                                 */
+/* ----------------------------------------------------------------------- */
+
+export interface PromotionItemDTO {
+  articleId: string;
+  barcode: string;
+  description: string;
+  /** Unidades del componente por cada promo vendida (decimal string). */
+  quantity: string;
+  costPrice: string;
+  stock: string;
+}
+
+export interface PromotionDTO {
+  id: string;
+  /** Artículo espejo con el que se vende la promo en el PDV. */
+  articleId: string;
+  name: string;
+  /** Código del espejo (PROMO-N): sirve para tipearlo/escanearlo en Ventas. */
+  code: string;
+  /** Precio de venta (va a las 3 listas del espejo). */
+  price: string;
+  /** Costo real = Σ cantidad × costo actual de cada componente. */
+  cost: string;
+  active: boolean;
+  notes: string | null;
+  items: PromotionItemDTO[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PromotionWritePayload {
+  name?: string;
+  price?: string;
+  notes?: string | null;
+  items?: Array<{ articleId: string; quantity: string }>;
+  active?: boolean;
+}
+
 export interface QuoteDTO {
   id: string;
   number: number;
@@ -1417,6 +1457,14 @@ export interface ApiSurface {
     get(payload: IdPayload): Res<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }>;
     listByDateRange(payload: DateRangeDTO): Res<SaleDTO[]>;
     getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;
+  };
+  promotions: {
+    list(): Res<PromotionDTO[]>;
+    get(payload: IdPayload): Res<PromotionDTO | null>;
+    create(payload: PromotionWritePayload): Res<PromotionDTO>;
+    update(payload: { id: string; data: PromotionWritePayload }): Res<PromotionDTO>;
+    setActive(payload: { id: string; active: boolean }): Res<PromotionDTO>;
+    delete(payload: IdPayload): Res<{ deleted: true }>;
   };
   quotes: {
     create(payload: CreateQuoteInputDTO): Res<QuoteWithLinesDTO>;

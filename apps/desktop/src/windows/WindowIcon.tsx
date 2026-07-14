@@ -4,6 +4,7 @@
  */
 import {
   ArrowLeftRight,
+  BadgePercent,
   BarChart3,
   Boxes,
   Building2,
@@ -30,6 +31,7 @@ import {
 export function WindowIcon({ name, className }: { name: string | undefined; className?: string }) {
   switch (name) {
     case 'ArrowLeftRight': return <ArrowLeftRight className={className} />
+    case 'BadgePercent': return <BadgePercent className={className} />
     case 'BarChart3': return <BarChart3 className={className} />
     case 'Boxes': return <Boxes className={className} />
     case 'Building2': return <Building2 className={className} />

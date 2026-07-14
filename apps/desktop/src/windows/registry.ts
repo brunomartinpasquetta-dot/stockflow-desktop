@@ -158,6 +158,13 @@ export const WINDOWS: Record<string, WindowDef> = {
     iconName: 'Tags',
     component: lazy(() => import('@/pages/Familias').then((m) => ({ default: m.Familias }))),
   },
+  promociones: {
+    pageKey: 'promociones',
+    title: 'Promociones',
+    iconName: 'BadgePercent',
+    component: lazy(() => import('@/pages/Promociones').then((m) => ({ default: m.Promociones }))),
+    requires: 'manage_promotions',
+  },
   'medios-de-pago': {
     pageKey: 'medios-de-pago',
     title: 'Medios de Pago',
@@ -288,6 +295,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/contabilidad/libro-iva-ventas': 'libro-iva-ventas',
   '/contabilidad/libro-iva-compras': 'libro-iva-compras',
   '/familias': 'familias',
+  '/promociones': 'promociones',
   '/medios-de-pago': 'medios-de-pago',
   '/cuentas-corrientes': 'cuentas-corrientes',
   '/cuentas-corrientes-proveedores': 'cuentas-corrientes-proveedores',

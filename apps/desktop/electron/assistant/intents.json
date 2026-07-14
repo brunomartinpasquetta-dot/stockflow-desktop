@@ -2043,6 +2043,72 @@
       "En los resultados, cada artículo muestra su marca en un chip azul, junto al precio y el stock — así distinguís el mismo producto entre distintos fabricantes."
      ],
      "image": "articulos-listado"
+    },
+    {
+     "id": "crear-promocion",
+     "canonical": "¿Cómo creo una promoción o combo de productos?",
+     "patterns": [
+      "crear promo",
+      "crear promocion",
+      "armar combo",
+      "hacer un combo",
+      "promo de productos",
+      "combo de articulos",
+      "como armo una promo",
+      "oferta combo",
+      "pack de productos",
+      "promocion nueva",
+      "vender en combo"
+     ],
+     "answer": "Las promociones agrupan varios artículos y se venden como UNO solo, al precio que elijas. El sistema te muestra el COSTO REAL (la suma de los costos de los componentes) y el margen que te queda. Al vender la promo, el stock se descuenta de cada componente automáticamente.",
+     "steps": [
+      "Hacé clic en el menú 'Gestión' (arriba) y elegí 'Promociones'.",
+      "Tocá el botón 'Nueva promo'.",
+      "Escribí el nombre (ej: 'Promo Asado') y el precio de venta.",
+      "En 'Agregar artículos que incluye', buscá cada producto y tocalo para sumarlo. Ajustá la cantidad de cada uno (ej: 2 gaseosas).",
+      "Abajo ves el costo real y el margen en vivo. Si el margen sale en rojo, estás vendiendo por debajo del costo.",
+      "Tocá 'Crear promoción'. Queda con un código propio (ej: PROMO-01) y marca PROMO."
+     ]
+    },
+    {
+     "id": "vender-promocion",
+     "canonical": "¿Cómo vendo una promoción en el punto de venta?",
+     "patterns": [
+      "vender promo",
+      "vender combo",
+      "cobrar una promo",
+      "promo en ventas",
+      "agregar promo al carrito",
+      "boton promos",
+      "como cobro un combo",
+      "vender la promocion"
+     ],
+     "answer": "En la pantalla de Ventas hay un botón 'Promos' al lado de 'Ver todos': te muestra las promociones activas y con un clic la agregás al carrito como una sola línea. También podés tipear su código (PROMO-01) en el buscador. El stock se descuenta solo de cada componente, y si anulás la venta, vuelve.",
+     "steps": [
+      "Abrí Ventas: presioná F5 o hacé clic en el botón 'Ventas'.",
+      "Tocá el botón 'Promos' (al lado de 'Ver todos').",
+      "Hacé clic en la promo: entra al carrito con su precio.",
+      "Cobrá normalmente con 'Confirmar venta (F2)'. En el ticket sale el nombre de la promo."
+     ]
+    },
+    {
+     "id": "desactivar-promocion",
+     "canonical": "¿Cómo desactivo o elimino una promoción?",
+     "patterns": [
+      "desactivar promo",
+      "eliminar promocion",
+      "borrar combo",
+      "sacar la promo",
+      "terminar promocion",
+      "pausar promo",
+      "ya no quiero la promo"
+     ],
+     "answer": "En Gestión → Promociones, hacé clic en la etiqueta 'Activa' de la promo para desactivarla: deja de aparecer en Ventas al instante y el historial se conserva (la podés reactivar cuando quieras). Eliminarla del todo solo se puede si NUNCA se vendió; si ya tuvo ventas, el sistema te pide desactivarla en su lugar.",
+     "steps": [
+      "Menú 'Gestión' → 'Promociones'.",
+      "En la columna Estado, hacé clic en 'Activa' para pausarla (o en 'Inactiva' para reactivarla).",
+      "Para borrarla definitivamente usá el tachito — solo funciona si nunca se vendió."
+     ]
     }
    ]
   },

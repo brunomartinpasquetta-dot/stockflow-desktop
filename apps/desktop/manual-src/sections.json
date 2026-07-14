@@ -587,6 +587,24 @@
       "Para volver a ver todo, elegí 'Todas las marcas'."
      ],
      "tips": []
+    },
+    {
+     "heading": "Promociones y combos",
+     "paragraphs": [
+      "Una promoción agrupa varios artículos con sus cantidades y se vende como UN solo producto, al precio que elijas (ej: 'Promo Asado' = 1 carbón + 2 gaseosas). El sistema calcula el COSTO REAL sumando los costos de los componentes y te muestra el margen antes de guardar.",
+      "Al vender una promo, el stock se descuenta de CADA componente automáticamente (2 promos = 4 gaseosas menos). Si se anula la venta, el stock vuelve. La promo aparece en el ticket con su nombre y se encuentra en los buscadores por su código (PROMO-01) o su marca PROMO."
+     ],
+     "steps": [
+      "Menú 'Gestión' → 'Promociones' → botón 'Nueva promo'.",
+      "Poné el nombre y el precio de venta.",
+      "Buscá y agregá los artículos que incluye, con la cantidad de cada uno.",
+      "Revisá el costo real y el margen en vivo (si da rojo, vendés bajo el costo).",
+      "Guardá. Para venderla: en Ventas (F5), botón 'Promos' → clic en la promo → se agrega al carrito."
+     ],
+     "tips": [
+      "Para pausar una promo hacé clic en su etiqueta 'Activa' (se conserva el historial y la podés reactivar).",
+      "Si un componente se queda sin stock y no permitís vender sin stock, el sistema avisa qué artículo falta al querer cobrar."
+     ]
     }
    ],
    "screenshots": [

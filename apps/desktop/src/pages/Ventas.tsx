@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
+import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import {
@@ -13,6 +13,7 @@ import {
   useCustomers,
   useFamilies,
   usePaymentMethods,
+  usePromotions,
   useSuppliers,
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
@@ -265,6 +266,75 @@ function ArticlePicker({
   )
 }
 
+/**
+ * Picker de PROMOCIONES para el PDV: lista las promos ACTIVAS y al elegir una
+ * agrega su artículo espejo al carrito (misma ruta que cualquier artículo).
+ * No muestra costos ni márgenes (lo ve el vendedor).
+ */
+function PromoPicker({
+  open,
+  articles,
+  onClose,
+  onPick,
+}: {
+  open: boolean
+  articles: ArticleDTO[]
+  onClose: () => void
+  onPick: (a: ArticleDTO) => void
+}) {
+  const promosQuery = usePromotions()
+  const activas = (promosQuery.data ?? []).filter((p) => p.active)
+
+  function pick(articleId: string, name: string): void {
+    const mirror = articles.find((a) => a.id === articleId)
+    if (!mirror) {
+      toast.error(`No se encontró el artículo de la promo "${name}" — recargá la pantalla de Ventas`)
+      return
+    }
+    onPick(mirror)
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BadgePercent className="h-5 w-5 text-primary" />
+            Promociones activas
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex max-h-[60vh] flex-col gap-1.5 overflow-y-auto">
+          {promosQuery.isLoading && <p className="py-6 text-center text-sm text-muted-foreground">Cargando…</p>}
+          {!promosQuery.isLoading && activas.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No hay promociones activas. Se crean desde Gestión → Promociones.
+            </p>
+          )}
+          {activas.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => pick(p.articleId, p.name)}
+              className="flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <BadgePercent className="h-5 w-5 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{p.name}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {p.items.map((i) => `${Number(i.quantity)}× ${i.description}`).join(' + ')}
+                </span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{p.code}</span>
+              <b className="shrink-0 tabular-nums">{formatCurrency(p.price)}</b>
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function NoCash() {
   const navigate = useNavigate()
   return (
@@ -345,6 +415,7 @@ function PDV() {
   const [isAccountSale, setIsAccountSale] = useState(false)
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [articlePickerOpen, setArticlePickerOpen] = useState(false)
+  const [promoPickerOpen, setPromoPickerOpen] = useState(false)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
   // Medio de pago seleccionado en modo mono-medio (default: efectivo).
@@ -928,6 +999,16 @@ function PDV() {
             <List className="mr-2 h-4 w-4" />
             Ver todos
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 border-primary/30 text-primary hover:bg-primary/10"
+            onClick={() => setPromoPickerOpen(true)}
+            title="Agregar una promoción al carrito"
+          >
+            <BadgePercent className="mr-2 h-4 w-4" />
+            Promos
+          </Button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto rounded-md border">
@@ -1208,6 +1289,15 @@ function PDV() {
       </div>
 
       <CustomerPicker open={customerPickerOpen} customers={customers} onClose={() => setCustomerPickerOpen(false)} onSelect={pickCustomer} />
+      <PromoPicker
+        open={promoPickerOpen}
+        articles={allArticles}
+        onClose={() => {
+          setPromoPickerOpen(false)
+          barcodeRef.current?.focus()
+        }}
+        onPick={(a) => addArticle(a)}
+      />
       <ArticlePicker
         open={articlePickerOpen}
         articles={allArticles}

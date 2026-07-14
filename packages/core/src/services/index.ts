@@ -28,6 +28,7 @@ export {
   type SaleLineDraft,
   type SalePaymentDraft,
 } from './sales.service';
+export { PromotionsService } from './promotions.service';
 export {
   QuotesService,
   type CreateQuoteInput,

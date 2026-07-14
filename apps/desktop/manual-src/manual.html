@@ -34,7 +34,7 @@ a { color: inherit; }
 <h1>StockFlow</h1>
 <div class="sub">Sistema de Gestión Comercial</div>
 <div class="sub" style="margin-top:18px;font-size:16pt;color:#1b2a4a;font-weight:600;">Manual de Usuario</div>
-<div class="ver">Versión 0.1.87</div>
+<div class="ver">Versión 0.1.88</div>
 <div class="foot">© 2026 · Crafted by BPSG</div>
 </div>
 <div class='toc'><h2>Índice</h2><ol>
@@ -424,6 +424,20 @@ a { color: inherit; }
 <li>Hacé clic en el desplegable de marcas (junto al buscador) y elegí la marca.</li>
 <li>Para volver a ver todo, elegí &#x27;Todas las marcas&#x27;.</li>
 </ol>
+<h3>Promociones y combos</h3>
+<p>Una promoción agrupa varios artículos con sus cantidades y se vende como UN solo producto, al precio que elijas (ej: &#x27;Promo Asado&#x27; = 1 carbón + 2 gaseosas). El sistema calcula el COSTO REAL sumando los costos de los componentes y te muestra el margen antes de guardar.</p>
+<p>Al vender una promo, el stock se descuenta de CADA componente automáticamente (2 promos = 4 gaseosas menos). Si se anula la venta, el stock vuelve. La promo aparece en el ticket con su nombre y se encuentra en los buscadores por su código (PROMO-01) o su marca PROMO.</p>
+<ol class='steps'>
+<li>Menú &#x27;Gestión&#x27; → &#x27;Promociones&#x27; → botón &#x27;Nueva promo&#x27;.</li>
+<li>Poné el nombre y el precio de venta.</li>
+<li>Buscá y agregá los artículos que incluye, con la cantidad de cada uno.</li>
+<li>Revisá el costo real y el margen en vivo (si da rojo, vendés bajo el costo).</li>
+<li>Guardá. Para venderla: en Ventas (F5), botón &#x27;Promos&#x27; → clic en la promo → se agrega al carrito.</li>
+</ol>
+<div class='tips'>
+<div class='tip'><span>Para pausar una promo hacé clic en su etiqueta &#x27;Activa&#x27; (se conserva el historial y la podés reactivar).</span></div>
+<div class='tip'><span>Si un componente se queda sin stock y no permitís vender sin stock, el sistema avisa qué artículo falta al querer cobrar.</span></div>
+</div>
 
 
 

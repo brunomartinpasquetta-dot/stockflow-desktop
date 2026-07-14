@@ -62,6 +62,7 @@ export const PERMISSION_ACTIONS = [
   'manage_customers',
   'view_quotes',
   'manage_quotes',
+  'manage_promotions',
 ] as const;
 
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
@@ -97,6 +98,7 @@ export const PERMISSION_AREAS: readonly PermissionArea[] = [
       'manage_prices',
       'import_data',
       'manage_families',
+      'manage_promotions',
     ],
   },
   {

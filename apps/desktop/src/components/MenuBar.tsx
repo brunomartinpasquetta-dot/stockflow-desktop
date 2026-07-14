@@ -14,6 +14,7 @@ import { BRANDING } from "@/assets/branding"
 import { useState } from 'react'
 import {
   ArrowLeftRight,
+  BadgePercent,
   BarChart3,
   BookOpen,
   Boxes,
@@ -99,6 +100,7 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'proveedores', label: 'Proveedores', icon: Truck, shortcut: 'F3', requires: 'manage_suppliers' },
       { pageKey: 'clientes', label: 'Clientes', icon: Users, shortcut: 'F6' },
       { pageKey: 'familias', label: 'Familias', icon: Tags },
+      { pageKey: 'promociones', label: 'Promociones', icon: BadgePercent, requires: 'manage_promotions' },
       { pageKey: 'usuarios', label: 'Usuarios', icon: ShieldCheck, shortcut: 'F12', roles: ['admin'], requires: 'manage_users' },
       { separator: true, label: '' },
       { pageKey: 'medios-de-pago', label: 'Medios de Pago', icon: CreditCard, roles: ['admin', 'manager'], requires: 'manage_payment_methods' },

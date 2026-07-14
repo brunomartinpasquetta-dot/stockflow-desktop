@@ -22,6 +22,8 @@ import {
   cashRegisters,
   companies,
   paymentMethods,
+  promotionItems,
+  promotions,
   saleLines,
   salePayments,
   sales,
@@ -177,26 +179,65 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           throw new ConstraintError('SALE_INSERT', 'No se pudo registrar la venta');
         }
 
-        // Líneas + descuento de stock.
-        const insertedLines: SaleLine[] = [];
-        for (const l of computedLines) {
+        // PROMOS: si alguna línea es el artículo espejo de una promoción, el
+        // stock se mueve sobre sus COMPONENTES (el stock del espejo no se toca).
+        const lineArticleIds = [...new Set(computedLines.map((l) => l.articleId))];
+        const promoRows = lineArticleIds.length
+          ? tx
+              .select({
+                promotionId: promotions.id,
+                mirrorArticleId: promotions.articleId,
+                componentId: promotionItems.articleId,
+                componentQty: promotionItems.quantity,
+                componentDesc: articles.description,
+              })
+              .from(promotions)
+              .innerJoin(promotionItems, eq(promotionItems.promotionId, promotions.id))
+              .innerJoin(articles, eq(articles.id, promotionItems.articleId))
+              .where(inArray(promotions.articleId, lineArticleIds))
+              .all()
+          : [];
+        const promoComponentsByMirror = new Map<string, typeof promoRows>();
+        for (const row of promoRows) {
+          const list = promoComponentsByMirror.get(row.mirrorArticleId) ?? [];
+          list.push(row);
+          promoComponentsByMirror.set(row.mirrorArticleId, list);
+        }
+        const discountStock = (articleId: string, quantity: string, label: string): void => {
           const current = tx
             .select({ stock: articles.stock })
             .from(articles)
-            .where(eq(articles.id, l.articleId))
+            .where(eq(articles.id, articleId))
             .get();
-          if (!current) throw new NotFoundError('Artículo', l.articleId);
-          if (!allowNegativeStock && !gteDecimal(current.stock, l.quantity)) {
+          if (!current) throw new NotFoundError('Artículo', articleId);
+          if (!allowNegativeStock && !gteDecimal(current.stock, quantity)) {
             throw new ConstraintError(
               'STOCK_INSUFFICIENT',
-              `Stock insuficiente para el artículo ${l.articleId}: hay ${current.stock}, se requieren ${l.quantity}`,
+              `Stock insuficiente para ${label}: hay ${current.stock}, se requieren ${quantity}`,
             );
           }
           tx
             .update(articles)
-            .set({ stock: subDecimal(current.stock, l.quantity, 3) })
-            .where(eq(articles.id, l.articleId))
+            .set({ stock: subDecimal(current.stock, quantity, 3) })
+            .where(eq(articles.id, articleId))
             .run();
+        };
+
+        // Líneas + descuento de stock.
+        const insertedLines: SaleLine[] = [];
+        for (const l of computedLines) {
+          const promoComponents = promoComponentsByMirror.get(l.articleId);
+          if (promoComponents && promoComponents.length > 0) {
+            for (const comp of promoComponents) {
+              discountStock(
+                comp.componentId,
+                mulDecimal(l.quantity, comp.componentQty, 3),
+                `"${comp.componentDesc}" (componente de la promo)`,
+              );
+            }
+          } else {
+            discountStock(l.articleId, l.quantity, `el artículo ${l.articleId}`);
+          }
 
           const lineRow: NewSaleLine = {
             saleId: insertedSale.id,
@@ -341,14 +382,45 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         }
 
         const lines = tx.select().from(saleLines).where(eq(saleLines.saleId, id)).all();
-        for (const line of lines) {
+        // PROMOS: las líneas cuyo artículo es un espejo de promoción restauran
+        // el stock de sus COMPONENTES (espejo intacto), igual que al vender.
+        const voidArticleIds = [...new Set(lines.map((l) => l.articleId))];
+        const voidPromoRows = voidArticleIds.length
+          ? tx
+              .select({
+                mirrorArticleId: promotions.articleId,
+                componentId: promotionItems.articleId,
+                componentQty: promotionItems.quantity,
+              })
+              .from(promotions)
+              .innerJoin(promotionItems, eq(promotionItems.promotionId, promotions.id))
+              .where(inArray(promotions.articleId, voidArticleIds))
+              .all()
+          : [];
+        const voidComponentsByMirror = new Map<string, typeof voidPromoRows>();
+        for (const row of voidPromoRows) {
+          const list = voidComponentsByMirror.get(row.mirrorArticleId) ?? [];
+          list.push(row);
+          voidComponentsByMirror.set(row.mirrorArticleId, list);
+        }
+        const restoreStock = (articleId: string, quantity: string): void => {
           tx
             .update(articles)
             .set({
-              stock: sql`printf('%.3f', CAST(${articles.stock} AS REAL) + CAST(${line.quantity} AS REAL))`,
+              stock: sql`printf('%.3f', CAST(${articles.stock} AS REAL) + CAST(${quantity} AS REAL))`,
             })
-            .where(eq(articles.id, line.articleId))
+            .where(eq(articles.id, articleId))
             .run();
+        };
+        for (const line of lines) {
+          const comps = voidComponentsByMirror.get(line.articleId);
+          if (comps && comps.length > 0) {
+            for (const comp of comps) {
+              restoreStock(comp.componentId, mulDecimal(line.quantity, comp.componentQty, 3));
+            }
+          } else {
+            restoreStock(line.articleId, line.quantity);
+          }
         }
 
         // Reverso de caja: sólo la parte en efectivo físico.

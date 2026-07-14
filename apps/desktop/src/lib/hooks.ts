@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient, type UseMutationResult } from '@
 import { api } from '@/lib/api'
 import type {
   ArticleDTO,
+  PromotionDTO,
   GlobalSearchResultDTO,
   InventoryReportDTO,
   LowStockReportRowDTO,
@@ -80,6 +81,10 @@ export function useSupplierMutations() {
 }
 
 // --- Familias ---
+export function usePromotions() {
+  return useQuery<PromotionDTO[]>({ queryKey: ['promotions'], queryFn: api.promotions.list })
+}
+
 export function useFamilies() {
   return useQuery<FamilyDTO[]>({ queryKey: ['families'], queryFn: api.families.list })
 }
