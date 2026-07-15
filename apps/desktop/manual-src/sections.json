@@ -1716,7 +1716,7 @@
       "El acceso se controla con un permiso propio (área Caja, pestaña Roles en Usuarios): podés bloquearla para un empleado sin afectar el Historial de Ventas ni el Historial de Cajas."
      ],
      "steps": [
-      "Menú 'Cobros y Pagos' → 'Caja General'.",
+      "Menú 'Consultas' → 'Caja General' (después de Estadísticas), botón 'Caja General' en la barra de accesos o F8.",
       "Arriba: saldo actual. Abajo: últimos movimientos con su saldo después de cada uno.",
       "'Registrar Ingreso' / 'Registrar Egreso' para movimientos manuales; 'Ver todos' filtra por fechas y exporta a Excel."
      ]
@@ -1776,7 +1776,7 @@
     {
      "id": "caja-general-pantalla",
      "caption": "Pantalla propia de Caja General: saldo actual, botones para registrar ingresos/egresos administrativos y últimos movimientos (los depósitos de cierre aparecen con categoría 'Cierre de caja').",
-     "howToOpen": "Menú Cobros y Pagos → Caja General (requiere el permiso 'Ver Caja General')"
+     "howToOpen": "Menú Consultas → Caja General o F8 (requiere el permiso 'Ver Caja General')"
     }
    ]
   },

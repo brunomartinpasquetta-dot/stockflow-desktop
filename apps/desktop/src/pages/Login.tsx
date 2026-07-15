@@ -50,9 +50,9 @@ export function Login() {
       <Card className="w-full max-w-sm">
         <CardContent className="flex flex-col gap-3 pt-6">
           <img
-            src={BRANDING.logoFull}
+            src={BRANDING.logoHorizontal}
             alt="StockFlow"
-            className="mx-auto mb-6 h-auto w-[300px]"
+            className="mx-auto mb-6 h-auto w-[320px]"
           />
           <div className="flex flex-col gap-1">
             <Label htmlFor="login-user">Usuario</Label>

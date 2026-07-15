@@ -117,7 +117,8 @@ export const WINDOWS: Record<string, WindowDef> = {
   'caja-general': {
     pageKey: 'caja-general',
     title: 'Caja General',
-    iconName: 'Landmark',
+    iconName: 'Vault',
+    fKey: 8,
     component: lazy(() => import('@/pages/CajaGeneral').then((m) => ({ default: m.CajaGeneral }))),
     requires: 'view_cash_general',
     minWidth: 900,
@@ -128,7 +129,6 @@ export const WINDOWS: Record<string, WindowDef> = {
     title: 'Historial de Cajas',
     iconName: 'History',
     component: lazy(() => import('@/pages/HistorialCajas').then((m) => ({ default: m.HistorialCajas }))),
-    fKey: 8,
     requires: 'view_reports',
     minWidth: 1000,
     minHeight: 600,

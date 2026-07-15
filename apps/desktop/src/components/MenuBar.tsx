@@ -28,6 +28,7 @@ import {
   History,
   Info,
   Landmark,
+  Vault,
   LogOut,
   Network,
   Package,
@@ -115,7 +116,6 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'presupuestos', label: 'Presupuestos', icon: FileText, requires: 'view_quotes' },
       { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F2', requires: 'manage_purchases' },
       { pageKey: 'caja', label: 'Caja', icon: Wallet, shortcut: 'F4' },
-      { pageKey: 'caja-general', label: 'Caja General', icon: Landmark, requires: 'view_cash_general' },
     ],
   },
   {
@@ -139,12 +139,12 @@ const GROUPS: MenuGroup[] = [
     items: [
       { pageKey: 'historial-ventas', label: 'Historial de Ventas', icon: Receipt, shortcut: 'F7' },
       { pageKey: 'historial-compras', label: 'Historial de Compras', icon: History },
-      { pageKey: 'historial-cajas', label: 'Historial de Cajas', icon: History, shortcut: 'F8', requires: 'view_reports' },
       { separator: true, label: '' },
       { pageKey: 'generador-compras', label: 'Generador de Compras', icon: PackagePlus, requires: 'view_reports' },
       { pageKey: 'inventario-articulos', label: 'Inventario de Artículos', icon: Boxes, requires: 'view_reports' },
       { pageKey: 'ventas-vendedor', label: 'Ventas por Vendedor', icon: ArrowLeftRight, requires: 'view_reports' },
       { pageKey: 'estadisticas', label: 'Estadísticas', icon: BarChart3, shortcut: 'F11', requires: 'view_reports' },
+      { pageKey: 'caja-general', label: 'Caja General', icon: Vault, shortcut: 'F8', requires: 'view_cash_general' },
     ],
   },
   {

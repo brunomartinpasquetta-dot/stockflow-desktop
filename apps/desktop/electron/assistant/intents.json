@@ -7232,9 +7232,9 @@
       "donde esta la caja general",
       "registrar egreso caja general"
      ],
-     "answer": "La Caja General ahora tiene su PROPIA pantalla: menú 'Cobros y Pagos' → 'Caja General'. Ahí ves el saldo actual, los últimos movimientos, y podés registrar ingresos/egresos manuales o exportar a Excel. El acceso se controla con su propio permiso (área Caja, pestaña Roles en Usuarios) — se puede bloquear sin afectar los historiales.",
+     "answer": "La Caja General ahora tiene su PROPIA pantalla: menú 'Consultas' → 'Caja General' (después de Estadísticas, atajo F8). Ahí ves el saldo actual, los últimos movimientos, y podés registrar ingresos/egresos manuales o exportar a Excel. El acceso se controla con su propio permiso (área Caja, pestaña Roles en Usuarios) — se puede bloquear sin afectar los historiales.",
      "steps": [
-      "Hacé clic en el menú 'Cobros y Pagos' (arriba) y elegí 'Caja General'.",
+      "Hacé clic en el menú 'Consultas' (arriba) y elegí 'Caja General' (o presioná F8, o el botón 'Caja General' de la barra).",
       "Arriba a la derecha está el saldo actual.",
       "Con los botones 'Registrar Ingreso' / 'Registrar Egreso' cargás movimientos manuales (requiere permiso).",
       "'Ver todos' abre el listado completo con filtros por fecha y exportación a Excel."

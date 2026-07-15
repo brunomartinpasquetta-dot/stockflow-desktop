@@ -25,6 +25,7 @@ import {
   Tags,
   Truck,
   Users,
+  Vault,
   Wallet,
 } from 'lucide-react'
 
@@ -50,6 +51,7 @@ export function WindowIcon({ name, className }: { name: string | undefined; clas
     case 'ShoppingCart': return <ShoppingCart className={className} />
     case 'Tag': return <Tag className={className} />
     case 'Tags': return <Tags className={className} />
+    case 'Vault': return <Vault className={className} />
     case 'Truck': return <Truck className={className} />
     case 'Users': return <Users className={className} />
     case 'Wallet': return <Wallet className={className} />
