@@ -5078,7 +5078,7 @@
       "le devuelvo productos al proveedor",
       "nota de credito proveedor"
      ],
-     "answer": "Desde el Historial de Compras podés devolver mercadería de una compra: el stock BAJA (la mercadería vuelve al proveedor) y el reintegro entra en efectivo a la caja o baja la deuda que tenés con el proveedor. Queda numerado como DPC #N.",
+     "answer": "Podés devolver mercadería de una compra desde el Historial de Compras ('Devolución al proveedor') o desde la cuenta corriente del proveedor (botón ↩ en la fila de la compra). El stock BAJA (la mercadería vuelve al proveedor) y el reintegro entra en efectivo a la caja o baja la deuda que tenés con el proveedor. Queda numerado como DPC #N.",
      "steps": [
       "Abrí el Historial de Compras: menú 'Consultas' → 'Historial de Compras'.",
       "Hacé clic en la compra y tocá 'Devolución al proveedor'.",
@@ -6308,14 +6308,12 @@
       "como hago una devolucion",
       "devolucion parcial"
      ],
-     "answer": "Podés devolver una venta COMPLETA o solo algunos artículos. El stock vuelve solo (si era una promo, vuelven sus componentes) y el reintegro sale en EFECTIVO de la caja o queda como CRÉDITO en la cuenta corriente del cliente (le baja la deuda). Queda un comprobante numerado (DEV #N).",
+     "answer": "Podés devolver una venta COMPLETA o solo algunos artículos, desde tres lugares: el botón 'Devolución' en la pantalla de Ventas (elegís la venta reciente), el detalle de una venta en el Historial de Ventas, o el botón ↩ en la cuenta corriente del cliente. El stock vuelve solo (si era una promo, vuelven sus componentes) y el reintegro sale en EFECTIVO de la caja o queda como CRÉDITO en la cuenta corriente del cliente (le baja la deuda). Queda un comprobante numerado (DEV #N).",
      "steps": [
-      "Abrí el Historial de Ventas: presioná F7 o menú 'Consultas' → 'Historial de Ventas'.",
-      "Hacé clic en la venta para ver el detalle y tocá el botón 'Devolución'.",
-      "En la tabla, poné la CANTIDAD a devolver de cada artículo (te muestra cuánto se vendió y cuánto ya se devolvió antes).",
-      "Elegí el reintegro: 'Efectivo' (sale de la caja — necesita caja abierta) o 'Crédito en cuenta corriente' (solo si la venta fue a cuenta).",
-      "Tocá 'Confirmar devolución': el stock vuelve, se registra el movimiento y se imprime el comprobante DEV (también podés guardarlo como PDF).",
-      "Atajo: en Cuentas Corrientes, la fila de cada venta tiene un botón ↩ que abre la misma devolución."
+      "En Ventas tocá el botón 'Devolución' y elegí la venta (o andá al Historial de Ventas → doble clic en la venta → 'Devolución').",
+      "Indicá cuánto devolver de cada artículo (el sistema muestra lo ya devuelto y no deja pasarse).",
+      "Elegí el reintegro: Efectivo (necesita caja abierta) o Crédito en cuenta corriente.",
+      "Confirmá: el stock vuelve, sale el comprobante DEV #N y podés imprimirlo en A4."
      ]
     }
    ]

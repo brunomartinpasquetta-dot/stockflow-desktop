@@ -1087,7 +1087,7 @@
     {
      "heading": "Devoluciones (el cliente se arrepiente)",
      "paragraphs": [
-      "Podés devolver una venta completa o solo algunos artículos, desde el Historial de Ventas (clic en la venta → botón 'Devolución') o desde la cuenta corriente del cliente (botón ↩ en la fila de la venta).",
+      "Podés devolver una venta completa o solo algunos artículos, desde tres lugares: el botón 'Devolución' en la pantalla de Ventas (elegís la venta reciente de una lista), el Historial de Ventas (doble clic en la venta → botón 'Devolución') o la cuenta corriente del cliente (botón ↩ en la fila de la venta).",
       "El stock vuelve automáticamente (si lo devuelto era una promo, vuelven sus componentes) y el reintegro puede ser en EFECTIVO (sale de la caja como egreso) o como CRÉDITO en la cuenta corriente (le baja la deuda al cliente). Queda un comprobante numerado DEV #N imprimible o exportable a PDF."
      ],
      "steps": [
@@ -1097,7 +1097,7 @@
       "Confirmá: stock restaurado, movimiento registrado y comprobante DEV impreso."
      ],
      "tips": [
-      "La devolución al PROVEEDOR es igual pero desde el Historial de Compras ('Devolución al proveedor'): el stock BAJA y el reintegro baja tu deuda o entra en efectivo.",
+      "La devolución al PROVEEDOR es igual pero desde el Historial de Compras ('Devolución al proveedor') o desde la cuenta corriente del proveedor (botón ↩ en la fila de la compra): el stock BAJA y el reintegro baja tu deuda o entra en efectivo.",
       "Las devoluciones con crédito aparecen en la cuenta corriente como 'Devolución' con su número."
      ]
     }

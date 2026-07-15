@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Wallet, X } from 'lucide-react'
+import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import {
@@ -16,16 +16,17 @@ import {
   usePromotions,
   useSuppliers,
 } from '@/lib/hooks'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
-import { formatCurrency, formatDate, formatNumber, parseCurrencyInput } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, formatNumber, parseCurrencyInput } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { ReturnSaleDialog } from '@/components/ReturnDialogs'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import { WeightDialog } from '@/components/WeightDialog'
 import { CobroQrModal } from '@/components/CobroQrModal'
@@ -271,6 +272,88 @@ function ArticlePicker({
  * agrega su artículo espejo al carrito (misma ruta que cualquier artículo).
  * No muestra costos ni márgenes (lo ve el vendedor).
  */
+/** Selector de venta reciente para lanzar una devolución desde el PDV. */
+function DevolucionPicker({
+  open,
+  customers,
+  onClose,
+  onPick,
+}: {
+  open: boolean
+  customers: CustomerDTO[]
+  onClose: () => void
+  onPick: (saleId: string) => void
+}) {
+  const [busca, setBusca] = useState('')
+  const salesQuery = useQuery({
+    queryKey: ['ventasDevolucionRecientes'],
+    queryFn: () => api.sales.listByDateRange(Date.now() - 30 * 86_400_000, Date.now() + 3_600_000),
+    enabled: open,
+  })
+  const customerName = useMemo(() => {
+    const m = new Map(customers.map((c) => [c.id, `${c.lastName}${c.firstName ? ', ' + c.firstName : ''}`]))
+    return (id: string) => m.get(id) ?? '—'
+  }, [customers])
+  const rows = useMemo(() => {
+    const completadas = (salesQuery.data ?? []).filter((v) => v.status === 'completed')
+    completadas.sort((a, b) => b.date - a.date)
+    const q = busca.trim().toLowerCase()
+    if (!q) return completadas.slice(0, 30)
+    return completadas
+      .filter((v) => String(v.number).includes(q) || customerName(v.customerId).toLowerCase().includes(q))
+      .slice(0, 30)
+  }, [salesQuery.data, busca, customerName])
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Devolución — elegí la venta</DialogTitle>
+        </DialogHeader>
+        <Input
+          autoFocus
+          placeholder="Buscar por N° de comprobante o cliente…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        <div className="max-h-80 overflow-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-muted">
+              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-2 py-1.5">Fecha</th>
+                <th className="px-2 py-1.5 text-right">N°</th>
+                <th className="px-2 py-1.5">Cliente</th>
+                <th className="px-2 py-1.5 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {salesQuery.isLoading ? (
+                <tr><td colSpan={4} className="px-2 py-6 text-center text-muted-foreground">Cargando…</td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan={4} className="px-2 py-6 text-center text-muted-foreground">Sin ventas completadas en los últimos 30 días.</td></tr>
+              ) : (
+                rows.map((v) => (
+                  <tr
+                    key={v.id}
+                    className="cursor-pointer border-t hover:bg-accent"
+                    onClick={() => onPick(v.id)}
+                  >
+                    <td className="px-2 py-1.5 text-xs text-muted-foreground">{formatDateTime(v.date)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">{v.number}</td>
+                    <td className="px-2 py-1.5">{customerName(v.customerId)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">{formatCurrency(v.total)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-muted-foreground">Ventas más viejas: buscalas desde el Historial de Ventas (botón Devolución en el detalle).</p>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PromoPicker({
   open,
   articles,
@@ -416,6 +499,9 @@ function PDV() {
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [articlePickerOpen, setArticlePickerOpen] = useState(false)
   const [promoPickerOpen, setPromoPickerOpen] = useState(false)
+  const canDevolver = usePermission('void_sale') && canWrite
+  const [devolucionPickerOpen, setDevolucionPickerOpen] = useState(false)
+  const [returningSaleId, setReturningSaleId] = useState<string | null>(null)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
   // Medio de pago seleccionado en modo mono-medio (default: efectivo).
@@ -1004,6 +1090,18 @@ function PDV() {
             <BadgePercent className="mr-2 h-4 w-4" />
             Promos
           </Button>
+          {canDevolver && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11"
+              onClick={() => setDevolucionPickerOpen(true)}
+              title="Registrar la devolución de una venta reciente"
+            >
+              <Undo2 className="mr-2 h-4 w-4" />
+              Devolución
+            </Button>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto rounded-md border">
@@ -1284,6 +1382,25 @@ function PDV() {
       </div>
 
       <CustomerPicker open={customerPickerOpen} customers={customers} onClose={() => setCustomerPickerOpen(false)} onSelect={pickCustomer} />
+      <DevolucionPicker
+        open={devolucionPickerOpen}
+        customers={customersQuery.data ?? []}
+        onClose={() => setDevolucionPickerOpen(false)}
+        onPick={(saleId) => {
+          setDevolucionPickerOpen(false)
+          setReturningSaleId(saleId)
+        }}
+      />
+      {returningSaleId && (
+        <ReturnSaleDialog
+          saleId={returningSaleId}
+          open
+          onClose={() => setReturningSaleId(null)}
+          onDone={() => {
+            void articlesQuery.refetch()
+          }}
+        />
+      )}
       <PromoPicker
         open={promoPickerOpen}
         articles={allArticles}

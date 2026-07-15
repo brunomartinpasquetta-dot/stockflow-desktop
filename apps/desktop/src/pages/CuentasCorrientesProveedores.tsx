@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { FileDown, ArrowLeft, ChevronDown, ChevronRight, Loader2, ReceiptText, Truck } from 'lucide-react'
+import { FileDown, ArrowLeft, ChevronDown, ChevronRight, Loader2, ReceiptText, Truck, Undo2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useSupplierBalances } from '@/lib/hooks'
@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { ReturnPurchaseDialog } from '@/components/ReturnDialogs'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import type { SupplierAccountPayableDTO } from '@/types/api'
 
@@ -290,8 +291,11 @@ function ComprobanteDetalle({ accountId }: { accountId: string }) {
 }
 
 function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: () => void }) {
+  const qc = useQueryClient()
   const canWrite = useCanWrite()
   const canPagar = usePermission('manage_supplier_accounts') && canWrite
+  const canDevolver = usePermission('manage_purchases') && canWrite
+  const [returningPurchaseId, setReturningPurchaseId] = useState<string | null>(null)
   const statementQuery = useQuery({
     queryKey: ['supplierStatement', supplierId],
     queryFn: () => api.supplierAccounts.getStatement(supplierId),
@@ -622,6 +626,17 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
                           </Button>
                         </span>
                       )}
+                      {e.kind === 'purchase' && e.purchaseId && canDevolver && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          title="Registrar una devolución al proveedor de esta compra"
+                          onClick={() => setReturningPurchaseId(e.purchaseId)}
+                        >
+                          <Undo2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -631,6 +646,17 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
         </CardContent>
       </Card>
 
+      {returningPurchaseId && (
+        <ReturnPurchaseDialog
+          purchaseId={returningPurchaseId}
+          open
+          onClose={() => setReturningPurchaseId(null)}
+          onDone={() => {
+            void qc.invalidateQueries({ queryKey: ['supplierStatement'] })
+            void qc.invalidateQueries({ queryKey: ['supplierBalances'] })
+          }}
+        />
+      )}
       {pagando && <PagoDialog account={pagando} supplierId={supplierId} onClose={() => setPagando(null)} />}
       {pagandoCuenta && (
         <PagoCuentaDialog

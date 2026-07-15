@@ -60,6 +60,8 @@ export interface SupplierStatementEntry {
   paymentMethodName: string | null;
   /** saldo del comprobante luego de este pago (sólo en pagos). */
   comprobanteBalance: string | null;
+  /** compra asociada (para lanzar una devolución desde el estado de cuenta). */
+  purchaseId: string | null;
 }
 
 export interface SupplierStatement {
@@ -312,6 +314,7 @@ export class SupplierAccountsService {
         credit: '0.0000',
         paymentMethodName: null,
         comprobanteBalance: null,
+        purchaseId: ac.purchaseId,
       });
       const pays = (await repos.supplierPayments.findByAccount(ac.id))
         .slice()
@@ -328,6 +331,7 @@ export class SupplierAccountsService {
           credit: pay.amount,
           paymentMethodName: pmName,
           comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
+          purchaseId: null,
         });
       }
     }
@@ -344,6 +348,7 @@ export class SupplierAccountsService {
         credit: r.total,
         paymentMethodName: null,
         comprobanteBalance: null,
+        purchaseId: r.purchaseId,
       });
       void purchase;
     }

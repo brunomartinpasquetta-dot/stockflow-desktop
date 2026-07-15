@@ -689,6 +689,7 @@ export interface SupplierStatementEntryDTO {
   runningBalance: string;
   paymentMethodName: string | null;
   comprobanteBalance: string | null;
+  purchaseId: string | null;
 }
 
 export interface SupplierStatementDTO {
