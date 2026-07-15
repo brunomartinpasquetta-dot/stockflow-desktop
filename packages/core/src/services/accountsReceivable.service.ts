@@ -51,7 +51,7 @@ export interface ReceivePaymentToCustomerResult {
 
 export interface StatementEntry {
   date: number;
-  kind: 'sale' | 'payment';
+  kind: 'sale' | 'payment' | 'return';
   reference: string;
   /** importe que aumenta la deuda (ventas a cuenta) */
   debit: string;
@@ -284,6 +284,25 @@ export class AccountsReceivableService {
           comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
         });
       }
+    }
+
+    // Devoluciones con CRÉDITO A CUENTA: bajan el saldo, se muestran como
+    // movimiento propio ("Devolución DEV #N").
+    const accountReturns = await repos.returns.findAccountCreditsBySales([...salesById.keys()]);
+    for (const r of accountReturns) {
+      const sale = salesById.get(r.saleId) ?? null;
+      raw.push({
+        date: r.date,
+        kind: 'return',
+        reference: `Devolución DEV #${r.number}`,
+        debit: '0.0000',
+        credit: r.total,
+        saleId: r.saleId,
+        saleType: sale?.type ?? null,
+        saleNumber: sale?.number ?? null,
+        paymentMethodName: null,
+        comprobanteBalance: null,
+      });
     }
 
     raw.sort((a, b) => a.date - b.date);

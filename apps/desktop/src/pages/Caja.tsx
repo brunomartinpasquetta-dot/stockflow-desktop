@@ -20,7 +20,10 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { CashMovementDTO } from '@/types/api'
+import type { CashReportDTO, CashMovementDTO } from '@/types/api'
+
+/** Datos del cierre recién confirmado, para proponer el depósito a Caja General. */
+type DepositInfo = { registerId: string; report: CashReportDTO; counted: string }
 
 function movementKind(m: CashMovementDTO): string {
   if (m.relatedSaleId) return m.type === 'income' ? 'Venta' : 'Anulación'
@@ -117,7 +120,7 @@ function CajaCerrada() {
 }
 
 // ── Estado B: caja abierta ────────────────────────────────────────────────
-function CajaAbierta({ registerId }: { registerId: string }) {
+function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCloseComplete: (info: DepositInfo, proposed: string) => void }) {
   const report = useCashReport(registerId)
   const { close, addMovement } = useCashMutations()
   const canWrite = useCanWrite()
@@ -153,9 +156,6 @@ function CajaAbierta({ registerId }: { registerId: string }) {
   const [closeAmount, setCloseAmount] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
 
-  const [transferOpen, setTransferOpen] = useState(false)
-  const [transferAmount, setTransferAmount] = useState('0')
-
   // Deep-link `?action=close`: abrir el dialog de cierre al cargar.
   const [searchParamsOpen, setSearchParamsOpen] = useSearchParams()
   useEffect(() => {
@@ -177,23 +177,6 @@ function CajaAbierta({ registerId }: { registerId: string }) {
     setMovType('income')
     setMovPaymentMethodId('')
     setMovOpen(true)
-  }
-
-  async function confirmarTransferencia(): Promise<void> {
-    const amt = parseCurrencyInput(transferAmount)
-    if (Number(amt) <= 0) {
-      toast.error('El monto debe ser mayor a cero')
-      return
-    }
-    try {
-      await api.cashGeneral.transferFromDaily({ cashRegisterId: registerId, amount: amt })
-      toast.success(`Transferido ${formatCurrency(amt)} a Caja General`)
-      setTransferOpen(false)
-      setTransferAmount('0')
-      void report.refetch()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo transferir a Caja General')
-    }
   }
 
   async function guardarMovimiento(): Promise<void> {
@@ -261,6 +244,16 @@ function CajaAbierta({ registerId }: { registerId: string }) {
       )
       setCloseAmount('')
       setCloseNotes('')
+
+      // Paso 2 del cierre: proponer el depósito a Caja General con el TOTAL del
+      // día (efectivo contado + neto de los demás medios: transferencias, tarjetas).
+      const nonCashNet = result.report.byPaymentMethod
+        .filter((b) => !b.isPhysicalCash)
+        .reduce((acc, b) => acc + Number(b.net ?? 0), 0)
+      const proposed = (Number(amt) + Math.max(0, nonCashNet)).toFixed(2)
+      // El dialog vive en el padre <Caja/>: al cerrarse la caja este componente
+      // se desmonta (la query pasa a null) y un estado local no sobreviviría.
+      onCloseComplete({ registerId, report: result.report, counted: amt }, proposed)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo cerrar la caja')
     }
@@ -367,15 +360,6 @@ function CajaAbierta({ registerId }: { registerId: string }) {
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canMove}
-              title={canMove ? undefined : 'Requiere permiso de encargado o administrador'}
-              onClick={() => { setTransferAmount('0'); setTransferOpen(true) }}
-            >
-              Transferir a Caja General
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -499,31 +483,6 @@ function CajaAbierta({ registerId }: { registerId: string }) {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: transferir a Caja General */}
-      <Dialog open={transferOpen} onOpenChange={(o) => { if (!o) setTransferOpen(false) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Transferir a Caja General</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <div className="rounded-md bg-muted px-3 py-2 text-sm">
-              Efectivo en el cajón: <span className="font-semibold tabular-nums">{formatCurrency(expected)}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="transfer-amount">Monto a transferir</Label>
-              <CurrencyInput id="transfer-amount" value={transferAmount} onChange={setTransferAmount} />
-              <span className="text-xs text-muted-foreground">
-                Se registra como egreso de esta caja y como ingreso en Caja General. Hacelo antes de cerrar la caja.
-              </span>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTransferOpen(false)}>Cancelar</Button>
-            <Button onClick={() => void confirmarTransferencia()} disabled={!canWrite}>Transferir</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Dialog: cerrar caja */}
       <Dialog open={closeOpen} onOpenChange={(o) => { if (!o) setCloseOpen(false) }}>
         <DialogContent>
@@ -588,6 +547,29 @@ function CajaAbierta({ registerId }: { registerId: string }) {
 
 export function Caja() {
   const current = useCurrentCash()
+  const canWrite = useCanWrite()
+
+  // PASO 2 del cierre — el dialog vive acá porque CajaAbierta se desmonta
+  // apenas la caja queda cerrada (la query pasa a null).
+  const [depositInfo, setDepositInfo] = useState<DepositInfo | null>(null)
+  const [depositAmount, setDepositAmount] = useState('0')
+
+  async function confirmarDeposito(): Promise<void> {
+    if (!depositInfo) return
+    const amt = parseCurrencyInput(depositAmount)
+    if (Number(amt) <= 0) {
+      toast.error('El monto debe ser mayor a cero')
+      return
+    }
+    try {
+      await api.cashGeneral.transferFromClosed({ cashRegisterId: depositInfo.registerId, amount: amt })
+      toast.success(`Ingresado ${formatCurrency(amt)} a Caja General`)
+      setDepositInfo(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo ingresar a Caja General')
+    }
+  }
+
   if (current.isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -595,5 +577,54 @@ export function Caja() {
       </div>
     )
   }
-  return current.data ? <CajaAbierta registerId={current.data.id} /> : <CajaCerrada />
+  return (
+    <>
+      {current.data ? (
+        <CajaAbierta
+          registerId={current.data.id}
+          onCloseComplete={(info, proposed) => {
+            setDepositAmount(proposed)
+            setDepositInfo(info)
+          }}
+        />
+      ) : (
+        <CajaCerrada />
+      )}
+
+      {/* Dialog: PASO 2 del cierre — ingreso automático a Caja General */}
+      <Dialog open={depositInfo !== null} onOpenChange={(o) => { if (!o) setDepositInfo(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ingresar a Caja General</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+              La caja quedó cerrada. Confirmá el importe que ingresa a Caja General (la recaudación completa del día).
+            </p>
+            {depositInfo && (
+              <div className="rounded-md bg-muted px-3 py-2 text-sm">
+                <div className="flex justify-between"><span>Efectivo contado</span><b className="tabular-nums">{formatCurrency(depositInfo.counted)}</b></div>
+                {depositInfo.report.byPaymentMethod.filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0).map((b) => (
+                  <div key={b.name} className="flex justify-between text-muted-foreground">
+                    <span>{b.name}</span><span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="deposit-amount">Importe a ingresar</Label>
+              <CurrencyInput id="deposit-amount" value={depositAmount} onChange={setDepositAmount} />
+              <span className="text-xs text-muted-foreground">
+                Podés ajustarlo si una parte no va a Caja General (ej: se deja cambio para mañana).
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDepositInfo(null)}>No ingresar</Button>
+            <Button onClick={() => void confirmarDeposito()} disabled={!canWrite}>Confirmar ingreso</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
 }

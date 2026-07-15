@@ -63,6 +63,7 @@ export const PERMISSION_ACTIONS = [
   'view_quotes',
   'manage_quotes',
   'manage_promotions',
+  'view_cash_general',
 ] as const;
 
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
@@ -136,7 +137,7 @@ export const PERMISSION_AREAS: readonly PermissionArea[] = [
   {
     key: 'caja',
     label: 'Caja',
-    actions: ['open_cash', 'close_cash', 'add_cash_movement', 'manage_cash_general'],
+    actions: ['open_cash', 'close_cash', 'add_cash_movement', 'manage_cash_general', 'view_cash_general'],
   },
   {
     key: 'reportes',

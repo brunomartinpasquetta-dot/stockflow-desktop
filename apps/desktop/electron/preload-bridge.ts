@@ -52,6 +52,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'suppliers',
   'families',
   'promotions',
+  'returns',
   'users',
   'roles',
   'company',
@@ -296,6 +297,12 @@ export function createApiBridge(
       get: () => c<never>('company:get'),
       upsert: (p) => c<never>('company:upsert', p),
     },
+    returns: {
+      createForSale: (p) => c<never>('returns:createForSale', p),
+      listBySale: (p) => c<never>('returns:listBySale', p),
+      createForPurchase: (p) => c<never>('returns:createForPurchase', p),
+      listByPurchase: (p) => c<never>('returns:listByPurchase', p),
+    },
     promotions: {
       list: () => c<never>('promotions:list'),
       get: (p) => c<never>('promotions:get', p),
@@ -488,6 +495,7 @@ export function createApiBridge(
       addIncome: (p) => c<never>('cashGeneral:addIncome', p),
       addExpense: (p) => c<never>('cashGeneral:addExpense', p),
       transferFromDaily: (p) => c<never>('cashGeneral:transferFromDaily', p),
+      transferFromClosed: (p) => c<never>('cashGeneral:transferFromClosed', p),
     },
     analytics: {
       getTopSellingProducts: (p) => c<never>('analytics:getTopSellingProducts', p),

@@ -426,6 +426,84 @@ export interface CreateSaleResultDTO {
 export type QuoteStatus = 'pending' | 'accepted' | 'rejected' | 'converted';
 
 /* ----------------------------------------------------------------------- */
+/* Devoluciones                                                             */
+/* ----------------------------------------------------------------------- */
+
+export interface ReturnDTO {
+  id: string;
+  number: number;
+  saleId: string;
+  customerId: string;
+  userId: string;
+  cashRegisterId: string | null;
+  date: number;
+  refundMethod: 'cash' | 'account';
+  total: string;
+  notes: string | null;
+  createdAt: number;
+}
+
+export interface ReturnLineDTO {
+  id: string;
+  returnId: string;
+  saleLineId: string;
+  articleId: string;
+  quantity: string;
+  unitPrice: string;
+  lineTotal: string;
+  createdAt: number;
+}
+
+export interface SaleReturnResultDTO {
+  ret: ReturnDTO;
+  lines: ReturnLineDTO[];
+}
+
+export interface PurchaseReturnDTO {
+  id: string;
+  number: number;
+  purchaseId: string;
+  supplierId: string;
+  userId: string;
+  cashRegisterId: string | null;
+  date: number;
+  refundMethod: 'cash' | 'account';
+  total: string;
+  notes: string | null;
+  createdAt: number;
+}
+
+export interface PurchaseReturnLineDTO {
+  id: string;
+  returnId: string;
+  purchaseLineId: string;
+  articleId: string;
+  quantity: string;
+  unitPrice: string;
+  lineTotal: string;
+  createdAt: number;
+}
+
+export interface PurchaseReturnResultDTO {
+  ret: PurchaseReturnDTO;
+  lines: PurchaseReturnLineDTO[];
+}
+
+export interface SaleReturnDraftDTO {
+  saleId: string;
+  refundMethod: 'cash' | 'account';
+  notes?: string | null;
+  lines: Array<{ saleLineId: string; quantity: string }>;
+}
+
+export interface PurchaseReturnDraftDTO {
+  purchaseId: string;
+  refundMethod: 'cash' | 'account';
+  notes?: string | null;
+  lines: Array<{ purchaseLineId: string; quantity: string }>;
+}
+
+/* ----------------------------------------------------------------------- */
 /* Promociones (combos con artículo espejo)                                 */
 /* ----------------------------------------------------------------------- */
 
@@ -604,7 +682,7 @@ export interface PayToSupplierResultDTO {
 
 export interface SupplierStatementEntryDTO {
   date: number;
-  kind: 'purchase' | 'payment';
+  kind: 'purchase' | 'payment' | 'return';
   reference: string;
   debit: string;
   credit: string;
@@ -765,7 +843,7 @@ export interface ReceivePaymentToCustomerResultDTO {
 
 export interface StatementEntryDTO {
   date: number;
-  kind: 'sale' | 'payment';
+  kind: 'sale' | 'payment' | 'return';
   reference: string;
   debit: string;
   credit: string;
@@ -1137,7 +1215,7 @@ export interface PriceUpdateApplyResultDTO {
 /* ----------------------------------------------------------------------- */
 
 export type CashGeneralMovementTypeDTO = 'income' | 'expense' | 'transfer_from_daily';
-export type CashGeneralCategoryDTO = 'deposit' | 'withdrawal' | 'service' | 'salary' | 'other';
+export type CashGeneralCategoryDTO = 'deposit' | 'close_deposit' | 'withdrawal' | 'service' | 'salary' | 'other';
 
 export interface CashGeneralMovementDTO {
   id: string;
@@ -1458,6 +1536,12 @@ export interface ApiSurface {
     listByDateRange(payload: DateRangeDTO): Res<SaleDTO[]>;
     getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;
   };
+  returns: {
+    createForSale(payload: SaleReturnDraftDTO): Res<SaleReturnResultDTO>;
+    listBySale(payload: { saleId: string }): Res<SaleReturnResultDTO[]>;
+    createForPurchase(payload: PurchaseReturnDraftDTO): Res<PurchaseReturnResultDTO>;
+    listByPurchase(payload: { purchaseId: string }): Res<PurchaseReturnResultDTO[]>;
+  };
   promotions: {
     list(): Res<PromotionDTO[]>;
     get(payload: IdPayload): Res<PromotionDTO | null>;
@@ -1512,6 +1596,8 @@ export interface ApiSurface {
     addIncome(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;
     addExpense(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;
     transferFromDaily(payload: TransferFromDailyInputDTO): Res<CashGeneralMovementDTO>;
+    /** Depósito del cierre: la caja debe estar CERRADA (flujo automático de cierre). */
+    transferFromClosed(payload: TransferFromDailyInputDTO): Res<CashGeneralMovementDTO>;
   };
   analytics: {
     getTopSellingProducts(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsTopProductRowDTO[]>;

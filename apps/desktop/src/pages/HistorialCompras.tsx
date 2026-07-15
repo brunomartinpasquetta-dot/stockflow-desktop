@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Undo2, Loader2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useSuppliers } from '@/lib/hooks'
@@ -11,6 +11,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
+import { ReturnPurchaseDialog } from '@/components/ReturnDialogs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,6 +50,7 @@ function PurchaseDetailDialog({
   const articlesQuery = useArticles()
   const descById = useMemo(() => new Map((articlesQuery.data ?? []).map((a) => [a.id, a.description])), [articlesQuery.data])
   const [confirming, setConfirming] = useState(false)
+  const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
 
   const purchase = detailQuery.data?.purchase
@@ -116,6 +118,25 @@ function PurchaseDetailDialog({
               <div className="flex justify-between text-xs text-muted-foreground"><span>IVA</span><span className="tabular-nums">{formatCurrency(purchase.vatAmount)}</span></div>
               <div className="flex justify-between font-semibold"><span>Total</span><span className="tabular-nums">{formatCurrency(purchase.total)}</span></div>
             </div>
+            {canVoid && purchase.status === 'completed' && (
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setReturning(true)}>
+                  <Undo2 className="h-4 w-4" />
+                  Devolución al proveedor
+                </Button>
+              </div>
+            )}
+            {returning && (
+              <ReturnPurchaseDialog
+                purchaseId={purchaseId}
+                open={returning}
+                onClose={() => setReturning(false)}
+                onDone={() => {
+                  void qc.invalidateQueries({ queryKey: ['purchasesHistory'] })
+                  void qc.invalidateQueries({ queryKey: ['purchase', purchaseId] })
+                }}
+              />
+            )}
             {canVoid && purchase.status === 'completed' && !confirming && (
               <div className="flex justify-end">
                 <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>Anular compra</Button>

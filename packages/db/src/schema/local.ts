@@ -439,6 +439,120 @@ export const saleLines = sqliteTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* returns — DEVOLUCIONES de ventas (total o parcial por líneas).       */
+/* Restauran stock (promo → componentes) y reintegran en efectivo       */
+/* (egreso de caja) o como crédito en la cuenta corriente (baja la AR). */
+/* Serie propia de numeración (DEV-N).                                  */
+/* ------------------------------------------------------------------ */
+export const returns = sqliteTable(
+  'returns',
+  {
+    id: pk(),
+    number: integer('number').notNull(),
+    saleId: text('sale_id')
+      .notNull()
+      .references(() => sales.id),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** Caja que pagó el reintegro (null si fue crédito en cuenta). */
+    cashRegisterId: text('cash_register_id').references(() => cashRegisters.id),
+    date: integer('date').notNull(),
+    refundMethod: text('refund_method', { enum: ['cash', 'account'] })
+      .notNull()
+      .default('cash'),
+    total: text('total').notNull(),
+    notes: text('notes'),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    numberIdx: uniqueIndex('idx_returns_number').on(t.number),
+    saleIdx: index('idx_returns_sale').on(t.saleId),
+  }),
+);
+
+export const returnLines = sqliteTable(
+  'return_lines',
+  {
+    id: pk(),
+    returnId: text('return_id')
+      .notNull()
+      .references(() => returns.id, { onDelete: 'cascade' }),
+    saleLineId: text('sale_line_id')
+      .notNull()
+      .references(() => saleLines.id),
+    articleId: text('article_id')
+      .notNull()
+      .references(() => articles.id),
+    quantity: text('quantity').notNull(),
+    unitPrice: text('unit_price').notNull(),
+    lineTotal: text('line_total').notNull(),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    returnIdx: index('idx_return_lines_return').on(t.returnId),
+    saleLineIdx: index('idx_return_lines_sale_line').on(t.saleLineId),
+  }),
+);
+
+/* Devoluciones de COMPRAS al proveedor: el stock BAJA (la mercadería    */
+/* vuelve al proveedor) y el reintegro entra en efectivo o baja la deuda.*/
+export const purchaseReturns = sqliteTable(
+  'purchase_returns',
+  {
+    id: pk(),
+    number: integer('number').notNull(),
+    purchaseId: text('purchase_id')
+      .notNull()
+      .references(() => purchases.id),
+    supplierId: text('supplier_id')
+      .notNull()
+      .references(() => suppliers.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    cashRegisterId: text('cash_register_id').references(() => cashRegisters.id),
+    date: integer('date').notNull(),
+    refundMethod: text('refund_method', { enum: ['cash', 'account'] })
+      .notNull()
+      .default('cash'),
+    total: text('total').notNull(),
+    notes: text('notes'),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    numberIdx: uniqueIndex('idx_purchase_returns_number').on(t.number),
+    purchaseIdx: index('idx_purchase_returns_purchase').on(t.purchaseId),
+  }),
+);
+
+export const purchaseReturnLines = sqliteTable(
+  'purchase_return_lines',
+  {
+    id: pk(),
+    returnId: text('return_id')
+      .notNull()
+      .references(() => purchaseReturns.id, { onDelete: 'cascade' }),
+    purchaseLineId: text('purchase_line_id')
+      .notNull()
+      .references(() => purchaseLines.id),
+    articleId: text('article_id')
+      .notNull()
+      .references(() => articles.id),
+    quantity: text('quantity').notNull(),
+    unitPrice: text('unit_price').notNull(),
+    lineTotal: text('line_total').notNull(),
+    createdAt: createdAtCol(),
+  },
+  (t) => ({
+    returnIdx: index('idx_purchase_return_lines_return').on(t.returnId),
+  }),
+);
+
+/* ------------------------------------------------------------------ */
 /* promotions — combos/promos. La promo se VENDE como un artículo       */
 /* "espejo" real (fila en `articles`, marca 'PROMO'): así el carrito,   */
 /* el ticket, el IVA y los reportes funcionan sin casos especiales.     */
@@ -1124,6 +1238,14 @@ export type SaleLine = typeof saleLines.$inferSelect;
 export type NewSaleLine = typeof saleLines.$inferInsert;
 export type SalePayment = typeof salePayments.$inferSelect;
 export type NewSalePayment = typeof salePayments.$inferInsert;
+export type Return = typeof returns.$inferSelect;
+export type NewReturn = typeof returns.$inferInsert;
+export type ReturnLine = typeof returnLines.$inferSelect;
+export type NewReturnLine = typeof returnLines.$inferInsert;
+export type PurchaseReturn = typeof purchaseReturns.$inferSelect;
+export type NewPurchaseReturn = typeof purchaseReturns.$inferInsert;
+export type PurchaseReturnLine = typeof purchaseReturnLines.$inferSelect;
+export type NewPurchaseReturnLine = typeof purchaseReturnLines.$inferInsert;
 export type Promotion = typeof promotions.$inferSelect;
 export type NewPromotion = typeof promotions.$inferInsert;
 export type PromotionItem = typeof promotionItems.$inferSelect;

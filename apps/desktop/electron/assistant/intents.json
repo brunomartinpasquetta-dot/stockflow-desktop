@@ -3033,6 +3033,25 @@
       "Si querés cambiar de precios finales a netos (o al revés), eso se define una sola vez en Configuración, en el modo de precios; no se toca presupuesto por presupuesto."
      ],
      "image": "presupuestos-listado.png"
+    },
+    {
+     "id": "presupuesto-familia-completa",
+     "canonical": "¿Cómo cargo toda una familia/rubro de artículos al presupuesto de una vez?",
+     "patterns": [
+      "cargar familia completa",
+      "agregar rubro entero",
+      "presupuesto de toda una familia",
+      "todos los articulos de una familia",
+      "pedido de un rubro completo",
+      "cargar familia en presupuesto"
+     ],
+     "answer": "En el presupuesto hay un botón 'Familia completa' al lado del buscador: elegís la familia y se agregan TODOS sus artículos activos (incluye subfamilias) con cantidad 1, para que después ajustes cantidades. Ideal para pedidos de un rubro entero sin cargar ítem por ítem.",
+     "steps": [
+      "Abrí Presupuestos y creá o editá un presupuesto.",
+      "Tocá el botón 'Familia completa' (al lado del buscador de productos).",
+      "Elegí la familia: se agregan todos sus artículos con cantidad 1 (los que ya estaban no se duplican).",
+      "Ajustá las cantidades y precios línea por línea y guardá."
+     ]
     }
    ]
   },
@@ -5047,6 +5066,26 @@
       "Si además querés registrar el número del papel del proveedor, escribilo aparte en el casillero 'N° Factura'."
      ],
      "image": "compras-principal.png"
+    },
+    {
+     "id": "devolucion-compra",
+     "canonical": "¿Cómo devuelvo mercadería al proveedor (devolución de compra)?",
+     "patterns": [
+      "devolver al proveedor",
+      "devolucion de compra",
+      "mercaderia fallada proveedor",
+      "devolver mercaderia",
+      "le devuelvo productos al proveedor",
+      "nota de credito proveedor"
+     ],
+     "answer": "Desde el Historial de Compras podés devolver mercadería de una compra: el stock BAJA (la mercadería vuelve al proveedor) y el reintegro entra en efectivo a la caja o baja la deuda que tenés con el proveedor. Queda numerado como DPC #N.",
+     "steps": [
+      "Abrí el Historial de Compras: menú 'Consultas' → 'Historial de Compras'.",
+      "Hacé clic en la compra y tocá 'Devolución al proveedor'.",
+      "Poné las cantidades a devolver por artículo.",
+      "Elegí el reintegro: 'Baja la deuda con el proveedor' (si la compra fue a cuenta) o 'Efectivo' (entra a la caja).",
+      "Confirmá: el stock baja y el movimiento queda en la cuenta del proveedor."
+     ]
     }
    ]
   },
@@ -6252,6 +6291,32 @@
       "Si para una venta puntual querés otra lista, cambiala a mano en ese selector — vale solo para esa venta."
      ],
      "image": "pdv-principal"
+    },
+    {
+     "id": "devolucion-venta",
+     "canonical": "¿Cómo registro la devolución de una venta (el cliente se arrepintió)?",
+     "patterns": [
+      "devolucion",
+      "devolver una venta",
+      "el cliente devolvio",
+      "quiere devolver un producto",
+      "devolver articulo vendido",
+      "se arrepintio de la compra",
+      "reintegro",
+      "nota de credito",
+      "devolver plata al cliente",
+      "como hago una devolucion",
+      "devolucion parcial"
+     ],
+     "answer": "Podés devolver una venta COMPLETA o solo algunos artículos. El stock vuelve solo (si era una promo, vuelven sus componentes) y el reintegro sale en EFECTIVO de la caja o queda como CRÉDITO en la cuenta corriente del cliente (le baja la deuda). Queda un comprobante numerado (DEV #N).",
+     "steps": [
+      "Abrí el Historial de Ventas: presioná F7 o menú 'Consultas' → 'Historial de Ventas'.",
+      "Hacé clic en la venta para ver el detalle y tocá el botón 'Devolución'.",
+      "En la tabla, poné la CANTIDAD a devolver de cada artículo (te muestra cuánto se vendió y cuánto ya se devolvió antes).",
+      "Elegí el reintegro: 'Efectivo' (sale de la caja — necesita caja abierta) o 'Crédito en cuenta corriente' (solo si la venta fue a cuenta).",
+      "Tocá 'Confirmar devolución': el stock vuelve, se registra el movimiento y se imprime el comprobante DEV (también podés guardarlo como PDF).",
+      "Atajo: en Cuentas Corrientes, la fila de cada venta tiene un botón ↩ que abre la misma devolución."
+     ]
     }
    ]
   },
@@ -7138,6 +7203,44 @@
       "Si querés filtrar por fecha o por cajero, o buscar cajas de días anteriores, presioná F8 (Historial de Cajas): ahí sí hay filtros de 'Desde', 'Hasta' y 'Cajero'."
      ],
      "image": "caja-abierta-resumen.png"
+    },
+    {
+     "id": "cierre-deposito-caja-general",
+     "canonical": "¿Cómo pasa la plata a Caja General al cerrar la caja?",
+     "patterns": [
+      "transferir a caja general",
+      "deposito caja general",
+      "cerrar caja y pasar plata",
+      "ingreso a caja general",
+      "al cerrar caja donde va la plata",
+      "deposito de cierre"
+     ],
+     "answer": "Ahora es automático y en 2 pasos: PRIMERO confirmás el cierre de la caja (contando el efectivo, como siempre) y DESPUÉS el sistema te propone el importe a ingresar a Caja General — sugiere el TOTAL del día (efectivo contado + transferencias + tarjetas), pero podés ajustarlo (ej: dejar cambio para mañana). Ya no existe el botón manual de transferir.",
+     "steps": [
+      "Presioná F4 (Caja) y tocá 'Cerrar caja'.",
+      "Contá el efectivo del cajón, ponelo en el campo y tocá 'Confirmar cierre'.",
+      "Se abre 'Ingresar a Caja General' con el total del día ya propuesto y el desglose por medio de pago.",
+      "Ajustá el importe si hace falta y tocá 'Confirmar ingreso' (o 'No ingresar' si ese día no depositás)."
+     ]
+    },
+    {
+     "id": "pantalla-caja-general",
+     "canonical": "¿Dónde veo la Caja General (saldo e ingresos/egresos)?",
+     "patterns": [
+      "caja general",
+      "saldo caja general",
+      "ver caja general",
+      "movimientos caja general",
+      "donde esta la caja general",
+      "registrar egreso caja general"
+     ],
+     "answer": "La Caja General ahora tiene su PROPIA pantalla: menú 'Cobros y Pagos' → 'Caja General'. Ahí ves el saldo actual, los últimos movimientos, y podés registrar ingresos/egresos manuales o exportar a Excel. El acceso se controla con su propio permiso (área Caja, pestaña Roles en Usuarios) — se puede bloquear sin afectar los historiales.",
+     "steps": [
+      "Hacé clic en el menú 'Cobros y Pagos' (arriba) y elegí 'Caja General'.",
+      "Arriba a la derecha está el saldo actual.",
+      "Con los botones 'Registrar Ingreso' / 'Registrar Egreso' cargás movimientos manuales (requiere permiso).",
+      "'Ver todos' abre el listado completo con filtros por fecha y exportación a Excel."
+     ]
     }
    ]
   },
@@ -8787,6 +8890,24 @@
       "Al confirmar se imprime solo el ticket con el detalle del período (cada venta y cobranza del rango, con los totales). El dinero se asigna a las ventas más viejas primero, como siempre."
      ],
      "image": "cuentas-corrientes-dialogo-cobranza-fifo"
+    },
+    {
+     "id": "cc-exportar-recibo-pdf",
+     "canonical": "¿Cómo imprimo o exporto a PDF un recibo desde Cuentas Corrientes?",
+     "patterns": [
+      "exportar recibo pdf",
+      "recibo en pdf",
+      "imprimir recibo cuenta corriente",
+      "pdf del recibo",
+      "guardar recibo",
+      "vista previa del recibo"
+     ],
+     "answer": "En los Movimientos de la cuenta, cada cobranza/pago tiene DOS botones en la columna Acciones: la impresora imprime el recibo (en ticket si tenés térmica, o en hoja A4 con vista previa si no), y el botón de descarga lo exporta directo como archivo PDF.",
+     "steps": [
+      "Presioná F9 (Cuentas Corrientes) y abrí la cuenta del cliente o proveedor.",
+      "En la lista de Movimientos, buscá la cobranza/pago.",
+      "Botón de impresora = imprimir · Botón de flecha hacia abajo = guardar como PDF."
+     ]
     }
    ]
   },

@@ -21,6 +21,7 @@ import { PurchaseRepository } from './purchase.repository';
 import { PurchaseLineRepository } from './purchaseLine.repository';
 import { RolePermissionRepository } from './rolePermission.repository';
 import { PromotionRepository } from './promotion.repository';
+import { ReturnRepository } from './return.repository';
 import { QuoteRepository } from './quote.repository';
 import { SaleRepository } from './sale.repository';
 import { SaleLineRepository } from './saleLine.repository';
@@ -61,6 +62,7 @@ export {
   type ConfigurableRole,
 } from './rolePermission.repository';
 export { PromotionRepository, type PromotionDetail, type PromotionItemDetail, type PromotionWriteInput } from './promotion.repository';
+export { ReturnRepository, type CreateSaleReturnInput, type CreatePurchaseReturnInput, type SaleReturnResult, type PurchaseReturnResult, type ReturnLineDraft, type PurchaseReturnLineDraft } from './return.repository';
 export { QuoteRepository, type QuoteWithLines } from './quote.repository';
 export { SaleRepository, type SaleWithLines } from './sale.repository';
 export { SaleLineRepository } from './saleLine.repository';
@@ -83,6 +85,7 @@ export interface Repositories {
   saleLines: SaleLineRepository;
   salePayments: SalePaymentRepository;
   promotions: PromotionRepository;
+  returns: ReturnRepository;
   quotes: QuoteRepository;
   purchases: PurchaseRepository;
   purchaseLines: PurchaseLineRepository;
@@ -113,6 +116,7 @@ export function createRepositories(db: LocalDatabase): Repositories {
     saleLines: new SaleLineRepository(db),
     salePayments: new SalePaymentRepository(db),
     promotions: new PromotionRepository(db),
+    returns: new ReturnRepository(db),
     quotes: new QuoteRepository(db),
     purchases: new PurchaseRepository(db),
     purchaseLines: new PurchaseLineRepository(db),

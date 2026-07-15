@@ -49,7 +49,7 @@ export interface PayToSupplierResult {
 
 export interface SupplierStatementEntry {
   date: number;
-  kind: 'purchase' | 'payment';
+  kind: 'purchase' | 'payment' | 'return';
   reference: string;
   /** importe que aumenta la deuda (compras a cuenta) */
   debit: string;
@@ -330,6 +330,22 @@ export class SupplierAccountsService {
           comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
         });
       }
+    }
+
+    // Devoluciones al proveedor con crédito a cuenta (bajan la deuda).
+    const accountReturns = await repos.returns.findAccountCreditsByPurchases([...purchasesById.keys()]);
+    for (const r of accountReturns) {
+      const purchase = purchasesById.get(r.purchaseId) ?? null;
+      raw.push({
+        date: r.date,
+        kind: 'return',
+        reference: `Devolución DPC #${r.number}`,
+        debit: '0.0000',
+        credit: r.total,
+        paymentMethodName: null,
+        comprobanteBalance: null,
+      });
+      void purchase;
     }
 
     raw.sort((a, b) => a.date - b.date);

@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { FileText, Loader2, Plus, Printer, Search, ShoppingCart, Trash2, X } from 'lucide-react'
+import { Boxes, FileText, Loader2, Plus, Printer, Search, ShoppingCart, Trash2, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import { useArticles, useCompany, useCustomers, useFamilies, usePaymentMethods, useSuppliers } from '@/lib/hooks'
@@ -529,6 +529,7 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
 
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<FormLine[]>([])
+  const [familyPickerOpen, setFamilyPickerOpen] = useState(false)
   const [globalDiscount, setGlobalDiscount] = useState('0')
   const [discountIsPct, setDiscountIsPct] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -558,6 +559,52 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
       return [...prev, { article: a, quantity: '1', unitPrice: resolvePrice(a, selectedCustomer, '1'), discount: '0', discountIsPct: false }]
     })
     setSearch('')
+  }
+
+  /**
+   * Carga TODOS los artículos activos de una familia (y sus subfamilias) de una
+   * sola vez — para pedidos de rubro completo sin ir ítem por ítem. Los que ya
+   * están en el presupuesto se conservan (no duplica ni pisa cantidades).
+   */
+  function addFamilyArticles(familyId: string): void {
+    const fams = familiesQuery.data ?? []
+    // familia + descendientes (subfamilias)
+    const ids = new Set<string>([familyId])
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const f of fams) {
+        if (f.parentId && ids.has(f.parentId) && !ids.has(f.id)) {
+          ids.add(f.id)
+          grew = true
+        }
+      }
+    }
+    const candidates = (articlesQuery.data ?? []).filter(
+      (a) => a.active && a.familyId && ids.has(a.familyId) && a.brand !== 'PROMO',
+    )
+    if (candidates.length === 0) {
+      toast.info('Esa familia no tiene artículos activos')
+      return
+    }
+    let added = 0
+    setCart((prev) => {
+      const inCart = new Set(prev.map((l) => l.article.id))
+      const nuevos = candidates
+        .filter((a) => !inCart.has(a.id))
+        .map((a) => ({
+          article: a,
+          quantity: '1',
+          unitPrice: resolvePrice(a, selectedCustomer, '1'),
+          discount: '0',
+          discountIsPct: false,
+        }))
+      added = nuevos.length
+      return [...prev, ...nuevos]
+    })
+    setFamilyPickerOpen(false)
+    const famName = fams.find((f) => f.id === familyId)?.name ?? 'familia'
+    toast.success(added > 0 ? `Se agregaron ${added} artículo(s) de "${famName}" — ajustá las cantidades` : `Los artículos de "${famName}" ya estaban en el presupuesto`)
   }
 
   const lineInputs = cart.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, discount: lineDiscountAbs(l), vatRate: l.article.vatRate }))
@@ -643,7 +690,8 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
         </div>
       </div>
 
-      <div className="relative">
+      <div className="flex items-start gap-2">
+      <div className="relative flex-1">
         <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="h-11 pl-10"
@@ -670,6 +718,47 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
           </div>
         )}
       </div>
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 shrink-0"
+        onClick={() => setFamilyPickerOpen(true)}
+        title="Agregar todos los artículos de una familia/rubro de una sola vez"
+      >
+        <Boxes className="mr-2 h-4 w-4" />
+        Familia completa
+      </Button>
+      </div>
+
+      <Dialog open={familyPickerOpen} onOpenChange={(o) => !o && setFamilyPickerOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Agregar familia completa</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Se agregan TODOS los artículos activos de la familia elegida (incluye subfamilias), con cantidad 1 para que ajustes después.
+          </p>
+          <div className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto">
+            {(familiesQuery.data ?? []).map((f) => {
+              const count = (articlesQuery.data ?? []).filter((a) => a.active && a.familyId === f.id && a.brand !== 'PROMO').length
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => addFamilyArticles(f.id)}
+                  className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <span>{f.parentId ? '↳ ' : ''}{f.name}</span>
+                  <span className="text-xs text-muted-foreground">{count} art.</span>
+                </button>
+              )
+            })}
+            {(familiesQuery.data ?? []).length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">No hay familias creadas.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="min-h-0 flex-1 overflow-auto rounded-md border">
         <table className="w-full text-sm">

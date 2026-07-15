@@ -114,6 +114,15 @@ export const WINDOWS: Record<string, WindowDef> = {
     minWidth: 1000,
     minHeight: 600,
   },
+  'caja-general': {
+    pageKey: 'caja-general',
+    title: 'Caja General',
+    iconName: 'Landmark',
+    component: lazy(() => import('@/pages/CajaGeneral').then((m) => ({ default: m.CajaGeneral }))),
+    requires: 'view_cash_general',
+    minWidth: 900,
+    minHeight: 560,
+  },
   'historial-cajas': {
     pageKey: 'historial-cajas',
     title: 'Historial de Cajas',
@@ -285,6 +294,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/presupuestos': 'presupuestos',
   '/caja': 'caja',
   '/consultas/caja': 'historial-cajas',
+  '/caja-general': 'caja-general',
   '/consultas/generador-compras': 'generador-compras',
   '/consultas/inventario': 'inventario-articulos',
   '/consultas/ventas-vendedor': 'ventas-vendedor',

@@ -1,11 +1,12 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2, ReceiptText, Truck } from 'lucide-react'
+import { FileDown, ArrowLeft, ChevronDown, ChevronRight, Loader2, ReceiptText, Truck } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useSupplierBalances } from '@/lib/hooks'
 import { useCompany, usePaymentMethods } from '@/lib/hooks'
+import { exportReceiptPdf } from '@/lib/receiptDoc'
 import { printPaymentReceiptSilent } from '@/lib/printPaymentReceipt'
 import type { PaymentReceiptData } from '@/print/PaymentReceipt'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
@@ -377,6 +378,35 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
     void printPaymentReceiptSilent(data, printerCfgQuery.data ?? null)
   }
 
+  // Recibo individual de un pago al proveedor (Imprimir / Exportar PDF).
+  function receiptDataFor(e: (typeof filteredEntries)[number]): PaymentReceiptData | null {
+    const company = companyQuery.data
+    if (!company) return null
+    return {
+      company,
+      customerName: name,
+      customerDoc: null,
+      date: e.date,
+      paymentMethod: e.paymentMethodName ?? 'Pago',
+      amount: e.credit,
+      comprobanteRef: e.kind === 'payment' && e.reference ? e.reference : null,
+      comprobanteBalance: e.comprobanteBalance ?? null,
+      accountBalance: e.runningBalance,
+      title: 'COMPROBANTE DE PAGO',
+      partyLabel: 'Proveedor',
+    }
+  }
+
+  function printReceipt(e: (typeof filteredEntries)[number]): void {
+    const data = receiptDataFor(e)
+    if (data) void printPaymentReceiptSilent(data, printerCfgQuery.data ?? null)
+  }
+
+  function exportPdf(e: (typeof filteredEntries)[number]): void {
+    const data = receiptDataFor(e)
+    if (data) exportReceiptPdf(data)
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -535,16 +565,17 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
                 <TableHead>Medio de pago</TableHead>
                 <TableHead className="text-right">Importe</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {statementQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Cargando…</TableCell>
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">Cargando…</TableCell>
                 </TableRow>
               ) : filteredEntries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
                     {rangeActive ? 'Sin movimientos en el período seleccionado' : 'Sin movimientos'}
                   </TableCell>
                 </TableRow>
@@ -555,15 +586,43 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
                     <TableCell>
                       {e.kind === 'purchase'
                         ? 'Compra'
-                        : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
-                          ? 'Pago total'
-                          : 'Pago parcial'}
+                        : e.kind === 'return'
+                          ? 'Devolución'
+                          : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
+                            ? 'Pago total'
+                            : 'Pago parcial'}
                     </TableCell>
-                    <TableCell className="text-sm">{e.kind === 'purchase' ? 'Cuenta corriente' : (e.paymentMethodName ?? '—')}</TableCell>
+                    <TableCell className="text-sm">{e.kind === 'purchase' ? 'Cuenta corriente' : e.kind === 'return' ? 'Crédito en cuenta' : (e.paymentMethodName ?? '—')}</TableCell>
                     <TableCell className={`text-right tabular-nums ${e.kind === 'payment' ? 'text-success' : ''}`}>
                       {formatCurrency(Number(e.debit) > 0 ? e.debit : e.credit)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(e.runningBalance)}</TableCell>
+                    <TableCell className="text-right">
+                      {e.kind === 'payment' && (
+                        <span className="inline-flex items-center">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Imprimir comprobante de pago"
+                            disabled={!companyQuery.data}
+                            onClick={() => printReceipt(e)}
+                          >
+                            <ReceiptText className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Exportar comprobante como PDF"
+                            disabled={!companyQuery.data}
+                            onClick={() => exportPdf(e)}
+                          >
+                            <FileDown className="h-4 w-4" />
+                          </Button>
+                        </span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

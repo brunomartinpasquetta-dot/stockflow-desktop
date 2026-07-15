@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Undo2, Loader2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useCompany, useCustomers, usePaymentMethods } from '@/lib/hooks'
@@ -11,6 +11,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
+import { ReturnSaleDialog } from '@/components/ReturnDialogs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,6 +60,7 @@ function SaleDetailDialog({
   const descById = useMemo(() => new Map((articlesQuery.data ?? []).map((a) => [a.id, a.description])), [articlesQuery.data])
   const pmNameById = useMemo(() => new Map((methodsQuery.data ?? []).map((m) => [m.id, m.name])), [methodsQuery.data])
   const [confirming, setConfirming] = useState(false)
+  const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
 
   const sale = detailQuery.data?.sale
@@ -157,7 +159,13 @@ function SaleDetailDialog({
                 ? 'Cuenta corriente'
                 : (detailQuery.data?.payments ?? []).map((p) => `${pmNameById.get(p.paymentMethodId) ?? p.paymentMethodId} ${formatCurrency(p.amount)}`).join(' · ') || '—'}
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {canVoid && sale.status === 'completed' && (
+                <Button variant="outline" size="sm" onClick={() => setReturning(true)}>
+                  <Undo2 className="h-4 w-4" />
+                  Devolución
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -167,6 +175,17 @@ function SaleDetailDialog({
                 Reimprimir ticket
               </Button>
             </div>
+            {returning && (
+              <ReturnSaleDialog
+                saleId={saleId}
+                open={returning}
+                onClose={() => setReturning(false)}
+                onDone={() => {
+                  void qc.invalidateQueries({ queryKey: ['salesHistory'] })
+                  void qc.invalidateQueries({ queryKey: ['sale', saleId] })
+                }}
+              />
+            )}
             {canVoid && sale.status === 'completed' && !confirming && (
               <div className="flex justify-end">
                 <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>Anular venta</Button>

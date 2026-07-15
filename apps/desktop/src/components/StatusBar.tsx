@@ -11,16 +11,13 @@ import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
 import { GlobalSearchBar } from '@/components/GlobalSearchBar'
 import { LanStatusIndicator } from '@/components/LanStatusIndicator'
-import { WhatsAppGlyph } from '@/components/WhatsAppGlyph'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAssistant } from '@/contexts/AssistantContext'
 import { useLicense } from '@/contexts/LicenseContext'
-import { useWhatsAppPanel } from '@/contexts/WhatsAppPanelContext'
 
 export function StatusBar() {
   const { currentUser } = useAuth()
   const assistant = useAssistant()
-  const wa = useWhatsAppPanel()
   const { state: license } = useLicense()
   const [now, setNow] = useState(() => new Date())
 
@@ -77,19 +74,6 @@ export function StatusBar() {
         >
           {trialDaysLeft > 0 ? `Prueba: ${trialDaysLeft} día(s)` : 'Prueba vencida'}
         </span>
-      )}
-      {/* Chip de panel MINIMIZADO (lado derecho) — restaura al hacer clic.
-          El asistente no necesita chip: su botón "Flowy" (izquierda) ya restaura. */}
-      {wa.state === 'min' && (
-        <button
-          type="button"
-          onClick={() => wa.set('normal')}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-primary/10 px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/20"
-          title="Restaurar WhatsApp"
-        >
-          <WhatsAppGlyph className="h-4 w-4" strokeWidth={2} />
-          <span className="hidden md:inline">WhatsApp</span>
-        </button>
       )}
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Wallet className="h-3.5 w-3.5" />

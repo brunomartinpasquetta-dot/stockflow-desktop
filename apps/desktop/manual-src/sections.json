@@ -166,7 +166,7 @@
      "heading": "La ventana principal y los paneles",
      "paragraphs": [
       "StockFlow abre siempre MAXIMIZADO (pantalla completa útil) para que nada quede fuera de vista. La ventana se puede minimizar a la barra de tareas, pero no achicar ni redimensionar: así no se 'pierde' la pantalla por un arrastre sin querer.",
-      "El panel de WhatsApp se minimiza con su botón −: queda como chip arriba a la derecha (junto al estado de la caja) y con un clic vuelve a abrirse. El chat de Flowy también se minimiza con −, y se reabre con su botón 'Flowy' de la barra superior."
+      "El panel de WhatsApp se minimiza con su botón − y queda como una LENGÜETA verde-azul en el borde derecho de la pantalla principal: un clic y se vuelve a abrir (la sesión nunca se pierde). El chat de Flowy se minimiza igual y se reabre con su botón 'Flowy' de la barra superior."
      ],
      "steps": [],
      "tips": [
@@ -627,6 +627,11 @@
      "id": "articulos-historial-precios",
      "caption": "Sección 'Últimos cambios de precio' dentro del formulario: tabla con los 10 últimos cambios (fecha, campo, valor anterior/nuevo, usuario, lote).",
      "howToOpen": "En la pantalla de Artículos → Seleccionar un artículo → Ver en el panel inferior bajo el formulario"
+    },
+    {
+     "id": "promociones-listado",
+     "caption": "Pantalla de Promociones: cada promo muestra código (PROMO-01), artículos que incluye, costo real calculado desde los componentes, precio de venta y margen. Botón 'Nueva promo' para crear.",
+     "howToOpen": "Menú Gestión → Promociones"
     }
    ]
   },
@@ -1078,6 +1083,23 @@
       "O tocá 'Ver todos', elegí una marca en el desplegable 'Todas las marcas' y hacé doble clic en el producto."
      ],
      "tips": []
+    },
+    {
+     "heading": "Devoluciones (el cliente se arrepiente)",
+     "paragraphs": [
+      "Podés devolver una venta completa o solo algunos artículos, desde el Historial de Ventas (clic en la venta → botón 'Devolución') o desde la cuenta corriente del cliente (botón ↩ en la fila de la venta).",
+      "El stock vuelve automáticamente (si lo devuelto era una promo, vuelven sus componentes) y el reintegro puede ser en EFECTIVO (sale de la caja como egreso) o como CRÉDITO en la cuenta corriente (le baja la deuda al cliente). Queda un comprobante numerado DEV #N imprimible o exportable a PDF."
+     ],
+     "steps": [
+      "Presioná F7 (Historial de Ventas) y hacé clic en la venta.",
+      "Tocá 'Devolución' y poné la cantidad a devolver de cada artículo (el sistema muestra cuánto ya se devolvió antes y no deja pasarse).",
+      "Elegí el reintegro: Efectivo (necesita caja abierta) o Crédito en cuenta corriente (solo ventas a cuenta).",
+      "Confirmá: stock restaurado, movimiento registrado y comprobante DEV impreso."
+     ],
+     "tips": [
+      "La devolución al PROVEEDOR es igual pero desde el Historial de Compras ('Devolución al proveedor'): el stock BAJA y el reintegro baja tu deuda o entra en efectivo.",
+      "Las devoluciones con crédito aparecen en la cuenta corriente como 'Devolución' con su número."
+     ]
     }
    ],
    "screenshots": [
@@ -1150,6 +1172,11 @@
      "id": "ticket-a4",
      "caption": "Ticket A4 formal: hoja completa con marco, encabezado de empresa (CUIT, dirección), tabla de ítems con bordes, metadata, totales.",
      "howToOpen": "Ventas → Confirmar venta con impresora A4 configurada (o Configuración → Impresora → Probar impresión)"
+    },
+    {
+     "id": "devolucion-dialog",
+     "caption": "Diálogo de Devolución desde el Historial de Ventas: muestra por artículo la cantidad vendida, lo YA devuelto y cuánto devolver (no deja pasarse). Elegís el reintegro (efectivo o crédito en cuenta corriente) y un motivo opcional.",
+     "howToOpen": "Historial de Ventas → doble clic en una venta completada → botón 'Devolución'"
     }
    ]
   },
@@ -1272,6 +1299,17 @@
       "El presupuesto no afecta stock ni caja hasta convertirlo.",
       "Numeración automática: P-0001, P-0002... no necesitás configurar.",
       "Cada presupuesto congela precios: cambios después no afectan la cotización ya creada."
+     ]
+    },
+    {
+     "heading": "Cargar una familia/rubro completo",
+     "paragraphs": [
+      "Si un cliente te pide 'todo el rubro' (ej: toda la línea de bebidas), no hace falta cargar ítem por ítem: el botón 'Familia completa' (al lado del buscador) agrega TODOS los artículos activos de la familia elegida —subfamilias incluidas— con cantidad 1, listos para ajustar."
+     ],
+     "steps": [
+      "En el presupuesto, tocá 'Familia completa'.",
+      "Elegí la familia (muestra cuántos artículos tiene cada una).",
+      "Ajustá cantidades/precios y guardá. Los artículos que ya estaban no se duplican."
      ]
     }
    ],
@@ -1655,6 +1693,33 @@
       "Guardá los reportes impresos — son auditoría de caja.",
       "Si no hay impresora, el sistema no bloquea — la caja se cierra igual."
      ]
+    },
+    {
+     "heading": "Cierre con depósito automático a Caja General",
+     "paragraphs": [
+      "Al cerrar la caja, el sistema ahora hace el pase a Caja General por vos, en dos pasos: primero confirmás el CIERRE (contando el efectivo, como siempre) y enseguida te propone el importe a INGRESAR a Caja General, sugiriendo el total del día (efectivo contado + transferencias + tarjetas) con su desglose.",
+      "Podés ajustar el importe (por ejemplo, si dejás cambio para el día siguiente) o elegir 'No ingresar'. El botón manual de transferir ya no existe: el flujo es parte del cierre."
+     ],
+     "steps": [
+      "F4 → 'Cerrar caja' → contá el efectivo → 'Confirmar cierre'.",
+      "En 'Ingresar a Caja General', revisá el importe propuesto y el desglose por medio.",
+      "'Confirmar ingreso' — el depósito queda registrado como 'Cierre de caja #N' en Caja General."
+     ],
+     "tips": [
+      "Cada cierre se puede depositar UNA sola vez (el sistema lo controla)."
+     ]
+    },
+    {
+     "heading": "Caja General (pantalla propia)",
+     "paragraphs": [
+      "La Caja General es el consolidado del negocio: recibe los depósitos de cierre de las cajas diarias y los ingresos/egresos manuales (pagos de servicios, retiros, sueldos). Ahora tiene su propia pantalla en el menú 'Cobros y Pagos' → 'Caja General'.",
+      "El acceso se controla con un permiso propio (área Caja, pestaña Roles en Usuarios): podés bloquearla para un empleado sin afectar el Historial de Ventas ni el Historial de Cajas."
+     ],
+     "steps": [
+      "Menú 'Cobros y Pagos' → 'Caja General'.",
+      "Arriba: saldo actual. Abajo: últimos movimientos con su saldo después de cada uno.",
+      "'Registrar Ingreso' / 'Registrar Egreso' para movimientos manuales; 'Ver todos' filtra por fechas y exporta a Excel."
+     ]
     }
    ],
    "screenshots": [
@@ -1702,6 +1767,16 @@
      "id": "caja-general-section",
      "caption": "Caja General — Saldo actual, botones para registrar ingresos/egresos, y últimos movimientos con fecha, tipo, concepto, categoría y saldo después.",
      "howToOpen": "Historial de cajas > Sección 'Caja General' (arriba)"
+    },
+    {
+     "id": "cierre-deposito-dialog",
+     "caption": "Paso 2 del cierre de caja: después de confirmar el cierre, StockFlow propone ingresar la recaudación completa del día a Caja General (efectivo contado + neto de los demás medios). Podés ajustar el importe o elegir 'No ingresar'.",
+     "howToOpen": "Módulo Caja → Cerrar caja → Confirmar cierre (el diálogo aparece automáticamente)"
+    },
+    {
+     "id": "caja-general-pantalla",
+     "caption": "Pantalla propia de Caja General: saldo actual, botones para registrar ingresos/egresos administrativos y últimos movimientos (los depósitos de cierre aparecen con categoría 'Cierre de caja').",
+     "howToOpen": "Menú Cobros y Pagos → Caja General (requiere el permiso 'Ver Caja General')"
     }
    ]
   },
@@ -1865,6 +1940,17 @@
      "tips": [
       "El cobro se imputa siempre a los comprobantes más viejos primero (igual que cualquier cobranza), y nunca puede superar el saldo real del cliente.",
       "Sirve para el clásico 'te pago todo lo del mes': filtrás el mes, cobrás y le entregás el ticket detallado."
+     ]
+    },
+    {
+     "heading": "Imprimir o exportar recibos (PDF)",
+     "paragraphs": [
+      "Cada cobranza o pago de la cuenta tiene dos botones en la columna Acciones: la impresora IMPRIME el recibo (ticket térmico si tenés una configurada; si no, sale como documento A4 con vista previa) y el botón de descarga lo EXPORTA directo como archivo PDF para mandar por WhatsApp o archivar."
+     ],
+     "steps": [
+      "Abrí la cuenta (F9) y andá a Movimientos.",
+      "En la fila de la cobranza: impresora = imprimir · flecha hacia abajo = guardar PDF.",
+      "En las filas de VENTA también tenés reimprimir el ticket y el botón ↩ para registrar una devolución."
      ]
     }
    ],

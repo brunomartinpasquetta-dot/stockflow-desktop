@@ -44,6 +44,10 @@ import type {
   FamilyDTO,
   PromotionDTO,
   PromotionWritePayload,
+  SaleReturnDraftDTO,
+  SaleReturnResultDTO,
+  PurchaseReturnDraftDTO,
+  PurchaseReturnResultDTO,
   IpcErrorCode,
   IpcResponse,
   LicenseStateDTO,
@@ -206,6 +210,16 @@ export const api = {
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
   },
+  returns: {
+    createForSale: (input: SaleReturnDraftDTO): Promise<SaleReturnResultDTO> =>
+      unwrap(sf().returns.createForSale(input)),
+    listBySale: (saleId: string): Promise<SaleReturnResultDTO[]> =>
+      unwrap(sf().returns.listBySale({ saleId })),
+    createForPurchase: (input: PurchaseReturnDraftDTO): Promise<PurchaseReturnResultDTO> =>
+      unwrap(sf().returns.createForPurchase(input)),
+    listByPurchase: (purchaseId: string): Promise<PurchaseReturnResultDTO[]> =>
+      unwrap(sf().returns.listByPurchase({ purchaseId })),
+  },
   promotions: {
     list: (): Promise<PromotionDTO[]> => unwrap(sf().promotions.list()),
     get: (id: string): Promise<PromotionDTO | null> => unwrap(sf().promotions.get({ id })),
@@ -318,6 +332,8 @@ export const api = {
       unwrap(sf().cashGeneral.addExpense(input)),
     transferFromDaily: (input: import('@/types/api').TransferFromDailyInputDTO) =>
       unwrap(sf().cashGeneral.transferFromDaily(input)),
+    transferFromClosed: (input: import('@/types/api').TransferFromDailyInputDTO) =>
+      unwrap(sf().cashGeneral.transferFromClosed(input)),
   },
   analytics: {
     getTopSellingProducts: (input: { from: number; to: number; limit?: number }) =>

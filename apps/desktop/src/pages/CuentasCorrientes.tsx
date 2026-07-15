@@ -1,12 +1,14 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2, Printer, ReceiptText } from 'lucide-react'
+import { Undo2, FileDown, ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2, Printer, ReceiptText } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useCompany, useCustomerBalances, usePaymentMethods } from '@/lib/hooks'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
+import { ReturnSaleDialog } from '@/components/ReturnDialogs'
+import { exportReceiptPdf } from '@/lib/receiptDoc'
 import { printPaymentReceiptSilent } from '@/lib/printPaymentReceipt'
 import type { SaleTicketData } from '@/print/SaleTicket'
 import type { PaymentReceiptData } from '@/print/PaymentReceipt'
@@ -305,6 +307,8 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
   const [cobrando, setCobrando] = useState<AccountReceivableDTO | null>(null)
   const [cobrandoCuenta, setCobrandoCuenta] = useState(false)
   const [cobrandoPeriodo, setCobrandoPeriodo] = useState(false)
+  const [returningSaleId, setReturningSaleId] = useState<string | null>(null)
+  const qc = useQueryClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   // Filtro de movimientos por rango de fechas (YYYY-MM-DD; vacío = sin límite).
   const [fromDate, setFromDate] = useState('')
@@ -424,11 +428,11 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
     await printSaleTicketSilent(ticketData, printerCfgQuery.data ?? null)
   }
 
-  // Imprime el recibo de una cobranza (importe entregado + saldos).
-  function printReceipt(e: StatementEntryDTO): void {
+  // Datos del recibo de una cobranza (compartidos por Imprimir y Exportar PDF).
+  function receiptDataFor(e: StatementEntryDTO): PaymentReceiptData | null {
     const company = companyQuery.data
-    if (!company) return
-    const data: PaymentReceiptData = {
+    if (!company) return null
+    return {
       company,
       customerName: name,
       customerDoc: customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
@@ -439,7 +443,16 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
       comprobanteBalance: e.comprobanteBalance,
       accountBalance: e.runningBalance,
     }
-    void printPaymentReceiptSilent(data, printerCfgQuery.data ?? null)
+  }
+
+  function printReceipt(e: StatementEntryDTO): void {
+    const data = receiptDataFor(e)
+    if (data) void printPaymentReceiptSilent(data, printerCfgQuery.data ?? null)
+  }
+
+  function exportPdf(e: StatementEntryDTO): void {
+    const data = receiptDataFor(e)
+    if (data) exportReceiptPdf(data)
   }
 
   return (
@@ -623,17 +636,20 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                     <TableCell>
                       {e.kind === 'sale'
                         ? 'Venta'
-                        : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
-                          ? 'Cobranza total'
-                          : 'Cobranza parcial'}
+                        : e.kind === 'return'
+                          ? 'Devolución'
+                          : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
+                            ? 'Cobranza total'
+                            : 'Cobranza parcial'}
                     </TableCell>
-                    <TableCell className="text-sm">{e.kind === 'sale' ? 'Cuenta corriente' : (e.paymentMethodName ?? '—')}</TableCell>
-                    <TableCell className={`text-right tabular-nums ${e.kind === 'payment' ? 'text-success' : ''}`}>
+                    <TableCell className="text-sm">{e.kind === 'sale' ? 'Cuenta corriente' : e.kind === 'return' ? 'Crédito en cuenta' : (e.paymentMethodName ?? '—')}</TableCell>
+                    <TableCell className={`text-right tabular-nums ${e.kind !== 'sale' ? 'text-success' : ''}`}>
                       {formatCurrency(Number(e.debit) > 0 ? e.debit : e.credit)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(e.runningBalance)}</TableCell>
                     <TableCell className="text-right">
                       {e.kind === 'payment' ? (
+                        <span className="inline-flex items-center">
                         <Button
                           size="icon"
                           variant="ghost"
@@ -644,17 +660,39 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                         >
                           <ReceiptText className="h-4 w-4" />
                         </Button>
-                      ) : e.saleId ? (
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7"
-                          title="Reimprimir venta"
+                          title="Exportar recibo como PDF"
                           disabled={!companyQuery.data}
-                          onClick={() => { void reprintSale(e.saleId!) }}
+                          onClick={() => exportPdf(e)}
                         >
-                          <Printer className="h-4 w-4" />
+                          <FileDown className="h-4 w-4" />
                         </Button>
+                        </span>
+                      ) : e.kind === 'sale' && e.saleId ? (
+                        <span className="inline-flex items-center">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Reimprimir venta"
+                            disabled={!companyQuery.data}
+                            onClick={() => { void reprintSale(e.saleId!) }}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Registrar una devolución de esta venta"
+                            onClick={() => setReturningSaleId(e.saleId)}
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                        </span>
                       ) : null}
                     </TableCell>
                   </TableRow>
@@ -665,6 +703,17 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
         </CardContent>
       </Card>
 
+      {returningSaleId && (
+        <ReturnSaleDialog
+          saleId={returningSaleId}
+          open
+          onClose={() => setReturningSaleId(null)}
+          onDone={() => {
+            void qc.invalidateQueries({ queryKey: ['customerStatement'] })
+            void qc.invalidateQueries({ queryKey: ['customerBalances'] })
+          }}
+        />
+      )}
       {cobrando && <CobranzaDialog account={cobrando} customerId={customerId} onClose={() => setCobrando(null)} />}
       {cobrandoCuenta && (
         <CobranzaCuentaDialog

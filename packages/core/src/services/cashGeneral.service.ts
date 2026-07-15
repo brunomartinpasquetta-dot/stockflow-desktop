@@ -6,11 +6,11 @@
  * - `view_reports` para leer; `manage_cash_general` para registrar
  *   ingresos/egresos manuales; `close_cash` para transferir desde caja diaria.
  */
-import type { CashGeneralCategory, CashGeneralMovementType } from '@stockflow/db';
+import type { CashGeneralCategory, CashGeneralMovement, CashGeneralMovementType } from '@stockflow/db';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
-import { ValidationError } from '../errors';
+import { NotFoundError, ValidationError } from '../errors';
 
 export interface CashGeneralMovementDTO {
   id: string;
@@ -120,6 +120,25 @@ export class CashGeneralService {
    * abierta — si ya se cerró, el dinero ya quedó arqueado y no puede transferirse
    * sin descuadrar el cierre. La UI debe ofrecer transferir ANTES de cerrar.
    */
+  /**
+   * Depósito automático al CERRAR la caja: permite al dueño de la caja (aunque
+   * no tenga `close_cash`, igual que el cierre) o a quien tenga el permiso.
+   */
+  async transferFromClosed(input: TransferFromDailyInput): Promise<CashGeneralMovementDTO> {
+    const { repos, currentUser } = this.ctx;
+    const reg = await repos.cashRegisters.findById(input.cashRegisterId);
+    if (!reg) throw new NotFoundError('Caja', input.cashRegisterId);
+    if (reg.userId !== currentUser?.id) {
+      requirePermission(currentUser, 'close_cash');
+    }
+    const m = await repos.cashGeneral.transferFromClosed({
+      cashRegisterId: input.cashRegisterId,
+      amount: input.amount,
+      createdBy: currentUser?.id ?? 'system',
+    });
+    return this.toDTO(m);
+  }
+
   async transferFromDaily(input: TransferFromDailyInput): Promise<CashGeneralMovementDTO> {
     const { currentUser, repos } = this.ctx;
     requirePermission(currentUser, 'close_cash');

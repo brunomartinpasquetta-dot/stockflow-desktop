@@ -57,12 +57,20 @@ export async function printPaymentReceiptSilent(
   data: PaymentReceiptData,
   printerCfg: PrinterConfigDTO | null,
 ): Promise<void> {
-  // El recibo se imprime siempre como ticket angosto (no A4 formal). Para A4
-  // usamos 58mm por defecto.
   const width = printerCfg?.paperFormat === '80mm' ? '80' : '58'
   const useDialog = printerCfg?.silentPrint === false
-  const printViaDialog = (): Promise<void> =>
-    printNode(createElement(PaymentReceipt, { data }), width)
+  // FIX vista previa (jul-2026): el ticket de 58 mm dentro de una hoja A4 (o
+  // sin impresora configurada) se veía roto/minúsculo en el diálogo del SO.
+  // En esos casos el recibo se imprime como DOCUMENTO FORMAL A4.
+  const wantsA4 = !printerCfg || printerCfg.paperFormat === 'A4'
+  const printViaDialog = async (): Promise<void> => {
+    if (wantsA4) {
+      const { printReceiptA4 } = await import('@/lib/receiptDoc')
+      await printReceiptA4(data)
+      return
+    }
+    await printNode(createElement(PaymentReceipt, { data }), width)
+  }
   try {
     if (!useDialog && printerCfg?.kind === 'system' && printerCfg.paperFormat !== 'A4') {
       try {

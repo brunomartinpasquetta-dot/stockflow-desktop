@@ -34,5 +34,10 @@ export function buildCashGeneralHandlers(deps: HandlerDeps): HandlerMap {
       (payload: TransferFromDailyInputDTO, ctx): Promise<CashGeneralMovementDTO> =>
         new CashGeneralService(ctx).transferFromDaily(payload),
     ),
+    'cashGeneral:transferFromClosed': withSession(
+      deps,
+      (payload: TransferFromDailyInputDTO, ctx): Promise<CashGeneralMovementDTO> =>
+        new CashGeneralService(ctx).transferFromClosed(payload),
+    ),
   };
 }

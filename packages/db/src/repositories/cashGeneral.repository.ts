@@ -23,7 +23,7 @@ import {
 const SINGLETON_ID = 'singleton';
 
 export type CashGeneralMovementType = 'income' | 'expense' | 'transfer_from_daily';
-export type CashGeneralCategory = 'deposit' | 'withdrawal' | 'service' | 'salary' | 'other';
+export type CashGeneralCategory = 'deposit' | 'close_deposit' | 'withdrawal' | 'service' | 'salary' | 'other';
 
 export interface AddCashGeneralMovementInput {
   type: CashGeneralMovementType;
@@ -165,6 +165,90 @@ export class CashGeneralRepository {
    * Esto evita la duplicación: antes el dinero sumaba en Caja General pero nunca
    * descontaba de la caja diaria de origen.
    */
+  /**
+   * Ingreso a Caja General al CERRAR la caja diaria (flujo automático de cierre).
+   * A diferencia de `transferFromDaily`, la caja debe estar CERRADA: el arqueo
+   * ya quedó firme y acá solo se deposita la recaudación en Caja General (no se
+   * toca la caja diaria — no genera cash_movement, no descuadra el cierre).
+   * Idempotente por caja: un solo depósito de cierre por arqueo.
+   */
+  async transferFromClosed(input: TransferFromDailyRepoInput): Promise<CashGeneralMovement> {
+    try {
+      return this.db.transaction((tx) => {
+        const now = Date.now();
+
+        const reg = tx
+          .select()
+          .from(cashRegisters)
+          .where(eq(cashRegisters.id, input.cashRegisterId))
+          .get();
+        if (!reg) throw new NotFoundError('Caja', input.cashRegisterId);
+        if (reg.status !== 'closed') {
+          throw new ConstraintError(
+            'REGISTER_NOT_CLOSED',
+            'El depósito de cierre se hace después de confirmar el cierre de la caja',
+          );
+        }
+
+        // Un solo depósito de cierre por arqueo.
+        const prev = tx
+          .select({ id: cashGeneralMovements.id })
+          .from(cashGeneralMovements)
+          .where(
+            and(
+              eq(cashGeneralMovements.referenceId, input.cashRegisterId),
+              eq(cashGeneralMovements.category, 'close_deposit'),
+            ),
+          )
+          .get();
+        if (prev) {
+          throw new ConstraintError(
+            'ALREADY_DEPOSITED',
+            `El cierre de la caja #${reg.number} ya fue ingresado a Caja General`,
+          );
+        }
+
+        const cur = tx
+          .select()
+          .from(cashGeneral)
+          .where(eq(cashGeneral.id, SINGLETON_ID))
+          .get();
+        const previousBalance = cur?.currentBalance ?? '0';
+        const balanceAfter = addDecimal(previousBalance, input.amount, 2);
+
+        const newRow = {
+          id: uuidv7(),
+          type: 'transfer_from_daily' as const,
+          amount: input.amount,
+          description: `Cierre de caja #${reg.number}`,
+          category: 'close_deposit' as const,
+          createdBy: input.createdBy,
+          referenceId: input.cashRegisterId,
+          balanceAfter,
+          createdAt: now,
+        };
+        const inserted = tx.insert(cashGeneralMovements).values(newRow).returning().all();
+
+        if (cur) {
+          tx.update(cashGeneral)
+            .set({ currentBalance: balanceAfter, lastUpdate: now })
+            .where(eq(cashGeneral.id, SINGLETON_ID))
+            .run();
+        } else {
+          tx.insert(cashGeneral)
+            .values({ id: SINGLETON_ID, currentBalance: balanceAfter, lastUpdate: now, createdAt: now })
+            .run();
+        }
+
+        const out = inserted[0];
+        if (!out) throw new Error('No se devolvió el movimiento insertado');
+        return out;
+      });
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async transferFromDaily(input: TransferFromDailyRepoInput): Promise<CashGeneralMovement> {
     try {
       return this.db.transaction((tx) => {

@@ -890,38 +890,33 @@ function PDV() {
   return (
     <div className="flex h-full flex-col gap-3">
       {/* ── Zona superior: encabezado de la venta ── */}
-      <div className="grid grid-cols-4 gap-3 rounded-lg border bg-card p-3">
+      <div className="grid grid-cols-5 gap-3 rounded-lg border bg-card p-3">
         <div className="col-span-2 flex flex-col gap-1">
           <Label>Cliente</Label>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="flex-1 justify-between" onClick={() => setCustomerPickerOpen(true)}>
-              <span className="truncate">
-                {selectedCustomer ? `${selectedCustomer.lastName}${selectedCustomer.firstName ? `, ${selectedCustomer.firstName}` : ''}` : 'Cargando…'}
-              </span>
-              <Search className="h-4 w-4 shrink-0 opacity-60" />
-            </Button>
-            <div className="flex shrink-0 flex-col gap-0.5">
-              <Label htmlFor="pdv-pricelist" className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Lista de precios
-              </Label>
-              <Select
-                id="pdv-pricelist"
-                className="h-9 w-32"
-                value={String(selectedPriceList)}
-                onChange={(e) => changePriceList(Number(e.target.value) as 1 | 2 | 3)}
-              >
-                <option value="1">Lista 1</option>
-                <option value="2">Lista 2</option>
-                <option value="3">Lista 3</option>
-              </Select>
-            </div>
-          </div>
+          <Button variant="outline" className="w-full justify-between" onClick={() => setCustomerPickerOpen(true)}>
+            <span className="truncate">
+              {selectedCustomer ? `${selectedCustomer.lastName}${selectedCustomer.firstName ? `, ${selectedCustomer.firstName}` : ''}` : 'Cargando…'}
+            </span>
+            <Search className="h-4 w-4 shrink-0 opacity-60" />
+          </Button>
           {selectedCustomer && (selectedCustomer.docNumber || Number(customerDebt) > 0) && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {selectedCustomer.docNumber && <span>{selectedCustomer.docType} {selectedCustomer.docNumber}</span>}
               {Number(customerDebt) > 0 && <Badge variant="warning">Saldo {formatCurrency(customerDebt)}</Badge>}
             </div>
           )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="pdv-pricelist">Lista de precios</Label>
+          <Select
+            id="pdv-pricelist"
+            value={String(selectedPriceList)}
+            onChange={(e) => changePriceList(Number(e.target.value) as 1 | 2 | 3)}
+          >
+            <option value="1">Lista 1</option>
+            <option value="2">Lista 2</option>
+            <option value="3">Lista 3</option>
+          </Select>
         </div>
         <div className="flex flex-col gap-1">
           <Label>Comprobante</Label>
@@ -943,7 +938,7 @@ function PDV() {
             <Input readOnly value={today} className="bg-muted" />
           </div>
         </div>
-        <div className="col-span-4 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="col-span-5 flex items-center justify-between text-xs text-muted-foreground">
           <span>Vendedor: {currentUser?.fullName}</span>
           <Badge variant={priceMode === 'gross' ? 'outline' : 'warning'}>
             Modo: Precios {priceMode === 'gross' ? 'con IVA incluido' : 'netos + IVA'}
