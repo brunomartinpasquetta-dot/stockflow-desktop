@@ -48,6 +48,12 @@ export const CreatePurchaseWithLinesSchema = CreatePurchaseSchema.extend({
   payments: z.array(PaymentInputSchema).default([]),
   /** Si se paga en efectivo, caja donde impacta el egreso (opcional). */
   cashRegisterId: idSchema.nullish(),
+  /**
+   * De dónde sale el dinero cuando es contado: 'daily' = caja diaria abierta
+   * (default, comportamiento histórico); 'general' = Caja General (el egreso
+   * baja el saldo consolidado, no la caja diaria).
+   */
+  fundingSource: z.enum(['daily', 'general']).default('daily'),
   /** Usuario que registra la compra (necesario si se genera el movimiento de caja). */
   userId: idSchema.nullish(),
 });

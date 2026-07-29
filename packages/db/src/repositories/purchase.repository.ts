@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, inArray, like, lte, max, or, sql } from 'drizzle-orm';
+import { v7 as uuidv7 } from 'uuid';
 import {
   CreatePurchaseWithLinesSchema,
   type CreatePurchaseWithLinesInput,
@@ -16,6 +17,8 @@ import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import {
   articles,
+  cashGeneral,
+  cashGeneralMovements,
   cashMovements,
   cashRegisters,
   companies,
@@ -167,8 +170,42 @@ export class PurchaseRepository extends BaseRepository<
           if (inserted) insertedLines.push(inserted);
         }
 
-        // Egresos de caja (sólo si es contado).
-        if (data.paymentType === 'cash' && data.cashRegisterId && data.userId) {
+        // Egreso desde CAJA GENERAL (contado, fundingSource='general'): un solo
+        // movimiento por el total que baja el saldo consolidado. No toca la caja
+        // diaria (el dinero sale de la caja fuerte, no del cajón del día).
+        if (data.paymentType === 'cash' && data.fundingSource === 'general' && data.userId) {
+          const cgCur = tx
+            .select()
+            .from(cashGeneral)
+            .where(eq(cashGeneral.id, 'singleton'))
+            .get();
+          const prevBalance = cgCur?.currentBalance ?? '0';
+          const balanceAfter = subDecimal(prevBalance, total, 2);
+          tx.insert(cashGeneralMovements)
+            .values({
+              id: uuidv7(),
+              type: 'expense',
+              amount: total,
+              description: `Compra ${data.type} #${number}`,
+              category: 'other',
+              createdBy: data.userId,
+              referenceId: insertedPurchase.id,
+              balanceAfter,
+              createdAt: now,
+            })
+            .run();
+          if (cgCur) {
+            tx.update(cashGeneral)
+              .set({ currentBalance: balanceAfter, lastUpdate: now })
+              .where(eq(cashGeneral.id, 'singleton'))
+              .run();
+          } else {
+            tx.insert(cashGeneral)
+              .values({ id: 'singleton', currentBalance: balanceAfter, lastUpdate: now, createdAt: now })
+              .run();
+          }
+        } else if (data.paymentType === 'cash' && data.cashRegisterId && data.userId) {
+          // Egresos de la caja diaria (comportamiento histórico).
           if (paymentsIn.length > 0) {
             const pmIds = [...new Set(paymentsIn.map((p) => p.paymentMethodId))];
             const pmRows = tx.select().from(paymentMethods).where(inArray(paymentMethods.id, pmIds)).all();

@@ -46,6 +46,11 @@ export interface CreatePurchaseInput {
   notes?: string | null;
   /** Caja donde impacta el egreso (sólo si es contado). */
   cashRegisterId?: string | null;
+  /**
+   * Origen del dinero cuando es contado: 'daily' (caja diaria, default) o
+   * 'general' (Caja General). Con 'general' el egreso baja el saldo consolidado.
+   */
+  fundingSource?: 'daily' | 'general';
   lines: PurchaseLineDraft[];
 }
 
@@ -114,13 +119,30 @@ export class PurchasesService {
       if (cmp < 0) throw new ValidationError('payments', 'Los pagos no cubren el total de la compra');
     }
 
-    const cashRegisterId = !isAccountPurchase
-      ? (input.cashRegisterId ??
-        (this.ctx.currentCashRegister?.status === 'open'
-          ? this.ctx.currentCashRegister.id
-          : (await repos.cashRegisters.getCurrentOpen())?.id) ??
-        null)
-      : null;
+    const fundingSource: 'daily' | 'general' =
+      !isAccountPurchase && input.fundingSource === 'general' ? 'general' : 'daily';
+
+    // Caja diaria: sólo se necesita si el pago sale de la caja diaria. Con
+    // fundingSource='general' el egreso va a Caja General y no hace falta caja abierta.
+    const cashRegisterId =
+      !isAccountPurchase && fundingSource === 'daily'
+        ? (input.cashRegisterId ??
+          (this.ctx.currentCashRegister?.status === 'open'
+            ? this.ctx.currentCashRegister.id
+            : (await repos.cashRegisters.getCurrentOpen())?.id) ??
+          null)
+        : null;
+
+    // Validación de fondos: si sale de Caja General, tiene que haber saldo.
+    if (fundingSource === 'general') {
+      const cgBalance = await repos.cashGeneral.getBalance();
+      if (cmpDecimal(cgBalance, preview.total) < 0) {
+        throw new BusinessRuleError(
+          'insufficient_cash_general',
+          `Caja General no tiene saldo suficiente (disponible ${cgBalance}, compra ${preview.total})`,
+        );
+      }
+    }
 
     // La transacción atómica (cabecera + líneas + stock + egresos de caja + AP
     // de cuenta corriente, BUG-S03) la hace el repo. Todo o nada.
@@ -134,6 +156,7 @@ export class PurchasesService {
       notes: input.notes ?? null,
       date: input.date,
       cashRegisterId,
+      fundingSource,
       userId: currentUser.id,
       payments: payments.map((p) => ({
         paymentMethodId: p.paymentMethodId,

@@ -337,6 +337,18 @@ export function useCashGeneralMutations() {
   }
 }
 
+// --- Auditoría ---
+export function useAuditLog(params: import('@/types/api').ListAuditPayloadDTO = {}) {
+  return useQuery({
+    queryKey: ['audit', 'list', params.from ?? null, params.to ?? null, params.userId ?? null, params.area ?? null, params.q ?? null],
+    queryFn: () => api.audit.list(params),
+  })
+}
+
+export function useAuditAreas() {
+  return useQuery({ queryKey: ['audit', 'areas'], queryFn: api.audit.listAreas })
+}
+
 // --- Analytics (P-FIX-FASE3) ---
 type DR = { from: number; to: number }
 

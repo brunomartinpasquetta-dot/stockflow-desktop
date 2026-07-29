@@ -5086,6 +5086,27 @@
       "Elegí el reintegro: 'Baja la deuda con el proveedor' (si la compra fue a cuenta) o 'Efectivo' (entra a la caja).",
       "Confirmá: el stock baja y el movimiento queda en la cuenta del proveedor."
      ]
+    },
+    {
+     "id": "compra-desde-caja-general",
+     "canonical": "¿Puedo pagar una compra desde la Caja General?",
+     "patterns": [
+      "pagar compra desde caja general",
+      "compra sale de caja general",
+      "de donde sale la plata de la compra",
+      "elegir caja para la compra",
+      "compra con caja general",
+      "pagar proveedor con caja general",
+      "compra caja diaria o general",
+      "origen del dinero de la compra"
+     ],
+     "answer": "Sí. Al confirmar una compra al contado podés elegir de dónde sale el dinero: la Caja diaria (por defecto) o la Caja General. Si elegís Caja General, el egreso baja el saldo de la caja fuerte y NO toca la caja diaria del día; el sistema verifica que haya saldo suficiente. Es útil para pagar compras grandes con la plata acumulada sin descuadrar la caja del cajero.",
+     "steps": [
+      "Armá la compra y dejala en contado (sin tildar 'a cuenta del proveedor').",
+      "En la zona de pago, en 'El dinero sale de' elegí Caja General.",
+      "Verificá el saldo que muestra y elegí la forma de pago.",
+      "Confirmá: el egreso queda registrado en Caja General."
+     ]
     }
    ]
   },
@@ -11170,6 +11191,33 @@
       "Abrí la pantalla: menú 'Precios' (arriba) → 'Actualización Masiva'.",
       "Tildá los artículos, y en 'Campo:' marcá 'L2' o 'L3'. Elegí el modo y el valor.",
       "Tocá 'Ver y aplicar cambios': en la vista previa vas a ver que los artículos con esa lista en $0 calculan el cambio desde el precio de la Lista 1. Confirmá y listo."
+     ]
+    },
+    {
+     "id": "auditoria-sistema",
+     "canonical": "¿Qué es la Auditoría del sistema?",
+     "patterns": [
+      "que es auditoria",
+      "auditoria del sistema",
+      "quien hizo tal operacion",
+      "ver movimientos de usuarios",
+      "registro de operaciones",
+      "log del sistema",
+      "quien anulo una venta",
+      "historial de acciones",
+      "quien cargo un articulo",
+      "auditoria",
+      "control de operaciones",
+      "que hicieron los usuarios",
+      "donde veo lo que hizo cada usuario",
+      "seguimiento de operaciones"
+     ],
+     "answer": "La Auditoría (menú Consultas → Auditoría, solo administradores) es la bitácora de TODO lo que se hace en el sistema: ventas, anulaciones, devoluciones, compras, cambios de artículos/clientes/precios, aperturas y cierres de caja, pagos y cobranzas. Cada línea muestra fecha, usuario, área y qué hizo. Se registra automáticamente, no hay que activar nada. Podés filtrar por fecha, usuario, área y texto, y exportar a Excel.",
+     "steps": [
+      "Entrá al menú Consultas → Auditoría (necesitás ser administrador).",
+      "Elegí el rango de fechas y, si querés, filtrá por usuario o área.",
+      "Usá el buscador para encontrar una operación puntual (ej: el número de una venta).",
+      "Exportá a Excel si necesitás guardar o compartir el registro."
      ]
     }
    ]

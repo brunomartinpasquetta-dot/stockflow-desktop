@@ -1470,6 +1470,19 @@
       "Los atajos facilitan mucho si trabajás con escáner — escaneas, presionas Enter, y F2 para pagar sin quitar las manos del teclado",
       "F4 es útil si usás varios medios regularmente y querés cambiar rápido sin abrir un menú"
      ]
+    },
+    {
+     "heading": "De dónde sale el dinero (Caja diaria o Caja General)",
+     "paragraphs": [
+      "Al confirmar una compra al contado, StockFlow te deja elegir de dónde sale la plata: la Caja diaria (la del día, comportamiento de siempre) o la Caja General (la caja fuerte con el saldo acumulado).",
+      "Si elegís Caja General, el egreso baja el saldo consolidado y NO toca la caja diaria del cajero. El sistema verifica que haya saldo suficiente antes de confirmar. Es ideal para pagar compras grandes con la plata acumulada sin descuadrar la caja del día."
+     ],
+     "steps": [
+      "Armá la compra y dejala al contado (no tildes 'Compra a cuenta del proveedor').",
+      "En la zona de pago, en 'El dinero sale de' elegí Caja diaria o Caja General.",
+      "Si elegís Caja General, mirá el saldo disponible que se muestra.",
+      "Elegí la forma de pago y confirmá (F2). El egreso queda registrado en la caja elegida."
+     ]
     }
    ],
    "screenshots": [
@@ -1497,6 +1510,11 @@
      "id": "historial-compras",
      "caption": "Historial de compras con filtros por fecha, proveedor, tipo de comprobante y estado. Doble clic para ver detalle y opción de anular.",
      "howToOpen": "Pantalla de Compras > botón 'Ver historial'"
+    },
+    {
+     "id": "compras-origen-fondos",
+     "caption": "Al confirmar una compra al contado podés elegir en 'El dinero sale de' si el egreso impacta en la Caja diaria o en la Caja General (muestra el saldo disponible).",
+     "howToOpen": "Compras → agregar productos y proveedor → zona de pago (compra al contado)"
     }
    ]
   },
@@ -1563,10 +1581,10 @@
      ]
     },
     {
-     "heading": "Transferencias a Caja General",
+     "heading": "Caja General (saldo acumulado + arqueos de cajas diarias)",
      "paragraphs": [
-      "Si tenés más dinero del que necesitás en el cajón diario, podés transferir parte a una Caja General (la caja de la sucursal o central).",
-      "El dinero se registra como egreso en la caja diaria y como ingreso en Caja General. Es una auditoria transparente."
+      "La Caja General es la caja fuerte del negocio: acumula los depósitos de cierre de las cajas diarias y los ingresos/egresos administrativos. Se abre desde el menú Consultas → Caja General, con el botón de la barra de accesos o con F8 (requiere el permiso 'Ver Caja General').",
+      "Arriba ves el saldo actual, los botones para registrar ingresos/egresos y la tabla de movimientos con filtro de período (desde/hasta/tipo) y exportación a Excel. Más abajo, en la misma pantalla, está 'Cajas diarias — arqueos y cierres': el historial de todas las cajas del día con sus aperturas, cierres y diferencias (lo que antes era 'Historial de Cajas')."
      ],
      "steps": [
       "Con la caja abierta, presioná 'Transferir a Caja General'.",
@@ -1774,9 +1792,9 @@
      "howToOpen": "Módulo Caja → Cerrar caja → Confirmar cierre (el diálogo aparece automáticamente)"
     },
     {
-     "id": "caja-general-pantalla",
-     "caption": "Pantalla propia de Caja General: saldo actual, botones para registrar ingresos/egresos administrativos y últimos movimientos (los depósitos de cierre aparecen con categoría 'Cierre de caja').",
-     "howToOpen": "Menú Consultas → Caja General o F8 (requiere el permiso 'Ver Caja General')"
+     "id": "caja-general-unificada",
+     "caption": "Caja General unificada: arriba el saldo y los movimientos con filtro de período; abajo 'Cajas diarias — arqueos y cierres' con el historial de aperturas y cierres.",
+     "howToOpen": "Menú Consultas → Caja General (o F8)"
     }
    ]
   },
@@ -2705,6 +2723,36 @@
      "id": "cuentas-corrientes-cobranza",
      "caption": "Cobranzas Parciales — cobrar monto específico a cliente asignando medios de pago (FIFO automático)",
      "howToOpen": "Cuentas Corrientes > seleccionar cliente > Abrir cuenta > Cobrar o Cobrar a la cuenta"
+    }
+   ]
+  },
+  {
+   "id": "auditoria",
+   "title": "Auditoría del sistema",
+   "overview": "La bitácora de todo lo que pasa en el sistema: quién hizo qué y cuándo. Solo para administradores.",
+   "subsections": [
+    {
+     "heading": "Qué registra la Auditoría",
+     "paragraphs": [
+      "La Auditoría es un registro automático de todas las operaciones de escritura del sistema: ventas, anulaciones, devoluciones, compras (incluyendo si el pago salió de Caja General), altas y cambios de artículos/clientes/proveedores/promociones, actualizaciones de precios, aperturas y cierres de caja, depósitos a Caja General, cobranzas y pagos, cambios de la empresa y backups.",
+      "No hay que activar nada ni cargar nada a mano: cada operación exitosa deja su huella con fecha, usuario, área y una descripción en español de lo que se hizo. Es solo lectura y solo para administradores."
+     ],
+     "steps": [
+      "Entrá al menú Consultas → Auditoría (necesitás ser administrador).",
+      "Elegí el rango de fechas (por defecto, la última semana).",
+      "Filtrá por usuario, por área (Ventas, Compras, Caja, etc.) o escribí en 'Buscar' para encontrar una operación puntual (por ejemplo, el número de una venta).",
+      "Apretá 'Buscar' para aplicar los filtros y 'Excel' para exportar el registro."
+     ],
+     "tips": [
+      "Sirve para controlar quién anuló una venta, quién cambió un precio o de qué caja salió el pago de una compra."
+     ]
+    }
+   ],
+   "screenshots": [
+    {
+     "id": "auditoria-pantalla",
+     "caption": "Pantalla de Auditoría: filtros por fecha, usuario, área y texto; la tabla muestra fecha y hora, usuario, área y la operación realizada. Exportable a Excel.",
+     "howToOpen": "Menú Consultas → Auditoría (solo administradores)"
     }
    ]
   },

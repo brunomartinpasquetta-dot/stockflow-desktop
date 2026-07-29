@@ -11,6 +11,7 @@ import {
   useArticles,
   useCompany,
   useCurrentCash,
+  useCashGeneralBalance,
   useFamilies,
   usePaymentMethods,
   useSuppliers,
@@ -131,6 +132,7 @@ export function Compras() {
   const paymentMethodsQuery = usePaymentMethods()
   const companyQuery = useCompany()
   const currentCash = useCurrentCash()
+  const cashGeneralBalance = useCashGeneralBalance()
   const qc = useQueryClient()
 
   const priceMode: PriceMode = companyQuery.data?.priceMode ?? 'gross'
@@ -152,6 +154,7 @@ export function Compras() {
   const [globalDiscount, setGlobalDiscount] = useState('0')
   const [updatePrices, setUpdatePrices] = useState(false)
   const [isAccountPurchase, setIsAccountPurchase] = useState(false)
+  const [fundingSource, setFundingSource] = useState<'daily' | 'general'>('daily')
   const [supplierPickerOpen, setSupplierPickerOpen] = useState(false)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
@@ -234,7 +237,7 @@ export function Compras() {
   const totalNum = Number(totals.total)
   const split = usePaymentSplit(activeMethods, totalNum)
 
-  const noCash = !isAccountPurchase && !currentCash.data
+  const noCash = !isAccountPurchase && fundingSource === 'daily' && !currentCash.data
   const noMethods = !isAccountPurchase && activeMethods.length === 0
 
   function addArticle(article: ArticleDTO): void {
@@ -318,6 +321,7 @@ export function Compras() {
         supplierInvoiceNumber: invoiceNumber.trim() || null,
         date: isoToTs(dateIso),
         isAccountPurchase,
+        fundingSource: isAccountPurchase ? undefined : fundingSource,
         payments: paymentsToSend,
         updatePrices,
         discount: parseCurrencyInput(globalDiscount),
@@ -334,6 +338,7 @@ export function Compras() {
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ['articles'] })
       void qc.invalidateQueries({ queryKey: ['cash'] })
+      void qc.invalidateQueries({ queryKey: ['cashGeneral'] })
       void qc.invalidateQueries({ queryKey: ['supplierBalances'] })
       toast.success(`Compra ${result.purchase.type} #${result.purchase.number} registrada — Total ${formatCurrency(result.purchase.total)}`)
       clearCompra()
@@ -564,7 +569,16 @@ export function Compras() {
               Queda como deuda con el proveedor. {selectedSupplier ? `(${selectedSupplier.name})` : ''} No requiere caja abierta.
             </p>
           ) : noCash ? (
-            <p className="text-xs text-destructive">No hay caja abierta. Abrí la caja (F7) o registrá la compra a cuenta del proveedor.</p>
+            <>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">El dinero sale de</Label>
+                <Select value={fundingSource} onChange={(e) => setFundingSource(e.target.value as 'daily' | 'general')}>
+                  <option value="daily">Caja diaria</option>
+                  <option value="general">Caja General{cashGeneralBalance.data ? ` (saldo ${formatCurrency(cashGeneralBalance.data.balance)})` : ''}</option>
+                </Select>
+              </div>
+              <p className="text-xs text-destructive">No hay caja diaria abierta. Abrí la caja (F7), pagá desde Caja General, o registrá la compra a cuenta del proveedor.</p>
+            </>
           ) : noMethods ? (
             <p className="text-xs text-destructive">No hay medios de pago configurados.</p>
           ) : mixedMode ? (
@@ -585,6 +599,16 @@ export function Compras() {
             </>
           ) : (
             <>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">El dinero sale de</Label>
+                <Select value={fundingSource} onChange={(e) => setFundingSource(e.target.value as 'daily' | 'general')}>
+                  <option value="daily">Caja diaria</option>
+                  <option value="general">Caja General{cashGeneralBalance.data ? ` (saldo ${formatCurrency(cashGeneralBalance.data.balance)})` : ''}</option>
+                </Select>
+              </div>
+              {fundingSource === 'general' && (
+                <p className="text-xs text-muted-foreground">El egreso baja el saldo de Caja General, no la caja diaria.</p>
+              )}
               <div className="flex flex-col gap-1">
                 <Label htmlFor="compra-method">Forma de pago</Label>
                 <PaymentMethodSelect

@@ -28,6 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import type { CashGeneralCategoryDTO, CashGeneralMovementDTO } from '@/types/api'
+import { HistorialCajas } from './HistorialCajas'
 
 function todayIso(): string {
   const d = new Date()
@@ -51,6 +52,7 @@ export function CajaGeneral() {
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
       <CajaGeneralInner />
+      <HistorialCajas />
     </div>
   )
 }
@@ -160,9 +162,7 @@ function CashGeneralMovementDialog({
 function CajaGeneralInner() {
   const canManage = usePermission('manage_cash_general')
   const balanceQ = useCashGeneralBalance()
-  const movementsQ = useCashGeneralMovements({ limit: 10 })
   const [openDialog, setOpenDialog] = useState<'income' | 'expense' | null>(null)
-  const [showAll, setShowAll] = useState(false)
 
   return (
     <Card>
@@ -195,49 +195,10 @@ function CajaGeneralInner() {
 
         <div>
           <div className="flex items-center justify-between border-b pb-1 mb-1">
-            <h3 className="text-sm font-medium">Últimos movimientos</h3>
-            <Button variant="ghost" size="sm" onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Ocultar' : 'Ver todos'}
-            </Button>
+            <h3 className="text-sm font-medium">Movimientos</h3>
           </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Concepto</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="text-right">Saldo después</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movementsQ.isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="py-4 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
-                ) : (movementsQ.data ?? []).length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="py-4 text-center text-muted-foreground">Sin movimientos</TableCell></TableRow>
-                ) : (movementsQ.data ?? []).map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(m.createdAt)}</TableCell>
-                    <TableCell className="text-xs">{cashGeneralTypeLabel(m.type)}</TableCell>
-                    <TableCell className="text-xs">{m.description}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{cashGeneralCategoryLabel(m.category)}</TableCell>
-                    <TableCell className={cn(
-                      'text-right tabular-nums',
-                      m.type === 'expense' ? 'text-destructive' : 'text-success',
-                    )}>
-                      {m.type === 'expense' ? '-' : '+'}{formatCurrency(m.amount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatCurrency(m.balanceAfter)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <CajaGeneralFullList />
         </div>
-
-        {showAll && <CajaGeneralFullList />}
 
         {openDialog && (
           <CashGeneralMovementDialog mode={openDialog} onClose={() => setOpenDialog(null)} />

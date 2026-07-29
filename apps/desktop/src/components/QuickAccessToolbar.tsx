@@ -25,7 +25,7 @@ import {
   ShoppingCart,
   Truck,
   Users,
-  Vault,
+  Banknote,
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
@@ -57,7 +57,7 @@ const BUTTONS: QuickButton[] = [
   { pageKey: 'cuentas-corrientes', label: 'Ctas. Cte.', fKey: 'F9', Icon: BookUser },
   { pageKey: 'contabilidad', label: 'Contabilidad', fKey: 'F10', Icon: Calculator },
   { pageKey: 'estadisticas', label: 'Estadísticas', fKey: 'F11', Icon: BarChart3 },
-  { pageKey: 'caja-general', label: 'Caja General', fKey: 'F8', Icon: Vault },
+  { pageKey: 'caja-general', label: 'Caja General', fKey: 'F8', Icon: Banknote },
   { pageKey: 'usuarios', label: 'Usuarios', fKey: 'F12', Icon: ShieldCheck },
   { pageKey: 'configuracion', label: 'Configuración', Icon: Settings },
 ]

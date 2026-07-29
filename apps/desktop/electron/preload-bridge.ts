@@ -74,6 +74,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'accounting',
   'cashGeneral',
   'analytics',
+  'audit',
 ]);
 
 export const LOCAL_GROUPS = new Set([
@@ -296,6 +297,10 @@ export function createApiBridge(
     company: {
       get: () => c<never>('company:get'),
       upsert: (p) => c<never>('company:upsert', p),
+    },
+    audit: {
+      list: (p) => c<never>('audit:list', p),
+      listAreas: () => c<never>('audit:listAreas'),
     },
     returns: {
       createForSale: (p) => c<never>('returns:createForSale', p),

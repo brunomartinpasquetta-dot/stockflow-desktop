@@ -635,6 +635,8 @@ export interface CreatePurchaseInputDTO {
   discount?: string;
   notes?: string | null;
   cashRegisterId?: string | null;
+  /** Origen del dinero (contado): 'daily' caja diaria (default) o 'general' Caja General. */
+  fundingSource?: 'daily' | 'general';
   lines: PurchaseLineDraftDTO[];
 }
 
@@ -1459,6 +1461,25 @@ export interface AssistantAskResultDTO {
 
 type Res<T> = Promise<IpcResponse<T>>;
 
+export interface AuditEntryDTO {
+  id: string;
+  createdAt: number;
+  userId: string | null;
+  username: string;
+  channel: string;
+  area: string;
+  description: string;
+}
+
+export interface ListAuditPayloadDTO {
+  from?: number;
+  to?: number;
+  userId?: string;
+  area?: string;
+  q?: string;
+  limit?: number;
+}
+
 export interface ApiSurface {
   auth: {
     login(payload: { username: string; password: string }): Res<LoginResultDTO>;
@@ -1471,6 +1492,10 @@ export interface ApiSurface {
   };
   assistant: {
     ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string }): Res<AssistantAskResultDTO>;
+  };
+  audit: {
+    list(payload: ListAuditPayloadDTO): Res<AuditEntryDTO[]>;
+    listAreas(): Res<string[]>;
   };
   articles: {
     list(): Res<ArticleDTO[]>;

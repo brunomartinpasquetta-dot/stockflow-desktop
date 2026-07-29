@@ -80,7 +80,7 @@ export function GlobalSearchBar() {
       { slug: 'open-cash', label: 'Abrir caja', perform: () => navigate('/caja?action=open') },
       { slug: 'close-cash', label: 'Cerrar caja', perform: () => navigate('/caja?action=close') },
       { slug: 'update-prices', label: 'Actualizar precios', perform: () => navigate('/precios/actualizar') },
-      { slug: 'cash-history', label: 'Historial de cajas', perform: () => navigate('/consultas/caja') },
+      { slug: 'cash-history', label: 'Caja General', perform: () => navigate('/caja-general') },
       { slug: 'sales-history', label: 'Historial de ventas', perform: () => navigate('/ventas/historial') },
       { slug: 'purchases-history', label: 'Historial de compras', perform: () => navigate('/compras/historial') },
       { slug: 'company', label: 'Mi empresa', perform: () => navigate('/empresa') },

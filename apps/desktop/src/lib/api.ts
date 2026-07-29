@@ -5,6 +5,8 @@
 import type {
   AssistantAskResultDTO,
   AssistantMessageDTO,
+  AuditEntryDTO,
+  ListAuditPayloadDTO,
   AccountReceivableDetailDTO,
   AccountReceivableDTO,
   ArticleDTO,
@@ -209,6 +211,10 @@ export const api = {
       unwrap(sf().sales.get({ id })),
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
+  },
+  audit: {
+    list: (payload: ListAuditPayloadDTO): Promise<AuditEntryDTO[]> => unwrap(sf().audit.list(payload)),
+    listAreas: (): Promise<string[]> => unwrap(sf().audit.listAreas()),
   },
   returns: {
     createForSale: (input: SaleReturnDraftDTO): Promise<SaleReturnResultDTO> =>

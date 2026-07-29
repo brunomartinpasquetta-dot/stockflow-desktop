@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Loader2, Printer, History } from 'lucide-react'
 
@@ -9,7 +8,7 @@ import {
   useCompany,
   useUsers,
 } from '@/lib/hooks'
-import { useAuth, usePermission } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { usePrintHistoricalCashReport, usePrintCashCloseReport } from '@/lib/usePrint'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -185,7 +184,6 @@ function HistoricalCashReportDialog({
 
 export function HistorialCajas() {
   const { currentUser } = useAuth()
-  const canView = usePermission('view_reports')
   const isAdmin = currentUser?.role === 'admin'
 
   const [fromIso, setFromIso] = useState(() => isoDaysAgo(30))
@@ -237,8 +235,6 @@ export function HistorialCajas() {
     })
   }
 
-  if (!canView) return <Navigate to="/" replace />
-
   const list = listQuery.data ?? []
   const selected = list.find((r) => r.id === selectedId) ?? null
 
@@ -246,7 +242,7 @@ export function HistorialCajas() {
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center gap-2">
         <History className="h-5 w-5 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Historial de cajas</h1>
+        <h1 className="text-lg font-semibold">Cajas diarias — arqueos y cierres</h1>
       </div>
 
 

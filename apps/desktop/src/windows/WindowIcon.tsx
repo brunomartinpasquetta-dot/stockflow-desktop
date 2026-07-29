@@ -18,6 +18,7 @@ import {
   Package,
   PackagePlus,
   Receipt,
+  ScrollText,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -25,7 +26,7 @@ import {
   Tags,
   Truck,
   Users,
-  Vault,
+  Banknote,
   Wallet,
 } from 'lucide-react'
 
@@ -46,12 +47,13 @@ export function WindowIcon({ name, className }: { name: string | undefined; clas
     case 'Package': return <Package className={className} />
     case 'PackagePlus': return <PackagePlus className={className} />
     case 'Receipt': return <Receipt className={className} />
+    case 'ScrollText': return <ScrollText className={className} />
     case 'Settings': return <Settings className={className} />
     case 'ShieldCheck': return <ShieldCheck className={className} />
     case 'ShoppingCart': return <ShoppingCart className={className} />
     case 'Tag': return <Tag className={className} />
     case 'Tags': return <Tags className={className} />
-    case 'Vault': return <Vault className={className} />
+    case 'Banknote': return <Banknote className={className} />
     case 'Truck': return <Truck className={className} />
     case 'Users': return <Users className={className} />
     case 'Wallet': return <Wallet className={className} />

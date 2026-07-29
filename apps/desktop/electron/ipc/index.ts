@@ -35,6 +35,7 @@ import { buildReportsHandlers } from './handlers/reports.handlers';
 import { buildRolesHandlers } from './handlers/roles.handlers';
 import { buildPromotionsHandlers } from './handlers/promotions.handlers';
 import { buildReturnsHandlers } from './handlers/returns.handlers';
+import { buildAuditHandlers } from './handlers/audit.handlers';
 import { buildQuotesHandlers } from './handlers/quotes.handlers';
 import { buildSalesHandlers } from './handlers/sales.handlers';
 import { buildSearchHandlers } from './handlers/search.handlers';
@@ -44,6 +45,7 @@ import { buildSystemHandlers } from './handlers/system.handlers';
 import { buildUsersHandlers } from './handlers/users.handlers';
 import { buildWhatsAppHandlers } from './handlers/whatsapp.handlers';
 import type { HandlerBuilder, HandlerDeps, HandlerMap } from './handler-context';
+import { isAuditable, withAudit } from './audit';
 
 const BUILDERS: HandlerBuilder[] = [
   buildAuthHandlers,
@@ -82,6 +84,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildDesktopWindowsHandlers,
   buildWhatsAppHandlers,
   buildAssistantHandlers,
+  buildAuditHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {
@@ -91,7 +94,7 @@ export function buildAllHandlers(deps: HandlerDeps): HandlerMap {
       if (channel in map) {
         throw new Error(`Canal IPC duplicado: ${channel}`);
       }
-      map[channel] = handler;
+      map[channel] = isAuditable(channel) ? withAudit(channel, handler, deps) : handler;
     }
   }
   return map;

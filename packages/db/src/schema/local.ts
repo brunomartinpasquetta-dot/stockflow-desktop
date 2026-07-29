@@ -858,6 +858,27 @@ export const supplierPayments = sqliteTable(
 /* Relaciones (joins type-safe)                                       */
 /* ================================================================== */
 
+/**
+ * AUDITORÍA — registro append-only de operaciones (lo llena la capa IPC).
+ */
+export const auditLog = sqliteTable(
+  'audit_log',
+  {
+    id: pk(),
+    createdAt: integer('created_at').notNull(),
+    userId: text('user_id'),
+    username: text('username').notNull(),
+    channel: text('channel').notNull(),
+    area: text('area').notNull(),
+    description: text('description').notNull(),
+  },
+  (t) => ({
+    createdIdx: index('idx_audit_created').on(t.createdAt),
+    userIdx: index('idx_audit_user').on(t.userId),
+  }),
+);
+export type AuditLogEntry = typeof auditLog.$inferSelect;
+
 export const familiesRelations = relations(families, ({ one, many }) => ({
   parent: one(families, {
     fields: [families.parentId],
@@ -1296,6 +1317,7 @@ export const localSchema = {
   mpConfig,
   mpPosDevices,
   mpOrders,
+  auditLog,
   familiesRelations,
   suppliersRelations,
   articlesRelations,
