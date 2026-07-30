@@ -296,6 +296,13 @@ export function useCashGeneralBalance() {
   })
 }
 
+export function useCashGeneralBalanceBreakdown() {
+  return useQuery<import('@/types/api').CashGeneralBalanceDTO>({
+    queryKey: ['cashGeneral', 'balanceBreakdown'],
+    queryFn: api.cashGeneral.getBalanceBreakdown,
+  })
+}
+
 export function useCashGeneralMovements(
   params: import('@/types/api').ListCashGeneralMovementsInputDTO = {},
 ) {

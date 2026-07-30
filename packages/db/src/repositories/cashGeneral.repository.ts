@@ -32,6 +32,8 @@ export interface AddCashGeneralMovementInput {
   category?: CashGeneralCategory | null;
   createdBy: string;
   referenceId?: string | null;
+  /** true = efectivo físico, false = electrónico. Default efectivo. */
+  isCash?: boolean;
 }
 
 export interface TransferFromDailyRepoInput {
@@ -39,6 +41,19 @@ export interface TransferFromDailyRepoInput {
   cashRegisterId: string;
   amount: string;
   createdBy: string;
+  /**
+   * Desglose del depósito. Si se omite, todo se toma como efectivo (retrocompat).
+   * `cashAmount + electronicAmount` debe ser igual a `amount`.
+   */
+  cashAmount?: string;
+  electronicAmount?: string;
+}
+
+/** Saldo de Caja General discriminado por naturaleza del dinero. */
+export interface CashGeneralBalance {
+  total: string;
+  cash: string;
+  electronic: string;
 }
 
 export interface ListMovementsFilter {
@@ -52,7 +67,7 @@ export interface ListMovementsFilter {
 export class CashGeneralRepository {
   constructor(private readonly db: LocalDatabase) {}
 
-  /** Devuelve el saldo actual (string decimal). */
+  /** Devuelve el saldo actual TOTAL (string decimal). Retrocompatible. */
   async getBalance(): Promise<string> {
     try {
       const row = this.db
@@ -61,6 +76,24 @@ export class CashGeneralRepository {
         .where(eq(cashGeneral.id, SINGLETON_ID))
         .get();
       return row?.currentBalance ?? '0';
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /** Devuelve el saldo discriminado en efectivo / electrónico / total. */
+  async getBalanceBreakdown(): Promise<CashGeneralBalance> {
+    try {
+      const row = this.db
+        .select()
+        .from(cashGeneral)
+        .where(eq(cashGeneral.id, SINGLETON_ID))
+        .get();
+      return {
+        total: row?.currentBalance ?? '0',
+        cash: row?.cashBalance ?? '0',
+        electronic: row?.electronicBalance ?? '0',
+      };
     } catch (err) {
       return rethrowDbError(err);
     }
@@ -85,68 +118,103 @@ export class CashGeneralRepository {
   }
 
   /**
-   * Crea un movimiento de caja general en transacción:
-   *  - lee el balance actual,
-   *  - calcula nuevo balance (sumar si income/transfer_from_daily, restar si expense),
-   *  - inserta el movimiento con balanceAfter,
-   *  - actualiza la fila singleton.
+   * Aplica un movimiento a los saldos (efectivo/electrónico/total) y lo inserta,
+   * actualizando el singleton. Centraliza la lógica de los 3 flujos de ingreso.
+   * `cashDelta`/`electronicDelta` son montos POSITIVOS a aplicar en el signo de
+   * `isCredit`. Devuelve el movimiento insertado.
+   */
+  private applyMovement(
+    tx: Parameters<Parameters<LocalDatabase['transaction']>[0]>[0],
+    args: {
+      type: CashGeneralMovementType;
+      amount: string;
+      description: string;
+      category: CashGeneralCategory | null;
+      createdBy: string;
+      referenceId: string | null;
+      cashDelta: string;
+      electronicDelta: string;
+      isCash: boolean;
+      now: number;
+    },
+  ): CashGeneralMovement {
+    const cur = tx.select().from(cashGeneral).where(eq(cashGeneral.id, SINGLETON_ID)).get();
+    const prevTotal = cur?.currentBalance ?? '0';
+    const prevCash = cur?.cashBalance ?? '0';
+    const prevElec = cur?.electronicBalance ?? '0';
+
+    const isCredit = args.type === 'income' || args.type === 'transfer_from_daily';
+    const op = isCredit ? addDecimal : subDecimal;
+    const balanceAfterCash = op(prevCash, args.cashDelta, 2);
+    const balanceAfterElectronic = op(prevElec, args.electronicDelta, 2);
+    const balanceAfter = addDecimal(balanceAfterCash, balanceAfterElectronic, 2);
+    void prevTotal;
+
+    const newRow = {
+      id: uuidv7(),
+      type: args.type,
+      amount: args.amount,
+      description: args.description,
+      category: args.category,
+      createdBy: args.createdBy,
+      referenceId: args.referenceId,
+      balanceAfter,
+      isCash: args.isCash,
+      balanceAfterCash,
+      balanceAfterElectronic,
+      createdAt: args.now,
+    };
+    const inserted = tx.insert(cashGeneralMovements).values(newRow).returning().all();
+
+    if (cur) {
+      tx.update(cashGeneral)
+        .set({
+          currentBalance: balanceAfter,
+          cashBalance: balanceAfterCash,
+          electronicBalance: balanceAfterElectronic,
+          lastUpdate: args.now,
+        })
+        .where(eq(cashGeneral.id, SINGLETON_ID))
+        .run();
+    } else {
+      tx.insert(cashGeneral)
+        .values({
+          id: SINGLETON_ID,
+          currentBalance: balanceAfter,
+          cashBalance: balanceAfterCash,
+          electronicBalance: balanceAfterElectronic,
+          lastUpdate: args.now,
+          createdAt: args.now,
+        })
+        .run();
+    }
+
+    const out = inserted[0];
+    if (!out) throw new Error('No se devolvió el movimiento insertado');
+    return out;
+  }
+
+  /**
+   * Crea un movimiento manual de caja general (ingreso/egreso). El delta se
+   * aplica al saldo de efectivo o electrónico según `isCash` (default efectivo).
    */
   async addMovement(input: AddCashGeneralMovementInput): Promise<CashGeneralMovement> {
     try {
-      return this.db.transaction((tx) => {
-        const cur = tx
-          .select()
-          .from(cashGeneral)
-          .where(eq(cashGeneral.id, SINGLETON_ID))
-          .get();
-
-        const now = Date.now();
-        const previousBalance = cur?.currentBalance ?? '0';
-
-        const isCredit = input.type === 'income' || input.type === 'transfer_from_daily';
-        const balanceAfter = isCredit
-          ? addDecimal(previousBalance, input.amount, 2)
-          : subDecimal(previousBalance, input.amount, 2);
-
-        const newRow = {
-          id: uuidv7(),
+      const isCash = input.isCash ?? true;
+      return this.db.transaction((tx) =>
+        this.applyMovement(tx, {
           type: input.type,
           amount: input.amount,
           description: input.description,
           category: input.category ?? null,
           createdBy: input.createdBy,
           referenceId: input.referenceId ?? null,
-          balanceAfter,
-          createdAt: now,
-        };
-
-        const inserted = tx
-          .insert(cashGeneralMovements)
-          .values(newRow)
-          .returning()
-          .all();
-
-        // Upsert singleton (debería existir por la migración, pero defensivo).
-        if (cur) {
-          tx.update(cashGeneral)
-            .set({ currentBalance: balanceAfter, lastUpdate: now })
-            .where(eq(cashGeneral.id, SINGLETON_ID))
-            .run();
-        } else {
-          tx.insert(cashGeneral)
-            .values({
-              id: SINGLETON_ID,
-              currentBalance: balanceAfter,
-              lastUpdate: now,
-              createdAt: now,
-            })
-            .run();
-        }
-
-        const out = inserted[0];
-        if (!out) throw new Error('No se devolvió el movimiento insertado');
-        return out;
-      });
+          cashDelta: isCash ? input.amount : '0',
+          electronicDelta: isCash ? '0' : input.amount,
+          isCash,
+          now: Date.now(),
+        }),
+      );
     } catch (err) {
       return rethrowDbError(err);
     }
@@ -208,41 +276,25 @@ export class CashGeneralRepository {
           );
         }
 
-        const cur = tx
-          .select()
-          .from(cashGeneral)
-          .where(eq(cashGeneral.id, SINGLETON_ID))
-          .get();
-        const previousBalance = cur?.currentBalance ?? '0';
-        const balanceAfter = addDecimal(previousBalance, input.amount, 2);
+        // Desglose efectivo/electrónico del depósito (default: todo efectivo).
+        const cashAmount = input.cashAmount ?? input.amount;
+        const electronicAmount = input.electronicAmount ?? '0';
+        // El movimiento se marca como "efectivo" si su parte física es la mayor;
+        // es solo una etiqueta de fila (los saldos se llevan por los deltas).
+        const isCash = Number(cashAmount) >= Number(electronicAmount);
 
-        const newRow = {
-          id: uuidv7(),
-          type: 'transfer_from_daily' as const,
+        return this.applyMovement(tx, {
+          type: 'transfer_from_daily',
           amount: input.amount,
           description: `Cierre de caja #${reg.number}`,
-          category: 'close_deposit' as const,
+          category: 'close_deposit',
           createdBy: input.createdBy,
           referenceId: input.cashRegisterId,
-          balanceAfter,
-          createdAt: now,
-        };
-        const inserted = tx.insert(cashGeneralMovements).values(newRow).returning().all();
-
-        if (cur) {
-          tx.update(cashGeneral)
-            .set({ currentBalance: balanceAfter, lastUpdate: now })
-            .where(eq(cashGeneral.id, SINGLETON_ID))
-            .run();
-        } else {
-          tx.insert(cashGeneral)
-            .values({ id: SINGLETON_ID, currentBalance: balanceAfter, lastUpdate: now, createdAt: now })
-            .run();
-        }
-
-        const out = inserted[0];
-        if (!out) throw new Error('No se devolvió el movimiento insertado');
-        return out;
+          cashDelta: cashAmount,
+          electronicDelta: electronicAmount,
+          isCash,
+          now,
+        });
       });
     } catch (err) {
       return rethrowDbError(err);
@@ -296,51 +348,20 @@ export class CashGeneralRepository {
           })
           .run();
 
-        // 4) Movimiento + balance de Caja General.
-        const cur = tx
-          .select()
-          .from(cashGeneral)
-          .where(eq(cashGeneral.id, SINGLETON_ID))
-          .get();
-        const previousBalance = cur?.currentBalance ?? '0';
-        const balanceAfter = addDecimal(previousBalance, input.amount, 2);
-
-        const newRow = {
-          id: uuidv7(),
-          type: 'transfer_from_daily' as const,
+        // 4) Movimiento + balance de Caja General. Es efectivo físico que sale
+        //    del cajón de la caja diaria → suma al saldo de EFECTIVO.
+        return this.applyMovement(tx, {
+          type: 'transfer_from_daily',
           amount: input.amount,
           description: 'Transferencia desde caja diaria',
-          category: 'deposit' as const,
+          category: 'deposit',
           createdBy: input.createdBy,
           referenceId: input.cashRegisterId,
-          balanceAfter,
-          createdAt: now,
-        };
-        const inserted = tx
-          .insert(cashGeneralMovements)
-          .values(newRow)
-          .returning()
-          .all();
-
-        if (cur) {
-          tx.update(cashGeneral)
-            .set({ currentBalance: balanceAfter, lastUpdate: now })
-            .where(eq(cashGeneral.id, SINGLETON_ID))
-            .run();
-        } else {
-          tx.insert(cashGeneral)
-            .values({
-              id: SINGLETON_ID,
-              currentBalance: balanceAfter,
-              lastUpdate: now,
-              createdAt: now,
-            })
-            .run();
-        }
-
-        const out = inserted[0];
-        if (!out) throw new Error('No se devolvió el movimiento insertado');
-        return out;
+          cashDelta: input.amount,
+          electronicDelta: '0',
+          isCash: true,
+          now,
+        });
       });
     } catch (err) {
       return rethrowDbError(err);

@@ -561,9 +561,36 @@ export function Caja() {
       toast.error('El monto debe ser mayor a cero')
       return
     }
+    // Separación automática efectivo vs electrónico del depósito de cierre:
+    // el efectivo contado va como EFECTIVO y el neto de los demás medios como
+    // ELECTRÓNICO. Si el usuario ajustó el total, se reparte proporcionalmente
+    // conservando la relación efectivo/electrónico del cierre.
+    const cashPart = Number(depositInfo.counted)
+    const elecPart = depositInfo.report.byPaymentMethod
+      .filter((b) => !b.isPhysicalCash)
+      .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
+    const baseTotal = cashPart + elecPart
+    let cashAmount: string
+    let electronicAmount: string
+    if (baseTotal <= 0) {
+      cashAmount = amt
+      electronicAmount = '0.00'
+    } else if (Math.abs(Number(amt) - baseTotal) < 0.005) {
+      cashAmount = cashPart.toFixed(2)
+      electronicAmount = elecPart.toFixed(2)
+    } else {
+      const factor = Number(amt) / baseTotal
+      cashAmount = (cashPart * factor).toFixed(2)
+      electronicAmount = (Number(amt) - Number(cashAmount)).toFixed(2)
+    }
     try {
-      await api.cashGeneral.transferFromClosed({ cashRegisterId: depositInfo.registerId, amount: amt })
-      toast.success(`Ingresado ${formatCurrency(amt)} a Caja General`)
+      await api.cashGeneral.transferFromClosed({
+        cashRegisterId: depositInfo.registerId,
+        amount: amt,
+        cashAmount,
+        electronicAmount,
+      })
+      toast.success(`Ingresado ${formatCurrency(amt)} a Caja General (efectivo ${formatCurrency(cashAmount)} · electrónico ${formatCurrency(electronicAmount)})`)
       setDepositInfo(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo ingresar a Caja General')

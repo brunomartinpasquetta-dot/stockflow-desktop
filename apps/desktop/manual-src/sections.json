@@ -1584,7 +1584,9 @@
      "heading": "Caja General (saldo acumulado + arqueos de cajas diarias)",
      "paragraphs": [
       "La Caja General es la caja fuerte del negocio: acumula los depósitos de cierre de las cajas diarias y los ingresos/egresos administrativos. Se abre desde el menú Consultas → Caja General, con el botón de la barra de accesos o con F8 (requiere el permiso 'Ver Caja General').",
-      "Arriba ves el saldo actual, los botones para registrar ingresos/egresos y la tabla de movimientos con filtro de período (desde/hasta/tipo) y exportación a Excel. Más abajo, en la misma pantalla, está 'Cajas diarias — arqueos y cierres': el historial de todas las cajas del día con sus aperturas, cierres y diferencias (lo que antes era 'Historial de Cajas')."
+      "Arriba ves TRES saldos: Efectivo, Electrónico (transferencias, tarjetas, QR) y el Total. Así sabés en todo momento cuánto de la Caja General es plata física y cuánto es electrónico, igual que en la caja diaria.",
+      "Cuando registrás un ingreso o egreso a mano, elegís con el selector 'Medio' si es Efectivo o Electrónico. Y cuando entra el depósito del cierre de una caja diaria, el sistema separa solo la parte de efectivo contado de la parte electrónica automáticamente. En la lista, la columna 'Medio' muestra de cuál es cada movimiento.",
+      "Abajo, en la misma pantalla, está 'Cajas diarias — arqueos y cierres': el historial de todas las cajas del día con sus aperturas, cierres y diferencias (lo que antes era 'Historial de Cajas'). La tabla tiene filtro de período (desde/hasta/tipo) y exportación a Excel (incluye columnas de saldo de efectivo y electrónico)."
      ],
      "steps": [
       "Con la caja abierta, presioná 'Transferir a Caja General'.",
@@ -2446,7 +2448,7 @@
       "Entrá como Administrador y abrí Configuración (ícono de la ruedita).",
       "Hacé clic en la pestaña 'Mantenimiento'.",
       "Revisá el detalle de qué se borra y qué se conserva, y tocá el botón rojo 'Reiniciar datos operativos'.",
-      "Escribí la palabra REINICIAR en el cuadro y confirmá con 'Reiniciar todo'.",
+      "Ingresá tu contraseña de administrador y confirmá con 'Reiniciar todo'.",
       "Listo: ventas, caja y stock quedan en cero, y los clientes/proveedores/cuentas corrientes intactos."
      ],
      "tips": [

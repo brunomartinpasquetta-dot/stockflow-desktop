@@ -214,7 +214,7 @@ export const api = {
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
   },
   maintenance: {
-    resetOperationalData: (payload: { confirm: string }): Promise<ResetOperationalResultDTO> =>
+    resetOperationalData: (payload: { password: string }): Promise<ResetOperationalResultDTO> =>
       unwrap(sf().maintenance.resetOperationalData(payload)),
   },
   audit: {
@@ -335,6 +335,7 @@ export const api = {
   },
   cashGeneral: {
     getBalance: () => unwrap(sf().cashGeneral.getBalance()),
+    getBalanceBreakdown: () => unwrap(sf().cashGeneral.getBalanceBreakdown()),
     listMovements: (input: import('@/types/api').ListCashGeneralMovementsInputDTO = {}) =>
       unwrap(sf().cashGeneral.listMovements(input)),
     addIncome: (input: import('@/types/api').AddCashGeneralMovementInputDTO) =>

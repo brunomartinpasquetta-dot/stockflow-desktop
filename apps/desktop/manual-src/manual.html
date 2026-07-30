@@ -34,7 +34,7 @@ a { color: inherit; }
 <h1>StockFlow</h1>
 <div class="sub">Sistema de Gestión Comercial</div>
 <div class="sub" style="margin-top:18px;font-size:16pt;color:#1b2a4a;font-weight:600;">Manual de Usuario</div>
-<div class="ver">Versión 0.1.91</div>
+<div class="ver">Versión 0.1.92</div>
 <div class="foot">© 2026 · Crafted by BPSG</div>
 </div>
 <div class='toc'><h2>Índice</h2><ol>
@@ -1092,7 +1092,9 @@ a { color: inherit; }
 </div>
 <h3>Caja General (saldo acumulado + arqueos de cajas diarias)</h3>
 <p>La Caja General es la caja fuerte del negocio: acumula los depósitos de cierre de las cajas diarias y los ingresos/egresos administrativos. Se abre desde el menú Consultas → Caja General, con el botón de la barra de accesos o con F8 (requiere el permiso &#x27;Ver Caja General&#x27;).</p>
-<p>Arriba ves el saldo actual, los botones para registrar ingresos/egresos y la tabla de movimientos con filtro de período (desde/hasta/tipo) y exportación a Excel. Más abajo, en la misma pantalla, está &#x27;Cajas diarias — arqueos y cierres&#x27;: el historial de todas las cajas del día con sus aperturas, cierres y diferencias (lo que antes era &#x27;Historial de Cajas&#x27;).</p>
+<p>Arriba ves TRES saldos: Efectivo, Electrónico (transferencias, tarjetas, QR) y el Total. Así sabés en todo momento cuánto de la Caja General es plata física y cuánto es electrónico, igual que en la caja diaria.</p>
+<p>Cuando registrás un ingreso o egreso a mano, elegís con el selector &#x27;Medio&#x27; si es Efectivo o Electrónico. Y cuando entra el depósito del cierre de una caja diaria, el sistema separa solo la parte de efectivo contado de la parte electrónica automáticamente. En la lista, la columna &#x27;Medio&#x27; muestra de cuál es cada movimiento.</p>
+<p>Abajo, en la misma pantalla, está &#x27;Cajas diarias — arqueos y cierres&#x27;: el historial de todas las cajas del día con sus aperturas, cierres y diferencias (lo que antes era &#x27;Historial de Cajas&#x27;). La tabla tiene filtro de período (desde/hasta/tipo) y exportación a Excel (incluye columnas de saldo de efectivo y electrónico).</p>
 <ol class='steps'>
 <li>Con la caja abierta, presioná &#x27;Transferir a Caja General&#x27;.</li>
 <li>Ves el efectivo esperado en el cajón.</li>
@@ -1671,7 +1673,7 @@ a { color: inherit; }
 <li>Entrá como Administrador y abrí Configuración (ícono de la ruedita).</li>
 <li>Hacé clic en la pestaña &#x27;Mantenimiento&#x27;.</li>
 <li>Revisá el detalle de qué se borra y qué se conserva, y tocá el botón rojo &#x27;Reiniciar datos operativos&#x27;.</li>
-<li>Escribí la palabra REINICIAR en el cuadro y confirmá con &#x27;Reiniciar todo&#x27;.</li>
+<li>Ingresá tu contraseña de administrador y confirmá con &#x27;Reiniciar todo&#x27;.</li>
 <li>Listo: ventas, caja y stock quedan en cero, y los clientes/proveedores/cuentas corrientes intactos.</li>
 </ol>
 <div class='tips'>

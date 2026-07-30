@@ -1184,6 +1184,10 @@ export type NewPriceUpdateEntry = typeof priceUpdateEntries.$inferInsert;
 export const cashGeneral = sqliteTable('cash_general', {
   id: text('id').primaryKey(),
   currentBalance: text('current_balance').notNull().default('0'),
+  /** Saldo en efectivo físico (parte de current_balance). */
+  cashBalance: text('cash_balance').notNull().default('0'),
+  /** Saldo electrónico: transferencias, tarjetas, QR (parte de current_balance). */
+  electronicBalance: text('electronic_balance').notNull().default('0'),
   lastUpdate: integer('last_update').notNull(),
   createdAt: integer('created_at').notNull(),
 });
@@ -1203,6 +1207,12 @@ export const cashGeneralMovements = sqliteTable(
       .references(() => users.id),
     referenceId: text('reference_id'),
     balanceAfter: text('balance_after').notNull(),
+    /** true = efectivo físico, false = electrónico (transfer/tarjeta/QR). */
+    isCash: integer('is_cash', { mode: 'boolean' }).notNull().default(true),
+    /** Saldo de efectivo tras este movimiento. */
+    balanceAfterCash: text('balance_after_cash').notNull().default('0'),
+    /** Saldo electrónico tras este movimiento. */
+    balanceAfterElectronic: text('balance_after_electronic').notNull().default('0'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => ({

@@ -7260,6 +7260,29 @@
       "Con los botones 'Registrar Ingreso' / 'Registrar Egreso' cargás movimientos manuales (requiere permiso).",
       "'Ver todos' abre el listado completo con filtros por fecha y exportación a Excel."
      ]
+    },
+    {
+     "id": "caja-general-efectivo-electronico",
+     "canonical": "¿La Caja General muestra cuánto tengo en efectivo y cuánto en electrónico?",
+     "patterns": [
+      "caja general efectivo y electronico",
+      "cuanto tengo en efectivo caja general",
+      "saldo electronico caja general",
+      "separar efectivo y transferencias caja general",
+      "caja general discrimina efectivo",
+      "cuanto hay en efectivo y cuanto en tarjeta",
+      "saldo en efectivo caja general",
+      "caja general dos saldos",
+      "efectivo vs electronico caja general"
+     ],
+     "answer": "Sí. La Caja General muestra tres saldos: Efectivo, Electrónico (transferencias, tarjetas, QR) y el Total. Cuando cerrás una caja diaria y su recaudación entra a la Caja General, el sistema separa solo la parte de efectivo contado del resto (medios electrónicos) automáticamente. Y cuando registrás un ingreso o egreso a mano, elegís con un selector si es Efectivo o Electrónico. Cada movimiento en la lista muestra su medio, y el Excel exporta las columnas de saldo de efectivo y electrónico por separado.",
+     "steps": [
+      "Abrí la Caja General (menú 'Consultas' → 'Caja General', o F8).",
+      "Arriba a la derecha ves tres saldos: Efectivo, Electrónico y Total.",
+      "Al registrar un Ingreso o Egreso, elegí en el selector 'Medio' si es Efectivo o Electrónico.",
+      "En la lista de movimientos, la columna 'Medio' te dice de cuál es cada uno.",
+      "Los depósitos que vienen del cierre de caja ya entran separados solos: el efectivo contado suma al efectivo y el resto al electrónico."
+     ]
     }
    ]
   },
@@ -10013,7 +10036,7 @@
       "Entrá como Administrador y abrí Configuración (ícono de la ruedita).",
       "Hacé clic en la pestaña 'Mantenimiento' (solo la ve el Administrador).",
       "Leé qué se borra y qué se conserva. Tocá el botón rojo 'Reiniciar datos operativos'.",
-      "Escribí la palabra REINICIAR para confirmar y tocá 'Reiniciar todo'.",
+      "Ingresá tu contraseña de administrador para confirmar y tocá 'Reiniciar todo'.",
       "StockFlow crea un backup automático y deja las ventas/caja/stock en cero. Si te arrepentís, restaurá ese backup desde Configuración → Backup."
      ]
     }

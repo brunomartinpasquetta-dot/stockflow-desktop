@@ -135,6 +135,7 @@ export {
 export {
   CashGeneralService,
   type CashGeneralMovementDTO,
+  type CashGeneralBalanceDTO,
   type ListCashGeneralMovementsInput,
   type AddIncomeOrExpenseInput,
   type TransferFromDailyInput,

@@ -1229,7 +1229,17 @@ export interface CashGeneralMovementDTO {
   createdBy: string;
   referenceId: string | null;
   balanceAfter: string;
+  isCash: boolean;
+  balanceAfterCash: string;
+  balanceAfterElectronic: string;
   createdAt: number;
+}
+
+/** Saldo de Caja General discriminado efectivo/electrónico/total. */
+export interface CashGeneralBalanceDTO {
+  total: string;
+  cash: string;
+  electronic: string;
 }
 
 export interface ListCashGeneralMovementsInputDTO {
@@ -1244,11 +1254,16 @@ export interface AddCashGeneralMovementInputDTO {
   amount: string;
   description: string;
   category?: CashGeneralCategoryDTO;
+  /** true = efectivo físico, false = electrónico. Default efectivo. */
+  isCash?: boolean;
 }
 
 export interface TransferFromDailyInputDTO {
   cashRegisterId: string;
   amount: string;
+  /** Desglose del depósito de cierre (suma = amount). Si se omite, todo efectivo. */
+  cashAmount?: string;
+  electronicAmount?: string;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1506,7 +1521,7 @@ export interface ApiSurface {
     ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string }): Res<AssistantAskResultDTO>;
   };
   maintenance: {
-    resetOperationalData(payload: { confirm: string }): Res<ResetOperationalResultDTO>;
+    resetOperationalData(payload: { password: string }): Res<ResetOperationalResultDTO>;
   };
   audit: {
     list(payload: ListAuditPayloadDTO): Res<AuditEntryDTO[]>;
@@ -1633,6 +1648,7 @@ export interface ApiSurface {
   };
   cashGeneral: {
     getBalance(): Res<{ balance: string }>;
+    getBalanceBreakdown(): Res<CashGeneralBalanceDTO>;
     listMovements(payload: ListCashGeneralMovementsInputDTO): Res<CashGeneralMovementDTO[]>;
     addIncome(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;
     addExpense(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;

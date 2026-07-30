@@ -10,10 +10,9 @@ import type { ResetOperationalResult } from '@stockflow/db';
 import type { BackupEntry } from '../../hardware/types';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 
-const CONFIRM_WORD = 'REINICIAR';
-
 export interface ResetOperationalPayload {
-  confirm: string;
+  /** Contraseña del administrador en sesión (confirmación de la acción). */
+  password: string;
 }
 
 export interface ResetOperationalResponse extends ResetOperationalResult {
@@ -28,8 +27,13 @@ export function buildMaintenanceHandlers(deps: HandlerDeps): HandlerMap {
         if (ctx.currentUser?.role !== 'admin') {
           throw new Error('Solo un administrador puede reiniciar los datos operativos');
         }
-        if ((payload?.confirm ?? '').trim().toUpperCase() !== CONFIRM_WORD) {
-          throw new Error(`Para confirmar tenés que escribir "${CONFIRM_WORD}"`);
+        // Confirmación por contraseña del administrador en sesión.
+        const ok = await deps.repos.users.verifyPassword(
+          ctx.currentUser.username,
+          payload?.password ?? '',
+        );
+        if (!ok) {
+          throw new Error('Contraseña incorrecta');
         }
 
         // 1) Backup automático (nunca reiniciar sin red de seguridad).

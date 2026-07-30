@@ -954,10 +954,10 @@ function readInitialTab(extras: unknown): TabValue | null {
 function MantenimientoSection() {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [confirmText, setConfirmText] = useState('')
+  const [password, setPassword] = useState('')
 
   const resetMut = useMutation({
-    mutationFn: () => api.maintenance.resetOperationalData({ confirm: confirmText }),
+    mutationFn: () => api.maintenance.resetOperationalData({ password }),
     onSuccess: (r) => {
       // invalidar todo lo operativo para que las pantallas reflejen el cero
       void qc.invalidateQueries()
@@ -967,7 +967,7 @@ function MantenimientoSection() {
         { duration: 12_000 },
       )
       setOpen(false)
-      setConfirmText('')
+      setPassword('')
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo reiniciar'),
   })
@@ -1008,25 +1008,27 @@ function MantenimientoSection() {
         </div>
       </CardContent>
 
-      <AlertDialog open={open} onOpenChange={(o) => { if (!o) { setOpen(false); setConfirmText('') } }}>
+      <AlertDialog open={open} onOpenChange={(o) => { if (!o) { setOpen(false); setPassword('') } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Reiniciar datos operativos</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción es <strong>irreversible</strong> (salvo restaurando el backup automático).
-              Para confirmar, escribí <span className="font-mono font-semibold text-foreground">REINICIAR</span> abajo.
+              Para confirmar, ingresá tu <strong>contraseña</strong> de administrador.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Input
-            value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value)}
-            placeholder="Escribí REINICIAR"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Contraseña de administrador"
             autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter' && password && !resetMut.isPending) resetMut.mutate() }}
           />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={resetMut.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={confirmText.trim().toUpperCase() !== 'REINICIAR' || resetMut.isPending}
+              disabled={!password || resetMut.isPending}
               onClick={(e) => {
                 e.preventDefault()
                 resetMut.mutate()

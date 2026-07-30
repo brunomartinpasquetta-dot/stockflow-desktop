@@ -21,7 +21,17 @@ export interface CashGeneralMovementDTO {
   createdBy: string;
   referenceId: string | null;
   balanceAfter: string;
+  isCash: boolean;
+  balanceAfterCash: string;
+  balanceAfterElectronic: string;
   createdAt: number;
+}
+
+/** Saldo de Caja General discriminado efectivo/electrónico/total. */
+export interface CashGeneralBalanceDTO {
+  total: string;
+  cash: string;
+  electronic: string;
 }
 
 export interface ListCashGeneralMovementsInput {
@@ -36,11 +46,16 @@ export interface AddIncomeOrExpenseInput {
   amount: string;
   description: string;
   category?: CashGeneralCategory;
+  /** true = efectivo físico, false = electrónico. Default efectivo. */
+  isCash?: boolean;
 }
 
 export interface TransferFromDailyInput {
   cashRegisterId: string;
   amount: string;
+  /** Desglose del depósito de cierre (suma = amount). Si se omite, todo efectivo. */
+  cashAmount?: string;
+  electronicAmount?: string;
 }
 
 function assertPositive(amount: string): void {
@@ -65,21 +80,18 @@ export class CashGeneralService {
     return repos.cashGeneral.getBalance();
   }
 
+  /** Saldo discriminado efectivo/electrónico/total. */
+  async getBalanceBreakdown(): Promise<CashGeneralBalanceDTO> {
+    const { currentUser, repos } = this.ctx;
+    requirePermission(currentUser, 'view_reports');
+    return repos.cashGeneral.getBalanceBreakdown();
+  }
+
   async listMovements(input: ListCashGeneralMovementsInput = {}): Promise<CashGeneralMovementDTO[]> {
     const { currentUser, repos } = this.ctx;
     requirePermission(currentUser, 'view_reports');
     const rows = await repos.cashGeneral.findMovements(input);
-    return rows.map((r) => ({
-      id: r.id,
-      type: r.type as CashGeneralMovementType,
-      amount: r.amount,
-      description: r.description,
-      category: (r.category ?? null) as CashGeneralCategory | null,
-      createdBy: r.createdBy,
-      referenceId: r.referenceId,
-      balanceAfter: r.balanceAfter,
-      createdAt: r.createdAt,
-    }));
+    return rows.map((r) => this.toDTO(r));
   }
 
   async addIncome(input: AddIncomeOrExpenseInput): Promise<CashGeneralMovementDTO> {
@@ -93,6 +105,7 @@ export class CashGeneralService {
       description: input.description.trim(),
       category: input.category ?? null,
       createdBy: currentUser.id,
+      isCash: input.isCash ?? true,
     });
     return this.toDTO(m);
   }
@@ -108,6 +121,7 @@ export class CashGeneralService {
       description: input.description.trim(),
       category: input.category ?? null,
       createdBy: currentUser.id,
+      isCash: input.isCash ?? true,
     });
     return this.toDTO(m);
   }
@@ -135,6 +149,8 @@ export class CashGeneralService {
       cashRegisterId: input.cashRegisterId,
       amount: input.amount,
       createdBy: currentUser?.id ?? 'system',
+      cashAmount: input.cashAmount,
+      electronicAmount: input.electronicAmount,
     });
     return this.toDTO(m);
   }
@@ -160,6 +176,9 @@ export class CashGeneralService {
     createdBy: string;
     referenceId: string | null;
     balanceAfter: string;
+    isCash: boolean;
+    balanceAfterCash: string;
+    balanceAfterElectronic: string;
     createdAt: number;
   }): CashGeneralMovementDTO {
     return {
@@ -171,6 +190,9 @@ export class CashGeneralService {
       createdBy: m.createdBy,
       referenceId: m.referenceId,
       balanceAfter: m.balanceAfter,
+      isCash: m.isCash,
+      balanceAfterCash: m.balanceAfterCash,
+      balanceAfterElectronic: m.balanceAfterElectronic,
       createdAt: m.createdAt,
     };
   }

@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { Loader2, PlusCircle, MinusCircle, Wallet } from 'lucide-react'
 
 import {
-  useCashGeneralBalance,
+  useCashGeneralBalanceBreakdown,
   useCashGeneralMovements,
   useCashGeneralMutations,
 } from '@/lib/hooks'
@@ -89,6 +89,7 @@ function CashGeneralMovementDialog({
   const [amount, setAmount] = useState('0.00')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<CashGeneralCategoryDTO | ''>('')
+  const [medio, setMedio] = useState<'cash' | 'electronic'>('cash')
   const m = useCashGeneralMutations()
   const submitting = m.addIncome.isPending || m.addExpense.isPending
 
@@ -105,6 +106,7 @@ function CashGeneralMovementDialog({
       amount,
       description: description.trim(),
       category: (category || undefined) as CashGeneralCategoryDTO | undefined,
+      isCash: medio === 'cash',
     }
     try {
       if (mode === 'income') await m.addIncome.mutateAsync(payload)
@@ -147,6 +149,13 @@ function CashGeneralMovementDialog({
               ))}
             </Select>
           </div>
+          <div className="flex flex-col gap-1">
+            <Label>Medio</Label>
+            <Select value={medio} onChange={(e) => setMedio(e.target.value as 'cash' | 'electronic')}>
+              <option value="cash">Efectivo</option>
+              <option value="electronic">Electrónico (transferencia / tarjeta)</option>
+            </Select>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancelar</Button>
@@ -161,21 +170,35 @@ function CashGeneralMovementDialog({
 
 function CajaGeneralInner() {
   const canManage = usePermission('manage_cash_general')
-  const balanceQ = useCashGeneralBalance()
+  const balanceQ = useCashGeneralBalanceBreakdown()
   const [openDialog, setOpenDialog] = useState<'income' | 'expense' | null>(null)
 
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 pt-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-primary" />
             <h2 className="text-base font-semibold">Caja General</h2>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-muted-foreground">Saldo actual</div>
-            <div className="text-2xl font-bold tabular-nums">
-              {balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.balance ?? '0')}
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="rounded-md border bg-muted/40 px-3 py-1.5 text-right">
+              <div className="text-[11px] text-muted-foreground">Efectivo</div>
+              <div className="text-lg font-semibold tabular-nums">
+                {balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.cash ?? '0')}
+              </div>
+            </div>
+            <div className="rounded-md border bg-muted/40 px-3 py-1.5 text-right">
+              <div className="text-[11px] text-muted-foreground">Electrónico</div>
+              <div className="text-lg font-semibold tabular-nums">
+                {balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.electronic ?? '0')}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">Saldo total</div>
+              <div className="text-2xl font-bold tabular-nums">
+                {balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.total ?? '0')}
+              </div>
             </div>
           </div>
         </div>
@@ -231,8 +254,11 @@ function CajaGeneralFullList() {
         Tipo: cashGeneralTypeLabel(m.type),
         Concepto: m.description,
         Categoría: cashGeneralCategoryLabel(m.category),
+        Medio: m.isCash ? 'Efectivo' : 'Electrónico',
         Monto: Number(m.amount),
-        'Saldo después': Number(m.balanceAfter),
+        'Saldo efectivo': Number(m.balanceAfterCash),
+        'Saldo electrónico': Number(m.balanceAfterElectronic),
+        'Saldo total': Number(m.balanceAfter),
       }))
       const ws = XLSX.utils.json_to_sheet(data)
       const wb = XLSX.utils.book_new()
@@ -273,19 +299,28 @@ function CajaGeneralFullList() {
               <TableHead>Tipo</TableHead>
               <TableHead>Concepto</TableHead>
               <TableHead>Categoría</TableHead>
+              <TableHead>Medio</TableHead>
               <TableHead className="text-right">Monto</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
+              <TableHead className="text-right">Saldo total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(movementsQ.data ?? []).length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="py-4 text-center text-muted-foreground">Sin movimientos en el rango</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="py-4 text-center text-muted-foreground">Sin movimientos en el rango</TableCell></TableRow>
             ) : (movementsQ.data ?? []).map((m) => (
               <TableRow key={m.id}>
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(m.createdAt)}</TableCell>
                 <TableCell className="text-xs">{cashGeneralTypeLabel(m.type)}</TableCell>
                 <TableCell className="text-xs">{m.description}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{cashGeneralCategoryLabel(m.category)}</TableCell>
+                <TableCell className="text-xs">
+                  <span className={cn(
+                    'rounded px-1.5 py-0.5 text-[11px]',
+                    m.isCash ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300',
+                  )}>
+                    {m.isCash ? 'Efectivo' : 'Electrónico'}
+                  </span>
+                </TableCell>
                 <TableCell className={cn(
                   'text-right tabular-nums',
                   m.type === 'expense' ? 'text-destructive' : 'text-success',
