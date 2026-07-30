@@ -82,14 +82,15 @@ export class SupplierAccountPayableRepository extends BaseRepository<
   /** Deuda agregada por proveedor (cuentas no saldadas), ordenada por deuda desc. */
   async listBalances(): Promise<SupplierBalanceRow[]> {
     try {
+      // Incluye a TODO proveedor con al menos una cuenta, aunque esté saldada
+      // (aparece con deuda $0) — una cuenta cancelada no desaparece de la lista.
       const rows = this.db
         .select({
           supplierId: supplierAccountsPayable.supplierId,
           total: sql<number>`COALESCE(SUM(CAST(${supplierAccountsPayable.balance} AS REAL)), 0)`,
-          cnt: sql<number>`COUNT(*)`,
+          cnt: sql<number>`SUM(CASE WHEN ${supplierAccountsPayable.status} != 'paid' THEN 1 ELSE 0 END)`,
         })
         .from(supplierAccountsPayable)
-        .where(ne(supplierAccountsPayable.status, 'paid'))
         .groupBy(supplierAccountsPayable.supplierId)
         .all();
       return rows
@@ -98,7 +99,7 @@ export class SupplierAccountPayableRepository extends BaseRepository<
           totalDebt: Number(r.total).toFixed(4),
           openInvoicesCount: Number(r.cnt),
         }))
-        .sort((a, b) => Number(b.totalDebt) - Number(a.totalDebt));
+        .sort((a, b) => Number(b.totalDebt) - Number(a.totalDebt) || a.supplierId.localeCompare(b.supplierId));
     } catch (err) {
       return rethrowDbError(err);
     }

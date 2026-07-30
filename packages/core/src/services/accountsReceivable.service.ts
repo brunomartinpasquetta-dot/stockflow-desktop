@@ -385,8 +385,9 @@ export class AccountsReceivableService {
       customers.map((c) => [c.id, c.firstName ? `${c.lastName}, ${c.firstName}` : c.lastName]),
     );
     const phoneById = new Map(customers.map((c) => [c.id, c.mobile ?? c.phone ?? null]));
+    // Incluye clientes con cuenta saldada (deuda $0) para que una cuenta
+    // cancelada en su totalidad no desaparezca de la lista.
     return balances
-      .filter((b) => Number(b.totalDebt) > 0)
       .map((b) => ({
         customerId: b.customerId,
         customerName: nameById.get(b.customerId) ?? b.customerId,

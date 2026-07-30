@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
-import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, RefreshCcw } from 'lucide-react'
+import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, RefreshCcw, AlertTriangle, Trash2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -938,7 +939,7 @@ function GeneralSection() {
 
 import { useWindowSelf } from '@/contexts/WindowManagerContext'
 
-const VALID_TABS = ['hardware', 'backup', 'lan', 'updates', 'general'] as const
+const VALID_TABS = ['hardware', 'backup', 'lan', 'updates', 'general', 'mantenimiento'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 function readInitialTab(extras: unknown): TabValue | null {
@@ -949,7 +950,101 @@ function readInitialTab(extras: unknown): TabValue | null {
   return null
 }
 
+/* ----------------------- MANTENIMIENTO ----------------------- */
+function MantenimientoSection() {
+  const qc = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+
+  const resetMut = useMutation({
+    mutationFn: () => api.maintenance.resetOperationalData({ confirm: confirmText }),
+    onSuccess: (r) => {
+      // invalidar todo lo operativo para que las pantallas reflejen el cero
+      void qc.invalidateQueries()
+      toast.success(
+        `Datos reiniciados — ${r.salesDeleted} ventas y ${r.purchasesDeleted} compras borradas, ` +
+          `stock de ${r.articlesStockReset} artículos a 0. Backup: ${r.backup?.filename ?? '—'}`,
+        { duration: 12_000 },
+      )
+      setOpen(false)
+      setConfirmText('')
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo reiniciar'),
+  })
+
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base text-destructive">
+          <AlertTriangle className="h-5 w-5" />
+          Reiniciar datos operativos
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        <p className="text-muted-foreground">
+          Deja el sistema como recién arrancado para empezar a operar de cero, <strong>conservando</strong>{' '}
+          clientes, proveedores, artículos, precios, promociones, usuarios y las{' '}
+          <strong>cuentas corrientes</strong> con sus deudas.
+        </p>
+        <div className="rounded-md border bg-muted/40 p-3">
+          <p className="mb-1 font-medium">Qué se borra:</p>
+          <ul className="list-inside list-disc text-muted-foreground">
+            <li>Ventas y compras de contado (las que tienen cuenta corriente se conservan)</li>
+            <li>Devoluciones de esas operaciones</li>
+            <li>Cajas diarias y sus movimientos</li>
+            <li>Caja General: movimientos y saldo → $0</li>
+            <li>Stock de todos los artículos → 0</li>
+          </ul>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Antes de borrar se crea un <strong>backup automático</strong> por si necesitás volver atrás
+          (Backup → Restaurar).
+        </p>
+        <div>
+          <Button variant="destructive" onClick={() => setOpen(true)}>
+            <Trash2 className="h-4 w-4" />
+            Reiniciar datos operativos
+          </Button>
+        </div>
+      </CardContent>
+
+      <AlertDialog open={open} onOpenChange={(o) => { if (!o) { setOpen(false); setConfirmText('') } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reiniciar datos operativos</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es <strong>irreversible</strong> (salvo restaurando el backup automático).
+              Para confirmar, escribí <span className="font-mono font-semibold text-foreground">REINICIAR</span> abajo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="Escribí REINICIAR"
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={confirmText.trim().toUpperCase() !== 'REINICIAR' || resetMut.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                resetMut.mutate()
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {resetMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reiniciar todo'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  )
+}
+
 export function Configuracion() {
+  const { currentUser } = useAuth()
+  const isAdmin = currentUser?.role === 'admin'
   const self = useWindowSelf()
   const initial = readInitialTab(self?.extras) ?? 'hardware'
   const [tab, setTab] = useState<TabValue>(initial)
@@ -972,6 +1067,7 @@ export function Configuracion() {
           <TabsTrigger value="lan">LAN</TabsTrigger>
           <TabsTrigger value="updates">Actualizaciones</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
+          {isAdmin && <TabsTrigger value="mantenimiento">Mantenimiento</TabsTrigger>}
         </TabsList>
         <TabsContent value="hardware" className="flex flex-col gap-3">
           <PrinterSection />
@@ -989,6 +1085,11 @@ export function Configuracion() {
         <TabsContent value="general">
           <GeneralSection />
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="mantenimiento">
+            <MantenimientoSection />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

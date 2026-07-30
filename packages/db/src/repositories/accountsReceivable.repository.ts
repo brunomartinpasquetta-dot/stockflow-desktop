@@ -83,8 +83,12 @@ export class AccountsReceivableRepository extends BaseRepository<
   }
 
   /**
-   * Deuda agregada por cliente (suma de balances de cuentas no saldadas + cantidad
-   * de comprobantes con saldo), ordenada por deuda descendente.
+   * Saldo agregado por cliente. Incluye a TODO cliente que tenga al menos una
+   * cuenta corriente, aunque esté toda saldada (aparece con deuda $0) — así una
+   * cuenta cancelada en su totalidad NO desaparece de la lista. `totalDebt` es
+   * la suma de saldos vivos; `openInvoicesCount` cuenta solo los comprobantes
+   * con saldo pendiente (status != 'paid'). Ordena por deuda descendente y luego
+   * alfabéticamente estable por customerId.
    */
   async listBalances(): Promise<CustomerBalanceRow[]> {
     try {
@@ -92,10 +96,9 @@ export class AccountsReceivableRepository extends BaseRepository<
         .select({
           customerId: accountsReceivable.customerId,
           total: sql<number>`COALESCE(SUM(CAST(${accountsReceivable.balance} AS REAL)), 0)`,
-          cnt: sql<number>`COUNT(*)`,
+          cnt: sql<number>`SUM(CASE WHEN ${accountsReceivable.status} != 'paid' THEN 1 ELSE 0 END)`,
         })
         .from(accountsReceivable)
-        .where(ne(accountsReceivable.status, 'paid'))
         .groupBy(accountsReceivable.customerId)
         .all();
       return rows
@@ -104,7 +107,7 @@ export class AccountsReceivableRepository extends BaseRepository<
           totalDebt: Number(r.total).toFixed(4),
           openInvoicesCount: Number(r.cnt),
         }))
-        .sort((a, b) => Number(b.totalDebt) - Number(a.totalDebt));
+        .sort((a, b) => Number(b.totalDebt) - Number(a.totalDebt) || a.customerId.localeCompare(b.customerId));
     } catch (err) {
       return rethrowDbError(err);
     }

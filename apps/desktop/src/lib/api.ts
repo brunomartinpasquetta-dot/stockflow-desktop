@@ -7,6 +7,7 @@ import type {
   AssistantMessageDTO,
   AuditEntryDTO,
   ListAuditPayloadDTO,
+  ResetOperationalResultDTO,
   AccountReceivableDetailDTO,
   AccountReceivableDTO,
   ArticleDTO,
@@ -211,6 +212,10 @@ export const api = {
       unwrap(sf().sales.get({ id })),
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
+  },
+  maintenance: {
+    resetOperationalData: (payload: { confirm: string }): Promise<ResetOperationalResultDTO> =>
+      unwrap(sf().maintenance.resetOperationalData(payload)),
   },
   audit: {
     list: (payload: ListAuditPayloadDTO): Promise<AuditEntryDTO[]> => unwrap(sf().audit.list(payload)),

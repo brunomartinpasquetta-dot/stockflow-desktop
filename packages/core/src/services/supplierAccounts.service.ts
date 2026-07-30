@@ -119,8 +119,9 @@ export class SupplierAccountsService {
     ]);
     const nameById = new Map(suppliers.map((s) => [s.id, `${s.code} — ${s.name}`]));
     const phoneById = new Map(suppliers.map((s) => [s.id, s.mobile ?? s.phone ?? null]));
+    // Incluye proveedores con cuenta saldada (deuda $0) para que una cuenta
+    // cancelada en su totalidad no desaparezca de la lista.
     return balances
-      .filter((b) => Number(b.totalDebt) > 0)
       .map((b) => ({
         supplierId: b.supplierId,
         supplierName: nameById.get(b.supplierId) ?? b.supplierId,

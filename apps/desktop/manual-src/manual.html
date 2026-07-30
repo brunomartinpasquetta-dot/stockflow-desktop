@@ -34,7 +34,7 @@ a { color: inherit; }
 <h1>StockFlow</h1>
 <div class="sub">Sistema de Gestión Comercial</div>
 <div class="sub" style="margin-top:18px;font-size:16pt;color:#1b2a4a;font-weight:600;">Manual de Usuario</div>
-<div class="ver">Versión 0.1.90</div>
+<div class="ver">Versión 0.1.91</div>
 <div class="foot">© 2026 · Crafted by BPSG</div>
 </div>
 <div class='toc'><h2>Índice</h2><ol>
@@ -1661,6 +1661,22 @@ a { color: inherit; }
 <div class='tip'><span>Recomendamos carpeta sincronizada con la nube para protección ante pérdida física de la máquina.</span></div>
 <div class='tip'><span>Restaurar reemplaza TODA la base de datos; usa solo si realmente necesitás volver a un punto anterior.</span></div>
 <div class='tip'><span>El tamaño del backup depende de cuántos comprobantes y artículos tengas (típicamente 10-50 MB).</span></div>
+</div>
+<h3>Mantenimiento: Reiniciar datos operativos (empezar de cero)</h3>
+<p>En Configuración → pestaña &#x27;Mantenimiento&#x27; (solo Administrador) hay una opción para dejar el sistema listo para empezar a operar de cero, sin perder tus datos maestros.</p>
+<p>SE BORRA: las ventas y compras de contado, las devoluciones de esas operaciones, las cajas diarias y sus movimientos, y la Caja General (su saldo queda en $0). Además, el stock de TODOS los artículos pasa a 0.</p>
+<p>SE CONSERVA: clientes, proveedores, artículos (solo se pone su stock en 0), familias, precios, promociones, usuarios y — muy importante — las cuentas corrientes de clientes y proveedores con sus deudas. Las ventas/compras que tienen cuenta corriente NO se borran, para no romper esas deudas.</p>
+<p>Antes de borrar nada, StockFlow crea un BACKUP automático. Si te arrepentís, podés volver al estado anterior desde Configuración → Backup → Restaurar.</p>
+<ol class='steps'>
+<li>Entrá como Administrador y abrí Configuración (ícono de la ruedita).</li>
+<li>Hacé clic en la pestaña &#x27;Mantenimiento&#x27;.</li>
+<li>Revisá el detalle de qué se borra y qué se conserva, y tocá el botón rojo &#x27;Reiniciar datos operativos&#x27;.</li>
+<li>Escribí la palabra REINICIAR en el cuadro y confirmá con &#x27;Reiniciar todo&#x27;.</li>
+<li>Listo: ventas, caja y stock quedan en cero, y los clientes/proveedores/cuentas corrientes intactos.</li>
+</ol>
+<div class='tips'>
+<div class='tip'><span>Usá esto al arrancar un período nuevo o cuando cargaste datos de prueba y querés limpiarlos antes de operar en serio.</span></div>
+<div class='tip'><span>Si necesitás volver atrás, el backup automático quedó guardado: Configuración → Backup → Restaurar.</span></div>
 </div>
 <h3>Red local (LAN): Múltiples cajas</h3>
 <p>StockFlow soporta operación en **red local (LAN)** con una PC principal (servidor) y PCs clientes conectadas. Todas sincronizan en tiempo real: cambios de stock, precios, clientes, cajas abiertas, etc.</p>

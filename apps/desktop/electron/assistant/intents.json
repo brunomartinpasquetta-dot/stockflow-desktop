@@ -9988,6 +9988,34 @@
       "Ojo importante: si esta computadora era un 'Cliente', al volver a 'PC única' deja de ver los datos de la principal y pasa a usar los suyos propios. Los datos compartidos siguen guardados en la computadora que era el Servidor.",
       "Si la que ponés en 'PC única' era el Servidor, avisá a las otras cajas: van a quedar sin conexión hasta que también las pases a 'PC única' o a otro servidor."
      ]
+    },
+    {
+     "id": "reiniciar-datos-operativos",
+     "canonical": "¿Cómo dejo en cero las ventas, la caja y el stock para empezar de nuevo?",
+     "patterns": [
+      "reiniciar datos",
+      "poner todo en cero",
+      "borrar ventas y stock",
+      "empezar de cero",
+      "dejar en cero la caja",
+      "resetear el sistema",
+      "borron y cuenta nueva",
+      "limpiar ventas",
+      "stock en cero",
+      "reiniciar caja general",
+      "como reinicio todo",
+      "borrar movimientos",
+      "quiero arrancar limpio",
+      "poner stock en 0"
+     ],
+     "answer": "Podés dejar el sistema listo para empezar a operar de cero SIN perder tus clientes, proveedores, artículos, precios ni las cuentas corrientes con sus deudas. Está en Configuración → pestaña 'Mantenimiento' (solo Administrador). Borra las ventas y compras de contado, las devoluciones de esas operaciones, las cajas diarias y la Caja General (saldo a $0), y pone el stock de todos los artículos en 0. Las ventas/compras que tienen cuenta corriente NO se borran (para no romper las deudas). Antes de borrar, StockFlow hace un backup automático por si necesitás volver atrás.",
+     "steps": [
+      "Entrá como Administrador y abrí Configuración (ícono de la ruedita).",
+      "Hacé clic en la pestaña 'Mantenimiento' (solo la ve el Administrador).",
+      "Leé qué se borra y qué se conserva. Tocá el botón rojo 'Reiniciar datos operativos'.",
+      "Escribí la palabra REINICIAR para confirmar y tocá 'Reiniciar todo'.",
+      "StockFlow crea un backup automático y deja las ventas/caja/stock en cero. Si te arrepentís, restaurá ese backup desde Configuración → Backup."
+     ]
     }
    ]
   },

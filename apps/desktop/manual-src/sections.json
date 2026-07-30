@@ -2435,6 +2435,26 @@
      ]
     },
     {
+     "heading": "Mantenimiento: Reiniciar datos operativos (empezar de cero)",
+     "paragraphs": [
+      "En Configuración → pestaña 'Mantenimiento' (solo Administrador) hay una opción para dejar el sistema listo para empezar a operar de cero, sin perder tus datos maestros.",
+      "SE BORRA: las ventas y compras de contado, las devoluciones de esas operaciones, las cajas diarias y sus movimientos, y la Caja General (su saldo queda en $0). Además, el stock de TODOS los artículos pasa a 0.",
+      "SE CONSERVA: clientes, proveedores, artículos (solo se pone su stock en 0), familias, precios, promociones, usuarios y — muy importante — las cuentas corrientes de clientes y proveedores con sus deudas. Las ventas/compras que tienen cuenta corriente NO se borran, para no romper esas deudas.",
+      "Antes de borrar nada, StockFlow crea un BACKUP automático. Si te arrepentís, podés volver al estado anterior desde Configuración → Backup → Restaurar."
+     ],
+     "steps": [
+      "Entrá como Administrador y abrí Configuración (ícono de la ruedita).",
+      "Hacé clic en la pestaña 'Mantenimiento'.",
+      "Revisá el detalle de qué se borra y qué se conserva, y tocá el botón rojo 'Reiniciar datos operativos'.",
+      "Escribí la palabra REINICIAR en el cuadro y confirmá con 'Reiniciar todo'.",
+      "Listo: ventas, caja y stock quedan en cero, y los clientes/proveedores/cuentas corrientes intactos."
+     ],
+     "tips": [
+      "Usá esto al arrancar un período nuevo o cuando cargaste datos de prueba y querés limpiarlos antes de operar en serio.",
+      "Si necesitás volver atrás, el backup automático quedó guardado: Configuración → Backup → Restaurar."
+     ]
+    },
+    {
      "heading": "Red local (LAN): Múltiples cajas",
      "paragraphs": [
       "StockFlow soporta operación en **red local (LAN)** con una PC principal (servidor) y PCs clientes conectadas. Todas sincronizan en tiempo real: cambios de stock, precios, clientes, cajas abiertas, etc.",

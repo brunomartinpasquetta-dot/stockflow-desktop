@@ -297,8 +297,9 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.focus();
     }
   });
@@ -335,6 +336,16 @@ if (!app.requestSingleInstanceLock()) {
         }, 10_000);
       });
       app.on('activate', () => {
+        // Clic en el ícono del Dock / barra con la app YA abierta: NO crear otra
+        // ventana principal (se veían "dos sistemas"). Si la principal existe,
+        // traerla al frente (aunque haya ventanas nativas hijas abiertas). Solo
+        // creamos una nueva si de verdad no queda ninguna ventana principal.
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          if (!mainWindow.isVisible()) mainWindow.show();
+          mainWindow.focus();
+          return;
+        }
         if (BrowserWindow.getAllWindows().length === 0) createWindow(lanArgs);
       });
     })

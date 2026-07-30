@@ -1461,6 +1461,18 @@ export interface AssistantAskResultDTO {
 
 type Res<T> = Promise<IpcResponse<T>>;
 
+export interface ResetOperationalResultDTO {
+  salesDeleted: number;
+  salesKept: number;
+  purchasesDeleted: number;
+  purchasesKept: number;
+  returnsDeleted: number;
+  cashRegistersDeleted: number;
+  cashGeneralMovementsDeleted: number;
+  articlesStockReset: number;
+  backup: { filename: string; fullPath: string; sizeBytes: number; createdAt: number } | null;
+}
+
 export interface AuditEntryDTO {
   id: string;
   createdAt: number;
@@ -1492,6 +1504,9 @@ export interface ApiSurface {
   };
   assistant: {
     ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string }): Res<AssistantAskResultDTO>;
+  };
+  maintenance: {
+    resetOperationalData(payload: { confirm: string }): Res<ResetOperationalResultDTO>;
   };
   audit: {
     list(payload: ListAuditPayloadDTO): Res<AuditEntryDTO[]>;

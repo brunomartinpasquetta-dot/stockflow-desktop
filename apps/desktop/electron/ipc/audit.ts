@@ -23,6 +23,7 @@ const IGNORED_CHANNELS = new Set([
   'print:setConfig',
   'hardware:openDrawer',
   'updater:setAutoCheck',
+  'maintenance:resetOperationalData',
 ]);
 
 /** Prefijos de grupo que nunca se auditan (ventanas, sistema, impresión). */
