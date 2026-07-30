@@ -127,6 +127,17 @@ export class BackupService {
       const tmpTarget = `${this.deps.dbPath}.restoring`;
       await fsp.copyFile(dbInZip, tmpTarget);
       await fsp.rename(tmpTarget, this.deps.dbPath);
+      // CRÍTICO: eliminar el WAL/SHM de la base anterior. Si quedan, SQLite
+      // reaplica esas escrituras pendientes sobre la base recién restaurada al
+      // reabrir → el restore "no toma efecto". Al arrancar sin WAL, la base
+      // restaurada queda tal cual.
+      for (const suffix of ['-wal', '-shm']) {
+        try {
+          await fsp.unlink(`${this.deps.dbPath}${suffix}`);
+        } catch {
+          /* no existía: ok */
+        }
+      }
       return { requiresRestart: true };
     } catch (err) {
       throw new Error('No se pudo restaurar el backup', { cause: err });

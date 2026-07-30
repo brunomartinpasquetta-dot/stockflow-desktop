@@ -144,13 +144,15 @@ export class MaintenanceRepository {
           tx.run(sql`UPDATE cash_movements SET related_purchase_id = NULL WHERE related_purchase_id IN (${inList(keptPurchaseList)}) AND ${regNotKept}`);
         }
 
-        // Borrar cajas y sus movimientos NO conservados.
+        // Borrar los MOVIMIENTOS de caja no conservados ahora (no referencian
+        // sales/purchases tras las nulificaciones de arriba). Las CAJAS se borran
+        // al FINAL, después de las ventas: `sales.cashRegisterId` es NOT NULL y
+        // apunta a la caja donde se registró la venta, así que hay que eliminar
+        // primero las ventas de esas cajas.
         if (keptRegList.length) {
           tx.run(sql`DELETE FROM cash_movements WHERE cash_register_id NOT IN (${inList(keptRegList)})`);
-          tx.run(sql`DELETE FROM cash_registers WHERE id NOT IN (${inList(keptRegList)})`);
         } else {
           tx.delete(cashMovements).run();
-          tx.delete(cashRegisters).run();
         }
 
         // ── Devoluciones: solo de ventas/compras que se van a borrar ──
@@ -219,9 +221,20 @@ export class MaintenanceRepository {
           tx.delete(purchases).where(delPurchases).run();
         }
 
-        // ── Caja General: movimientos + saldo a 0 ──
+        // ── Cajas diarias: ahora que ya no quedan ventas apuntando a ellas
+        //    (salvo las de CC en cajas conservadas), se borran las no conservadas.
+        if (keptRegList.length) {
+          tx.run(sql`DELETE FROM cash_registers WHERE id NOT IN (${inList(keptRegList)})`);
+        } else {
+          tx.delete(cashRegisters).run();
+        }
+
+        // ── Caja General: movimientos + saldos (total/efectivo/electrónico) a 0 ──
         tx.delete(cashGeneralMovements).run();
-        tx.update(cashGeneral).set({ currentBalance: '0', lastUpdate: Date.now() }).run();
+        tx
+          .update(cashGeneral)
+          .set({ currentBalance: '0', cashBalance: '0', electronicBalance: '0', lastUpdate: Date.now() })
+          .run();
 
         // ── Stock de todos los artículos → 0 (NO borra artículos) ──
         tx.update(articles).set({ stock: '0.000' }).run();

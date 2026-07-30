@@ -5,6 +5,7 @@
  * antes de tocar la base, y solo la puede ejecutar un administrador que
  * escriba la palabra de confirmación exacta.
  */
+import { PermissionDeniedError, ValidationError } from '@stockflow/core';
 import type { ResetOperationalResult } from '@stockflow/db';
 
 import type { BackupEntry } from '../../hardware/types';
@@ -25,7 +26,10 @@ export function buildMaintenanceHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       async (payload: ResetOperationalPayload, ctx): Promise<ResetOperationalResponse> => {
         if (ctx.currentUser?.role !== 'admin') {
-          throw new Error('Solo un administrador puede reiniciar los datos operativos');
+          throw new PermissionDeniedError(
+            'reset_operational_data',
+            'Solo un administrador puede reiniciar los datos operativos',
+          );
         }
         // Confirmación por contraseña del administrador en sesión.
         const ok = await deps.repos.users.verifyPassword(
@@ -33,7 +37,7 @@ export function buildMaintenanceHandlers(deps: HandlerDeps): HandlerMap {
           payload?.password ?? '',
         );
         if (!ok) {
-          throw new Error('Contraseña incorrecta');
+          throw new ValidationError('password', 'Contraseña incorrecta');
         }
 
         // 1) Backup automático (nunca reiniciar sin red de seguridad).
