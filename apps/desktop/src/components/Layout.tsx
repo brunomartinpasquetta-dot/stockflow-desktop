@@ -7,8 +7,9 @@
  * área MDI con divs flotantes. Las rutas internas siguen "absorbiéndose" como
  * ventanas nativas vía `useDeepLinkRouter`.
  */
-import { type CSSProperties } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 
+import { api } from '@/lib/api'
 import { useLicense, useLicenseStatus } from '@/contexts/LicenseContext'
 import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext'
 import { WindowManagerProvider } from '@/contexts/WindowManagerContext'
@@ -49,6 +50,18 @@ function LayoutInner() {
   // Barra de título propia SÓLO en macOS (en Windows queda la nativa, con sus
   // botones de min/max/cerrar).
   const isMac = navigator.userAgent.includes('Mac')
+  // Versión de la app, para mostrarla al final del título de la ventana.
+  const [appVersion, setAppVersion] = useState('')
+  useEffect(() => {
+    void api.system
+      .getVersion()
+      .then((r) => {
+        setAppVersion(r.version)
+        // Título nativo (Windows/Linux, y el nombre en la barra de tareas).
+        document.title = `StockFlow - Sistema de Gestión Comercial v${r.version}`
+      })
+      .catch(() => undefined)
+  }, [])
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -61,7 +74,7 @@ function LayoutInner() {
           style={{ WebkitAppRegion: 'drag' } as CSSProperties}
         >
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold">
-            StockFlow — Sistema de Gestión Comercial
+            StockFlow — Sistema de Gestión Comercial{appVersion ? ` v${appVersion}` : ''}
           </span>
         </div>
       )}

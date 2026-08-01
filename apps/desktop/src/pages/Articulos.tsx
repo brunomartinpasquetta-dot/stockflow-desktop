@@ -65,7 +65,7 @@ import {
   useSuppliers,
 } from '@/lib/hooks'
 import { api } from '@/lib/api'
-import { formatCurrency, formatNumber } from '@/lib/format'
+import { formatCurrency, formatQty } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -534,7 +534,7 @@ export function Articulos() {
         a.description,
         a.familyId ? (familyName.get(a.familyId) ?? '—') : '—',
         formatCurrency(a.listPrice1),
-        formatNumber(a.stock, 3),
+        formatQty(a.stock),
       ]),
       startY: 26,
       styles: { fontSize: 9 },
@@ -731,7 +731,7 @@ export function Articulos() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge variant={stockBadgeVariant(a.stock, a.minStock, a.idealStock)}>
-                          {formatNumber(a.stock, 3)}
+                          {formatQty(a.stock)}
                         </Badge>
                       </TableCell>
                     </TableRow>

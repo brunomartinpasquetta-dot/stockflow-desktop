@@ -9,7 +9,7 @@
  * 58mm y 80mm.
  */
 import type { CompanyDTO, PriceMode, SaleDTO, VoucherType } from '@/types/api'
-import { formatCurrency, formatDateTime, formatNumber } from '@/lib/format'
+import { formatCurrency, formatDateTime, formatQty } from '@/lib/format'
 
 const VOUCHER_LABELS: Record<VoucherType, string> = {
   A: 'Factura A',
@@ -30,9 +30,7 @@ const SEP_DASH = '-'.repeat(WIDTH)
 function formatQuantity(value: string): string {
   const n = Number(value)
   if (!Number.isFinite(n)) return value
-  return Number.isInteger(n)
-    ? formatNumber(n, 0)
-    : formatNumber(n, 3).replace(/0+$/, '').replace(/,$/, '')
+  return formatQty(n)
 }
 
 export interface SaleTicketLine {

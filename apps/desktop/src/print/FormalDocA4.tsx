@@ -7,7 +7,7 @@
  * Se imprime con `printNode(<FormalDocA4 .../>, 'a4')`.
  */
 import type { CompanyDTO } from '@/types/api'
-import { formatCurrency, formatNumber } from '@/lib/format'
+import { formatCurrency, formatQty } from '@/lib/format'
 
 export interface FormalDocLine {
   description: string
@@ -54,11 +54,6 @@ export interface FormalDocData {
   showCompanyHeader?: boolean
 }
 
-function formatQty(value: string): string {
-  const n = Number(value)
-  if (!Number.isFinite(n)) return value
-  return Number.isInteger(n) ? formatNumber(n, 0) : formatNumber(n, 3).replace(/0+$/, '').replace(/,$/, '')
-}
 
 export function FormalDocA4({ data }: { data: FormalDocData }) {
   const {

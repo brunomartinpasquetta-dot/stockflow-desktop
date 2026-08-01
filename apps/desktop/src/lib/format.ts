@@ -47,6 +47,25 @@ export function formatNumber(value: string | number | null | undefined, decimals
 }
 
 /**
+ * Cantidad "limpia" para mostrar: sin decimales cuando el número es entero y
+ * sin ceros de relleno a la derecha cuando no lo es.
+ *
+ *   formatQty(0)        // "0"       (antes: "0,000")
+ *   formatQty(12)       // "12"
+ *   formatQty(1.5)      // "1,5"
+ *   formatQty(2.250)    // "2,25"
+ *   formatQty(null)     // "0"
+ *
+ * `maxDecimals` es el tope de decimales a mostrar (3 = stock/cantidades).
+ */
+export function formatQty(value: string | number | null | undefined, maxDecimals = 3): string {
+  return new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDecimals,
+  }).format(toNumber(value))
+}
+
+/**
  * Convierte un importe ingresado por el usuario (es-AR: "1.234,56", "1234,56",
  * "1234", o formato "programador" "1234.56") a la cadena canónica para guardar
  * en la DB ("1234.56").

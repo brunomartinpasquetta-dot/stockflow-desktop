@@ -11,7 +11,7 @@
  * perder la sesión. SOLO pruebas locales.
  */
 import { BRANDING } from "@/assets/branding"
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Minus, RefreshCw, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
@@ -27,10 +27,6 @@ const TRANSITION = 'width 300ms cubic-bezier(0.4,0,0.2,1)'
 
 export function WelcomeScreen() {
   const { state, set } = useWhatsAppPanel()
-  const [appVersion, setAppVersion] = useState('')
-  useEffect(() => {
-    void api.system.getVersion().then((r) => setAppVersion(r.version)).catch(() => undefined)
-  }, [])
   const boxRef = useRef<HTMLDivElement>(null)
   const createdRef = useRef(false)
   const pendingUrlRef = useRef<string | null>(null)
@@ -97,16 +93,13 @@ export function WelcomeScreen() {
   return (
     <div className="relative flex h-full overflow-hidden bg-gradient-to-br from-background to-muted/30">
       {/* Logo (se comprime cuando el panel abre) */}
-      <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-2 px-8 py-12">
+      <div className="flex min-w-0 flex-1 items-center justify-center px-8 py-12">
         <img
           src={BRANDING.logoStacked}
           alt="StockFlow — Sistema de Gestión Comercial"
           className="h-auto w-[260px] select-none"
           draggable={false}
         />
-        <span className="select-none text-sm font-medium text-muted-foreground">
-          Versión {appVersion}
-        </span>
       </div>
 
       {/* Contenedor que RECORTA (se anima el ancho de éste, no el del webview) */}

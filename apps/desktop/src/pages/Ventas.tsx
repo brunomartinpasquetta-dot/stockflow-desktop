@@ -21,7 +21,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
-import { formatCurrency, formatDate, formatDateTime, formatNumber, parseCurrencyInput } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
@@ -251,7 +251,7 @@ function ArticlePicker({
                       {a.familyId ? (familyName.get(a.familyId) ?? '—') : '—'}
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums">
-                      {formatNumber(a.stock, 3)}
+                      {formatQty(a.stock)}
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums">
                       {formatCurrency(a.listPrice1)}
@@ -1133,7 +1133,7 @@ function PDV() {
                         <div className="font-medium">{l.article.description}</div>
                         <div className="font-mono text-xs text-muted-foreground">
                           {l.article.barcode}
-                          {overStock && <span className="ml-2 text-destructive">Stock: {formatNumber(l.article.stock, 3)}</span>}
+                          {overStock && <span className="ml-2 text-destructive">Stock: {formatQty(l.article.stock)}</span>}
                         </div>
                       </td>
                       <td className="px-2 py-1 text-sm text-muted-foreground">{l.article.brand ?? ''}</td>

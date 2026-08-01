@@ -16,8 +16,10 @@
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 42%;
-    --accent: 210 40% 94%;
-    --accent-foreground: 222 47% 11%;
+    /* Foco/hover de menús, accesos directos y filas: AZUL StockFlow (mismo tono
+       que --primary, el del borde/barra de la ventana) en vez del gris previo. */
+    --accent: 221 83% 45%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 58% 34%;
@@ -32,6 +34,24 @@
 
   * {
     @apply border-border;
+  }
+
+  /* El foco/hover de menús, accesos y filas usa AZUL (--accent). Como muchos
+     componentes aplican `hover:bg-accent` sin fijar el color de texto, forzamos
+     acá que todo lo que quede sobre ese fondo se lea en blanco
+     (--accent-foreground). Cubre hover, foco de teclado y el estado abierto de
+     los menús; los íconos heredan por currentColor. */
+  .hover\:bg-accent:hover,
+  .hover\:bg-accent:hover *,
+  .focus-visible\:bg-accent:focus-visible,
+  .focus-visible\:bg-accent:focus-visible *,
+  .aria-selected\:bg-accent[aria-selected='true'],
+  .aria-selected\:bg-accent[aria-selected='true'] *,
+  .data-\[state\=open\]\:bg-accent[data-state='open'],
+  .data-\[state\=open\]\:bg-accent[data-state='open'] *,
+  [data-radix-menu-content] [data-highlighted],
+  [data-radix-menu-content] [data-highlighted] * {
+    color: hsl(var(--accent-foreground));
   }
 
   html,
