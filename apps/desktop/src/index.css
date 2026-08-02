@@ -45,6 +45,8 @@
   .hover\:bg-accent:hover *,
   .focus-visible\:bg-accent:focus-visible,
   .focus-visible\:bg-accent:focus-visible *,
+  .bg-accent,
+  .bg-accent *,
   .aria-selected\:bg-accent[aria-selected='true'],
   .aria-selected\:bg-accent[aria-selected='true'] *,
   .data-\[state\=open\]\:bg-accent[data-state='open'],

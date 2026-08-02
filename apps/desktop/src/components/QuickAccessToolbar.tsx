@@ -97,7 +97,7 @@ export function QuickAccessToolbar() {
               'group flex h-full w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-1 transition-colors xl:w-20',
               '[@media(max-width:1199px)]:w-16',
               'hover:bg-accent focus:outline-none focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-primary/30',
-              active && 'bg-accent ring-2 ring-primary/30',
+              active && 'bg-accent text-accent-foreground ring-2 ring-primary/30 [&_.rounded.bg-muted]:bg-white/25 [&_.rounded.bg-muted]:text-inherit',
               !enabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
             )}
           >
@@ -106,7 +106,9 @@ export function QuickAccessToolbar() {
               {btn.label}
             </span>
             {btn.fKey ? (
-              <span className="rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground">
+              // Sobre el foco/hover azul (bg-accent) el chip pasa a fondo
+              // translúcido blanco para seguir legible.
+              <span className="rounded bg-muted px-1 text-[10px] font-medium text-muted-foreground group-hover:bg-white/25 group-hover:text-inherit group-focus-visible:bg-white/25 group-focus-visible:text-inherit">
                 {btn.fKey}
               </span>
             ) : (
