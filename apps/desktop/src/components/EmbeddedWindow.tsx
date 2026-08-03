@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { PageSpinner } from '@/components/PageSpinner'
 import { WindowManagerProvider, WindowSelfProvider } from '@/contexts/WindowManagerContext'
 import { api } from '@/lib/api'
+import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
 import { useEmbeddedShortcuts } from '@/lib/useEmbeddedShortcuts'
 import { WINDOWS } from '@/windows/registry'
 
@@ -94,6 +95,33 @@ export function EmbeddedWindow() {
         <p className="text-xs text-muted-foreground">
           La pantalla «{pageKey}» no existe.
         </p>
+      </div>
+    )
+  }
+
+  // Permisos: se validan ACÁ, después de que `loading` terminó y con
+  // `currentUser` ya resuelto. Las páginas hacen `<Navigate to="/">` cuando no
+  // tienen permiso; si eso corriera dentro de una ventana de módulo, la ventana
+  // se convertiría en OTRO panel principal (bug "sistema duplicado"). Cortamos
+  // antes de montar la página.
+  const roleOk = !def.roles || (currentUser.role && def.roles.includes(currentUser.role))
+  const permOk = !def.requires || hasPermissionFor(currentUser.permissions, def.requires as PermissionAction)
+  if (!roleOk || !permOk) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background px-8 text-center">
+        <p className="text-sm font-medium">No tenés permiso para ver «{def.title}»</p>
+        <p className="text-xs text-muted-foreground">
+          Pedile a un administrador que te habilite el acceso.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            void api.desktopWindow.closeSelf()
+          }}
+          className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
+        >
+          Cerrar ventana
+        </button>
       </div>
     )
   }
