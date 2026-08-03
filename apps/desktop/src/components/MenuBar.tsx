@@ -246,14 +246,15 @@ export function MenuBar() {
                       handleSelect(it)
                     }}
                     className={cn(
-                      'data-[highlighted]:bg-blue-500/15',
+                      // Mismo foco azul que la barra de accesos directos.
+                      'group data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground',
                       !enabled && 'opacity-50 cursor-not-allowed',
                     )}
                   >
-                    {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
+                    {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground group-data-[highlighted]:text-inherit" />}
                     <span className="flex-1">{it.label}</span>
                     {it.shortcut && (
-                      <kbd className="ml-2 rounded bg-muted px-1 text-[10px] text-muted-foreground">
+                      <kbd className="ml-2 rounded bg-muted px-1 text-[10px] text-muted-foreground group-data-[highlighted]:bg-white/25 group-data-[highlighted]:text-inherit">
                         {it.shortcut}
                       </kbd>
                     )}
