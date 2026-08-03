@@ -64,6 +64,15 @@ function setupAppMenu(): void {
 }
 
 function createWindow(extraArgs: string[]): void {
+  // Guarda anti-duplicado: si ya existe una ventana principal viva, NO creamos
+  // otra (si la sobrescribiéramos, la anterior quedaría huérfana en pantalla y
+  // el usuario vería "dos sistemas"). Solo la traemos al frente.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
   setupAppMenu();
   mainWindow = new BrowserWindow({
     width: 1280,
