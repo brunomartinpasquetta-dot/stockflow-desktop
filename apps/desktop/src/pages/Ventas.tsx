@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X } from 'lucide-react'
 
@@ -17,6 +17,7 @@ import {
   useSuppliers,
 } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
+import { useWindowNav } from '@/lib/useWindowNav'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
@@ -443,6 +444,7 @@ const FALLBACK_COMPANY: CompanyDTO = {
 function PDV() {
   const { currentUser } = useAuth()
   const canWrite = useCanWrite()
+  const openWindow = useWindowNav()
   const articlesQuery = useArticles()
   const familiesQuery = useFamilies()
   const suppliersQuery = useSuppliers()
@@ -1264,9 +1266,13 @@ function PDV() {
           ) : noMethods ? (
             <p className="text-xs text-destructive">
               No hay medios de pago configurados.{' '}
-              <Link to="/medios-de-pago" className="font-medium underline">
+              <button
+                type="button"
+                onClick={() => openWindow('medios-de-pago')}
+                className="font-medium underline"
+              >
                 Configurar medios de pago
-              </Link>
+              </button>
             </p>
           ) : mixedMode ? (
             <>

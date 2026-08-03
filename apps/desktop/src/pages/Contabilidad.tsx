@@ -3,11 +3,12 @@
  * Muestra activos, ventas, CMV, resultado bruto y posición IVA en un período.
  */
 import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { Calculator, FileText, Printer } from 'lucide-react'
 
 import { useCompany, useFinancialSummary } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
+import { useWindowNav } from '@/lib/useWindowNav'
 import { formatCurrency } from '@/lib/format'
 import { PERIOD_PRESETS, dayEnd, dayStart, toIso } from '@/lib/periodPresets'
 import { usePrintAccountingSummary } from '@/lib/usePrint'
@@ -24,6 +25,7 @@ function firstOfMonthIso(): string {
 
 export function Contabilidad() {
   const canView = usePermission('view_accounting')
+  const openWindow = useWindowNav()
   const companyQuery = useCompany()
 
   const [fromIso, setFromIso] = useState(() => firstOfMonthIso())
@@ -93,17 +95,19 @@ export function Contabilidad() {
               Imprimir
             </Button>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" asChild>
-                <Link to="/contabilidad/libro-iva-ventas">
-                  <FileText className="h-4 w-4" />
-                  Libro IVA Ventas
-                </Link>
+              {/*
+                Abrimos la ventana NATIVA con `useWindowNav` en vez de navegar con
+                <Link>: Contabilidad ya es una ventana de módulo (#/embedded/...),
+                y una navegación de router la sacaría de esa ruta (la ventana se
+                cerraría en lugar de abrir el libro).
+              */}
+              <Button variant="outline" onClick={() => openWindow('libro-iva-ventas')}>
+                <FileText className="h-4 w-4" />
+                Libro IVA Ventas
               </Button>
-              <Button variant="outline" asChild>
-                <Link to="/contabilidad/libro-iva-compras">
-                  <FileText className="h-4 w-4" />
-                  Libro IVA Compras
-                </Link>
+              <Button variant="outline" onClick={() => openWindow('libro-iva-compras')}>
+                <FileText className="h-4 w-4" />
+                Libro IVA Compras
               </Button>
             </div>
           </div>
