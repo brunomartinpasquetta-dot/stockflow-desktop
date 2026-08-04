@@ -29,6 +29,13 @@ export {
   type SalePaymentDraft,
 } from './sales.service';
 export { PromotionsService } from './promotions.service';
+export {
+  FiscalService,
+  type ArcaGateway,
+  type IssueInvoiceInput,
+  type IssueNoteInput,
+  type IssuedVoucher,
+} from './fiscal.service';
 export { ReturnsService, type SaleReturnDraft, type PurchaseReturnDraft } from './returns.service';
 export {
   QuotesService,
