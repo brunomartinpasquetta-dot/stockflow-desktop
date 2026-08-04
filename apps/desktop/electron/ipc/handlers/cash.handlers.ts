@@ -14,8 +14,16 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
   return {
     'cash:open': withSession(
       deps,
-      async (payload: { openingAmount: string }, ctx): Promise<CashRegisterDTO> => {
-        const register = await new CashService(ctx).openCashRegister(payload.openingAmount);
+      async (
+        payload: { openingAmount: string; terminalName?: string | null },
+        ctx,
+      ): Promise<CashRegisterDTO> => {
+        // Cada PC es una terminal: se identifica con su machineId, así en una
+        // instalación en red cada puesto abre y arquea su propia caja.
+        const register = await new CashService(ctx).openCashRegister(payload.openingAmount, {
+          id: deps.machineId,
+          name: payload.terminalName ?? null,
+        });
         deps.sessionStore.setCurrentCashRegister(register);
         return register;
       },
@@ -46,7 +54,8 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
       },
     ),
     'cash:getCurrent': withSession(deps, async (_payload, ctx): Promise<CashRegisterDTO | null> => {
-      const open = await ctx.repos.cashRegisters.getCurrentOpen();
+      // La caja de ESTA terminal (o la compartida heredada, si no hay por puesto).
+      const open = await ctx.repos.cashRegisters.getCurrentOpen(deps.machineId);
       deps.sessionStore.setCurrentCashRegister(open);
       return open;
     }),

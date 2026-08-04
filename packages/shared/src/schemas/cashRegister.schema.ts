@@ -20,6 +20,10 @@ export const CashRegisterSchema = z.object({
 export const OpenCashRegisterSchema = z.object({
   openingAmount: moneySchema.default('0.0000'),
   userId: idSchema,
+  /** Terminal que abre la caja. Null = instalación de una sola PC. */
+  terminalId: z.string().max(120).nullish(),
+  /** Nombre del puesto para el arqueo, ej. "Caja 1 — Mostrador". */
+  terminalName: z.string().max(80).nullish(),
 });
 
 /** Cerrar caja. */

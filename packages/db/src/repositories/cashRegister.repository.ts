@@ -37,16 +37,28 @@ export class CashRegisterRepository extends BaseRepository<
     super(db, cashRegisters, 'Caja');
   }
 
-  /** Caja actualmente abierta (la última con status='open'), o `null`. */
-  async getCurrentOpen(): Promise<CashRegister | null> {
+  /**
+   * Caja abierta de una terminal, o `null`.
+   *
+   * Con `terminalId` devuelve la caja de ESE puesto (o la compartida heredada,
+   * con terminal_id NULL, para no romper instalaciones que ya venían operando).
+   * Sin `terminalId` mantiene el comportamiento previo: la última abierta.
+   */
+  async getCurrentOpen(terminalId?: string | null): Promise<CashRegister | null> {
     try {
-      const row = this.db
+      const rows = this.db
         .select()
         .from(cashRegisters)
         .where(eq(cashRegisters.status, 'open'))
         .all();
-      // Si por algún motivo hay más de una, devolvemos la de mayor número.
-      return row.sort((a, b) => b.number - a.number)[0] ?? null;
+      if (!terminalId) {
+        return rows.sort((a, b) => b.number - a.number)[0] ?? null;
+      }
+      const mine = rows.filter((r) => r.terminalId === terminalId);
+      if (mine.length > 0) return mine.sort((a, b) => b.number - a.number)[0] ?? null;
+      // Caja heredada sin terminal asignada: la toma cualquier puesto.
+      const shared = rows.filter((r) => r.terminalId == null);
+      return shared.sort((a, b) => b.number - a.number)[0] ?? null;
     } catch (err) {
       return rethrowDbError(err);
     }
@@ -57,13 +69,25 @@ export class CashRegisterRepository extends BaseRepository<
     try {
       const data = this.parseOrThrow<OpenCashRegisterInput>(OpenCashRegisterSchema, rawData);
       return this.db.transaction((tx) => {
-        const open = tx
-          .select({ id: cashRegisters.id })
+        const openRows = tx
+          .select({ id: cashRegisters.id, terminalId: cashRegisters.terminalId })
           .from(cashRegisters)
           .where(eq(cashRegisters.status, 'open'))
-          .get();
-        if (open) {
-          throw new ConstraintError('CASH_ALREADY_OPEN', 'Ya hay una caja abierta');
+          .all();
+        // Con multi-terminal cada puesto tiene su caja: solo bloquea si ESTA
+        // terminal ya tiene una abierta. Sin terminal (instalación de una sola
+        // PC) se mantiene la regla previa: una caja a la vez.
+        const terminalId = data.terminalId ?? null;
+        const conflict = terminalId
+          ? openRows.find((r) => r.terminalId === terminalId || r.terminalId == null)
+          : openRows[0];
+        if (conflict) {
+          throw new ConstraintError(
+            'CASH_ALREADY_OPEN',
+            terminalId
+              ? 'Esta terminal ya tiene una caja abierta'
+              : 'Ya hay una caja abierta',
+          );
         }
         const numRow = tx.select({ value: max(cashRegisters.number) }).from(cashRegisters).get();
         const number = (numRow?.value ?? 0) + 1;
@@ -76,6 +100,8 @@ export class CashRegisterRepository extends BaseRepository<
             openingAmount: data.openingAmount ?? '0.0000',
             status: 'open',
             userId: data.userId,
+            terminalId: data.terminalId ?? null,
+            terminalName: data.terminalName ?? null,
           })
           .returning()
           .all()[0];

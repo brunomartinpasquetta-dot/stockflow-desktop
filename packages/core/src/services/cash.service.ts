@@ -96,11 +96,25 @@ export interface CashReport {
 export class CashService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  /** Abre una caja a nombre del usuario actual (falla si ya hay una abierta). */
-  async openCashRegister(openingAmount: string): Promise<CashRegister> {
+  /**
+   * Abre una caja a nombre del usuario actual.
+   *
+   * Con `terminal`, la caja queda ligada a ese puesto: cada terminal de una
+   * instalación en red abre y arquea la suya. Sin terminal (una sola PC) se
+   * mantiene la regla de una caja a la vez.
+   */
+  async openCashRegister(
+    openingAmount: string,
+    terminal?: { id: string; name?: string | null } | null,
+  ): Promise<CashRegister> {
     const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'open_cash');
-    return repos.cashRegisters.openRegister({ openingAmount, userId: currentUser.id });
+    return repos.cashRegisters.openRegister({
+      openingAmount,
+      userId: currentUser.id,
+      terminalId: terminal?.id ?? null,
+      terminalName: terminal?.name ?? null,
+    });
   }
 
   /**
