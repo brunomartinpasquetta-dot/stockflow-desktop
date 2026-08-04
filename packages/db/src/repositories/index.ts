@@ -24,6 +24,7 @@ import { PromotionRepository } from './promotion.repository';
 import { ReturnRepository } from './return.repository';
 import { AuditRepository } from './audit.repository';
 import { MaintenanceRepository } from './maintenance.repository';
+import { FiscalRepository } from './fiscal.repository';
 import { QuoteRepository } from './quote.repository';
 import { SaleRepository } from './sale.repository';
 import { SaleLineRepository } from './saleLine.repository';
@@ -66,6 +67,12 @@ export {
 export { PromotionRepository, type PromotionDetail, type PromotionItemDetail, type PromotionWriteInput } from './promotion.repository';
 export { AuditRepository, type InsertAuditInput, type ListAuditInput } from './audit.repository';
 export { MaintenanceRepository, type ResetOperationalResult } from './maintenance.repository';
+export {
+  FiscalRepository,
+  type SaveFiscalConfigInput,
+  type CreateVoucherInput,
+  type ListVouchersInput,
+} from './fiscal.repository';
 export { ReturnRepository, type CreateSaleReturnInput, type CreatePurchaseReturnInput, type SaleReturnResult, type PurchaseReturnResult, type ReturnLineDraft, type PurchaseReturnLineDraft } from './return.repository';
 export { QuoteRepository, type QuoteWithLines } from './quote.repository';
 export { SaleRepository, type SaleWithLines } from './sale.repository';
@@ -92,6 +99,7 @@ export interface Repositories {
   returns: ReturnRepository;
   audit: AuditRepository;
   maintenance: MaintenanceRepository;
+  fiscal: FiscalRepository;
   quotes: QuoteRepository;
   purchases: PurchaseRepository;
   purchaseLines: PurchaseLineRepository;
@@ -125,6 +133,7 @@ export function createRepositories(db: LocalDatabase): Repositories {
     returns: new ReturnRepository(db),
     audit: new AuditRepository(db),
     maintenance: new MaintenanceRepository(db),
+    fiscal: new FiscalRepository(db),
     quotes: new QuoteRepository(db),
     purchases: new PurchaseRepository(db),
     purchaseLines: new PurchaseLineRepository(db),
