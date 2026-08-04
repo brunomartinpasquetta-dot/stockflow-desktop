@@ -15,6 +15,7 @@ import { ReturnSaleDialog } from '@/components/ReturnDialogs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -84,6 +85,31 @@ function SaleDetailDialog({
     () => (salePointsQuery.data ?? []).filter((p) => p.active),
     [salePointsQuery.data],
   )
+  // Notas de crédito/débito sobre un comprobante ya autorizado.
+  const [noteKind, setNoteKind] = useState<'credit_note' | 'debit_note' | null>(null)
+  const [noteAmount, setNoteAmount] = useState('')
+  const noteMutation = useMutation({
+    mutationFn: () =>
+      api.fiscal.issueNote({
+        relatedVoucherId: voucherQuery.data!.id,
+        kind: noteKind!,
+        total: noteAmount.trim() ? parseCurrencyInput(noteAmount) : undefined,
+      }),
+    onSuccess: (v) => {
+      void qc.invalidateQueries({ queryKey: ['fiscal'] })
+      setNoteKind(null)
+      setNoteAmount('')
+      toast.success(
+        `${v.label} ${String(v.salePoint).padStart(5, '0')}-${String(v.number).padStart(8, '0')} — CAE ${v.cae}`,
+        { duration: 10_000 },
+      )
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : 'ARCA no autorizó la nota', {
+        duration: 12_000,
+      }),
+  })
+
   const issueMutation = useMutation({
     mutationFn: (letter: 'A' | 'B' | 'C') =>
       api.fiscal.issueInvoice({
@@ -221,6 +247,16 @@ function SaleDetailDialog({
                         Observaciones de ARCA: {voucherQuery.data.observations}
                       </span>
                     )}
+                    {canVoid && (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setNoteKind('credit_note')}>
+                          Nota de crédito
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setNoteKind('debit_note')}>
+                          Nota de débito
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : fiscalCfgQuery.data?.enabled ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -280,6 +316,59 @@ function SaleDetailDialog({
                 Reimprimir ticket
               </Button>
             </div>
+            {/* Nota de crédito / débito sobre el comprobante fiscal. */}
+            {noteKind && voucherQuery.data && (
+              <Dialog open onOpenChange={(o) => { if (!o) { setNoteKind(null); setNoteAmount('') } }}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {noteKind === 'credit_note' ? 'Nota de Crédito' : 'Nota de Débito'}{' '}
+                      {voucherQuery.data.letter}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-3 text-sm">
+                    <p className="text-muted-foreground">
+                      {noteKind === 'credit_note'
+                        ? 'La nota de crédito anula total o parcialmente la factura. Se emite con CAE y queda asociada al comprobante original.'
+                        : 'La nota de débito suma un importe a la factura original (intereses, gastos). Se emite con CAE.'}
+                    </p>
+                    <div className="rounded-md bg-muted px-3 py-2 text-xs">
+                      Sobre: {voucherQuery.data.letter}{' '}
+                      {String(voucherQuery.data.salePoint).padStart(5, '0')}-
+                      {String(voucherQuery.data.number).padStart(8, '0')} ·{' '}
+                      {formatCurrency(voucherQuery.data.total)}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="note-amount">Importe</Label>
+                      <CurrencyInput
+                        id="note-amount"
+                        value={noteAmount}
+                        onChange={setNoteAmount}
+                        autoFocus
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        Dejalo vacío para usar el total de la factura
+                        {' '}({formatCurrency(voucherQuery.data.total)}).
+                      </span>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => { setNoteKind(null); setNoteAmount('') }}
+                      disabled={noteMutation.isPending}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button onClick={() => noteMutation.mutate()} disabled={noteMutation.isPending}>
+                      {noteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Emitir con CAE
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+
             {returning && (
               <ReturnSaleDialog
                 saleId={saleId}
