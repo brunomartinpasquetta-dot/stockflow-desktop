@@ -20,6 +20,13 @@ import type { BrowserWindow } from 'electron';
 
 interface UpdaterPrefs {
   autoCheck: boolean;
+  /**
+   * Canal de actualizaciones:
+   *  - 'stable' (default): solo releases finales. Es lo que reciben los clientes.
+   *  - 'beta': además acepta prereleases (vX.Y.Z-beta.N) para las PCs de prueba.
+   * Así se puede publicar y probar sin que le llegue a un cliente en producción.
+   */
+  channel: 'stable' | 'beta';
 }
 
 const FILE_NAME = 'updater.json';
@@ -28,13 +35,16 @@ const FIVE_SECONDS_MS = 5_000;
 
 function readPrefs(userDataDir: string): UpdaterPrefs {
   const fp = path.join(userDataDir, FILE_NAME);
-  if (!existsSync(fp)) return { autoCheck: true };
+  if (!existsSync(fp)) return { autoCheck: true, channel: 'stable' };
   try {
     const raw = readFileSync(fp, 'utf8');
     const parsed = JSON.parse(raw) as Partial<UpdaterPrefs>;
-    return { autoCheck: parsed.autoCheck !== false };
+    return {
+      autoCheck: parsed.autoCheck !== false,
+      channel: parsed.channel === 'beta' ? 'beta' : 'stable',
+    };
   } catch {
-    return { autoCheck: true };
+    return { autoCheck: true, channel: 'stable' };
   }
 }
 
@@ -45,6 +55,9 @@ function writePrefs(userDataDir: string, prefs: UpdaterPrefs): void {
 
 const GITHUB_LATEST_URL =
   'https://api.github.com/repos/brunomartinpasquetta-dot/stockflow-desktop/releases/latest';
+/** Lista completa (incluye prereleases). Solo se consulta en canal 'beta'. */
+const GITHUB_RELEASES_URL =
+  'https://api.github.com/repos/brunomartinpasquetta-dot/stockflow-desktop/releases?per_page=10';
 
 interface GithubAsset {
   name: string;
@@ -56,15 +69,30 @@ interface RemoteRelease {
   downloadUrl: string;
 }
 
-/** Compara dos versiones SemVer simples (X.Y.Z). Devuelve positivo si a > b. */
+/**
+ * Compara versiones SemVer (X.Y.Z y X.Y.Z-beta.N). Devuelve positivo si a > b.
+ * Regla SemVer: una prerelease es MENOR que su versión final
+ * (0.3.0-beta.2 < 0.3.0), y entre betas manda el número (beta.2 > beta.1).
+ */
 export function compareVersions(a: string, b: string): number {
-  const pa = a.replace(/^v/, '').split('.').map((n) => Number(n) || 0);
-  const pb = b.replace(/^v/, '').split('.').map((n) => Number(n) || 0);
+  const split = (v: string) => {
+    const [core, pre] = v.replace(/^v/, '').split('-');
+    return {
+      nums: (core ?? '').split('.').map((n) => Number(n) || 0),
+      // sin sufijo → release final; con sufijo → número de beta
+      preNum: pre === undefined ? null : Number(pre.replace(/[^0-9]/g, '')) || 0,
+    };
+  };
+  const pa = split(a);
+  const pb = split(b);
   for (let i = 0; i < 3; i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    const d = (pa.nums[i] ?? 0) - (pb.nums[i] ?? 0);
     if (d !== 0) return d;
   }
-  return 0;
+  if (pa.preNum === null && pb.preNum === null) return 0;
+  if (pa.preNum === null) return 1; // final > beta
+  if (pb.preNum === null) return -1; // beta < final
+  return pa.preNum - pb.preNum;
 }
 
 /**
@@ -97,19 +125,28 @@ function pickAssetForPlatform(assets: GithubAsset[]): GithubAsset | undefined {
  * si la red falla o la respuesta no tiene `tag_name`. Elige el asset acorde al
  * SO/arch del proceso (Windows `.exe`, macOS `.dmg`, Linux `.AppImage`).
  */
-export async function checkRemoteVersion(): Promise<RemoteRelease | null> {
+export async function checkRemoteVersion(
+  channel: 'stable' | 'beta' = 'stable',
+): Promise<RemoteRelease | null> {
   try {
-    const res = await fetch(GITHUB_LATEST_URL, {
+    // 'stable' usa /releases/latest, que GitHub ya define como el último release
+    // NO-prerelease → un cliente en producción nunca ve una beta.
+    // 'beta' lista los últimos releases y toma el más nuevo, sea final o beta.
+    const url = channel === 'beta' ? GITHUB_RELEASES_URL : GITHUB_LATEST_URL;
+    const res = await fetch(url, {
       headers: { 'user-agent': 'stockflow-desktop-updater' },
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as {
+    const body = (await res.json()) as unknown;
+    const data = (Array.isArray(body)
+      ? (body as { draft?: boolean; tag_name?: string }[]).find((r) => !r.draft)
+      : body) as {
       tag_name?: string;
       html_url?: string;
       assets?: GithubAsset[];
-    };
-    const tag = data.tag_name?.replace(/^v/, '');
-    if (!tag) return null;
+    } | undefined;
+    const tag = data?.tag_name?.replace(/^v/, '');
+    if (!tag || !data) return null;
     const assets = data.assets ?? [];
     const asset = pickAssetForPlatform(assets);
     // Si no hay asset para este SO, mandamos a la página del release — NUNCA a
@@ -136,9 +173,10 @@ export async function checkForOutdatedVersion(opts: {
   appVersion: string;
   isPackaged: boolean;
   onOutdated: (info: OutdatedInfo) => void;
+  channel?: 'stable' | 'beta';
 }): Promise<{ outdated: boolean; latestVersion: string | null }> {
   if (!opts.isPackaged) return { outdated: false, latestVersion: null };
-  const remote = await checkRemoteVersion();
+  const remote = await checkRemoteVersion(opts.channel ?? 'stable');
   if (!remote) return { outdated: false, latestVersion: null };
   if (compareVersions(remote.latestVersion, opts.appVersion) > 0) {
     opts.onOutdated({
@@ -156,6 +194,8 @@ export interface UpdaterController {
   quitAndInstall: () => void;
   getAutoCheck: () => boolean;
   setAutoCheck: (v: boolean) => void;
+  getChannel: () => 'stable' | 'beta';
+  setChannel: (c: 'stable' | 'beta') => void;
   /** Limpia los timers del updater (chequeo periódico) para un cierre limpio. */
   dispose?: () => void;
 }
@@ -186,6 +226,7 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
         appVersion: ctx.appVersion,
         isPackaged: ctx.isPackaged,
         onOutdated: (info) => ctx.getWindow()?.webContents.send('updater:outdated', info),
+        channel: prefs.channel,
       });
       return r.outdated
         ? { status: 'outdated', version: r.latestVersion ?? undefined }
@@ -202,7 +243,14 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
       quitAndInstall: () => { /* no-op */ },
       getAutoCheck: () => prefs.autoCheck,
       setAutoCheck: (v: boolean) => {
-        prefs = { autoCheck: v };
+        prefs = { ...prefs, autoCheck: v };
+        writePrefs(ctx.userDataDir, prefs);
+      },
+      // El canal se persiste también en dev: así se puede dejar una PC de prueba
+      // marcada como 'beta' antes de instalarle una versión empaquetada.
+      getChannel: () => prefs.channel,
+      setChannel: (c: 'stable' | 'beta') => {
+        prefs = { ...prefs, channel: c };
         writePrefs(ctx.userDataDir, prefs);
       },
     };
@@ -223,7 +271,12 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
       quitAndInstall: () => { /* no-op */ },
       getAutoCheck: () => prefs.autoCheck,
       setAutoCheck: (v) => {
-        prefs = { autoCheck: v };
+        prefs = { ...prefs, autoCheck: v };
+        writePrefs(ctx.userDataDir, prefs);
+      },
+      getChannel: () => prefs.channel,
+      setChannel: (c) => {
+        prefs = { ...prefs, channel: c };
         writePrefs(ctx.userDataDir, prefs);
       },
     };
@@ -237,6 +290,8 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   const isMac = process.platform === 'darwin';
   autoUpdater.autoDownload = !isMac;
   autoUpdater.autoInstallOnAppQuit = false;
+  // Solo el canal 'beta' baja prereleases; en 'stable' electron-updater las ignora.
+  autoUpdater.allowPrerelease = prefs.channel === 'beta';
 
   autoUpdater.on('update-available', (info: { version: string }) => {
     ctx.getWindow()?.webContents.send('updater:available', { version: info.version });
@@ -275,8 +330,14 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
     quitAndInstall: () => autoUpdater.quitAndInstall(false, true),
     getAutoCheck: () => prefs.autoCheck,
     setAutoCheck: (v: boolean) => {
-      prefs = { autoCheck: v };
+      prefs = { ...prefs, autoCheck: v };
       writePrefs(ctx.userDataDir, prefs);
+    },
+    getChannel: () => prefs.channel,
+    setChannel: (c: 'stable' | 'beta') => {
+      prefs = { ...prefs, channel: c };
+      writePrefs(ctx.userDataDir, prefs);
+      autoUpdater.allowPrerelease = c === 'beta';
     },
     dispose: () => {
       clearTimeout(startupCheck);

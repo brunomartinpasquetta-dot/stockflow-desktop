@@ -527,6 +527,8 @@ export function createApiBridge(
       quitAndInstall: () => c<never>('updater:quitAndInstall'),
       getAutoCheck: () => c<never>('updater:getAutoCheck'),
       setAutoCheck: (p) => c<never>('updater:setAutoCheck', p),
+      getChannel: () => c<never>('updater:getChannel'),
+      setChannel: (p) => c<never>('updater:setChannel', p),
       onAvailable: (cb) => on('updater:available', (p) => cb(p as never)),
       onDownloaded: (cb) => on('updater:downloaded', (p) => cb(p as never)),
       onOutdated: (cb) => on('updater:outdated', (p) => cb(p as never)),

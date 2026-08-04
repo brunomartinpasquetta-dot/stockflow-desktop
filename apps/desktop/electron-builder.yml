@@ -89,4 +89,7 @@ publish:
     # Repo público: el updater baja latest.yml/.exe por URL directa SIN token.
     # Con private:true el cliente necesitaría GH_TOKEN y el auto-download fallaba.
     private: false
+    # El workflow sobreescribe esto con EP_PRE_RELEASE=true cuando el tag lleva
+    # sufijo -beta. Un release marcado como prerelease queda EXCLUIDO de
+    # /releases/latest, así una beta nunca le llega a un cliente en canal estable.
     releaseType: release

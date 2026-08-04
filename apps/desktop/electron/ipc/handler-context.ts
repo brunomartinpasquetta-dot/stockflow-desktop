@@ -35,6 +35,8 @@ export interface HandlerDeps {
     quitAndInstall: () => void;
     getAutoCheck: () => boolean;
     setAutoCheck: (v: boolean) => void;
+    getChannel?: () => 'stable' | 'beta';
+    setChannel?: (c: 'stable' | 'beta') => void;
   };
   /** Token store seguro para credenciales MercadoPago. */
   mpTokenStore?: MpTokenStoreLike;

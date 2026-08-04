@@ -1820,6 +1820,8 @@ export interface ApiSurface {
     quitAndInstall(): Res<{ ok: true }>;
     getAutoCheck(): Res<{ autoCheck: boolean }>;
     setAutoCheck(payload: { autoCheck: boolean }): Res<{ ok: true }>;
+    getChannel(): Res<{ channel: 'stable' | 'beta' }>;
+    setChannel(payload: { channel: 'stable' | 'beta' }): Res<{ ok: true }>;
     onAvailable(cb: (info: { version: string }) => void): () => void;
     onDownloaded(cb: (info: { version: string }) => void): () => void;
     /** Detección manual: hay una versión más nueva en GitHub Releases que la instalada. */

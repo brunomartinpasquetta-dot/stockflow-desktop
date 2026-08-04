@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -833,7 +834,10 @@ function LanSection() {
 function UpdatesSection() {
   const versionQuery = useQuery({ queryKey: ['system', 'version'], queryFn: () => api.system.getVersion() })
   const autoQuery = useQuery({ queryKey: ['updater', 'autoCheck'], queryFn: () => api.updater.getAutoCheck() })
+  const channelQuery = useQuery({ queryKey: ['updater', 'channel'], queryFn: () => api.updater.getChannel() })
   const [auto, setAuto] = useState<boolean>(true)
+  const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
+  const [seededCh, setSeededCh] = useState<unknown>(undefined)
   const [seeded, setSeeded] = useState<unknown>(undefined)
   const [checkStatus, setCheckStatus] = useState<string | null>(null)
   const [downloaded, setDownloaded] = useState<string | null>(null)
@@ -841,6 +845,10 @@ function UpdatesSection() {
   if (autoQuery.data && seeded !== autoQuery.data) {
     setSeeded(autoQuery.data)
     setAuto(autoQuery.data.autoCheck)
+  }
+  if (channelQuery.data && seededCh !== channelQuery.data) {
+    setSeededCh(channelQuery.data)
+    setChannel(channelQuery.data.channel)
   }
 
   useEffect(() => {
@@ -851,6 +859,17 @@ function UpdatesSection() {
   const setAutoMut = useMutation({
     mutationFn: (next: boolean) => api.updater.setAutoCheck(next),
     onSuccess: () => toast.success('Preferencia guardada'),
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo guardar'),
+  })
+
+  const setChannelMut = useMutation({
+    mutationFn: (next: 'stable' | 'beta') => api.updater.setChannel(next),
+    onSuccess: (_r, next) =>
+      toast.success(
+        next === 'beta'
+          ? 'Canal BETA activado — esta PC va a recibir versiones de prueba'
+          : 'Canal estable activado',
+      ),
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo guardar'),
   })
 
@@ -889,6 +908,26 @@ function UpdatesSection() {
         <p className="text-xs text-muted-foreground">
           Versión actual: <span className="font-mono">{versionQuery.data?.version ?? '—'}</span>
         </p>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Canal de actualizaciones</Label>
+          <Select
+            value={channel}
+            onChange={(e) => {
+              const next = e.target.value as 'stable' | 'beta'
+              setChannel(next)
+              setChannelMut.mutate(next)
+            }}
+            className="max-w-xs"
+          >
+            <option value="stable">Estable (recomendado)</option>
+            <option value="beta">Beta — versiones de prueba</option>
+          </Select>
+          <span className="text-xs text-muted-foreground">
+            {channel === 'beta'
+              ? 'Esta PC recibe versiones de prueba antes que el resto. Usalo solo en equipos de testeo.'
+              : 'Solo versiones finales, probadas. Es lo que debe usar un negocio en producción.'}
+          </span>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => void checkNow()}>
             Buscar actualizaciones ahora

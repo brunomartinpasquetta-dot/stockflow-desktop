@@ -502,6 +502,8 @@ export const api = {
     quitAndInstall: () => unwrap(sf().updater.quitAndInstall()),
     getAutoCheck: () => unwrap(sf().updater.getAutoCheck()),
     setAutoCheck: (autoCheck: boolean) => unwrap(sf().updater.setAutoCheck({ autoCheck })),
+    getChannel: () => unwrap(sf().updater.getChannel()),
+    setChannel: (channel: 'stable' | 'beta') => unwrap(sf().updater.setChannel({ channel })),
     onAvailable: (cb: (info: { version: string }) => void) => sf().updater.onAvailable(cb),
     onDownloaded: (cb: (info: { version: string }) => void) => sf().updater.onDownloaded(cb),
     onOutdated: (

@@ -34,6 +34,9 @@ jobs:
         # aborta con "GitHub Personal Access Token is not set".
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          # Tag con sufijo -beta → se publica como PRERELEASE (no llega al canal
+          # estable de los clientes). Tag vX.Y.Z limpio → release final.
+          EP_PRE_RELEASE: ${{ contains(github.ref_name, '-beta') }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: pnpm --filter @stockflow/desktop run publish:mac
@@ -48,4 +51,7 @@ jobs:
         # GH_TOKEN: PAT si existe, si no el GITHUB_TOKEN integrado (ver job mac).
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          # Tag con sufijo -beta → se publica como PRERELEASE (no llega al canal
+          # estable de los clientes). Tag vX.Y.Z limpio → release final.
+          EP_PRE_RELEASE: ${{ contains(github.ref_name, '-beta') }}
         run: pnpm --filter @stockflow/desktop run publish:win

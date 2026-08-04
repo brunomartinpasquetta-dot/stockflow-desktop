@@ -17,6 +17,16 @@ export function buildUpdaterHandlers(deps: HandlerDeps): HandlerMap {
     'updater:getAutoCheck': unguarded(deps, async (): Promise<{ autoCheck: boolean }> => ({
       autoCheck: deps.updater?.getAutoCheck() ?? true,
     })),
+    'updater:getChannel': unguarded(deps, async (): Promise<{ channel: 'stable' | 'beta' }> => ({
+      channel: deps.updater?.getChannel?.() ?? 'stable',
+    })),
+    'updater:setChannel': unguarded(
+      deps,
+      async (payload: { channel: 'stable' | 'beta' }): Promise<{ ok: true }> => {
+        deps.updater?.setChannel?.(payload.channel === 'beta' ? 'beta' : 'stable');
+        return { ok: true };
+      },
+    ),
     'updater:setAutoCheck': unguarded(
       deps,
       async (payload: { autoCheck: boolean }): Promise<{ ok: true }> => {
