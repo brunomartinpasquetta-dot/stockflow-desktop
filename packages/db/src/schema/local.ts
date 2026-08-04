@@ -879,6 +879,117 @@ export const auditLog = sqliteTable(
 );
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 
+/* ------------------------------------------------------------------ */
+/* FACTURACIÓN ELECTRÓNICA ARCA (ex AFIP)                              */
+/* ------------------------------------------------------------------ */
+
+/** Configuración fiscal (singleton, id='singleton'). */
+export const fiscalConfig = sqliteTable('fiscal_config', {
+  id: text('id').primaryKey(),
+  environment: text('environment', { enum: ['homologacion', 'produccion'] })
+    .notNull()
+    .default('homologacion'),
+  cuit: text('cuit').notNull(),
+  businessName: text('business_name'),
+  address: text('address'),
+  /** Condición del EMISOR frente al IVA. */
+  vatCondition: text('vat_condition', { enum: ['RI', 'MT'] }).notNull().default('RI'),
+  grossIncome: text('gross_income'),
+  activityStartDate: integer('activity_start_date'),
+  certPath: text('cert_path'),
+  keyAlias: text('key_alias'),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  createdAt: createdAtCol(),
+  updatedAt: updatedAtCol(),
+});
+export type FiscalConfig = typeof fiscalConfig.$inferSelect;
+
+/** Puntos de venta habilitados en ARCA (uno por terminal que factura). */
+export const salePoints = sqliteTable(
+  'sale_points',
+  {
+    id: pk(),
+    number: integer('number').notNull(),
+    description: text('description').notNull(),
+    /** Terminal asignada (null = cualquiera puede usarlo). */
+    terminalId: text('terminal_id'),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({ numberIdx: uniqueIndex('idx_sale_points_number').on(t.number) }),
+);
+export type SalePoint = typeof salePoints.$inferSelect;
+
+/** Comprobantes fiscales emitidos (facturas y notas de crédito/débito). */
+export const fiscalVouchers = sqliteTable(
+  'fiscal_vouchers',
+  {
+    id: pk(),
+    /** Código ARCA: 1=FA 6=FB 11=FC / 3=NCA 8=NCB 13=NCC / 2=NDA 7=NDB 12=NDC */
+    voucherCode: integer('voucher_code').notNull(),
+    letter: text('letter', { enum: ['A', 'B', 'C'] }).notNull(),
+    kind: text('kind', { enum: ['invoice', 'credit_note', 'debit_note'] })
+      .notNull()
+      .default('invoice'),
+    salePoint: integer('sale_point').notNull(),
+    number: integer('number').notNull(),
+    date: integer('date').notNull(),
+    saleId: text('sale_id').references(() => sales.id),
+    /** Comprobante ajustado por una nota de crédito/débito. */
+    relatedVoucherId: text('related_voucher_id'),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    /** Datos del receptor congelados al emitir (ARCA los exige inmutables). */
+    customerDocType: integer('customer_doc_type').notNull(),
+    customerDocNumber: text('customer_doc_number').notNull(),
+    customerName: text('customer_name').notNull(),
+    netAmount: text('net_amount').notNull().default('0.0000'),
+    vatAmount: text('vat_amount').notNull().default('0.0000'),
+    exemptAmount: text('exempt_amount').notNull().default('0.0000'),
+    untaxedAmount: text('untaxed_amount').notNull().default('0.0000'),
+    total: text('total').notNull(),
+    cae: text('cae'),
+    caeExpiry: integer('cae_expiry'),
+    status: text('status', { enum: ['pending', 'approved', 'rejected', 'error'] })
+      .notNull()
+      .default('pending'),
+    observations: text('observations'),
+    errors: text('errors'),
+    qrUrl: text('qr_url'),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    numIdx: uniqueIndex('idx_fiscal_vouchers_num').on(t.voucherCode, t.salePoint, t.number),
+    dateIdx: index('idx_fiscal_vouchers_date').on(t.date),
+    saleIdx: index('idx_fiscal_vouchers_sale').on(t.saleId),
+    customerIdx: index('idx_fiscal_vouchers_customer').on(t.customerId),
+  }),
+);
+export type FiscalVoucher = typeof fiscalVouchers.$inferSelect;
+
+/** Desglose de alícuotas de IVA por comprobante (ARCA lo exige detallado). */
+export const fiscalVoucherVat = sqliteTable(
+  'fiscal_voucher_vat',
+  {
+    id: pk(),
+    voucherId: text('voucher_id')
+      .notNull()
+      .references(() => fiscalVouchers.id, { onDelete: 'cascade' }),
+    /** Id de alícuota ARCA: 3=0% 4=10.5% 5=21% 6=27% */
+    vatId: integer('vat_id').notNull(),
+    baseAmount: text('base_amount').notNull(),
+    vatAmount: text('vat_amount').notNull(),
+  },
+  (t) => ({ voucherIdx: index('idx_fiscal_vat_voucher').on(t.voucherId) }),
+);
+export type FiscalVoucherVat = typeof fiscalVoucherVat.$inferSelect;
+
 export const familiesRelations = relations(families, ({ one, many }) => ({
   parent: one(families, {
     fields: [families.parentId],
@@ -1328,6 +1439,10 @@ export const localSchema = {
   mpPosDevices,
   mpOrders,
   auditLog,
+  fiscalConfig,
+  salePoints,
+  fiscalVouchers,
+  fiscalVoucherVat,
   familiesRelations,
   suppliersRelations,
   articlesRelations,
