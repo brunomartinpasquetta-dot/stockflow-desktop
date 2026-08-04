@@ -85,6 +85,38 @@ function SaleDetailDialog({
     () => (salePointsQuery.data ?? []).filter((p) => p.active),
     [salePointsQuery.data],
   )
+  // Impresión del comprobante fiscal (A4 con CAE y QR de ARCA).
+  const [printingFiscal, setPrintingFiscal] = useState(false)
+  async function printFiscal(): Promise<void> {
+    const v = voucherQuery.data
+    const company = companyQuery.data
+    if (!v || !company) return
+    setPrintingFiscal(true)
+    try {
+      const [{ buildFiscalDoc }, { printNode }, { FormalDocA4 }, { createElement }] =
+        await Promise.all([
+          import('@/lib/fiscalDoc'),
+          import('@/lib/printService'),
+          import('@/print/FormalDocA4'),
+          import('react'),
+        ])
+      const d = detailQuery.data
+      const doc = await buildFiscalDoc({
+        company,
+        voucher: v,
+        sale: d?.sale ?? null,
+        lines: d?.lines,
+        descriptionById: descById,
+        paymentNote: d?.sale.isAccountSale ? 'Cuenta corriente' : null,
+      })
+      printNode(createElement(FormalDocA4, { data: doc }), 'a4')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo imprimir el comprobante')
+    } finally {
+      setPrintingFiscal(false)
+    }
+  }
+
   // Notas de crédito/débito sobre un comprobante ya autorizado.
   const [noteKind, setNoteKind] = useState<'credit_note' | 'debit_note' | null>(null)
   const [noteAmount, setNoteAmount] = useState('')
@@ -247,16 +279,27 @@ function SaleDetailDialog({
                         Observaciones de ARCA: {voucherQuery.data.observations}
                       </span>
                     )}
-                    {canVoid && (
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setNoteKind('credit_note')}>
-                          Nota de crédito
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setNoteKind('debit_note')}>
-                          Nota de débito
-                        </Button>
-                      </div>
-                    )}
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!companyQuery.data || printingFiscal}
+                        onClick={() => void printFiscal()}
+                      >
+                        {printingFiscal && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Imprimir comprobante
+                      </Button>
+                      {canVoid && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => setNoteKind('credit_note')}>
+                            Nota de crédito
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setNoteKind('debit_note')}>
+                            Nota de débito
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ) : fiscalCfgQuery.data?.enabled ? (
                   <div className="flex flex-wrap items-center gap-2">

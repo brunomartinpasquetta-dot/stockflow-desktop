@@ -280,3 +280,28 @@ body.printing #print-area { display: block; }
   .doc-a4 .doc-notes { margin-top: 5mm; font-size: 9.5pt; white-space: pre-wrap; }
   .doc-a4 .doc-footer { margin-top: 8mm; text-align: center; font-size: 10pt; font-weight: 600; }
 }
+
+/* ---- Pie fiscal del comprobante A4 (CAE + QR de ARCA) ---- */
+.doc-a4 .doc-letter-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #000;
+  width: 16mm;
+  height: 16mm;
+  align-self: flex-start;
+}
+.doc-a4 .doc-letter { font-size: 22pt; font-weight: 700; line-height: 1; }
+.doc-a4 .doc-letter-code { font-size: 6pt; }
+.doc-a4 .doc-fiscal {
+  display: flex;
+  align-items: center;
+  gap: 5mm;
+  margin-top: 4mm;
+  padding-top: 3mm;
+  border-top: 1px solid #d6dae3;
+}
+.doc-a4 .doc-qr { width: 25mm; height: 25mm; }
+.doc-a4 .doc-fiscal-data { font-size: 9pt; line-height: 1.5; }
+.doc-a4 .doc-fiscal-note { font-size: 8pt; color: #555; }

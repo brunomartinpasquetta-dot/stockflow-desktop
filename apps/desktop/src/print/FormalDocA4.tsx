@@ -52,13 +52,31 @@ export interface FormalDocData {
   footerNote?: string | null
   /** Mostrar el encabezado de empresa (true por defecto). */
   showCompanyHeader?: boolean
+  /**
+   * Datos fiscales del comprobante autorizado por ARCA. Cuando vienen, el PDF
+   * incluye el pie obligatorio con CAE, vencimiento y el QR (RG 4892).
+   */
+  fiscal?: {
+    cae: string
+    caeExpiry?: string | null
+    /**
+     * QR de ARCA ya renderizado como data URL (imagen embebida). Se genera
+     * localmente con `qrcode` — el comprobante tiene que poder imprimirse sin
+     * internet.
+     */
+    qrDataUrl?: string | null
+    /** Letra grande del comprobante (A/B/C) en el recuadro central. */
+    letter?: 'A' | 'B' | 'C'
+    /** Código de comprobante ARCA, va debajo de la letra. */
+    voucherCode?: number
+  } | null
 }
 
 
 export function FormalDocA4({ data }: { data: FormalDocData }) {
   const {
     company, title, number, meta, customer, lines, totals,
-    payments, paymentNote, notes, footerNote, showCompanyHeader = true,
+    payments, paymentNote, notes, footerNote, showCompanyHeader = true, fiscal,
   } = data
   const discountNum = Number(totals.discount ?? 0)
   const vatNum = Number(totals.vatAmount ?? 0)
@@ -82,6 +100,15 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
             <div className="doc-company-name">{company.name}</div>
           )}
         </div>
+        {/* Letra del comprobante en el centro, como exige el formato de ARCA. */}
+        {fiscal?.letter && (
+          <div className="doc-letter-box">
+            <div className="doc-letter">{fiscal.letter}</div>
+            {fiscal.voucherCode != null && (
+              <div className="doc-letter-code">COD. {String(fiscal.voucherCode).padStart(2, '0')}</div>
+            )}
+          </div>
+        )}
         <div className="doc-title-box">
           <div className="doc-title">{title}</div>
           <div className="doc-number">N° {number}</div>
@@ -168,6 +195,20 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
 
       {notes && (
         <div className="doc-notes"><strong>Observaciones:</strong> {notes}</div>
+      )}
+
+      {/* Pie fiscal obligatorio: QR (RG 4892) + CAE y su vencimiento. */}
+      {fiscal?.cae && (
+        <div className="doc-fiscal">
+          {fiscal.qrDataUrl && (
+            <img className="doc-qr" src={fiscal.qrDataUrl} alt="Código QR del comprobante" />
+          )}
+          <div className="doc-fiscal-data">
+            <div><strong>CAE N°:</strong> {fiscal.cae}</div>
+            {fiscal.caeExpiry && <div><strong>Vencimiento del CAE:</strong> {fiscal.caeExpiry}</div>}
+            <div className="doc-fiscal-note">Comprobante autorizado por ARCA</div>
+          </div>
+        </div>
       )}
 
       {footerNote && <div className="doc-footer">{footerNote}</div>}
