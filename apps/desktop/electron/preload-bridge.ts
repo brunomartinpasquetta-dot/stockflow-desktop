@@ -302,6 +302,7 @@ export function createApiBridge(
     },
     fiscal: {
       getConfig: () => c<never>('fiscal:getConfig'),
+      getConfigPublic: () => c<never>('fiscal:getConfigPublic'),
       saveConfig: (p) => c<never>('fiscal:saveConfig', p),
       testConnection: () => c<never>('fiscal:testConnection'),
       listSalePoints: () => c<never>('fiscal:listSalePoints'),

@@ -1608,6 +1608,7 @@ export interface ApiSurface {
   };
   fiscal: {
     getConfig(): Res<FiscalConfigDTO | null>;
+    getConfigPublic(): Res<{ enabled: boolean; environment: 'homologacion' | 'produccion'; vatCondition: 'RI' | 'MT' } | null>;
     saveConfig(payload: SaveFiscalConfigDTO): Res<FiscalConfigDTO>;
     testConnection(): Res<{ ok: boolean; message: string; servers?: string }>;
     listSalePoints(): Res<SalePointDTO[]>;

@@ -56,6 +56,23 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
       return cfg as FiscalConfigDTO | null;
     }),
 
+    /**
+     * Config PÚBLICA: lo mínimo que necesita la pantalla de Ventas para saber si
+     * puede facturar. Sin certificado ni datos sensibles → no requiere ser admin.
+     */
+    'fiscal:getConfigPublic': withSession(
+      deps,
+      async (): Promise<{ enabled: boolean; environment: 'homologacion' | 'produccion'; vatCondition: 'RI' | 'MT' } | null> => {
+        const cfg = deps.repos.fiscal.getConfig();
+        if (!cfg) return null;
+        return {
+          enabled: cfg.enabled,
+          environment: cfg.environment,
+          vatCondition: cfg.vatCondition,
+        };
+      },
+    ),
+
     'fiscal:saveConfig': withSession(
       deps,
       async (payload: SaveFiscalConfigDTO, ctx): Promise<FiscalConfigDTO> => {

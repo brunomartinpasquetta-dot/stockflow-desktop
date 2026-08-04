@@ -220,6 +220,11 @@ export const api = {
   },
   fiscal: {
     getConfig: (): Promise<FiscalConfigDTO | null> => unwrap(sf().fiscal.getConfig()),
+    getConfigPublic: (): Promise<{
+      enabled: boolean
+      environment: 'homologacion' | 'produccion'
+      vatCondition: 'RI' | 'MT'
+    } | null> => unwrap(sf().fiscal.getConfigPublic()),
     saveConfig: (payload: SaveFiscalConfigDTO): Promise<FiscalConfigDTO> =>
       unwrap(sf().fiscal.saveConfig(payload)),
     testConnection: (): Promise<{ ok: boolean; message: string; servers?: string }> =>

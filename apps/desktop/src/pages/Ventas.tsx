@@ -49,15 +49,18 @@ interface CartLine {
   priceManuallySet: boolean
 }
 
-// Por defecto "Remito X" (no fiscal): sin conexión AFIP/ARCA no se pueden emitir
-// facturas con CAE válidas. Las Factura A/B/C quedan disponibles pero marcadas
-// "requiere AFIP" (cuando haya conexión fiscal, el tipo lo determinará ARCA).
-const VOUCHER_OPTIONS: { value: VoucherType; label: string }[] = [
-  { value: 'X', label: 'Remito X (no fiscal)' },
-  { value: 'A', label: 'Factura A (requiere AFIP)' },
-  { value: 'B', label: 'Factura B (requiere AFIP)' },
-  { value: 'C', label: 'Factura C (requiere AFIP)' },
-]
+// Opciones del comprobante. Cuando la facturación electrónica está configurada
+// y activa, las facturas se emiten con CAE real; si no, quedan marcadas
+// "requiere ARCA" y solo el Remito X (no fiscal) es utilizable.
+function voucherOptions(fiscalEnabled: boolean): { value: VoucherType; label: string }[] {
+  const suffix = fiscalEnabled ? 'con CAE' : 'requiere ARCA'
+  return [
+    { value: 'X', label: 'Remito X (no fiscal)' },
+    { value: 'A', label: `Factura A (${suffix})` },
+    { value: 'B', label: `Factura B (${suffix})` },
+    { value: 'C', label: `Factura C (${suffix})` },
+  ]
+}
 
 function isCfCustomer(c: CustomerDTO | null): boolean {
   return c == null || c.lastName.toUpperCase() === 'CONSUMIDOR FINAL' || c.docType === 'CF'
@@ -487,6 +490,24 @@ function PDV() {
   const isCF = isCfCustomer(selectedCustomer)
 
   const [voucherType, setVoucherType] = useState<VoucherType>('X')
+  // Facturación electrónica: si está activa, al confirmar se pide el CAE.
+  const fiscalConfigQuery = useQuery({
+    queryKey: ['fiscal', 'configPublic'],
+    queryFn: () => api.fiscal.getConfigPublic(),
+    staleTime: 60_000,
+  })
+  const salePointsQuery = useQuery({
+    queryKey: ['fiscal', 'salePoints'],
+    queryFn: () => api.fiscal.listSalePoints(),
+    staleTime: 60_000,
+  })
+  const fiscalEnabled = fiscalConfigQuery.data?.enabled === true
+  const activeSalePoints = useMemo(
+    () => (salePointsQuery.data ?? []).filter((p) => p.active),
+    [salePointsQuery.data],
+  )
+  const [salePoint, setSalePoint] = useState<number | null>(null)
+  const effectiveSalePoint = salePoint ?? activeSalePoints[0]?.number ?? null
   const numberQuery = useQuery({
     queryKey: ['sales', 'nextNumber', voucherType],
     queryFn: () => api.sales.getNextNumber(voucherType),
@@ -859,6 +880,32 @@ function PDV() {
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} registrada — ${formatCurrency(result.sale.total)}`,
       )
+
+      // Facturación electrónica: si está activa y el comprobante es fiscal, se
+      // pide el CAE a ARCA. La VENTA ya está registrada, así que un fallo acá no
+      // la pierde: se avisa y queda para reintentar desde el Historial.
+      if (fiscalEnabled && voucherType !== 'X' && effectiveSalePoint != null) {
+        void api.fiscal
+          .issueInvoice({ saleId: result.sale.id, salePoint: effectiveSalePoint, letter: voucherType })
+          .then((v) => {
+            toast.success(
+              `${v.label} ${String(v.salePoint).padStart(5, '0')}-${String(v.number).padStart(8, '0')} — CAE ${v.cae}`,
+              { duration: 10_000 },
+            )
+            if (v.observations.length > 0) {
+              toast.warning(`ARCA observó: ${v.observations.join(' · ')}`, { duration: 12_000 })
+            }
+          })
+          .catch((err: unknown) => {
+            toast.error(
+              `La venta quedó registrada pero ARCA no la autorizó: ${
+                err instanceof Error ? err.message : 'error desconocido'
+              }. Podés reintentar desde el Historial de Ventas.`,
+              { duration: 15_000 },
+            )
+          })
+      }
+
       clearSale()
       void numberQuery.refetch()
 
@@ -1009,12 +1056,30 @@ function PDV() {
         <div className="flex flex-col gap-1">
           <Label>Comprobante</Label>
           <Select value={voucherType} onChange={(e) => setVoucherType(e.target.value as VoucherType)}>
-            {VOUCHER_OPTIONS.map((o) => (
+            {voucherOptions(fiscalEnabled).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
           </Select>
+          {fiscalEnabled && voucherType !== 'X' && activeSalePoints.length > 1 && (
+            <Select
+              value={String(effectiveSalePoint ?? '')}
+              onChange={(e) => setSalePoint(Number(e.target.value))}
+              className="mt-1"
+            >
+              {activeSalePoints.map((p) => (
+                <option key={p.id} value={p.number}>
+                  Pto. venta {String(p.number).padStart(5, '0')} — {p.description}
+                </option>
+              ))}
+            </Select>
+          )}
+          {!fiscalEnabled && voucherType !== 'X' && (
+            <span className="text-xs text-destructive">
+              La facturación electrónica no está activa: se registrará sin CAE.
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
