@@ -8,6 +8,11 @@ import type {
   AuditEntryDTO,
   ListAuditPayloadDTO,
   ResetOperationalResultDTO,
+  FiscalConfigDTO,
+  SaveFiscalConfigDTO,
+  SalePointDTO,
+  FiscalVoucherDTO,
+  IssuedVoucherDTO,
   AccountReceivableDetailDTO,
   AccountReceivableDTO,
   ArticleDTO,
@@ -212,6 +217,39 @@ export const api = {
       unwrap(sf().sales.get({ id })),
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
+  },
+  fiscal: {
+    getConfig: (): Promise<FiscalConfigDTO | null> => unwrap(sf().fiscal.getConfig()),
+    saveConfig: (payload: SaveFiscalConfigDTO): Promise<FiscalConfigDTO> =>
+      unwrap(sf().fiscal.saveConfig(payload)),
+    testConnection: (): Promise<{ ok: boolean; message: string; servers?: string }> =>
+      unwrap(sf().fiscal.testConnection()),
+    listSalePoints: (): Promise<SalePointDTO[]> => unwrap(sf().fiscal.listSalePoints()),
+    fetchSalePointsFromArca: (): Promise<{ number: number; type: string; blocked: boolean }[]> =>
+      unwrap(sf().fiscal.fetchSalePointsFromArca()),
+    saveSalePoint: (payload: {
+      number: number
+      description: string
+      terminalId?: string | null
+      active?: boolean
+    }): Promise<SalePointDTO> => unwrap(sf().fiscal.saveSalePoint(payload)),
+    deleteSalePoint: (id: string): Promise<{ ok: true }> =>
+      unwrap(sf().fiscal.deleteSalePoint({ id })),
+    issueInvoice: (payload: {
+      saleId: string
+      salePoint: number
+      letter?: 'A' | 'B' | 'C'
+    }): Promise<IssuedVoucherDTO> => unwrap(sf().fiscal.issueInvoice(payload)),
+    issueNote: (payload: {
+      relatedVoucherId: string
+      kind: 'credit_note' | 'debit_note'
+      total?: string
+      reason?: string
+    }): Promise<IssuedVoucherDTO> => unwrap(sf().fiscal.issueNote(payload)),
+    getVoucherForSale: (saleId: string): Promise<FiscalVoucherDTO | null> =>
+      unwrap(sf().fiscal.getVoucherForSale({ saleId })),
+    listVouchers: (payload: { from?: number; to?: number; limit?: number } = {}): Promise<FiscalVoucherDTO[]> =>
+      unwrap(sf().fiscal.listVouchers(payload)),
   },
   maintenance: {
     resetOperationalData: (payload: { password: string }): Promise<ResetOperationalResultDTO> =>

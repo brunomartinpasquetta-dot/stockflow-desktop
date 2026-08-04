@@ -152,6 +152,17 @@ export const WINDOWS: Record<string, WindowDef> = {
     minWidth: 1100,
     minHeight: 600,
   },
+  'facturacion-electronica': {
+    pageKey: 'facturacion-electronica',
+    title: 'Facturación Electrónica',
+    iconName: 'ShieldCheck',
+    component: lazy(() =>
+      import('@/pages/FacturacionElectronica').then((m) => ({ default: m.FacturacionElectronica })),
+    ),
+    roles: ['admin'],
+    minWidth: 900,
+    minHeight: 600,
+  },
   auditoria: {
     pageKey: 'auditoria',
     title: 'Auditoría',
@@ -307,6 +318,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/familias': 'familias',
   '/promociones': 'promociones',
   '/auditoria': 'auditoria',
+  '/facturacion-electronica': 'facturacion-electronica',
   '/medios-de-pago': 'medios-de-pago',
   '/cuentas-corrientes': 'cuentas-corrientes',
   '/cuentas-corrientes-proveedores': 'cuentas-corrientes-proveedores',
