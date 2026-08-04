@@ -8,7 +8,7 @@ import { api, ApiError } from '@/lib/api'
 import { useArticles, useCompany, useCustomers, usePaymentMethods } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
-import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { ReturnSaleDialog } from '@/components/ReturnDialogs'
@@ -62,6 +62,47 @@ function SaleDetailDialog({
   const [confirming, setConfirming] = useState(false)
   const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
+
+  // Estado fiscal de la venta: si ya tiene comprobante con CAE, o si se puede
+  // emitir/reintentar (cuando ARCA falló o la venta se hizo sin facturar).
+  const voucherQuery = useQuery({
+    queryKey: ['fiscal', 'voucher', saleId],
+    queryFn: () => api.fiscal.getVoucherForSale(saleId),
+  })
+  const fiscalCfgQuery = useQuery({
+    queryKey: ['fiscal', 'configPublic'],
+    queryFn: () => api.fiscal.getConfigPublic(),
+    staleTime: 60_000,
+  })
+  const salePointsQuery = useQuery({
+    queryKey: ['fiscal', 'salePoints'],
+    queryFn: () => api.fiscal.listSalePoints(),
+    staleTime: 60_000,
+  })
+  const [issuePoint, setIssuePoint] = useState<number | null>(null)
+  const activePoints = useMemo(
+    () => (salePointsQuery.data ?? []).filter((p) => p.active),
+    [salePointsQuery.data],
+  )
+  const issueMutation = useMutation({
+    mutationFn: (letter: 'A' | 'B' | 'C') =>
+      api.fiscal.issueInvoice({
+        saleId,
+        salePoint: issuePoint ?? activePoints[0]?.number ?? 1,
+        letter,
+      }),
+    onSuccess: (v) => {
+      void qc.invalidateQueries({ queryKey: ['fiscal', 'voucher', saleId] })
+      toast.success(
+        `${v.label} ${String(v.salePoint).padStart(5, '0')}-${String(v.number).padStart(8, '0')} — CAE ${v.cae}`,
+        { duration: 10_000 },
+      )
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : 'ARCA no autorizó el comprobante', {
+        duration: 12_000,
+      }),
+  })
 
   const sale = detailQuery.data?.sale
   const voidMutation = useMutation({
@@ -159,6 +200,70 @@ function SaleDetailDialog({
                 ? 'Cuenta corriente'
                 : (detailQuery.data?.payments ?? []).map((p) => `${pmNameById.get(p.paymentMethodId) ?? p.paymentMethodId} ${formatCurrency(p.amount)}`).join(' · ') || '—'}
             </div>
+            {/* Estado fiscal: CAE si ya se facturó, o emisión/reintento si no. */}
+            {sale.status === 'completed' && (
+              <div className="rounded-md border p-2 text-xs">
+                {voucherQuery.data?.cae ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-medium">
+                      Comprobante fiscal: {voucherQuery.data.letter}{' '}
+                      {String(voucherQuery.data.salePoint).padStart(5, '0')}-
+                      {String(voucherQuery.data.number).padStart(8, '0')}
+                    </span>
+                    <span className="text-muted-foreground">
+                      CAE {voucherQuery.data.cae}
+                      {voucherQuery.data.caeExpiry
+                        ? ` · vence ${formatDate(voucherQuery.data.caeExpiry)}`
+                        : ''}
+                    </span>
+                    {voucherQuery.data.observations && (
+                      <span className="text-amber-600">
+                        Observaciones de ARCA: {voucherQuery.data.observations}
+                      </span>
+                    )}
+                  </div>
+                ) : fiscalCfgQuery.data?.enabled ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground">
+                      Esta venta todavía no tiene comprobante fiscal.
+                    </span>
+                    {activePoints.length > 1 && (
+                      <select
+                        className="rounded border bg-background px-1 py-0.5 text-xs"
+                        value={String(issuePoint ?? activePoints[0]?.number ?? '')}
+                        onChange={(e) => setIssuePoint(Number(e.target.value))}
+                      >
+                        {activePoints.map((p) => (
+                          <option key={p.id} value={p.number}>
+                            Pto. {String(p.number).padStart(5, '0')}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={issueMutation.isPending}
+                      onClick={() =>
+                        issueMutation.mutate(
+                          sale.type === 'A' || sale.type === 'B' || sale.type === 'C'
+                            ? sale.type
+                            : 'B',
+                        )
+                      }
+                    >
+                      {issueMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {sale.type === 'X' ? 'Facturar (Factura B)' : `Emitir Factura ${sale.type}`}
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Comprobante no fiscal (la facturación electrónica está desactivada).
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
               {canVoid && sale.status === 'completed' && (
                 <Button variant="outline" size="sm" onClick={() => setReturning(true)}>
