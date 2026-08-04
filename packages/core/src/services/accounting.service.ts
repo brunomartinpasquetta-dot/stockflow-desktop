@@ -58,6 +58,12 @@ export interface VatBookSaleRow {
   vat27: string;
   total: string;
   status: 'completed' | 'voided' | 'pending';
+  /** Datos del comprobante fiscal, cuando la venta se facturó con ARCA. */
+  cae?: string | null;
+  salePoint?: number | null;
+  /** Número fiscal de ARCA (puede diferir del interno de la venta). */
+  fiscalNumber?: number | null;
+  kind?: 'invoice' | 'credit_note' | 'debit_note';
 }
 
 export interface VatBookPurchaseRow {
@@ -303,6 +309,50 @@ export class AccountingService {
         status: s.status,
       };
     });
+
+    // Comprobantes fiscales del período. Cuando una venta se facturó con ARCA,
+    // el CAE y el número FISCAL son la verdad ante el organismo: se muestran en
+    // lugar del número interno. Las notas de crédito/débito no nacen de una
+    // venta, así que se agregan como filas propias del libro.
+    const vouchers = this.ctx.repos.fiscal.listVouchers({ from: input.from, to: input.to });
+    const voucherBySale = new Map<string, (typeof vouchers)[number]>();
+    for (const v of vouchers) {
+      if (v.kind === 'invoice' && v.saleId) voucherBySale.set(v.saleId, v);
+    }
+    for (const r of rows) {
+      const v = voucherBySale.get(r.saleId);
+      if (!v) continue;
+      r.cae = v.cae;
+      r.salePoint = v.salePoint;
+      r.fiscalNumber = v.number;
+      r.kind = 'invoice';
+      r.type = v.letter;
+    }
+
+    for (const v of vouchers) {
+      if (v.kind === 'invoice') continue;
+      const vat = this.ctx.repos.fiscal.vatDetailsFor(v.id);
+      const bucket = (id: number) => vat.filter((x) => x.vatId === id);
+      const sumOf = (id: number) => sumDecimals(bucket(id).map((x) => x.vatAmount));
+      rows.push({
+        saleId: v.saleId ?? v.id,
+        date: v.date,
+        type: v.letter,
+        number: v.number,
+        customerName: v.customerName,
+        customerCuit: v.customerDocType === 80 ? v.customerDocNumber : null,
+        netAmount: v.netAmount,
+        vat21: sumOf(5),
+        vat105: sumOf(4),
+        vat27: sumOf(6),
+        total: v.total,
+        status: 'completed',
+        cae: v.cae,
+        salePoint: v.salePoint,
+        fiscalNumber: v.number,
+        kind: v.kind,
+      });
+    }
 
     rows.sort((a, b) => {
       if (a.date !== b.date) return a.date - b.date;

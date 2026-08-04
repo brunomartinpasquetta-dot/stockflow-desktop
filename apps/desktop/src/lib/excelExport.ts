@@ -25,13 +25,17 @@ export function exportVatBookSalesToExcel(
     [companyName],
     [`Libro IVA Ventas — período: ${periodLabel(period)}`],
     [],
-    ['Fecha', 'Tipo', 'N°', 'Cliente', 'CUIT', 'Neto', 'IVA 21%', 'IVA 10.5%', 'IVA 27%', 'Total', 'Estado'],
+    ['Fecha', 'Tipo', 'N°', 'Cliente', 'CUIT', 'Neto', 'IVA 21%', 'IVA 10.5%', 'IVA 27%', 'Total', 'CAE', 'Estado'],
   ]
   const dataStart = headerRows.length + 1 // 1-indexed
   const dataRows = rows.map((r) => [
     formatDate(r.date),
-    r.type,
-    r.number,
+    // Prefijo NC/ND para distinguir notas de crédito y débito en el libro.
+    r.kind === 'credit_note' ? `NC ${r.type}` : r.kind === 'debit_note' ? `ND ${r.type}` : r.type,
+    // Numeración FISCAL (punto de venta + número) cuando hay CAE.
+    r.cae && r.salePoint != null
+      ? `${String(r.salePoint).padStart(5, '0')}-${String(r.fiscalNumber ?? r.number).padStart(8, '0')}`
+      : r.number,
     r.customerName,
     r.customerCuit ?? '',
     r.status === 'voided' ? 0 : Number(r.netAmount),
@@ -39,6 +43,7 @@ export function exportVatBookSalesToExcel(
     r.status === 'voided' ? 0 : Number(r.vat105),
     r.status === 'voided' ? 0 : Number(r.vat27),
     r.status === 'voided' ? 0 : Number(r.total),
+    r.cae ?? '',
     r.status === 'voided' ? 'ANULADA' : r.status === 'pending' ? 'Pendiente' : 'OK',
   ])
   const dataEnd = dataStart + dataRows.length - 1

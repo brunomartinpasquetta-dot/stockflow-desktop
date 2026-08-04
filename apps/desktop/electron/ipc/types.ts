@@ -1021,6 +1021,11 @@ export interface VatBookSaleRowDTO {
   vat27: string;
   total: string;
   status: 'completed' | 'voided' | 'pending';
+  /** Datos del comprobante fiscal si la venta se facturó con ARCA. */
+  cae?: string | null;
+  salePoint?: number | null;
+  fiscalNumber?: number | null;
+  kind?: 'invoice' | 'credit_note' | 'debit_note';
 }
 
 export interface VatBookPurchaseRowDTO {

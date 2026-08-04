@@ -164,17 +164,18 @@ export function LibroIvaVentas() {
                   <TableHead className="text-right">IVA 10.5%</TableHead>
                   <TableHead className="text-right">IVA 27%</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead>CAE</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {query.isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-10 text-center text-muted-foreground">Cargando…</TableCell>
+                    <TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Cargando…</TableCell>
                   </TableRow>
                 ) : data.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={12} className="py-10 text-center text-muted-foreground">
                       Sin ventas en el rango seleccionado.
                     </TableCell>
                   </TableRow>
@@ -182,10 +183,22 @@ export function LibroIvaVentas() {
                   data.map((r) => {
                     const voided = r.status === 'voided'
                     return (
-                      <TableRow key={r.saleId} className={voided ? 'line-through opacity-60' : ''}>
+                      <TableRow key={`${r.saleId}-${r.kind ?? 'sale'}-${r.number}`} className={voided ? 'line-through opacity-60' : ''}>
                         <TableCell>{formatDate(r.date)}</TableCell>
-                        <TableCell>{r.type}</TableCell>
-                        <TableCell className="text-right tabular-nums">{r.number}</TableCell>
+                        <TableCell>
+                          {r.kind === 'credit_note'
+                            ? `NC ${r.type}`
+                            : r.kind === 'debit_note'
+                              ? `ND ${r.type}`
+                              : r.type}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {/* Con CAE se muestra la numeración FISCAL (0000X-00000000N),
+                              que es la que reconoce ARCA. Sin CAE, la interna. */}
+                          {r.cae && r.salePoint != null
+                            ? `${String(r.salePoint).padStart(5, '0')}-${String(r.fiscalNumber ?? r.number).padStart(8, '0')}`
+                            : r.number}
+                        </TableCell>
                         <TableCell>{r.customerName}</TableCell>
                         <TableCell>{r.customerCuit ?? ''}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(r.netAmount)}</TableCell>
@@ -193,6 +206,7 @@ export function LibroIvaVentas() {
                         <TableCell className="text-right tabular-nums">{formatCurrency(r.vat105)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(r.vat27)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(r.total)}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.cae ?? '—'}</TableCell>
                         <TableCell>
                           {voided ? <Badge variant="destructive">Anulada</Badge> : r.status === 'pending' ? <Badge variant="outline">Pendiente</Badge> : <Badge>OK</Badge>}
                         </TableCell>
