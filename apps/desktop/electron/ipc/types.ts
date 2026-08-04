@@ -1488,6 +1488,92 @@ export interface ResetOperationalResultDTO {
   backup: { filename: string; fullPath: string; sizeBytes: number; createdAt: number } | null;
 }
 
+/* ----------------------------------------------------------------------- */
+/* Facturación electrónica ARCA                                             */
+/* ----------------------------------------------------------------------- */
+
+export interface FiscalConfigDTO {
+  id: string;
+  environment: 'homologacion' | 'produccion';
+  cuit: string;
+  businessName: string | null;
+  address: string | null;
+  vatCondition: 'RI' | 'MT';
+  grossIncome: string | null;
+  activityStartDate: number | null;
+  certPath: string | null;
+  keyAlias: string | null;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SaveFiscalConfigDTO {
+  environment: 'homologacion' | 'produccion';
+  cuit: string;
+  businessName?: string | null;
+  address?: string | null;
+  vatCondition: 'RI' | 'MT';
+  grossIncome?: string | null;
+  activityStartDate?: number | null;
+  certPath?: string | null;
+  keyAlias?: string | null;
+  enabled: boolean;
+}
+
+export interface SalePointDTO {
+  id: string;
+  number: number;
+  description: string;
+  terminalId: string | null;
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface FiscalVoucherDTO {
+  id: string;
+  voucherCode: number;
+  letter: 'A' | 'B' | 'C';
+  kind: 'invoice' | 'credit_note' | 'debit_note';
+  salePoint: number;
+  number: number;
+  date: number;
+  saleId: string | null;
+  relatedVoucherId: string | null;
+  customerId: string;
+  customerDocType: number;
+  customerDocNumber: string;
+  customerName: string;
+  netAmount: string;
+  vatAmount: string;
+  exemptAmount: string;
+  untaxedAmount: string;
+  total: string;
+  cae: string | null;
+  caeExpiry: number | null;
+  status: 'pending' | 'approved' | 'rejected' | 'error';
+  observations: string | null;
+  errors: string | null;
+  qrUrl: string | null;
+  userId: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface IssuedVoucherDTO {
+  id: string;
+  label: string;
+  letter: 'A' | 'B' | 'C';
+  salePoint: number;
+  number: number;
+  cae: string;
+  caeExpiry: number | null;
+  total: string;
+  qrUrl: string | null;
+  observations: string[];
+}
+
 export interface AuditEntryDTO {
   id: string;
   createdAt: number;
@@ -1519,6 +1605,19 @@ export interface ApiSurface {
   };
   assistant: {
     ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string }): Res<AssistantAskResultDTO>;
+  };
+  fiscal: {
+    getConfig(): Res<FiscalConfigDTO | null>;
+    saveConfig(payload: SaveFiscalConfigDTO): Res<FiscalConfigDTO>;
+    testConnection(): Res<{ ok: boolean; message: string; servers?: string }>;
+    listSalePoints(): Res<SalePointDTO[]>;
+    fetchSalePointsFromArca(): Res<{ number: number; type: string; blocked: boolean }[]>;
+    saveSalePoint(payload: { number: number; description: string; terminalId?: string | null; active?: boolean }): Res<SalePointDTO>;
+    deleteSalePoint(payload: { id: string }): Res<{ ok: true }>;
+    issueInvoice(payload: { saleId: string; salePoint: number; letter?: 'A' | 'B' | 'C' }): Res<IssuedVoucherDTO>;
+    issueNote(payload: { relatedVoucherId: string; kind: 'credit_note' | 'debit_note'; total?: string; reason?: string }): Res<IssuedVoucherDTO>;
+    getVoucherForSale(payload: { saleId: string }): Res<FiscalVoucherDTO | null>;
+    listVouchers(payload: { from?: number; to?: number; limit?: number }): Res<FiscalVoucherDTO[]>;
   };
   maintenance: {
     resetOperationalData(payload: { password: string }): Res<ResetOperationalResultDTO>;

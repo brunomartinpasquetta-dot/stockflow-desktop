@@ -37,6 +37,7 @@ import { buildPromotionsHandlers } from './handlers/promotions.handlers';
 import { buildReturnsHandlers } from './handlers/returns.handlers';
 import { buildAuditHandlers } from './handlers/audit.handlers';
 import { buildMaintenanceHandlers } from './handlers/maintenance.handlers';
+import { buildFiscalHandlers } from './handlers/fiscal.handlers';
 import { buildQuotesHandlers } from './handlers/quotes.handlers';
 import { buildSalesHandlers } from './handlers/sales.handlers';
 import { buildSearchHandlers } from './handlers/search.handlers';
@@ -87,6 +88,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildAssistantHandlers,
   buildAuditHandlers,
   buildMaintenanceHandlers,
+  buildFiscalHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {

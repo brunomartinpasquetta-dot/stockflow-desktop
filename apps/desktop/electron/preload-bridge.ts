@@ -76,6 +76,7 @@ export const LAN_ROUTED_GROUPS = new Set([
   'analytics',
   'audit',
   'maintenance',
+  'fiscal',
 ]);
 
 export const LOCAL_GROUPS = new Set([
@@ -298,6 +299,19 @@ export function createApiBridge(
     company: {
       get: () => c<never>('company:get'),
       upsert: (p) => c<never>('company:upsert', p),
+    },
+    fiscal: {
+      getConfig: () => c<never>('fiscal:getConfig'),
+      saveConfig: (p) => c<never>('fiscal:saveConfig', p),
+      testConnection: () => c<never>('fiscal:testConnection'),
+      listSalePoints: () => c<never>('fiscal:listSalePoints'),
+      fetchSalePointsFromArca: () => c<never>('fiscal:fetchSalePointsFromArca'),
+      saveSalePoint: (p) => c<never>('fiscal:saveSalePoint', p),
+      deleteSalePoint: (p) => c<never>('fiscal:deleteSalePoint', p),
+      issueInvoice: (p) => c<never>('fiscal:issueInvoice', p),
+      issueNote: (p) => c<never>('fiscal:issueNote', p),
+      getVoucherForSale: (p) => c<never>('fiscal:getVoucherForSale', p),
+      listVouchers: (p) => c<never>('fiscal:listVouchers', p),
     },
     maintenance: {
       resetOperationalData: (p) => c<never>('maintenance:resetOperationalData', p),
