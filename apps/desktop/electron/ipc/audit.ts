@@ -153,6 +153,15 @@ export function withAudit(channel: string, handler: HandlerFn, deps: HandlerDeps
   return async (payload, event) => {
     const res = await handler(payload, event);
     if (res.ok) {
+      // Avisar a TODAS las ventanas que hubo un cambio, para que refresquen sus
+      // datos. Cada módulo abre su propia BrowserWindow con cache aislada: sin
+      // este aviso, una devolución hecha en Historial no actualizaba el stock
+      // que muestra la ventana de Artículos (quedaba el valor viejo en pantalla).
+      try {
+        deps.emit('data:changed', { channel, group });
+      } catch {
+        /* el aviso nunca debe romper la operación */
+      }
       try {
         const session = deps.sessionStore.getSession();
         const user = session?.user ?? (channel === 'auth:login' ? (res.data as { user?: { id: string; fullName?: string; username?: string } })?.user : null);

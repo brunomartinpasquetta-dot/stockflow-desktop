@@ -216,7 +216,12 @@ function bootstrap(): { lanArgs: string[] } {
     importService,
     mpTokenStore,
     emit: (channel: string, payload: unknown) => {
-      mainWindow?.webContents.send(channel, payload);
+      // A TODAS las ventanas, no solo a la principal: cada módulo abre su propia
+      // BrowserWindow con su cache aislada, así que un cambio hecho en una
+      // ventana (p.ej. una devolución) tiene que poder refrescar a las demás.
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) w.webContents.send(channel, payload);
+      }
     },
     focusMainWindow: () => {
       mainWindow?.show();

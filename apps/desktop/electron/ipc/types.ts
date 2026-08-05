@@ -1810,6 +1810,7 @@ export interface ApiSurface {
     getSalesByVendor(payload: DateRangeDTO & { userId?: string }): Res<SalesByVendorReportDTO>;
   };
   system: {
+    onDataChanged(cb: (info: { channel: string; group: string }) => void): () => void;
     pickFile(payload?: { filters?: { name: string; extensions: string[] }[] }): Res<{ filePath: string | null }>;
     pickImage(): Res<{ filePath: string | null }>;
     getMachineId(): Res<{ machineId: string }>;

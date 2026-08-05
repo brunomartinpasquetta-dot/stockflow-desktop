@@ -421,6 +421,8 @@ export const api = {
       unwrap(sf().analytics.getStockRotation(input)),
   },
   system: {
+    onDataChanged: (cb: (info: { channel: string; group: string }) => void): (() => void) =>
+      sf().system.onDataChanged(cb),
     pickFile: (filters?: { name: string; extensions: string[] }[]): Promise<{ filePath: string | null }> =>
       unwrap(sf().system.pickFile({ filters })),
     pickImage: (): Promise<{ filePath: string | null }> => unwrap(sf().system.pickImage()),

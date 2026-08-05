@@ -29,3 +29,24 @@ export const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: handleGlobalError }),
   mutationCache: new MutationCache({ onError: handleGlobalError }),
 })
+
+/**
+ * Sincronización entre ventanas.
+ *
+ * Cada módulo abre su propia BrowserWindow, con una cache de React Query
+ * aislada. `refetchOnWindowFocus` no alcanza: una devolución hecha en el
+ * Historial no refrescaba el stock que mostraba la ventana de Artículos, y el
+ * usuario veía un valor viejo (parecía que el stock no se había revertido).
+ *
+ * El proceso principal emite `data:changed` tras cada operación de escritura;
+ * acá se invalida la cache para que la ventana recargue lo que tenga en
+ * pantalla. Se llama una vez al arrancar el renderer.
+ */
+export function subscribeToDataChanges(): () => void {
+  const sf = (window as unknown as { stockflow?: { system?: { onDataChanged?: (cb: () => void) => () => void } } })
+    .stockflow
+  const off = sf?.system?.onDataChanged?.(() => {
+    void queryClient.invalidateQueries()
+  })
+  return off ?? (() => undefined)
+}

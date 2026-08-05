@@ -416,6 +416,9 @@ export function createApiBridge(
       getSalesByVendor: (p) => c<never>('reports:getSalesByVendor', p),
     },
     system: {
+      /** Aviso de que otra ventana modificó datos: sirve para refrescar. */
+      onDataChanged: (cb: (info: { channel: string; group: string }) => void) =>
+        on('data:changed', (p) => cb(p as { channel: string; group: string })),
       pickFile: (p) => c<never>('system:pickFile', p),
       pickImage: () => c<never>('system:pickImage'),
       getMachineId: () => c<never>('system:getMachineId'),

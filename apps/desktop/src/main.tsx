@@ -7,7 +7,7 @@ import { Toaster } from 'sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { LanProvider } from '@/contexts/LanContext'
 import { LicenseProvider } from '@/contexts/LicenseContext'
-import { queryClient } from '@/lib/queryClient'
+import { queryClient, subscribeToDataChanges } from '@/lib/queryClient'
 import { router } from '@/router'
 import './index.css'
 
@@ -20,6 +20,8 @@ if (navigator.userAgent.includes('Windows')) {
 
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('No se encontró el elemento #root')
+
+subscribeToDataChanges()
 
 createRoot(rootEl).render(
   <StrictMode>
