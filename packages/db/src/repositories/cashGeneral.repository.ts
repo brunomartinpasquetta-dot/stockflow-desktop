@@ -147,8 +147,12 @@ export class CashGeneralRepository {
     const op = isCredit ? addDecimal : subDecimal;
     const balanceAfterCash = op(prevCash, args.cashDelta, 2);
     const balanceAfterElectronic = op(prevElec, args.electronicDelta, 2);
-    const balanceAfter = addDecimal(balanceAfterCash, balanceAfterElectronic, 2);
-    void prevTotal;
+    // El TOTAL se deriva del saldo anterior ± el importe del movimiento, NO de
+    // la suma de los dos parciales: si el desglose quedara desincronizado (como
+    // pasó al migrar una caja que ya tenía saldo sin discriminar), sumar las
+    // columnas arrastraría el error al total, que es el número que el comercio
+    // usa todos los días.
+    const balanceAfter = op(prevTotal, args.amount, 2);
 
     const newRow = {
       id: uuidv7(),
