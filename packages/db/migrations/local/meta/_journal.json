@@ -127,6 +127,13 @@
       "when": 1780000000000,
       "tag": "0018_fix_cash_general_split",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1780100000000,
+      "tag": "0019_rebuild_cash_general",
+      "breakpoints": true
     }
   ]
 }

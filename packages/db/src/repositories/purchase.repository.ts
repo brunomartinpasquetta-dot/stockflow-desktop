@@ -180,7 +180,14 @@ export class PurchaseRepository extends BaseRepository<
             .where(eq(cashGeneral.id, 'singleton'))
             .get();
           const prevBalance = cgCur?.currentBalance ?? '0';
+          const prevCash = cgCur?.cashBalance ?? '0';
+          const prevElec = cgCur?.electronicBalance ?? '0';
           const balanceAfter = subDecimal(prevBalance, total, 2);
+          // La compra sale del EFECTIVO de la caja fuerte. Hay que bajar también
+          // el desglose: si solo se tocaba `currentBalance`, el movimiento
+          // quedaba con los saldos parciales en cero y —como el total se
+          // recalculaba desde esas columnas— el egreso NO descontaba del saldo.
+          const balanceAfterCash = subDecimal(prevCash, total, 2);
           tx.insert(cashGeneralMovements)
             .values({
               id: uuidv7(),
@@ -191,17 +198,32 @@ export class PurchaseRepository extends BaseRepository<
               createdBy: data.userId,
               referenceId: insertedPurchase.id,
               balanceAfter,
+              isCash: true,
+              balanceAfterCash,
+              balanceAfterElectronic: prevElec,
               createdAt: now,
             })
             .run();
           if (cgCur) {
             tx.update(cashGeneral)
-              .set({ currentBalance: balanceAfter, lastUpdate: now })
+              .set({
+                currentBalance: balanceAfter,
+                cashBalance: balanceAfterCash,
+                electronicBalance: prevElec,
+                lastUpdate: now,
+              })
               .where(eq(cashGeneral.id, 'singleton'))
               .run();
           } else {
             tx.insert(cashGeneral)
-              .values({ id: 'singleton', currentBalance: balanceAfter, lastUpdate: now, createdAt: now })
+              .values({
+                id: 'singleton',
+                currentBalance: balanceAfter,
+                cashBalance: balanceAfterCash,
+                electronicBalance: prevElec,
+                lastUpdate: now,
+                createdAt: now,
+              })
               .run();
           }
         } else if (data.paymentType === 'cash' && data.cashRegisterId && data.userId) {
