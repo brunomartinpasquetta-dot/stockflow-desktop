@@ -4,7 +4,7 @@
  * Single-row pattern: hay UNA sola fila en `cash_general` con id='singleton'
  * (creada por la migración 0007). Los movimientos van a `cash_general_movements`.
  */
-import { and, asc, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 
 import { addDecimal, subDecimal } from '@stockflow/shared';
@@ -244,6 +244,31 @@ export class CashGeneralRepository {
    * toca la caja diaria — no genera cash_movement, no descuadra el cierre).
    * Idempotente por caja: un solo depósito de cierre por arqueo.
    */
+  /**
+   * De un conjunto de cajas cerradas, cuáles YA tienen su depósito de cierre
+   * en Caja General. Sirve para que el historial marque los cierres huérfanos
+   * (el diálogo de depósito aparece una sola vez tras el cierre: si se pierde
+   * —error, reinicio, "No ingresar" por equivocación— acá se recupera).
+   */
+  async closeDepositRefIds(cashRegisterIds: string[]): Promise<Set<string>> {
+    try {
+      if (cashRegisterIds.length === 0) return new Set();
+      const rows = this.db
+        .select({ referenceId: cashGeneralMovements.referenceId })
+        .from(cashGeneralMovements)
+        .where(
+          and(
+            eq(cashGeneralMovements.category, 'close_deposit'),
+            inArray(cashGeneralMovements.referenceId, cashRegisterIds),
+          ),
+        )
+        .all();
+      return new Set(rows.map((r) => r.referenceId).filter((x): x is string => x != null));
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async transferFromClosed(input: TransferFromDailyRepoInput): Promise<CashGeneralMovement> {
     try {
       return this.db.transaction((tx) => {

@@ -735,6 +735,8 @@ export interface HistoricalCashRegisterDTO {
   difference: string | null;
   status: CashStatus;
   movementCount: number;
+  /** true si el cierre ya fue ingresado a Caja General. */
+  depositedToGeneral: boolean;
 }
 
 export interface HistoricalCashMovementDTO {

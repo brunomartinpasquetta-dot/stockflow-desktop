@@ -53,6 +53,8 @@ export interface HistoricalCashRegisterSummary {
   status: 'open' | 'closed';
   movementCount: number;
   number: number;
+  /** true si el cierre ya fue ingresado a Caja General (depósito de cierre). */
+  depositedToGeneral: boolean;
 }
 
 export interface HistoricalCashMovement {
@@ -179,6 +181,9 @@ export class CashService {
     const isPhysical = (paymentMethodId: string | null): boolean =>
       paymentMethodId == null || pmById.get(paymentMethodId)?.isPhysicalCash === true;
 
+    // Qué cierres ya fueron ingresados a Caja General (para marcar huérfanos).
+    const depositedIds = await repos.cashGeneral.closeDepositRefIds(registers.map((r) => r.id));
+
     const summaries: HistoricalCashRegisterSummary[] = [];
     for (const r of registers) {
       const movements = await repos.cashMovements.findByRegister(r.id);
@@ -213,6 +218,7 @@ export class CashService {
         difference,
         status: r.status,
         movementCount: movements.length,
+        depositedToGeneral: depositedIds.has(r.id),
       });
     }
     return summaries;

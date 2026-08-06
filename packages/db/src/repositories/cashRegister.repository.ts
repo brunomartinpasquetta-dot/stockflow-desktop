@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, max } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte, max, or } from 'drizzle-orm';
 import {
   CloseCashRegisterSchema,
   OpenCashRegisterSchema,
@@ -69,8 +69,11 @@ export class CashRegisterRepository extends BaseRepository<
     try {
       const data = this.parseOrThrow<OpenCashRegisterInput>(OpenCashRegisterSchema, rawData);
       return this.db.transaction((tx) => {
+        // `select()` completo en vez de proyección por columnas: con la
+        // proyección, drizzle explota si alguna columna referenciada no está
+        // presente en el schema compilado.
         const openRows = tx
-          .select({ id: cashRegisters.id, terminalId: cashRegisters.terminalId })
+          .select()
           .from(cashRegisters)
           .where(eq(cashRegisters.status, 'open'))
           .all();
@@ -78,16 +81,27 @@ export class CashRegisterRepository extends BaseRepository<
         // terminal ya tiene una abierta. Sin terminal (instalación de una sola
         // PC) se mantiene la regla previa: una caja a la vez.
         const terminalId = data.terminalId ?? null;
-        const conflict = terminalId
-          ? openRows.find((r) => r.terminalId === terminalId || r.terminalId == null)
-          : openRows[0];
-        if (conflict) {
+        // Solo bloquea si ESTA terminal ya tiene su caja abierta. Una caja
+        // heredada (terminal_id NULL, de antes de multi-terminal) NO bloquea:
+        // se ADOPTA para esta terminal. Antes la tomaba como conflicto y el
+        // usuario quedaba sin poder abrir caja, con un mensaje que además
+        // mentía ("esta terminal ya tiene una caja abierta").
+        const mine = terminalId ? openRows.find((r) => r.terminalId === terminalId) : openRows[0];
+        if (mine) {
           throw new ConstraintError(
             'CASH_ALREADY_OPEN',
-            terminalId
-              ? 'Esta terminal ya tiene una caja abierta'
-              : 'Ya hay una caja abierta',
+            terminalId ? 'Esta terminal ya tiene una caja abierta' : 'Ya hay una caja abierta',
           );
+        }
+        // Caja heredada (sin terminal, de antes de multi-terminal): se ADOPTA
+        // para esta terminal en vez de bloquear la apertura.
+        const heredada = terminalId ? openRows.find((r) => r.terminalId == null) : undefined;
+        if (heredada) {
+          tx.update(cashRegisters)
+            .set({ terminalId, terminalName: data.terminalName ?? null })
+            .where(eq(cashRegisters.id, heredada.id))
+            .run();
+          return { ...heredada, terminalId, terminalName: data.terminalName ?? null };
         }
         const numRow = tx.select({ value: max(cashRegisters.number) }).from(cashRegisters).get();
         const number = (numRow?.value ?? 0) + 1;
@@ -177,7 +191,14 @@ export class CashRegisterRepository extends BaseRepository<
     userId?: string;
   }): Promise<CashRegister[]> {
     try {
-      const conds = [gte(cashRegisters.openDate, opts.from), lte(cashRegisters.openDate, opts.to)];
+      // Una caja entra en el rango si se ABRIÓ o si se CERRÓ dentro de él. Antes
+      // solo miraba openDate: una caja abierta ayer y cerrada hoy no aparecía al
+      // filtrar por hoy, y el usuario veía un cierre menos de los que hizo.
+      const enRango = or(
+        and(gte(cashRegisters.openDate, opts.from), lte(cashRegisters.openDate, opts.to)),
+        and(gte(cashRegisters.closeDate, opts.from), lte(cashRegisters.closeDate, opts.to)),
+      )!;
+      const conds = [enRango];
       if (opts.userId) conds.push(eq(cashRegisters.userId, opts.userId));
       return this.db
         .select()

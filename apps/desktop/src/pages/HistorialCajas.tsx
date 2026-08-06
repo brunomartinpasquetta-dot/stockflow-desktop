@@ -9,8 +9,11 @@ import {
   useUsers,
 } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCanWrite } from '@/contexts/LicenseContext'
+import { api } from '@/lib/api'
 import { usePrintHistoricalCashReport, usePrintCashCloseReport } from '@/lib/usePrint'
-import { formatCurrency, formatDateTime } from '@/lib/format'
+import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -182,6 +185,110 @@ function HistoricalCashReportDialog({
 }
 
 
+/**
+ * Recuperación de un cierre sin depósito: el diálogo de "Ingresar a Caja
+ * General" aparece una sola vez tras cerrar la caja. Si se perdió (error,
+ * reinicio, "No ingresar" por equivocación), desde acá se ingresa después.
+ * Misma lógica de desglose efectivo/electrónico que el paso 2 del cierre.
+ */
+function DepositarCierreDialog({
+  register,
+  onClose,
+}: {
+  register: HistoricalCashRegisterDTO
+  onClose: () => void
+}) {
+  const reportQuery = useHistoricalCashReport(register.id)
+  const [amount, setAmount] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const r = reportQuery.data
+  const counted = Number(register.closingAmount ?? '0')
+  const elecPart = (r?.byPaymentMethod ?? [])
+    .filter((b) => !b.isPhysicalCash)
+    .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
+  const proposed = (counted + elecPart).toFixed(2)
+  const value = amount ?? proposed
+
+  async function confirmar(): Promise<void> {
+    const amt = parseCurrencyInput(value)
+    if (Number(amt) <= 0) {
+      toast.error('El monto debe ser mayor a cero')
+      return
+    }
+    const baseTotal = counted + elecPart
+    let cashAmount: string
+    let electronicAmount: string
+    if (baseTotal <= 0) {
+      cashAmount = amt
+      electronicAmount = '0.00'
+    } else if (Math.abs(Number(amt) - baseTotal) < 0.005) {
+      cashAmount = counted.toFixed(2)
+      electronicAmount = elecPart.toFixed(2)
+    } else {
+      const factor = Number(amt) / baseTotal
+      cashAmount = (counted * factor).toFixed(2)
+      electronicAmount = (Number(amt) - Number(cashAmount)).toFixed(2)
+    }
+    setSaving(true)
+    try {
+      await api.cashGeneral.transferFromClosed({
+        cashRegisterId: register.id,
+        amount: amt,
+        cashAmount,
+        electronicAmount,
+      })
+      toast.success(`Ingresado ${formatCurrency(amt)} a Caja General (efectivo ${formatCurrency(cashAmount)} · electrónico ${formatCurrency(electronicAmount)})`)
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo ingresar a Caja General')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Ingresar cierre a Caja General</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            El cierre de la caja #{register.number} ({formatDateTime(register.closeDate ?? register.openDate)}) todavía no fue ingresado a Caja General.
+          </p>
+          {reportQuery.isLoading ? (
+            <div className="py-4 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <div className="rounded-md bg-muted px-3 py-2 text-sm">
+              <div className="flex justify-between"><span>Efectivo contado</span><b className="tabular-nums">{formatCurrency(counted)}</b></div>
+              {(r?.byPaymentMethod ?? []).filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0).map((b) => (
+                <div key={b.paymentMethodId ?? b.name} className="flex justify-between text-muted-foreground">
+                  <span>{b.name}</span><span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="late-deposit-amount">Importe a ingresar</Label>
+            <CurrencyInput id="late-deposit-amount" value={value} onChange={setAmount} />
+            <span className="text-xs text-muted-foreground">
+              Podés ajustarlo si una parte no fue a Caja General.
+            </span>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={() => void confirmar()} disabled={saving || reportQuery.isLoading}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Confirmar ingreso
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function HistorialCajas() {
   const { currentUser } = useAuth()
   const isAdmin = currentUser?.role === 'admin'
@@ -191,6 +298,8 @@ export function HistorialCajas() {
   const [userId, setUserId] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [depositRegId, setDepositRegId] = useState<string | null>(null)
+  const canWrite = useCanWrite()
   const [appliedRange, setAppliedRange] = useState({
     from: dayStart(isoDaysAgo(30)),
     to: dayEnd(todayIso()),
@@ -290,13 +399,14 @@ export function HistorialCajas() {
                   <TableHead className="text-right">Cierre</TableHead>
                   <TableHead className="text-right">Diferencia</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Caja General</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {listQuery.isLoading ? (
-                  <TableRow><TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
                 ) : list.length === 0 ? (
-                  <TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">No hay cajas en el rango seleccionado.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} className="py-10 text-center text-muted-foreground">No hay cajas en el rango seleccionado.</TableCell></TableRow>
                 ) : (
                   list.map((r) => (
                     <TableRow
@@ -314,6 +424,24 @@ export function HistorialCajas() {
                       <TableCell className="text-right tabular-nums">{r.closingAmount ? formatCurrency(r.closingAmount) : '—'}</TableCell>
                       <TableCell className="text-right tabular-nums">{r.difference ? formatCurrency(r.difference) : '—'}</TableCell>
                       <TableCell><StatusBadge r={r} /></TableCell>
+                      <TableCell>
+                        {r.status !== 'closed' ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : r.depositedToGeneral ? (
+                          <Badge variant="success">Ingresado</Badge>
+                        ) : canWrite ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={(e) => { e.stopPropagation(); setDepositRegId(r.id) }}
+                          >
+                            Ingresar
+                          </Button>
+                        ) : (
+                          <Badge variant="outline" className="bg-amber-100 text-amber-800">Sin ingresar</Badge>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -383,6 +511,13 @@ export function HistorialCajas() {
           </div>
         </CardContent>
       </Card>
+
+      {depositRegId && (() => {
+        const reg = list.find((r) => r.id === depositRegId)
+        return reg ? (
+          <DepositarCierreDialog register={reg} onClose={() => setDepositRegId(null)} />
+        ) : null
+      })()}
 
       {detailId && (
         <HistoricalCashReportDialog
