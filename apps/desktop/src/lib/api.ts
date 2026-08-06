@@ -379,6 +379,7 @@ export const api = {
   cashGeneral: {
     getBalance: () => unwrap(sf().cashGeneral.getBalance()),
     getBalanceBreakdown: () => unwrap(sf().cashGeneral.getBalanceBreakdown()),
+    adjustBreakdown: (cashAmount: string) => unwrap(sf().cashGeneral.adjustBreakdown({ cashAmount })),
     listMovements: (input: import('@/types/api').ListCashGeneralMovementsInputDTO = {}) =>
       unwrap(sf().cashGeneral.listMovements(input)),
     addIncome: (input: import('@/types/api').AddCashGeneralMovementInputDTO) =>

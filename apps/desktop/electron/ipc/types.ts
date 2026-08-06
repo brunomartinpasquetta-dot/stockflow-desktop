@@ -1756,6 +1756,7 @@ export interface ApiSurface {
   cashGeneral: {
     getBalance(): Res<{ balance: string }>;
     getBalanceBreakdown(): Res<CashGeneralBalanceDTO>;
+    adjustBreakdown(payload: { cashAmount: string }): Res<CashGeneralBalanceDTO>;
     listMovements(payload: ListCashGeneralMovementsInputDTO): Res<CashGeneralMovementDTO[]>;
     addIncome(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;
     addExpense(payload: AddCashGeneralMovementInputDTO): Res<CashGeneralMovementDTO>;

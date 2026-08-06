@@ -19,6 +19,11 @@ export function buildCashGeneralHandlers(deps: HandlerDeps): HandlerMap {
       (_payload, ctx): Promise<{ total: string; cash: string; electronic: string }> =>
         new CashGeneralService(ctx).getBalanceBreakdown(),
     ),
+    'cashGeneral:adjustBreakdown': withSession(
+      deps,
+      (payload: { cashAmount: string }, ctx): Promise<{ total: string; cash: string; electronic: string }> =>
+        new CashGeneralService(ctx).adjustBreakdown(payload),
+    ),
     'cashGeneral:listMovements': withSession(
       deps,
       (payload: ListCashGeneralMovementsInputDTO, ctx): Promise<CashGeneralMovementDTO[]> =>

@@ -183,11 +183,29 @@ export class PurchaseRepository extends BaseRepository<
           const prevCash = cgCur?.cashBalance ?? '0';
           const prevElec = cgCur?.electronicBalance ?? '0';
           const balanceAfter = subDecimal(prevBalance, total, 2);
-          // La compra sale del EFECTIVO de la caja fuerte. Hay que bajar también
-          // el desglose: si solo se tocaba `currentBalance`, el movimiento
-          // quedaba con los saldos parciales en cero y —como el total se
-          // recalculaba desde esas columnas— el egreso NO descontaba del saldo.
-          const balanceAfterCash = subDecimal(prevCash, total, 2);
+          // El desglose sale de los MEDIOS DE PAGO elegidos, igual que en la
+          // caja diaria. Antes se asumía que toda compra pagada desde Caja
+          // General salía del efectivo: una compra pagada por transferencia
+          // igual descontaba de la caja fuerte y el reparto quedaba desviado
+          // (el total seguía bien, pero efectivo/electrónico no).
+          let cashPart = '0';
+          let elecPart = '0';
+          if (paymentsIn.length > 0) {
+            const pmIds = [...new Set(paymentsIn.map((p) => p.paymentMethodId))];
+            const pmRows = tx.select().from(paymentMethods).where(inArray(paymentMethods.id, pmIds)).all();
+            const pmMap = new Map(pmRows.map((r) => [r.id, r]));
+            for (const p of paymentsIn) {
+              const pm = pmMap.get(p.paymentMethodId);
+              if (!pm) throw new NotFoundError('Medio de pago', p.paymentMethodId);
+              if (pm.isPhysicalCash) cashPart = addDecimal(cashPart, p.amount, 2);
+              else elecPart = addDecimal(elecPart, p.amount, 2);
+            }
+          } else {
+            // Sin medios declarados se mantiene el criterio previo: efectivo.
+            cashPart = total;
+          }
+          const balanceAfterCash = subDecimal(prevCash, cashPart, 2);
+          const balanceAfterElec = subDecimal(prevElec, elecPart, 2);
           tx.insert(cashGeneralMovements)
             .values({
               id: uuidv7(),
@@ -198,9 +216,10 @@ export class PurchaseRepository extends BaseRepository<
               createdBy: data.userId,
               referenceId: insertedPurchase.id,
               balanceAfter,
-              isCash: true,
+              // Etiqueta de la fila: efectivo si la parte física es la mayor.
+              isCash: Number(cashPart) >= Number(elecPart),
               balanceAfterCash,
-              balanceAfterElectronic: prevElec,
+              balanceAfterElectronic: balanceAfterElec,
               createdAt: now,
             })
             .run();
@@ -209,7 +228,7 @@ export class PurchaseRepository extends BaseRepository<
               .set({
                 currentBalance: balanceAfter,
                 cashBalance: balanceAfterCash,
-                electronicBalance: prevElec,
+                electronicBalance: balanceAfterElec,
                 lastUpdate: now,
               })
               .where(eq(cashGeneral.id, 'singleton'))

@@ -519,6 +519,7 @@ export function createApiBridge(
     cashGeneral: {
       getBalance: () => c<never>('cashGeneral:getBalance'),
       getBalanceBreakdown: () => c<never>('cashGeneral:getBalanceBreakdown'),
+      adjustBreakdown: (p: { cashAmount: string }) => c('cashGeneral:adjustBreakdown', p),
       listMovements: (p) => c<never>('cashGeneral:listMovements', p),
       addIncome: (p) => c<never>('cashGeneral:addIncome', p),
       addExpense: (p) => c<never>('cashGeneral:addExpense', p),

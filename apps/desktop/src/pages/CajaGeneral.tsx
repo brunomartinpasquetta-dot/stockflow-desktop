@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Loader2, PlusCircle, MinusCircle, Wallet } from 'lucide-react'
+import { Loader2, PlusCircle, MinusCircle, Wallet, Scale } from 'lucide-react'
 
 import {
   useCashGeneralBalanceBreakdown,
@@ -17,7 +17,7 @@ import {
   useCashGeneralMutations,
 } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
-import { formatCurrency, formatDateTime } from '@/lib/format'
+import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -168,10 +168,90 @@ function CashGeneralMovementDialog({
   )
 }
 
+/**
+ * Ajuste del reparto efectivo/electrónico. El comercio declara cuánto tiene
+ * realmente en la caja fuerte; el resto queda como electrónico. NO cambia el
+ * saldo total ni toca ningún movimiento — sólo corrige cómo está repartido,
+ * que es lo único que el sistema no puede deducir solo (historial viejo sin
+ * discriminar, o pagos hechos por un medio distinto al registrado).
+ */
+function AjustarDesgloseDialog({
+  total,
+  cash,
+  onClose,
+}: {
+  total: string
+  cash: string
+  onClose: () => void
+}) {
+  const [efectivo, setEfectivo] = useState(cash)
+  const m = useCashGeneralMutations()
+  const monto = parseCurrencyInput(efectivo)
+  const resto = Number(total) - Number(monto)
+  const excede = resto < -0.005
+
+  async function submit(): Promise<void> {
+    if (Number(monto) < 0) {
+      toast.error('El efectivo no puede ser negativo')
+      return
+    }
+    if (excede) {
+      toast.error('El efectivo no puede superar el saldo total')
+      return
+    }
+    try {
+      await m.adjustBreakdown.mutateAsync(monto)
+      toast.success('Desglose actualizado — el saldo total no cambió')
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo ajustar el desglose')
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Ajustar efectivo / electrónico</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Indicá cuánto tenés realmente en <b>efectivo</b> en la caja fuerte. El resto se toma
+            como electrónico. El saldo total y los movimientos no se modifican.
+          </p>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="ajuste-efectivo">Efectivo real</Label>
+            <CurrencyInput id="ajuste-efectivo" value={efectivo} onChange={setEfectivo} autoFocus />
+          </div>
+          <div className="rounded-md bg-muted px-3 py-2 text-sm">
+            <div className="flex justify-between">
+              <span>Saldo total (no cambia)</span>
+              <b className="tabular-nums">{formatCurrency(total)}</b>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Quedará como electrónico</span>
+              <span className={cn('tabular-nums', excede && 'text-destructive font-medium')}>
+                {excede ? 'supera el total' : formatCurrency(resto.toFixed(2))}
+              </span>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={m.adjustBreakdown.isPending}>Cancelar</Button>
+          <Button onClick={() => void submit()} disabled={m.adjustBreakdown.isPending || excede}>
+            {m.adjustBreakdown.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function CajaGeneralInner() {
   const canManage = usePermission('manage_cash_general')
   const balanceQ = useCashGeneralBalanceBreakdown()
   const [openDialog, setOpenDialog] = useState<'income' | 'expense' | null>(null)
+  const [ajusteOpen, setAjusteOpen] = useState(false)
 
   return (
     <Card>
@@ -204,7 +284,7 @@ function CajaGeneralInner() {
         </div>
 
         {canManage && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button onClick={() => setOpenDialog('income')} className="bg-success text-success-foreground hover:bg-success/90">
               <PlusCircle className="h-4 w-4" />
               Registrar Ingreso
@@ -213,7 +293,19 @@ function CajaGeneralInner() {
               <MinusCircle className="h-4 w-4" />
               Registrar Egreso
             </Button>
+            <Button variant="outline" onClick={() => setAjusteOpen(true)}>
+              <Scale className="h-4 w-4" />
+              Ajustar efectivo / electrónico
+            </Button>
           </div>
+        )}
+
+        {ajusteOpen && (
+          <AjustarDesgloseDialog
+            total={balanceQ.data?.total ?? '0'}
+            cash={balanceQ.data?.cash ?? '0'}
+            onClose={() => setAjusteOpen(false)}
+          />
         )}
 
         <div>

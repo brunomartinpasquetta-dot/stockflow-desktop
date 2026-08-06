@@ -87,6 +87,22 @@ export class CashGeneralService {
     return repos.cashGeneral.getBalanceBreakdown();
   }
 
+  /**
+   * Corrige el reparto efectivo/electrónico declarando cuánto hay en la caja
+   * fuerte. No altera el total ni los movimientos.
+   */
+  async adjustBreakdown(input: { cashAmount: string }): Promise<CashGeneralBalanceDTO> {
+    const { currentUser, repos } = this.ctx;
+    requirePermission(currentUser, 'manage_cash_general');
+    // A diferencia de los movimientos, acá CERO es válido (puede no tener
+    // nada en efectivo), pero nunca negativo.
+    const n = Number(input.cashAmount);
+    if (!Number.isFinite(n) || n < 0) {
+      throw new ValidationError('cashAmount', 'El efectivo declarado no puede ser negativo');
+    }
+    return repos.cashGeneral.adjustBreakdown(input.cashAmount, currentUser.id);
+  }
+
   async listMovements(input: ListCashGeneralMovementsInput = {}): Promise<CashGeneralMovementDTO[]> {
     const { currentUser, repos } = this.ctx;
     requirePermission(currentUser, 'view_reports');

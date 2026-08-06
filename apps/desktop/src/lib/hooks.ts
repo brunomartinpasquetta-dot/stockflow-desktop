@@ -341,6 +341,10 @@ export function useCashGeneralMutations() {
         api.cashGeneral.transferFromDaily(input),
       onSuccess: invalidate,
     }),
+    adjustBreakdown: useMutation({
+      mutationFn: (cashAmount: string) => api.cashGeneral.adjustBreakdown(cashAmount),
+      onSuccess: invalidate,
+    }),
   }
 }
 

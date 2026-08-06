@@ -82,6 +82,43 @@ export class CashGeneralRepository {
   }
 
   /** Devuelve el saldo discriminado en efectivo / electrónico / total. */
+  /**
+   * Declara cuánto del saldo está en EFECTIVO. El resto queda como
+   * electrónico: el TOTAL no se toca y ningún movimiento se modifica ni se
+   * borra — sólo se corrige el reparto entre las dos columnas.
+   *
+   * Hace falta porque el reparto puede desviarse de la realidad (historial
+   * sin discriminar, o compras que se pagaron por transferencia y el sistema
+   * descontaba del efectivo). El comercio es el único que sabe cuánto tiene
+   * en la caja fuerte, así que lo declara y a partir de ahí el sistema lo
+   * sigue llevando bien.
+   */
+  async adjustBreakdown(cashAmount: string, userId: string): Promise<CashGeneralBalance> {
+    try {
+      return this.db.transaction((tx) => {
+        const row = tx.select().from(cashGeneral).where(eq(cashGeneral.id, SINGLETON_ID)).get();
+        const total = row?.currentBalance ?? '0';
+        if (Number(cashAmount) < 0) {
+          throw new ConstraintError('NEGATIVE_CASH', 'El efectivo no puede ser negativo');
+        }
+        if (Number(cashAmount) > Number(total) + 0.005) {
+          throw new ConstraintError(
+            'CASH_OVER_TOTAL',
+            `El efectivo declarado no puede superar el saldo total (${total})`,
+          );
+        }
+        const electronic = subDecimal(total, cashAmount, 2);
+        tx.update(cashGeneral)
+          .set({ cashBalance: cashAmount, electronicBalance: electronic, lastUpdate: Date.now() })
+          .where(eq(cashGeneral.id, SINGLETON_ID))
+          .run();
+        return { total, cash: cashAmount, electronic };
+      });
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async getBalanceBreakdown(): Promise<CashGeneralBalance> {
     try {
       const row = this.db
