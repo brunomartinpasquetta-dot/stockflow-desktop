@@ -53,8 +53,12 @@ export interface HistoricalCashRegisterSummary {
   status: 'open' | 'closed';
   movementCount: number;
   number: number;
-  /** true si el cierre ya fue ingresado a Caja General (depósito de cierre). */
+  /** true si el cierre ya fue ingresado COMPLETO a Caja General. */
   depositedToGeneral: boolean;
+  /** Cuánto de ese cierre ya se ingresó a Caja General. */
+  depositedAmount: string;
+  /** Cuánto podía ingresarse en total (efectivo contado + neto electrónico). */
+  depositableAmount: string;
 }
 
 export interface HistoricalCashMovement {
@@ -203,6 +207,18 @@ export class CashService {
       );
       const difference =
         r.closingAmount != null ? subDecimal(r.closingAmount, expectedAmount, 4) : null;
+      // Lo que ese cierre podía aportar a Caja General y lo que realmente
+      // aportó: si aportó menos, el historial ofrece completar la diferencia.
+      const netoElectronico = subDecimal(
+        subDecimal(totalIncome, totalExpense, 2),
+        subDecimal(cashIncome, cashExpense, 2),
+        2,
+      );
+      const depositable =
+        r.status === 'closed'
+          ? sumDecimals([r.closingAmount ?? '0', Number(netoElectronico) > 0 ? netoElectronico : '0'])
+          : '0';
+      const yaDepositado = depositedIds.get(r.id) ?? '0';
       summaries.push({
         id: r.id,
         number: r.number,
@@ -218,7 +234,9 @@ export class CashService {
         difference,
         status: r.status,
         movementCount: movements.length,
-        depositedToGeneral: depositedIds.has(r.id),
+        depositedToGeneral: Number(yaDepositado) >= Number(depositable) - 0.005,
+        depositedAmount: yaDepositado,
+        depositableAmount: depositable,
       });
     }
     return summaries;

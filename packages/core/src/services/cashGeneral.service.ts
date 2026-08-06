@@ -6,6 +6,7 @@
  * - `view_reports` para leer; `manage_cash_general` para registrar
  *   ingresos/egresos manuales; `close_cash` para transferir desde caja diaria.
  */
+import { addDecimal, subDecimal } from '@stockflow/shared';
 import type { CashGeneralCategory, CashGeneralMovement, CashGeneralMovementType } from '@stockflow/db';
 
 import { requirePermission } from '../auth/permissions';
@@ -161,12 +162,33 @@ export class CashGeneralService {
     if (reg.userId !== currentUser?.id) {
       requirePermission(currentUser, 'close_cash');
     }
+    // Tope de lo que ese cierre puede aportar: efectivo contado + neto de los
+    // medios no físicos. Permite completar un depósito parcial (típico: se
+    // ingresó sólo el efectivo y quedó afuera la parte electrónica) sin
+    // habilitar que se deposite más de lo recaudado.
+    const movs = await repos.cashMovements.findByRegister(input.cashRegisterId);
+    const pmById = await repos.paymentMethods.byId();
+    let noFisico = '0';
+    for (const mv of movs) {
+      const fisico = mv.paymentMethodId == null || pmById.get(mv.paymentMethodId)?.isPhysicalCash === true;
+      if (fisico) continue;
+      noFisico =
+        mv.type === 'income'
+          ? addDecimal(noFisico, mv.amount, 2)
+          : subDecimal(noFisico, mv.amount, 2);
+    }
+    const maxDepositable = addDecimal(
+      reg.closingAmount ?? '0',
+      Number(noFisico) > 0 ? noFisico : '0',
+      2,
+    );
     const m = await repos.cashGeneral.transferFromClosed({
       cashRegisterId: input.cashRegisterId,
       amount: input.amount,
       createdBy: currentUser?.id ?? 'system',
       cashAmount: input.cashAmount,
       electronicAmount: input.electronicAmount,
+      maxDepositable,
     });
     return this.toDTO(m);
   }

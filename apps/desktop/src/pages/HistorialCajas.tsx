@@ -207,7 +207,9 @@ function DepositarCierreDialog({
   const elecPart = (r?.byPaymentMethod ?? [])
     .filter((b) => !b.isPhysicalCash)
     .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
-  const proposed = (counted + elecPart).toFixed(2)
+  // Si ya se ingresó una parte, se propone SÓLO lo que falta.
+  const yaIngresado = Number(register.depositedAmount ?? '0')
+  const proposed = Math.max(0, counted + elecPart - yaIngresado).toFixed(2)
   const value = amount ?? proposed
 
   async function confirmar(): Promise<void> {
@@ -216,18 +218,22 @@ function DepositarCierreDialog({
       toast.error('El monto debe ser mayor a cero')
       return
     }
-    const baseTotal = counted + elecPart
+    const baseTotal = counted + elecPart - yaIngresado
     let cashAmount: string
     let electronicAmount: string
     if (baseTotal <= 0) {
       cashAmount = amt
       electronicAmount = '0.00'
     } else if (Math.abs(Number(amt) - baseTotal) < 0.005) {
-      cashAmount = counted.toFixed(2)
-      electronicAmount = elecPart.toFixed(2)
+      // Se ingresa exactamente lo que falta: el efectivo que aún no entró
+      // primero, y el resto como electrónico.
+      const efeFalta = Math.max(0, Math.min(counted - yaIngresado, baseTotal))
+      cashAmount = efeFalta.toFixed(2)
+      electronicAmount = (Number(amt) - efeFalta).toFixed(2)
     } else {
       const factor = Number(amt) / baseTotal
-      cashAmount = (counted * factor).toFixed(2)
+      const efeFalta = Math.max(0, Math.min(counted - yaIngresado, baseTotal))
+      cashAmount = (efeFalta * factor).toFixed(2)
       electronicAmount = (Number(amt) - Number(cashAmount)).toFixed(2)
     }
     setSaving(true)
@@ -255,7 +261,9 @@ function DepositarCierreDialog({
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            El cierre de la caja #{register.number} ({formatDateTime(register.closeDate ?? register.openDate)}) todavía no fue ingresado a Caja General.
+            {yaIngresado > 0
+              ? `Del cierre de la caja #${register.number} se ingresaron ${formatCurrency(register.depositedAmount)} de ${formatCurrency(register.depositableAmount)}. Falta la diferencia.`
+              : `El cierre de la caja #${register.number} (${formatDateTime(register.closeDate ?? register.openDate)}) todavía no fue ingresado a Caja General.`}
           </p>
           {reportQuery.isLoading ? (
             <div className="py-4 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -429,17 +437,30 @@ export function HistorialCajas() {
                           <span className="text-xs text-muted-foreground">—</span>
                         ) : r.depositedToGeneral ? (
                           <Badge variant="success">Ingresado</Badge>
-                        ) : canWrite ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={(e) => { e.stopPropagation(); setDepositRegId(r.id) }}
-                          >
-                            Ingresar
-                          </Button>
                         ) : (
-                          <Badge variant="outline" className="bg-amber-100 text-amber-800">Sin ingresar</Badge>
+                          <div className="flex items-center gap-2">
+                            {Number(r.depositedAmount) > 0 && (
+                              <span className="text-xs text-amber-700">
+                                falta {formatCurrency(
+                                  (Number(r.depositableAmount) - Number(r.depositedAmount)).toFixed(2),
+                                )}
+                              </span>
+                            )}
+                            {canWrite ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={(e) => { e.stopPropagation(); setDepositRegId(r.id) }}
+                              >
+                                {Number(r.depositedAmount) > 0 ? 'Completar' : 'Ingresar'}
+                              </Button>
+                            ) : (
+                              <Badge variant="outline" className="bg-amber-100 text-amber-800">
+                                {Number(r.depositedAmount) > 0 ? 'Parcial' : 'Sin ingresar'}
+                              </Badge>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>

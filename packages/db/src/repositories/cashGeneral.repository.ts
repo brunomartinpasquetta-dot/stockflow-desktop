@@ -47,6 +47,12 @@ export interface TransferFromDailyRepoInput {
    */
   cashAmount?: string;
   electronicAmount?: string;
+  /**
+   * Tope de lo que ese cierre puede aportar (efectivo contado + neto de los
+   * demás medios). Presente sólo en el depósito de cierre: habilita completar
+   * un depósito parcial sin permitir depositar de más.
+   */
+  maxDepositable?: string;
 }
 
 /** Saldo de Caja General discriminado por naturaleza del dinero. */
@@ -287,11 +293,12 @@ export class CashGeneralRepository {
    * (el diálogo de depósito aparece una sola vez tras el cierre: si se pierde
    * —error, reinicio, "No ingresar" por equivocación— acá se recupera).
    */
-  async closeDepositRefIds(cashRegisterIds: string[]): Promise<Set<string>> {
+  async closeDepositRefIds(cashRegisterIds: string[]): Promise<Map<string, string>> {
     try {
-      if (cashRegisterIds.length === 0) return new Set();
+      const acc = new Map<string, string>();
+      if (cashRegisterIds.length === 0) return acc;
       const rows = this.db
-        .select({ referenceId: cashGeneralMovements.referenceId })
+        .select()
         .from(cashGeneralMovements)
         .where(
           and(
@@ -300,7 +307,13 @@ export class CashGeneralRepository {
           ),
         )
         .all();
-      return new Set(rows.map((r) => r.referenceId).filter((x): x is string => x != null));
+      // Puede haber más de un depósito por caja (un complemento tras uno
+      // parcial), así que se acumulan.
+      for (const r of rows) {
+        if (!r.referenceId) continue;
+        acc.set(r.referenceId, addDecimal(acc.get(r.referenceId) ?? '0', r.amount, 2));
+      }
+      return acc;
     } catch (err) {
       return rethrowDbError(err);
     }
@@ -324,9 +337,12 @@ export class CashGeneralRepository {
           );
         }
 
-        // Un solo depósito de cierre por arqueo.
-        const prev = tx
-          .select({ id: cashGeneralMovements.id })
+        // Se admite completar un depósito parcial (el usuario puede haber
+        // ingresado sólo el efectivo y olvidado la parte electrónica), pero
+        // NUNCA depositar más de lo que ese cierre recaudó: eso inventaría
+        // plata que no existe.
+        const previos = tx
+          .select()
           .from(cashGeneralMovements)
           .where(
             and(
@@ -334,8 +350,21 @@ export class CashGeneralRepository {
               eq(cashGeneralMovements.category, 'close_deposit'),
             ),
           )
-          .get();
-        if (prev) {
+          .all();
+        let yaDepositado = '0';
+        for (const p of previos) yaDepositado = addDecimal(yaDepositado, p.amount, 2);
+        if (input.maxDepositable != null) {
+          const tope = Number(input.maxDepositable);
+          if (Number(yaDepositado) + Number(input.amount) > tope + 0.005) {
+            const resta = Math.max(0, tope - Number(yaDepositado));
+            throw new ConstraintError(
+              'DEPOSIT_OVER_CLOSE',
+              resta <= 0.005
+                ? `El cierre de la caja #${reg.number} ya fue ingresado completo a Caja General`
+                : `Del cierre de la caja #${reg.number} queda por ingresar ${resta.toFixed(2)}`,
+            );
+          }
+        } else if (previos.length > 0) {
           throw new ConstraintError(
             'ALREADY_DEPOSITED',
             `El cierre de la caja #${reg.number} ya fue ingresado a Caja General`,
