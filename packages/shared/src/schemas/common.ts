@@ -16,6 +16,20 @@ export const moneySchema = z
   .string()
   .regex(/^\d+(\.\d{1,4})?$/, 'Debe ser un decimal con hasta 4 decimales');
 
+/**
+ * Importe que PUEDE ser negativo. Para saldos y arqueos, no para montos que se
+ * cargan (una venta o un egreso siempre son positivos).
+ *
+ * Hace falta porque un arqueo tiene que poder declarar la realidad: si el
+ * cajón quedó en rojo (se pagó más de lo que había), el cajero debe poder
+ * cerrar con ese número. Con `moneySchema` el cierre se rechazaba con
+ * "Debe ser un decimal con hasta 4 decimales" —un mensaje que no explicaba
+ * nada— y la caja quedaba imposible de cerrar.
+ */
+export const signedMoneySchema = z
+  .string()
+  .regex(/^-?\d+(\.\d{1,4})?$/, 'Debe ser un decimal con hasta 4 decimales');
+
 /** Decimal de cantidad/stock: hasta 3 decimales. Ej. "12.500". */
 export const qtySchema = z
   .string()

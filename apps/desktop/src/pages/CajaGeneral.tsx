@@ -91,6 +91,8 @@ function CashGeneralMovementDialog({
   const [category, setCategory] = useState<CashGeneralCategoryDTO | ''>('')
   const [medio, setMedio] = useState<'cash' | 'electronic'>('cash')
   const m = useCashGeneralMutations()
+  const saldoQ = useCashGeneralBalanceBreakdown()
+  const saldo = saldoQ.data ?? { total: '0', cash: '0', electronic: '0' }
   const submitting = m.addIncome.isPending || m.addExpense.isPending
 
   async function submit(): Promise<void> {
@@ -101,6 +103,19 @@ function CashGeneralMovementDialog({
     if (!description.trim()) {
       toast.error('El concepto es obligatorio')
       return
+    }
+    // Un egreso mayor al saldo deja Caja General en rojo. No se bloquea (puede
+    // estar cargando algo atrasado), pero se avisa antes de confirmarlo.
+    if (mode === 'expense') {
+      const disponible = medio === 'cash' ? Number(saldo.cash) : Number(saldo.electronic)
+      if (Number(amount) > disponible + 0.005) {
+        const nombre = medio === 'cash' ? 'efectivo' : 'electrónico'
+        const ok = window.confirm(
+          `En Caja General hay ${formatCurrency(disponible)} en ${nombre} y estás sacando ${formatCurrency(amount)}.\n\n` +
+          `El saldo ${nombre} quedaría en ${formatCurrency((disponible - Number(amount)).toFixed(2))}.\n\n¿Registrar igual?`,
+        )
+        if (!ok) return
+      }
     }
     const payload = {
       amount,

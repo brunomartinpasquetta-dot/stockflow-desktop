@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { idSchema, moneySchema, timestampSchema } from './common';
+import { idSchema, moneySchema, signedMoneySchema, timestampSchema } from './common';
 
 /** Shape completo de `cash_registers` (matches DB). */
 export const CashRegisterSchema = z.object({
@@ -9,7 +9,7 @@ export const CashRegisterSchema = z.object({
   openDate: timestampSchema,
   closeDate: timestampSchema.nullable(),
   openingAmount: moneySchema,
-  closingAmount: moneySchema.nullable(),
+  closingAmount: signedMoneySchema.nullable(),
   status: z.enum(['open', 'closed']),
   userId: idSchema,
   notes: z.string().optional(), // diferencia de arqueo, se guarda como texto
@@ -28,7 +28,8 @@ export const OpenCashRegisterSchema = z.object({
 
 /** Cerrar caja. */
 export const CloseCashRegisterSchema = z.object({
-  closingAmount: moneySchema,
+  // El arqueo declara lo que HAY, y puede ser negativo si se pagó de más.
+  closingAmount: signedMoneySchema,
   /** Observaciones del cierre (se anteponen a la línea de arqueo automática). */
   notes: z.string().max(500).nullish(),
 });

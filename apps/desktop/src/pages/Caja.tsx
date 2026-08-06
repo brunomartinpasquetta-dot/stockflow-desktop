@@ -144,6 +144,10 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
     () => activeMethods.find((m) => m.isPhysicalCash) ?? activeMethods[0],
     [activeMethods],
   )
+  const pmById = useMemo(
+    () => new Map((paymentMethodsQuery.data ?? []).map((m) => [m.id, m])),
+    [paymentMethodsQuery.data],
+  )
 
   const [movOpen, setMovOpen] = useState(false)
   const [movType, setMovType] = useState<'income' | 'expense'>('income')
@@ -188,6 +192,18 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
     if (Number(amt) <= 0) {
       toast.error('El monto debe ser mayor a cero')
       return
+    }
+    // Un egreso mayor al efectivo del cajón deja la caja en rojo. No se
+    // bloquea (puede estar registrando algo que ya pasó), pero se avisa: si
+    // no, el descuadre aparece recién al cerrar y nadie sabe de dónde salió.
+    const esEfectivo = !movPm || pmById.get(movPm)?.isPhysicalCash === true
+    if (movType === 'expense' && esEfectivo && Number(amt) > Number(expected) + 0.005) {
+      const quedaria = (Number(expected) - Number(amt)).toFixed(2)
+      const ok = window.confirm(
+        `En el cajón hay ${formatCurrency(expected)} y estás sacando ${formatCurrency(amt)}.\n\n` +
+        `La caja quedaría en ${formatCurrency(quedaria)}.\n\n¿Registrar igual?`,
+      )
+      if (!ok) return
     }
     try {
       await addMovement.mutateAsync({
