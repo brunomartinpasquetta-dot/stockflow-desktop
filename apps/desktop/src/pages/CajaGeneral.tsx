@@ -6,7 +6,7 @@
  * `view_cash_general` (área Caja) — así se puede bloquear sin tocar los
  * historiales de ventas/cajas (pedido de Bruno, 2026-07).
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Loader2, PlusCircle, MinusCircle, Wallet, Scale } from 'lucide-react'
@@ -348,6 +348,40 @@ function CajaGeneralFullList() {
     type: (type || undefined) as 'income' | 'expense' | 'transfer_from_daily' | undefined,
   })
 
+  // Saldo con el que ARRANCA el período: es el que dejó el último movimiento
+  // anterior al rango. Sin esto no se puede saber cuánto aportó el período a
+  // cada columna.
+  const previoQ = useCashGeneralMovements({ to: dayStart(fromIso) - 1, limit: 1 })
+
+  // Totales del rango filtrado. El desglose efectivo/electrónico NO se puede
+  // sacar del flag `isCash`: en un depósito de cierre ese flag es sólo una
+  // etiqueta de fila (dice cuál parte pesó más) y el movimiento en realidad
+  // aporta a las DOS columnas. El reparto real sale de cómo se movieron los
+  // saldos entre un movimiento y el siguiente.
+  const totales = useMemo(() => {
+    const movs = movementsQ.data ?? []
+    const t = { ingresos: 0, egresos: 0 }
+    for (const m of movs) {
+      if (m.type === 'expense') t.egresos += Number(m.amount)
+      else t.ingresos += Number(m.amount)
+    }
+    const ultimo = movs[0]            // la lista viene del más nuevo al más viejo
+    const anterior = (previoQ.data ?? [])[0]
+    const baseEfe = anterior ? Number(anterior.balanceAfterCash) : 0
+    const baseEle = anterior ? Number(anterior.balanceAfterElectronic) : 0
+    const finEfe = ultimo ? Number(ultimo.balanceAfterCash) : baseEfe
+    const finEle = ultimo ? Number(ultimo.balanceAfterElectronic) : baseEle
+    return {
+      ...t,
+      neto: t.ingresos - t.egresos,
+      variacionEfe: finEfe - baseEfe,
+      variacionEle: finEle - baseEle,
+      saldoFinal: ultimo ? Number(ultimo.balanceAfter) : null,
+      saldoFinalEfe: ultimo ? finEfe : null,
+      saldoFinalEle: ultimo ? finEle : null,
+    }
+  }, [movementsQ.data, previoQ.data])
+
   async function exportarExcel(): Promise<void> {
     const rows = movementsQ.data ?? []
     if (rows.length === 0) {
@@ -367,6 +401,33 @@ function CajaGeneralFullList() {
         'Saldo electrónico': Number(m.balanceAfterElectronic),
         'Saldo total': Number(m.balanceAfter),
       }))
+      data.push({} as (typeof data)[number])
+      data.push({
+        Fecha: 'TOTALES DEL PERÍODO', Tipo: '', Concepto: '', Categoría: '', Medio: '',
+        Monto: 0, 'Saldo efectivo': 0, 'Saldo electrónico': 0, 'Saldo total': 0,
+      } as (typeof data)[number])
+      data.push({
+        Fecha: 'Ingresos', Tipo: '', Concepto: '', Categoría: '', Medio: '',
+        Monto: totales.ingresos, 'Saldo efectivo': 0, 'Saldo electrónico': 0, 'Saldo total': 0,
+      } as (typeof data)[number])
+      data.push({
+        Fecha: 'Egresos', Tipo: '', Concepto: '', Categoría: '', Medio: '',
+        Monto: totales.egresos, 'Saldo efectivo': 0, 'Saldo electrónico': 0, 'Saldo total': 0,
+      } as (typeof data)[number])
+      data.push({
+        Fecha: 'Resultado del período', Tipo: '', Concepto: '', Categoría: '', Medio: '',
+        Monto: totales.neto,
+        'Saldo efectivo': totales.variacionEfe,
+        'Saldo electrónico': totales.variacionEle,
+        'Saldo total': totales.neto,
+      } as (typeof data)[number])
+      data.push({
+        Fecha: 'Saldo al cierre del período', Tipo: '', Concepto: '', Categoría: '', Medio: '',
+        Monto: totales.saldoFinal ?? 0,
+        'Saldo efectivo': totales.saldoFinalEfe ?? 0,
+        'Saldo electrónico': totales.saldoFinalEle ?? 0,
+        'Saldo total': totales.saldoFinal ?? 0,
+      } as (typeof data)[number])
       const ws = XLSX.utils.json_to_sheet(data)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Caja General')
@@ -440,6 +501,51 @@ function CajaGeneralFullList() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Resumen del rango filtrado */}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-md border bg-background px-3 py-2">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-success">Ingresos del período</div>
+          <div className="text-lg font-semibold tabular-nums">{formatCurrency(totales.ingresos)}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
+            ventas depositadas y aportes
+          </div>
+        </div>
+        <div className="rounded-md border bg-background px-3 py-2">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-destructive">Egresos del período</div>
+          <div className="text-lg font-semibold tabular-nums">{formatCurrency(totales.egresos)}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
+            compras, servicios y retiros
+          </div>
+        </div>
+        <div className="rounded-md border bg-background px-3 py-2">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Resultado del período</div>
+          <div className={cn('text-lg font-semibold tabular-nums', totales.neto < 0 && 'text-destructive')}>
+            {totales.neto >= 0 ? '+' : ''}{formatCurrency(totales.neto)}
+          </div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+            efectivo {totales.variacionEfe >= 0 ? '+' : ''}{formatCurrency(totales.variacionEfe)} · electrónico {totales.variacionEle >= 0 ? '+' : ''}{formatCurrency(totales.variacionEle)}
+          </div>
+        </div>
+      </div>
+      {totales.saldoFinal != null && (
+        <div className="rounded-md border bg-background px-3 py-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Saldo al último movimiento del período
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm tabular-nums">
+              <span className="text-muted-foreground">efectivo <b className="text-foreground">{formatCurrency(totales.saldoFinalEfe ?? 0)}</b></span>
+              <span className="text-muted-foreground">electrónico <b className="text-foreground">{formatCurrency(totales.saldoFinalEle ?? 0)}</b></span>
+              <span className="text-base font-semibold">{formatCurrency(totales.saldoFinal)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+      <p className="px-1 text-[11px] text-muted-foreground">
+        {(movementsQ.data ?? []).length} movimiento(s) entre {fromIso.split('-').reverse().join('/')} y {toIso.split('-').reverse().join('/')}.
+        El saldo de arriba es el acumulado de toda la historia, no el del período.
+      </p>
     </div>
   )
 }
