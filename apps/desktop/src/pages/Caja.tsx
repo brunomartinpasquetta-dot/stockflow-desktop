@@ -568,36 +568,34 @@ export function Caja() {
   // PASO 2 del cierre — el dialog vive acá porque CajaAbierta se desmonta
   // apenas la caja queda cerrada (la query pasa a null).
   const [depositInfo, setDepositInfo] = useState<DepositInfo | null>(null)
-  const [depositAmount, setDepositAmount] = useState('0')
+  const [depositCash, setDepositCash] = useState('0')
+  // Neto de los medios no físicos del cierre: entra siempre completo.
+  const depositElectronico = useMemo(() => {
+    if (!depositInfo) return '0'
+    return depositInfo.report.byPaymentMethod
+      .filter((b) => !b.isPhysicalCash)
+      .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
+      .toFixed(2)
+  }, [depositInfo])
 
   async function confirmarDeposito(): Promise<void> {
     if (!depositInfo) return
-    const amt = parseCurrencyInput(depositAmount)
+    // Ya no hay que prorratear nada: el electrónico entra completo y el
+    // efectivo es lo que el usuario decidió llevar a la caja fuerte.
+    const cashAmount = parseCurrencyInput(depositCash)
+    const electronicAmount = depositElectronico
+    const amt = (Number(cashAmount) + Number(electronicAmount)).toFixed(2)
+    if (Number(cashAmount) < 0) {
+      toast.error('El efectivo no puede ser negativo')
+      return
+    }
+    if (Number(cashAmount) > Number(depositInfo.counted) + 0.005) {
+      toast.error(`No podés ingresar más efectivo del que contaste (${formatCurrency(depositInfo.counted)})`)
+      return
+    }
     if (Number(amt) <= 0) {
       toast.error('El monto debe ser mayor a cero')
       return
-    }
-    // Separación automática efectivo vs electrónico del depósito de cierre:
-    // el efectivo contado va como EFECTIVO y el neto de los demás medios como
-    // ELECTRÓNICO. Si el usuario ajustó el total, se reparte proporcionalmente
-    // conservando la relación efectivo/electrónico del cierre.
-    const cashPart = Number(depositInfo.counted)
-    const elecPart = depositInfo.report.byPaymentMethod
-      .filter((b) => !b.isPhysicalCash)
-      .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
-    const baseTotal = cashPart + elecPart
-    let cashAmount: string
-    let electronicAmount: string
-    if (baseTotal <= 0) {
-      cashAmount = amt
-      electronicAmount = '0.00'
-    } else if (Math.abs(Number(amt) - baseTotal) < 0.005) {
-      cashAmount = cashPart.toFixed(2)
-      electronicAmount = elecPart.toFixed(2)
-    } else {
-      const factor = Number(amt) / baseTotal
-      cashAmount = (cashPart * factor).toFixed(2)
-      electronicAmount = (Number(amt) - Number(cashAmount)).toFixed(2)
     }
     try {
       await api.cashGeneral.transferFromClosed({
@@ -625,8 +623,8 @@ export function Caja() {
       {current.data ? (
         <CajaAbierta
           registerId={current.data.id}
-          onCloseComplete={(info, proposed) => {
-            setDepositAmount(proposed)
+          onCloseComplete={(info) => {
+            setDepositCash(info.counted)
             setDepositInfo(info)
           }}
         />
@@ -634,7 +632,13 @@ export function Caja() {
         <CajaCerrada />
       )}
 
-      {/* Dialog: PASO 2 del cierre — ingreso automático a Caja General */}
+      {/* PASO 2 del cierre — ingreso a Caja General.
+          El importe electrónico NO es editable a propósito: esa plata ya está
+          en la cuenta del comercio, no puede "quedarse en el cajón". Lo único
+          ajustable es el efectivo (por si deja cambio para el día siguiente).
+          Antes había un solo campo con la suma de ambos, y al cerrar se
+          escribía el efectivo contado —el número que uno tiene delante— y la
+          parte electrónica quedaba afuera sin que nadie lo notara. */}
       <Dialog open={depositInfo !== null} onOpenChange={(o) => { if (!o) setDepositInfo(null) }}>
         <DialogContent>
           <DialogHeader>
@@ -642,25 +646,46 @@ export function Caja() {
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              La caja quedó cerrada. Confirmá el importe que ingresa a Caja General (la recaudación completa del día).
+              La caja quedó cerrada. Esto es lo que recaudó el día y pasa a Caja General.
             </p>
             {depositInfo && (
-              <div className="rounded-md bg-muted px-3 py-2 text-sm">
-                <div className="flex justify-between"><span>Efectivo contado</span><b className="tabular-nums">{formatCurrency(depositInfo.counted)}</b></div>
-                {depositInfo.report.byPaymentMethod.filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0).map((b) => (
-                  <div key={b.name} className="flex justify-between text-muted-foreground">
-                    <span>{b.name}</span><span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
+              <>
+                <div className="flex flex-col gap-1 rounded-md border bg-muted/40 px-3 py-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Cobrado con tarjeta y transferencia</span>
+                    <b className="tabular-nums">{formatCurrency(depositElectronico)}</b>
                   </div>
-                ))}
-              </div>
+                  {depositInfo.report.byPaymentMethod
+                    .filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0)
+                    .map((b) => (
+                      <div key={b.name} className="flex justify-between text-xs text-muted-foreground">
+                        <span>{b.name}</span><span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
+                      </div>
+                    ))}
+                  <span className="mt-0.5 text-[11px] text-muted-foreground">
+                    Ya está en tu cuenta: entra completo, no se puede modificar.
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="deposit-cash">Efectivo que llevás a la caja fuerte</Label>
+                  <CurrencyInput id="deposit-cash" value={depositCash} onChange={setDepositCash} />
+                  <span className="text-xs text-muted-foreground">
+                    Contaste {formatCurrency(depositInfo.counted)} en el cajón.
+                    {Number(parseCurrencyInput(depositCash)) < Number(depositInfo.counted) - 0.005 && (
+                      <> Quedan <b>{formatCurrency((Number(depositInfo.counted) - Number(parseCurrencyInput(depositCash))).toFixed(2))}</b> como cambio para mañana.</>
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-md bg-primary/10 px-3 py-2">
+                  <span className="text-sm font-medium">Total que ingresa</span>
+                  <b className="text-lg tabular-nums">
+                    {formatCurrency((Number(parseCurrencyInput(depositCash)) + Number(depositElectronico)).toFixed(2))}
+                  </b>
+                </div>
+              </>
             )}
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="deposit-amount">Importe a ingresar</Label>
-              <CurrencyInput id="deposit-amount" value={depositAmount} onChange={setDepositAmount} />
-              <span className="text-xs text-muted-foreground">
-                Podés ajustarlo si una parte no va a Caja General (ej: se deja cambio para mañana).
-              </span>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDepositInfo(null)}>No ingresar</Button>

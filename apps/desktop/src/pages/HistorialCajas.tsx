@@ -199,7 +199,6 @@ function DepositarCierreDialog({
   onClose: () => void
 }) {
   const reportQuery = useHistoricalCashReport(register.id)
-  const [amount, setAmount] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const r = reportQuery.data
@@ -207,44 +206,40 @@ function DepositarCierreDialog({
   const elecPart = (r?.byPaymentMethod ?? [])
     .filter((b) => !b.isPhysicalCash)
     .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
-  // Si ya se ingresó una parte, se propone SÓLO lo que falta.
   const yaIngresado = Number(register.depositedAmount ?? '0')
-  const proposed = Math.max(0, counted + elecPart - yaIngresado).toFixed(2)
-  const value = amount ?? proposed
 
-  async function confirmar(): Promise<void> {
-    const amt = parseCurrencyInput(value)
-    if (Number(amt) <= 0) {
-      toast.error('El monto debe ser mayor a cero')
+  // Mismo criterio que el paso 2 del cierre: lo cobrado con tarjeta y
+  // transferencia entra completo (ya está en la cuenta), y lo único que se
+  // ajusta es el efectivo. Acá además se descuenta lo que ya se ingresó.
+  const elecPendiente = Math.max(0, elecPart - Math.max(0, yaIngresado - counted))
+  const efePendiente = Math.max(0, counted - Math.min(yaIngresado, counted))
+  const [efectivo, setEfectivo] = useState(efePendiente.toFixed(2))
+  const monto = parseCurrencyInput(efectivo)
+  const totalIngresa = Number(monto) + elecPendiente
+  const excede = Number(monto) > efePendiente + 0.005
+
+  async function submit(): Promise<void> {
+    if (Number(monto) < 0) {
+      toast.error('El efectivo no puede ser negativo')
       return
     }
-    const baseTotal = counted + elecPart - yaIngresado
-    let cashAmount: string
-    let electronicAmount: string
-    if (baseTotal <= 0) {
-      cashAmount = amt
-      electronicAmount = '0.00'
-    } else if (Math.abs(Number(amt) - baseTotal) < 0.005) {
-      // Se ingresa exactamente lo que falta: el efectivo que aún no entró
-      // primero, y el resto como electrónico.
-      const efeFalta = Math.max(0, Math.min(counted - yaIngresado, baseTotal))
-      cashAmount = efeFalta.toFixed(2)
-      electronicAmount = (Number(amt) - efeFalta).toFixed(2)
-    } else {
-      const factor = Number(amt) / baseTotal
-      const efeFalta = Math.max(0, Math.min(counted - yaIngresado, baseTotal))
-      cashAmount = (efeFalta * factor).toFixed(2)
-      electronicAmount = (Number(amt) - Number(cashAmount)).toFixed(2)
+    if (excede) {
+      toast.error(`Del efectivo de ese cierre quedan ${formatCurrency(efePendiente.toFixed(2))} por ingresar`)
+      return
+    }
+    if (totalIngresa <= 0) {
+      toast.error('No queda nada por ingresar de este cierre')
+      return
     }
     setSaving(true)
     try {
       await api.cashGeneral.transferFromClosed({
         cashRegisterId: register.id,
-        amount: amt,
-        cashAmount,
-        electronicAmount,
+        amount: totalIngresa.toFixed(2),
+        cashAmount: Number(monto).toFixed(2),
+        electronicAmount: elecPendiente.toFixed(2),
       })
-      toast.success(`Ingresado ${formatCurrency(amt)} a Caja General (efectivo ${formatCurrency(cashAmount)} · electrónico ${formatCurrency(electronicAmount)})`)
+      toast.success(`Ingresado ${formatCurrency(totalIngresa.toFixed(2))} a Caja General`)
       onClose()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo ingresar a Caja General')
@@ -262,32 +257,44 @@ function DepositarCierreDialog({
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
             {yaIngresado > 0
-              ? `Del cierre de la caja #${register.number} se ingresaron ${formatCurrency(register.depositedAmount)} de ${formatCurrency(register.depositableAmount)}. Falta la diferencia.`
+              ? `Del cierre de la caja #${register.number} se ingresaron ${formatCurrency(register.depositedAmount)} de ${formatCurrency(register.depositableAmount)}.`
               : `El cierre de la caja #${register.number} (${formatDateTime(register.closeDate ?? register.openDate)}) todavía no fue ingresado a Caja General.`}
           </p>
           {reportQuery.isLoading ? (
             <div className="py-4 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : (
-            <div className="rounded-md bg-muted px-3 py-2 text-sm">
-              <div className="flex justify-between"><span>Efectivo contado</span><b className="tabular-nums">{formatCurrency(counted)}</b></div>
-              {(r?.byPaymentMethod ?? []).filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0).map((b) => (
-                <div key={b.paymentMethodId ?? b.name} className="flex justify-between text-muted-foreground">
-                  <span>{b.name}</span><span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
+            <>
+              {elecPendiente > 0.005 && (
+                <div className="flex flex-col gap-1 rounded-md border bg-muted/40 px-3 py-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Cobrado con tarjeta y transferencia</span>
+                    <b className="tabular-nums">{formatCurrency(elecPendiente.toFixed(2))}</b>
+                  </div>
+                  {(r?.byPaymentMethod ?? []).filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0).map((b) => (
+                    <div key={b.paymentMethodId ?? b.name} className="flex justify-between text-xs text-muted-foreground">
+                      <span>{b.name}</span><span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
+                    </div>
+                  ))}
+                  <span className="mt-0.5 text-[11px] text-muted-foreground">Entra completo: esa plata ya está en la cuenta.</span>
                 </div>
-              ))}
-            </div>
+              )}
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="late-deposit-cash">Efectivo a ingresar</Label>
+                <CurrencyInput id="late-deposit-cash" value={efectivo} onChange={setEfectivo} autoFocus />
+                <span className="text-xs text-muted-foreground">
+                  De ese cierre quedan {formatCurrency(efePendiente.toFixed(2))} de efectivo por ingresar.
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-md bg-primary/10 px-3 py-2">
+                <span className="text-sm font-medium">Total que ingresa</span>
+                <b className="text-lg tabular-nums">{formatCurrency(totalIngresa.toFixed(2))}</b>
+              </div>
+            </>
           )}
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="late-deposit-amount">Importe a ingresar</Label>
-            <CurrencyInput id="late-deposit-amount" value={value} onChange={setAmount} />
-            <span className="text-xs text-muted-foreground">
-              Podés ajustarlo si una parte no fue a Caja General.
-            </span>
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => void confirmar()} disabled={saving || reportQuery.isLoading}>
+          <Button onClick={() => void submit()} disabled={saving || reportQuery.isLoading || excede}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Confirmar ingreso
           </Button>
