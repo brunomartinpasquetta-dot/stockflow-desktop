@@ -1,4 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom'
+
+import { useLanContext } from '@/contexts/LanContext'
 import { Loader2 } from 'lucide-react'
 
 import { useLicenseStatus } from '@/contexts/LicenseContext'
@@ -9,6 +11,20 @@ import { useLicenseStatus } from '@/contexts/LicenseContext'
  */
 export function LicenseGuard() {
   const status = useLicenseStatus()
+  const { mode, online, serverLicense } = useLanContext()
+
+  // Un puesto conectado a un servidor NO tiene licencia propia: trabaja
+  // amparado por la del servidor (una licencia por comercio). Mandarlo a
+  // activar sería pedirle una clave que no existe.
+  if (mode === 'client') {
+    if (serverLicense === 'revoked' || serverLicense === 'unlicensed') {
+      return <Navigate to="/activacion" replace />
+    }
+    // Sin conexión no puede operar, pero eso lo resuelve `useCanWrite`
+    // (modo lectura) — no hay que echarlo a la pantalla de activación.
+    void online
+    return <Outlet />
+  }
 
   if (status === 'loading') {
     return (

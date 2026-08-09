@@ -494,6 +494,8 @@ export function createApiBridge(
       setMode: (p) => c<never>('lan:setMode', p),
       testConnection: (p) => c<never>('lan:testConnection', p),
       scanNetwork: () => c<never>('lan:scanNetwork'),
+      openFirewall: () => c<never>('lan:openFirewall'),
+      diagnose: () => c<never>('lan:diagnose'),
       getConnectedClients: () => c<never>('lan:getConnectedClients'),
       applyAndRestart: () => c<never>('lan:applyAndRestart'),
     },

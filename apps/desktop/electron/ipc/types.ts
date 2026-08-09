@@ -1907,6 +1907,8 @@ export interface ApiSurface {
     testConnection(payload: { ip: string; port: number; token?: string }): Res<{ ok: boolean; latencyMs?: number; error?: string }>;
     scanNetwork(): Res<{ supported: boolean; results: { ip: string; port: number; name?: string }[] }>;
     getConnectedClients(): Res<{ ip: string; lastSeen: number }[]>;
+    openFirewall(): Res<{ ok: boolean; needsAdmin?: boolean; command?: string; error?: string }>;
+    diagnose(): Res<{ checks: { id: string; label: string; ok: boolean; detail: string; fix?: 'openFirewall' }[]; allOk: boolean }>;
     applyAndRestart(): Res<{ ok: true }>;
   };
   mpQr: {

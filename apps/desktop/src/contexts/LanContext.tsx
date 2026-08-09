@@ -16,6 +16,8 @@ interface LanContextValue {
   config: LanConfigDTO | undefined
   mode: LanModeDTO | undefined
   online: boolean
+  /** Estado de la licencia del SERVIDOR (sólo en modo cliente). */
+  serverLicense?: string | null
   lastPingAt: number | null
   lastError: string | null
 }
@@ -36,6 +38,7 @@ export function LanProvider({ children }: { children: ReactNode }) {
   const isClient = cfg?.mode === 'client'
 
   const [online, setOnline] = useState<boolean>(true)
+  const [serverLicense, setServerLicense] = useState<string | null>(null)
   const [lastPingAt, setLastPingAt] = useState<number | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
 
@@ -48,6 +51,7 @@ export function LanProvider({ children }: { children: ReactNode }) {
       const r = await api.lan.pingServer(cfg.serverIp!, cfg.serverPort!)
       if (cancelled) return
       setOnline(r.ok)
+      setServerLicense(r.ok ? (r.license ?? 'active') : null)
       setLastPingAt(Date.now())
       setLastError(r.ok ? null : 'Sin conexión con el servidor')
     }
@@ -64,10 +68,11 @@ export function LanProvider({ children }: { children: ReactNode }) {
       config: cfg,
       mode: cfg?.mode,
       online: isClient ? online : true,
+      serverLicense,
       lastPingAt,
       lastError,
     }),
-    [cfg, isClient, online, lastPingAt, lastError],
+    [cfg, isClient, online, serverLicense, lastPingAt, lastError],
   )
 
   return <LanContext.Provider value={value}>{children}</LanContext.Provider>

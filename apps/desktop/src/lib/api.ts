@@ -508,20 +508,25 @@ export const api = {
     testConnection: (ip: string, port: number, token?: string) =>
       unwrap(sf().lan.testConnection({ ip, port, token })),
     scanNetwork: () => unwrap(sf().lan.scanNetwork()),
+    openFirewall: () => unwrap(sf().lan.openFirewall()),
+    diagnose: () => unwrap(sf().lan.diagnose()),
     getConnectedClients: () => unwrap(sf().lan.getConnectedClients()),
     applyAndRestart: () => unwrap(sf().lan.applyAndRestart()),
     /**
      * Ping directo desde el renderer (HTTP GET /lan/ping al server LAN).
      * No usa IPC: el renderer puede hacer fetch sin CORS issues (server permite *).
      */
-    pingServer: async (ip: string, port: number, timeoutMs = 3000): Promise<{ ok: boolean; latencyMs?: number }> => {
+    pingServer: async (ip: string, port: number, timeoutMs = 3000): Promise<{ ok: boolean; latencyMs?: number; license?: string }> => {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), timeoutMs)
       const start = Date.now()
       try {
         const res = await fetch(`http://${ip}:${port}/lan/ping`, { signal: controller.signal })
         if (!res.ok) return { ok: false }
-        return { ok: true, latencyMs: Date.now() - start }
+        // El servidor informa su licencia: el puesto no tiene una propia y
+        // trabaja amparado por ella (una licencia por comercio).
+        const body = (await res.json().catch(() => ({}))) as { license?: string }
+        return { ok: true, latencyMs: Date.now() - start, license: body.license }
       } catch {
         return { ok: false }
       } finally {

@@ -269,6 +269,7 @@ function bootstrap(): { lanArgs: string[] } {
       token: lanCfg.token,
       enableMdns: true,
       sessionStore,
+      licenseStatus: () => licenseManager?.getState().status ?? 'unlicensed',
       resolveUser: async (userId: string) => {
         const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
         if (!u) return null;

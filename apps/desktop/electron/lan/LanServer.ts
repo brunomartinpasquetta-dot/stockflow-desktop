@@ -43,6 +43,12 @@ export interface LanServerOptions {
   enableMdns?: boolean;
   /** Duración del JWT en segundos (default 12h). */
   jwtExpiresInSec?: number;
+  /**
+   * Estado de la licencia de ESTE servidor. Los puestos conectados no tienen
+   * licencia propia: trabajan amparados por la del servidor (una licencia por
+   * comercio), así que necesitan poder consultarla.
+   */
+  licenseStatus?: () => 'active' | 'readOnly' | 'unlicensed' | 'revoked';
 }
 
 interface UserLite {
@@ -233,7 +239,11 @@ export class LanServer {
     }
     if (req.method === 'GET' && req.url === '/lan/ping') {
       this.touchClient(req);
-      sendJson(res, 200, { ok: true, timestamp: Date.now() });
+      sendJson(res, 200, {
+        ok: true,
+        timestamp: Date.now(),
+        license: this.opts.licenseStatus ? this.opts.licenseStatus() : 'active',
+      });
       return;
     }
     if (req.method !== 'POST' || req.url !== '/lan/rpc') {

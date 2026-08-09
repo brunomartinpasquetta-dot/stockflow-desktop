@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+
+import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, RefreshCcw, AlertTriangle, Trash2 } from 'lucide-react'
 
@@ -662,6 +664,39 @@ function LanSection() {
   const [clientPort, setClientPort] = useState<number>(7777)
   const [seeded, setSeeded] = useState<unknown>(undefined)
   const [testing, setTesting] = useState(false)
+  const [diag, setDiag] = useState<{ checks: { id: string; label: string; ok: boolean; detail: string; fix?: 'openFirewall' }[]; allOk: boolean } | null>(null)
+  const [diagBusy, setDiagBusy] = useState(false)
+  const [fwBusy, setFwBusy] = useState(false)
+
+  async function correrDiagnostico(): Promise<void> {
+    setDiagBusy(true)
+    try {
+      setDiag(await api.lan.diagnose())
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo revisar la red')
+    } finally {
+      setDiagBusy(false)
+    }
+  }
+
+  async function habilitarPuerto(): Promise<void> {
+    setFwBusy(true)
+    try {
+      const r = await api.lan.openFirewall()
+      if (r.ok) {
+        toast.success('Puerto habilitado en el firewall')
+        setDiag(await api.lan.diagnose())
+      } else if (r.needsAdmin) {
+        toast.error('Abrí StockFlow como administrador para habilitar el puerto')
+      } else {
+        toast.error(r.error ?? 'No se pudo habilitar el puerto')
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo habilitar el puerto')
+    } finally {
+      setFwBusy(false)
+    }
+  }
   const [testResult, setTestResult] = useState<string | null>(null)
 
   if (cfgQuery.data && seeded !== cfgQuery.data) {
@@ -787,6 +822,41 @@ function LanSection() {
             </p>
           </div>
         )}
+
+        {/* Chequeo de red: dice qué falta para que los otros puestos conecten.
+            El firewall de Windows bloquea el puerto por defecto y es la causa
+            número uno de que una instalación multi-puesto no funcione. */}
+        <div className="flex flex-col gap-2 rounded-md border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">Chequeo de red</span>
+            <Button variant="outline" size="sm" type="button" onClick={() => void correrDiagnostico()} disabled={diagBusy}>
+              {diagBusy && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+              Revisar
+            </Button>
+          </div>
+          {diag && (
+            <div className="flex flex-col gap-1.5">
+              {diag.checks.map((c) => (
+                <div key={c.id} className="flex items-start gap-2 text-xs">
+                  <span className={cn('mt-0.5 font-bold', c.ok ? 'text-success' : 'text-destructive')}>
+                    {c.ok ? '\u2713' : '\u2715'}
+                  </span>
+                  <div className="flex flex-1 flex-col">
+                    <span className="font-medium">{c.label}</span>
+                    <span className="text-muted-foreground">{c.detail}</span>
+                  </div>
+                  {c.fix === 'openFirewall' && (
+                    <Button variant="outline" size="sm" type="button" onClick={() => void habilitarPuerto()} disabled={fwBusy}>
+                      {fwBusy && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                      Habilitar
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {diag.allOk && <span className="text-xs text-success">Todo listo para trabajar en red.</span>}
+            </div>
+          )}
+        </div>
 
         {mode === 'client' && (
           <div className="flex flex-col gap-2 rounded-md border p-3">

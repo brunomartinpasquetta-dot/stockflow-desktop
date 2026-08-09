@@ -52,9 +52,11 @@ export function useLicense(): LicenseContextValue {
  */
 export function useCanWrite(): boolean {
   const { state } = useLicense()
-  const { mode, online } = useLanContext()
+  const { mode, online, serverLicense } = useLanContext()
+  // En un puesto manda la licencia del SERVIDOR, no la local (que no existe).
+  // Sin conexión queda en sólo lectura: no puede escribir a ciegas.
+  if (mode === 'client') return online && serverLicense === 'active'
   if (state?.status !== 'active') return false
-  if (mode === 'client' && !online) return false
   return true
 }
 

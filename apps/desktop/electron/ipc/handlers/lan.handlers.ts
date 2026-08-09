@@ -9,7 +9,13 @@
  * El switch de modo NO arranca/detiene el server en caliente — exige reinicio
  * para tomar la nueva config. Es la forma más segura.
  */
+import { execFile } from 'node:child_process';
+import os from 'node:os';
+import { promisify } from 'node:util';
+
 import { requirePermission } from '@stockflow/core';
+
+const execFileP = promisify(execFile);
 
 import { LanManager } from '../../lan/LanManager';
 import type { LanConfig, LanMode } from '../../lan/types';
@@ -43,6 +49,20 @@ async function pingServer(ip: string, port: number, timeoutMs = 3000): Promise<L
   }
 }
 
+export interface LanCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+  /** Acción que puede arreglarlo desde la app. */
+  fix?: 'openFirewall';
+}
+
+export interface LanDiagnosis {
+  checks: LanCheck[];
+  allOk: boolean;
+}
+
 export interface LanSetModeInput {
   mode: LanMode;
   /** Sólo modo client: */
@@ -52,6 +72,41 @@ export interface LanSetModeInput {
   token?: string;
   /** Sólo modo server: puerto (default 7777). */
   port?: number;
+}
+
+/**
+ * Regla de firewall de Windows para el puerto del servidor.
+ *
+ * Sin esto los otros puestos NO se conectan: Windows bloquea el puerto entrante
+ * por defecto y el aviso de "Permitir acceso" a veces no aparece (o se rechaza
+ * sin querer). Es la causa número uno de que una instalación en red no ande.
+ */
+async function firewallRuleState(port: number): Promise<'present' | 'absent' | 'unsupported'> {
+  if (process.platform !== 'win32') return 'unsupported';
+  try {
+    const { stdout } = await execFileP('netsh', [
+      'advfirewall', 'firewall', 'show', 'rule', `name=StockFlow ${port}`,
+    ]);
+    return /LocalPort/i.test(stdout) ? 'present' : 'absent';
+  } catch {
+    return 'absent';
+  }
+}
+
+async function addFirewallRule(port: number): Promise<{ ok: boolean; needsAdmin?: boolean; error?: string }> {
+  if (process.platform !== 'win32') return { ok: true };
+  try {
+    await execFileP('netsh', [
+      'advfirewall', 'firewall', 'add', 'rule',
+      `name=StockFlow ${port}`, 'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`,
+    ]);
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // netsh devuelve "Acceso denegado" / "requires elevation" sin permisos.
+    const needsAdmin = /denegado|denied|elevat|administrador|administrator/i.test(msg);
+    return { ok: false, needsAdmin, error: msg };
+  }
 }
 
 function getManager(deps: HandlerDeps): LanManager {
@@ -124,6 +179,80 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
         return { ok: true };
       },
     ),
+    /** Abre el puerto del servidor en el firewall de Windows. */
+    'lan:openFirewall': unguarded(
+      deps,
+      async (): Promise<{ ok: boolean; needsAdmin?: boolean; command?: string; error?: string }> => {
+        const cfg = getManager(deps).getConfig();
+        const port = cfg.port ?? DEFAULT_LAN_PORT;
+        const res = await addFirewallRule(port);
+        return {
+          ...res,
+          command: `netsh advfirewall firewall add rule name="StockFlow ${port}" dir=in action=allow protocol=TCP localport=${port}`,
+        };
+      },
+    ),
+    /**
+     * Chequeo de red para una instalación multi-puesto: dice qué está bien y
+     * qué falta, en criollo, para no tener que adivinar en el local del cliente.
+     */
+    'lan:diagnose': unguarded(deps, async (): Promise<LanDiagnosis> => {
+      const cfg = getManager(deps).getConfig();
+      const port = cfg.port ?? DEFAULT_LAN_PORT;
+      const checks: LanCheck[] = [];
+
+      checks.push({
+        id: 'modo',
+        label: 'Modo de esta PC',
+        ok: true,
+        detail: cfg.mode === 'server' ? 'Servidor (guarda los datos)'
+          : cfg.mode === 'client' ? `Puesto conectado a ${cfg.serverIp ?? '?'}:${cfg.serverPort ?? port}`
+          : 'PC única (sin red)',
+      });
+
+      const ips = Object.values(os.networkInterfaces())
+        .flat()
+        .filter((n): n is os.NetworkInterfaceInfo => !!n && n.family === 'IPv4' && !n.internal)
+        .map((n) => n.address);
+      checks.push({
+        id: 'ip',
+        label: 'Dirección de esta PC en la red',
+        ok: ips.length > 0,
+        detail: ips.length ? ips.join(', ') : 'Sin red: revisá el cable o el WiFi',
+      });
+
+      if (cfg.mode === 'server') {
+        const fw = await firewallRuleState(port);
+        checks.push({
+          id: 'firewall',
+          label: `Puerto ${port} habilitado en el firewall`,
+          ok: fw !== 'absent',
+          detail: fw === 'present' ? 'Habilitado'
+            : fw === 'unsupported' ? 'No aplica en este sistema'
+            : 'FALTA: los otros puestos no van a poder conectarse',
+          fix: fw === 'absent' ? 'openFirewall' : undefined,
+        });
+        checks.push({
+          id: 'pin',
+          label: 'PIN para los otros puestos',
+          ok: !!cfg.token,
+          detail: cfg.token ?? 'Sin PIN: volvé a guardar el modo servidor',
+        });
+      }
+
+      if (cfg.mode === 'client' && cfg.serverIp) {
+        const ping = await pingServer(cfg.serverIp, cfg.serverPort ?? port);
+        checks.push({
+          id: 'conexion',
+          label: 'Conexión con el servidor',
+          ok: ping.ok,
+          detail: ping.ok ? `Responde en ${ping.latencyMs} ms`
+            : `Sin respuesta (${ping.error ?? '—'}). Revisá que el servidor esté encendido y el firewall abierto.`,
+        });
+      }
+
+      return { checks, allOk: checks.every((c) => c.ok) };
+    }),
     'lan:setMode': unguarded(
       deps,
       async (payload: LanSetModeInput): Promise<{ requiresRestart: true; config: LanConfig }> => {
