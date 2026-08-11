@@ -383,41 +383,54 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         if stock and Decimal(str(stock)) < 0:
             rep.aviso(f"stock negativo en '{desc[:30]}' ({stock}) -> se carga 0")
             stock = 0
-        precio = r.get(precio_venta) or r.get("PRECIO1") or 0
+        # Mapeo confirmado con el comercio:
+        #   PRECIO1 = costo | PRECIO2 = venta al público | PRECIO3/4 = listas
+        #   especiales (mayorista, etc.)
+        #
+        # Los dos sistemas guardan los precios CON IVA INCLUIDO (StockFlow
+        # trabaja en modo 'gross' por defecto: el precio cargado es el que paga
+        # el cliente). Por eso NO se divide por el IVA: hacerlo dejaría todo el
+        # catálogo 21% más barato, que es el error clásico de estas migraciones.
+        costo = r["PRECIO1"] or 0
+        venta = r.get(precio_venta) or r["PRECIO2"] or 0
         iva = dec(r["IVA"], 2) if r["IVA"] is not None else "21.00"
-        neto = precio
-        if iva_incluido and precio and Decimal(str(iva)) > 0:
-            neto = Decimal(str(precio)) / (1 + Decimal(str(iva)) / 100)
+        if not iva_incluido:
+            # El comercio declaró precios SIN IVA: se le agrega para guardarlos
+            # como precio final, que es como los muestra StockFlow.
+            f = 1 + Decimal(str(iva)) / 100
+            costo = Decimal(str(costo)) * f
+            venta = Decimal(str(venta)) * f
+            lista2 = Decimal(str(r["PRECIO3"] or 0)) * f
+            lista3 = Decimal(str(r["PRECIO4"] or 0)) * f
+            mayor = Decimal(str(r["PRECIOU"] or 0)) * f
+        else:
+            lista2 = r["PRECIO3"] or 0
+            lista3 = r["PRECIO4"] or 0
+            mayor = r["PRECIOU"] or 0
         aid = uuid7()
         try:
-            # StockFácil trae hasta 5 precios; StockFlow tiene 3 listas + mayorista
-            def sin_iva(v):
-                if not v:
-                    return dec(0)
-                return dec(Decimal(str(v)) / (1 + Decimal(str(iva)) / 100)
-                           if iva_incluido and Decimal(str(iva)) > 0 else v)
             sq.execute(
                 "INSERT INTO articles (id,barcode,description,brand,family_id,vat_rate,"
                 "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
-                "active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
                 (aid, barcode[:40], desc[:120], txt(r["MARCA"])[:40] or None,
-                 fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva, dec(0),
-                 dec(neto), sin_iva(r["PRECIO2"]), sin_iva(r["PRECIO3"]),
-                 sin_iva(r["PRECIOU"]), dec(stock, 3), ahora, ahora))
+                 fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva,
+                 dec(costo), dec(venta), dec(lista2), dec(lista3), dec(mayor),
+                 dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), ahora, ahora))
             art_id[r["IDARTICULO"]] = aid
             rep.suma("Artículos", 1)
         except sqlite3.IntegrityError:
             # No debería pasar con el código interno; si pasa, se reintenta.
             try:
-                alt = f"INT-{(r['IDARTICULO'] or 0):06d}-{len(art_id)}"
+                alt = ean13_interno((r["IDARTICULO"] or 0) + 5_000_000)
                 sq.execute(
                     "INSERT INTO articles (id,barcode,description,brand,family_id,vat_rate,"
                     "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
-                    "active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                    "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
                     (aid, alt, desc[:120], txt(r["MARCA"])[:40] or None,
-                     fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva, dec(0),
-                     dec(neto), sin_iva(r["PRECIO2"]), sin_iva(r["PRECIO3"]),
-                     sin_iva(r["PRECIOU"]), dec(stock, 3), ahora, ahora))
+                     fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva,
+                     dec(costo), dec(venta), dec(lista2), dec(lista3), dec(mayor),
+                     dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), ahora, ahora))
                 art_id[r["IDARTICULO"]] = aid
                 rep.suma("Artículos", 1)
             except sqlite3.Error as e:
