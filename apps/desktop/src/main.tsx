@@ -21,6 +21,13 @@ if (navigator.userAgent.includes('Windows')) {
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('No se encontró el elemento #root')
 
+// Si la página la sirvió el servidor (puesto que entra por navegador), no hay
+// preload de Electron que arme `window.stockflow`: lo monta el puente web.
+if (!window.stockflow) {
+  const { instalarPuenteWeb } = await import('@/web/webBridge')
+  instalarPuenteWeb()
+}
+
 subscribeToDataChanges()
 
 createRoot(rootEl).render(

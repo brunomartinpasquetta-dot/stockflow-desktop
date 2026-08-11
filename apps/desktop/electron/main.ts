@@ -270,6 +270,11 @@ function bootstrap(): { lanArgs: string[] } {
       enableMdns: true,
       sessionStore,
       licenseStatus: () => licenseManager?.getState().status ?? 'unlicensed',
+      // La misma interfaz que usa la app, servida para que un puesto entre por
+      // navegador (necesario en PC donde Electron ya no corre, ej. Windows 7).
+      // getAppPath() apunta al .asar empaquetado y a apps/desktop en
+      // desarrollo: la interfaz compilada vive en dist/ en los dos casos.
+      webRoot: path.join(app.getAppPath(), 'dist'),
       resolveUser: async (userId: string) => {
         const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
         if (!u) return null;

@@ -25,11 +25,30 @@
  *  - mDNS via `bonjour-service` cargado dinámicamente (opcional).
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { existsSync, statSync, promises as fsp } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import path from 'node:path';
 
 import type { HandlerMap } from '../ipc/handler-context';
 import type { SessionStore } from '../ipc/session-store';
 import type { IpcResponse } from '../ipc/types';
+
+interface InfoCliente {
+  lastSeen: number;
+  usuario?: string;
+  ultimaAccion?: string;
+  via?: 'app' | 'navegador';
+  operaciones?: number;
+}
+
+export interface ClienteConectado {
+  ip: string;
+  lastSeen: number;
+  usuario: string | null;
+  ultimaAccion: string | null;
+  via: 'app' | 'navegador';
+  operaciones: number;
+}
 
 export interface LanServerOptions {
   handlers: HandlerMap;
@@ -49,6 +68,8 @@ export interface LanServerOptions {
    * comercio), así que necesitan poder consultarla.
    */
   licenseStatus?: () => 'active' | 'readOnly' | 'unlicensed' | 'revoked';
+  /** Carpeta con la interfaz compilada, para servirla al navegador. */
+  webRoot?: string;
 }
 
 interface UserLite {
@@ -163,7 +184,9 @@ export class LanServer {
   private bonjourService: { stop: (cb?: () => void) => void } | null = null;
   private readonly log: NonNullable<LanServerOptions['log']>;
   /** ip -> lastSeen ms; ping y rpc actualizan. */
-  private readonly clients = new Map<string, number>();
+  private readonly clients = new Map<string, InfoCliente>();
+  /** Última vez que cambiaron los datos (para que los puestos web refresquen). */
+  private ultimoCambio = Date.now();
 
   constructor(opts: LanServerOptions) {
     this.opts = opts;
@@ -211,21 +234,100 @@ export class LanServer {
     });
   }
 
-  /** Lista de IPs vistas en los últimos `PING_TTL_MS` (60s). */
-  getConnectedClients(): { ip: string; lastSeen: number }[] {
+  /**
+   * Puestos vistos últimamente, con lo que se sabe de cada uno. Sirve para el
+   * panel de terminales: dice si hay comunicación y quién está trabajando en
+   * cada máquina, que es lo que hace falta para diagnosticar sin ir a mirar.
+   */
+  getConnectedClients(): ClienteConectado[] {
     const now = Date.now();
-    const result: { ip: string; lastSeen: number }[] = [];
-    for (const [ip, lastSeen] of this.clients) {
-      if (now - lastSeen <= PING_TTL_MS) result.push({ ip, lastSeen });
-      else this.clients.delete(ip);
+    const result: ClienteConectado[] = [];
+    for (const [ip, info] of this.clients) {
+      if (now - info.lastSeen > PING_TTL_MS) {
+        this.clients.delete(ip);
+        continue;
+      }
+      result.push({
+        ip,
+        lastSeen: info.lastSeen,
+        usuario: info.usuario ?? null,
+        ultimaAccion: info.ultimaAccion ?? null,
+        via: info.via ?? 'app',
+        operaciones: info.operaciones ?? 0,
+      });
     }
-    return result;
+    return result.sort((a, b) => b.lastSeen - a.lastSeen);
   }
 
-  private touchClient(req: IncomingMessage): void {
+  private touchClient(req: IncomingMessage, extra?: Partial<InfoCliente>): void {
     const remote = req.socket.remoteAddress ?? '';
     if (!remote || !isLanRemote(remote)) return;
-    this.clients.set(remote, Date.now());
+    const prev = this.clients.get(remote);
+    this.clients.set(remote, {
+      lastSeen: Date.now(),
+      usuario: extra?.usuario ?? prev?.usuario,
+      ultimaAccion: extra?.ultimaAccion ?? prev?.ultimaAccion,
+      via: extra?.via ?? prev?.via ?? 'app',
+      operaciones: (prev?.operaciones ?? 0) + (extra?.ultimaAccion ? 1 : 0),
+    });
+  }
+
+  /**
+   * Sirve la interfaz web. Cualquier ruta que no sea un archivo cae en
+   * index.html, porque el ruteo lo hace la propia interfaz en el navegador.
+   */
+  private async servirEstatico(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+    const raiz = this.opts.webRoot;
+    if (!raiz) return false;
+    const pedido = decodeURIComponent((req.url ?? '/').split('?')[0] ?? '/');
+    if (pedido.startsWith('/lan/')) return false;
+
+    const candidato = pedido === '/' ? 'index.html' : pedido.replace(/^\/+/, '');
+    // Nunca salir de la carpeta servida.
+    const destino = path.resolve(raiz, candidato);
+    if (!destino.startsWith(path.resolve(raiz))) {
+      sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Ruta inválida' });
+      return true;
+    }
+
+    let archivo = destino;
+    if (!existsSync(archivo) || statSync(archivo).isDirectory()) {
+      archivo = path.join(raiz, 'index.html');
+      if (!existsSync(archivo)) return false;
+    }
+    const ext = path.extname(archivo).toLowerCase();
+    const tipos: Record<string, string> = {
+      '.html': 'text/html; charset=utf-8',
+      '.js': 'text/javascript; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.svg': 'image/svg+xml',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.ico': 'image/x-icon',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+      '.pdf': 'application/pdf',
+    };
+    try {
+      const contenido = await fsp.readFile(archivo);
+      res.writeHead(200, {
+        'Content-Type': tipos[ext] ?? 'application/octet-stream',
+        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(contenido);
+      this.touchClient(req, { via: 'navegador' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Marca que hubo un cambio de datos, para que los puestos web refresquen. */
+  private marcarCambio(): void {
+    this.ultimoCambio = Date.now();
   }
 
   private get jwtSecret(): string {
@@ -245,6 +347,21 @@ export class LanServer {
         license: this.opts.licenseStatus ? this.opts.licenseStatus() : 'active',
       });
       return;
+    }
+    // Los puestos que entran por navegador preguntan acá si hubo cambios, para
+    // refrescar la pantalla cuando otro puesto carga una venta (en la app
+    // instalada eso llega por IPC, que en una pestaña no existe).
+    if (req.method === 'GET' && req.url?.startsWith('/lan/changes')) {
+      this.touchClient(req, { via: 'navegador' });
+      const desde = Number(new URL(req.url, 'http://x').searchParams.get('since') ?? 0);
+      sendJson(res, 200, { changed: this.ultimoCambio > desde, at: this.ultimoCambio });
+      return;
+    }
+    // La interfaz servida al navegador. Permite que una PC vieja (Windows 7,
+    // donde Electron ya no arranca) trabaje sin instalar nada.
+    if (req.method === 'GET' && this.opts.webRoot) {
+      const servido = await this.servirEstatico(req, res);
+      if (servido) return;
     }
     if (req.method !== 'POST' || req.url !== '/lan/rpc') {
       sendJson(res, 404, { ok: false, code: 'NOT_FOUND', message: 'Ruta inexistente' });
@@ -315,6 +432,15 @@ export class LanServer {
       }
     }
 
+    // Queda registrado quién trabaja en cada puesto y qué hizo último, para
+    // que el panel de terminales sirva de verdad para diagnosticar.
+    this.touchClient(req, {
+      usuario: (jwtUser as { fullName?: string; username?: string } | null)?.fullName
+        ?? (jwtUser as { username?: string } | null)?.username,
+      ultimaAccion: channel,
+      via: /Mozilla/i.test(String(req.headers['user-agent'] ?? '')) ? 'navegador' : 'app',
+    });
+
     try {
       let response: IpcResponse<unknown>;
       if (needsAuth && jwtUser && this.opts.sessionStore) {
@@ -325,6 +451,11 @@ export class LanServer {
         )) as IpcResponse<unknown>;
       } else {
         response = (await handler(parsed.payload)) as IpcResponse<unknown>;
+      }
+
+      // Si fue una escritura, avisar a los puestos web que refresquen.
+      if (response.ok && /^(create|update|delete|void|add|receive|pay|transfer|open|close|apply|adjust|register|reset)/i.test(channel.split(':')[1] ?? '')) {
+        this.marcarCambio();
       }
 
       // En auth:login ok: firmar JWT y adjuntarlo al data.

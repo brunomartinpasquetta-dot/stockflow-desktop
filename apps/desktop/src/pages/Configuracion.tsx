@@ -664,6 +664,12 @@ function LanSection() {
   const [clientPort, setClientPort] = useState<number>(7777)
   const [seeded, setSeeded] = useState<unknown>(undefined)
   const [testing, setTesting] = useState(false)
+  const terminales = useQuery({
+    queryKey: ['lan', 'terminales'],
+    queryFn: () => api.lan.getConnectedClients(),
+    refetchInterval: 5000,
+    enabled: mode === 'server',
+  })
   const [diag, setDiag] = useState<{ checks: { id: string; label: string; ok: boolean; detail: string; fix?: 'openFirewall' }[]; allOk: boolean } | null>(null)
   const [diagBusy, setDiagBusy] = useState(false)
   const [fwBusy, setFwBusy] = useState(false)
@@ -820,6 +826,46 @@ function LanSection() {
                 </>
               )}
             </p>
+          </div>
+        )}
+
+        {/* Terminales conectadas: para saber de un vistazo si hay comunicación
+            entre las PC, quién está trabajando en cada una y desde cuándo no
+            se sabe nada de alguna. Sólo tiene sentido en el servidor. */}
+        {mode === 'server' && (
+          <div className="flex flex-col gap-2 rounded-md border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">Terminales conectadas</span>
+              <span className="text-xs text-muted-foreground">se actualiza solo</span>
+            </div>
+            {(terminales.data ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Ninguna terminal se comunicó en el último minuto. Si deberían estar trabajando,
+                revisá el firewall del servidor y que estén en la misma red.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {(terminales.data ?? []).map((t) => {
+                  const hace = Math.round((Date.now() - t.lastSeen) / 1000)
+                  const viva = hace < 60
+                  return (
+                    <div key={t.ip} className="flex items-center gap-2 rounded border bg-background px-2 py-1.5 text-xs">
+                      <span className={cn('h-2 w-2 shrink-0 rounded-full', viva ? 'bg-success' : 'bg-destructive')} />
+                      <span className="font-mono">{t.ip}</span>
+                      <span className="text-muted-foreground">
+                        {t.via === 'navegador' ? 'por navegador' : 'app instalada'}
+                      </span>
+                      <span className="flex-1 truncate text-muted-foreground">
+                        {t.usuario ? `— ${t.usuario}` : '— sin sesión iniciada'}
+                      </span>
+                      <span className={cn('shrink-0', viva ? 'text-success' : 'text-destructive')}>
+                        {viva ? (hace < 10 ? 'activa' : `hace ${hace}s`) : 'sin respuesta'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

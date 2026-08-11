@@ -49,6 +49,16 @@ async function pingServer(ip: string, port: number, timeoutMs = 3000): Promise<L
   }
 }
 
+export interface TerminalConectada {
+  ip: string;
+  /** Último contacto (ms). Si pasa de un minuto, el puesto se da por caído. */
+  lastSeen: number;
+  usuario: string | null;
+  ultimaAccion: string | null;
+  via: 'app' | 'navegador';
+  operaciones: number;
+}
+
 export interface LanCheck {
   id: string;
   label: string;
@@ -166,8 +176,8 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
     ),
     'lan:getConnectedClients': unguarded(
       deps,
-      async (): Promise<{ ip: string; lastSeen: number }[]> => {
-        return extras.getConnectedClients?.() ?? [];
+      async (): Promise<TerminalConectada[]> => {
+        return (extras.getConnectedClients?.() ?? []) as TerminalConectada[];
       },
     ),
     'lan:applyAndRestart': unguarded(
