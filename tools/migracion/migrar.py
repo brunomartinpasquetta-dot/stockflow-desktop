@@ -105,6 +105,17 @@ def letra(v, default: str = "X") -> str:
     return default
 
 
+def ean13_interno(n: int) -> str:
+    """Código de barras EAN-13 válido para un artículo sin código de fábrica.
+
+    Usa el prefijo 2, que el estándar reserva justamente para uso interno del
+    comercio. Lleva dígito verificador real, así que cualquier lector lo lee y
+    se puede imprimir la etiqueta."""
+    base = f"2{n:011d}"[:12]
+    suma = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(base))
+    return base + str((10 - suma % 10) % 10)
+
+
 def categoria_iva(v) -> str:
     """CATEGORIA de StockFácil → categoría fiscal de StockFlow."""
     s = txt(v).upper()
@@ -350,15 +361,25 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
 
     # ---- ARTÍCULOS ----
     art_id: dict[int, str] = {}
-    campos_art = ["IDARTICULO", "CODIGO", "CODIGO2", "DETALLE", "MARCA", "IVA",
+    barcodes_usados: set[str] = set()
+    campos_art = ["IDARTICULO", "CODIGO", "CODIGO2", "INTCOD", "DETALLE", "MARCA", "IVA",
                   "PRECIO1", "PRECIO2", "PRECIO3", "PRECIO4", "PRECIOU",
-                  "CANTIDAD1", "CLASIFICACION"]
+                  "STOCK", "STOCKMIN", "FAMILIA", "CLASIFICACION", "OBSERVA"]
     for r in leer(con, "ARTICULO", campos_art) if "ARTICULO" in hay else []:
-        desc = txt(r["DETALLE"])
-        if not desc:
-            continue
-        barcode = txt(r["CODIGO2"]) or txt(r["CODIGO"]) or f"INT-{(r['IDARTICULO'] or 0):06d}"
-        stock = r["CANTIDAD1"] or 0
+        desc = txt(r["DETALLE"]) or f"Artículo sin descripción #{r['IDARTICULO']}"
+        # El código tiene que ser único. En bases reales hay miles de artículos
+        # con el mismo CODIGO ('0000', vacío) porque el comercio nunca los
+        # numeró: a esos se les da un código interno derivado de su id, así no
+        # se pierde ni un artículo.
+        # Código de barras: se respeta el del fabricante si lo tiene; si no
+        # (acá NINGUNO lo tenía) se genera un EAN-13 interno válido, para que
+        # el comercio pueda imprimir etiquetas y usar el lector.
+        cand = txt(r["CODIGO2"])
+        if not cand or cand in barcodes_usados or set(cand) <= {"0"}:
+            cand = ean13_interno(r["IDARTICULO"] or 0)
+        barcode = cand
+        barcodes_usados.add(barcode)
+        stock = r["STOCK"] or 0
         if stock and Decimal(str(stock)) < 0:
             rep.aviso(f"stock negativo en '{desc[:30]}' ({stock}) -> se carga 0")
             stock = 0
@@ -380,13 +401,27 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
                 "active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
                 (aid, barcode[:40], desc[:120], txt(r["MARCA"])[:40] or None,
-                 fam_id.get(txt(r["CLASIFICACION"])), iva, dec(0),
+                 fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva, dec(0),
                  dec(neto), sin_iva(r["PRECIO2"]), sin_iva(r["PRECIO3"]),
                  sin_iva(r["PRECIOU"]), dec(stock, 3), ahora, ahora))
             art_id[r["IDARTICULO"]] = aid
             rep.suma("Artículos", 1)
         except sqlite3.IntegrityError:
-            rep.aviso(f"código repetido '{barcode}' en '{desc[:30]}' -> se omite")
+            # No debería pasar con el código interno; si pasa, se reintenta.
+            try:
+                alt = f"INT-{(r['IDARTICULO'] or 0):06d}-{len(art_id)}"
+                sq.execute(
+                    "INSERT INTO articles (id,barcode,description,brand,family_id,vat_rate,"
+                    "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
+                    "active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                    (aid, alt, desc[:120], txt(r["MARCA"])[:40] or None,
+                     fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva, dec(0),
+                     dec(neto), sin_iva(r["PRECIO2"]), sin_iva(r["PRECIO3"]),
+                     sin_iva(r["PRECIOU"]), dec(stock, 3), ahora, ahora))
+                art_id[r["IDARTICULO"]] = aid
+                rep.suma("Artículos", 1)
+            except sqlite3.Error as e:
+                rep.aviso(f"no se pudo migrar '{desc[:30]}': {e}")
 
     # ---- CLIENTES ----
     cli_id: dict[int, str] = {}
@@ -462,13 +497,29 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         if txt(r["CAE"]):
             rep.suma("Facturas con CAE", 1)
 
+    art_borrado: str | None = None
+    # OJO: en LINEAVENTA la referencia a la venta se llama VENTA, no IDVENTA.
     for r in leer(con, "LINEAVENTA",
-                  ["IDVENTA", "IDARTICULO", "CANTIDAD", "PRECIO", "DESCUENTO", "IVA", "NUMLINEA"],
-                  "ORDER BY IDVENTA") if "LINEAVENTA" in hay else []:
-        sid = venta_map.get(r["IDVENTA"])
-        aid = art_id.get(r["IDARTICULO"])
-        if not sid or not aid:
+                  ["VENTA", "IDVENTA", "IDARTICULO", "CANTIDAD", "PRECIO", "DESCUENTO",
+                   "IVA", "NUMLINEA"]) if "LINEAVENTA" in hay else []:
+        sid = venta_map.get(r["VENTA"] if r["VENTA"] is not None else r["IDVENTA"])
+        if not sid:
             continue
+        aid = art_id.get(r["IDARTICULO"])
+        if not aid:
+            # El artículo se borró del catálogo pero la venta lo incluyó. Se
+            # conserva la línea contra un artículo de respaldo, así el detalle
+            # de la venta histórica sigue completo.
+            if art_borrado is None:
+                art_borrado = uuid7()
+                sq.execute(
+                    "INSERT INTO articles (id,barcode,description,vat_rate,cost_price,"
+                    "list_price1,stock,active,created_at,updated_at) "
+                    "VALUES (?,?,?,?,?,?,?,0,?,?)",
+                    (art_borrado, ean13_interno(999999), "Artículo eliminado en StockFácil",
+                     "21.00", dec(0), dec(0), dec(0, 3), ahora, ahora))
+                rep.aviso("hay ventas de artículos ya borrados: se conservan con un artículo de respaldo")
+            aid = art_borrado
         cant = r["CANTIDAD"] or 0
         precio = r["PRECIO"] or 0
         sq.execute(
@@ -482,15 +533,21 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     # ---- COMPRAS ----
     compra_map: dict[int, str] = {}
     algun_prov = next(iter(prov_id.values()), None)
-    for r in leer(con, "COMPRA", ["IDCOMPRA", "FECHA", "NUMERO", "LETRA", "IDPERSONA",
-                                  "IDPROVEEDOR", "SUBTOTAL", "IVA", "DESCUENTO", "ESTADO"],
+    for r in leer(con, "COMPRA", ["IDCOMPRA", "FECHA", "NUMERO", "LETRA", "PROVEEDOR",
+                                  "SUBTOTAL", "IVA", "DESCUENTO", "ESTADO"],
                   "ORDER BY IDCOMPRA") if "COMPRA" in hay else []:
-        prov = (prov_id.get(r["IDPROVEEDOR"]) if r["IDPROVEEDOR"] is not None else None) \
-            or (prov_por_persona.get(r["IDPERSONA"]) if r["IDPERSONA"] is not None else None) \
-            or algun_prov
+        prov = prov_id.get(r["PROVEEDOR"]) or prov_por_persona.get(r["PROVEEDOR"]) or algun_prov
         if not prov:
-            rep.aviso("hay compras pero ningún proveedor: no se migran")
-            break
+            # El comercio puede no haber cargado nunca proveedores (le pasa a
+            # quien sólo usa el módulo de ventas). Se crea uno genérico para no
+            # perder las compras: después las reasigna si quiere.
+            prov = uuid7()
+            sq.execute(
+                "INSERT INTO suppliers (id,code,name,created_at,updated_at) VALUES (?,?,?,?,?)",
+                (prov, "PROV-0001", "Proveedor sin identificar (de StockFácil)", ahora, ahora))
+            prov_id[-1] = prov
+            algun_prov = prov
+            rep.aviso("las compras no tenían proveedor: se les asignó uno genérico")
         sub = r["SUBTOTAL"] or 0
         iva = r["IVA"] or 0
         cid = uuid7()
@@ -506,9 +563,9 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         rep.suma("Compras", 1)
 
     for r in leer(con, "LINEACOMPRA",
-                  ["IDCOMPRA", "IDARTICULO", "CANTIDAD", "PRECIO", "DESCUENTO", "IVA", "NUMLINEA"]
-                  ) if "LINEACOMPRA" in hay else []:
-        pid = compra_map.get(r["IDCOMPRA"])
+                  ["COMPRA", "IDCOMPRA", "IDARTICULO", "CANTIDAD", "PRECIO", "DESCUENTO",
+                   "IVA", "NUMLINEA"]) if "LINEACOMPRA" in hay else []:
+        pid = compra_map.get(r["COMPRA"] if r["COMPRA"] is not None else r["IDCOMPRA"])
         aid = art_id.get(r["IDARTICULO"])
         if not pid or not aid:
             continue
@@ -526,18 +583,55 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             pass
 
     # ---- CUENTAS CORRIENTES (lo que le deben al comercio) ----
+    # StockFlow cuelga cada saldo de una venta, pero en StockFácil la cuenta es
+    # del cliente y no de un comprobante puntual. Se crea una venta de "saldo
+    # anterior" por cada deudor: el saldo queda trazable y el cliente ve de
+    # dónde viene en su cuenta.
+    nro_saldo = (sq.execute("SELECT COALESCE(MAX(number),0) FROM sales").fetchone()[0] or 0)
     for r in leer(con, "CUENTAS", ["IDCUENTA", "IDCLIENTE", "TOTAL", "SALDO", "FECHAINI"]
                   ) if "CUENTAS" in hay else []:
-        cliente = cli_id.get(r["IDCLIENTE"]) or cli_por_persona.get(r["IDCLIENTE"])
         saldo = r["SALDO"] or 0
-        if not cliente or Decimal(str(saldo)) <= 0:
+        if Decimal(str(saldo)) <= 0:
             continue
+        cliente = cli_id.get(r["IDCLIENTE"]) or cli_por_persona.get(r["IDCLIENTE"])
+        if not cliente:
+            # El comercio borró la ficha del cliente pero la deuda sigue viva.
+            # Se recupera desde PERSONA para no perder plata a cobrar.
+            p = personas.get(r["IDCLIENTE"])
+            nombre = nombre_de(p, "") if p else ""
+            if not nombre:
+                nombre = f"Cliente {r['IDCLIENTE']} (dado de baja en StockFácil)"
+            cliente = uuid7()
+            doc = txt(p.get("CUIT") if p else None) or txt(p.get("DNI") if p else None)
+            sq.execute(
+                "INSERT INTO customers (id,last_name,first_name,doc_type,doc_number,address,"
+                "phone,mobile,email,category,credit_limit,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (cliente, nombre[:60], txt(p.get("NOMBRE") if p else None)[:60] or None,
+                 ("CUIT" if len(doc.replace("-", "")) == 11 else "DNI") if doc else None,
+                 doc or None, txt(p.get("DOMICILIO") if p else None) or None,
+                 txt(p.get("TEL") if p else None) or None,
+                 txt(p.get("CEL") if p else None) or None,
+                 txt(p.get("EMAIL") if p else None) or None,
+                 categoria_iva(p.get("CATEGORIA") if p else None), dec(0), ahora, ahora))
+            cli_id[r["IDCLIENTE"]] = cliente
+            rep.suma("Clientes", 1)
+            rep.aviso(f"'{nombre[:34]}' estaba dado de baja pero debe {saldo}: se recuperó")
         try:
+            nro_saldo += 1
+            vid = uuid7()
+            fecha = ms(r["FECHAINI"])
+            sq.execute(
+                "INSERT INTO sales (id,number,type,date,customer_id,seller_id,cash_register_id,"
+                "is_account_sale,subtotal,discount,vat_amount,total,status,notes,"
+                "created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,?,?,?,?,'completed',?,?,?)",
+                (vid, nro_saldo, "X", fecha, cliente, uid, caja_id,
+                 dec(saldo), dec(0), dec(0), dec(saldo),
+                 "Saldo de cuenta corriente traído de StockFácil", fecha, fecha))
             sq.execute(
                 "INSERT INTO accounts_receivable (id,customer_id,sale_id,total,balance,"
-                "status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
-                (uuid7(), cliente, None, dec(r["TOTAL"] or saldo), dec(saldo), "open",
-                 ms(r["FECHAINI"]), ahora))
+                "status,created_at,updated_at) VALUES (?,?,?,?,?,'open',?,?)",
+                (uuid7(), cliente, vid, dec(saldo), dec(saldo), fecha, ahora))
             rep.suma("Cuentas corrientes", 1)
         except sqlite3.Error as e:
             rep.aviso(f"cuenta corriente no migrada: {e}")
