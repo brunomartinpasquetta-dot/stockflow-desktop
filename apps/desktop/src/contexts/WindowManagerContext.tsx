@@ -25,6 +25,8 @@ import {
 } from 'react'
 import { toast } from 'sonner'
 
+import { router } from '@/router'
+
 import { api } from '@/lib/api'
 import { WINDOWS } from '@/windows/registry'
 
@@ -142,7 +144,11 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
     // comercio) y vuelve al inicio con el botón de la barra superior.
     if ((window as { __stockflowWeb?: boolean }).__stockflowWeb) {
       const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : ''
-      window.location.hash = `#/embedded/${input.pageKey}${qs}`
+      // Se navega con el router y no asignando `location.hash`: los datos que
+      // el menú manda (por ejemplo la pestaña de Configuración) van
+      // codificados, y al escribirlos a mano en la barra el navegador los
+      // rompe y la pantalla no abre.
+      void router.navigate(`/embedded/${input.pageKey}${qs}`)
       return
     }
 
