@@ -23,6 +23,7 @@ import {
 import type { IpcResponse } from '../../electron/ipc/types';
 
 const PIN_KEY = 'stockflow.web.pin';
+const SESION_KEY = 'stockflow.web.sesion';
 
 /** El servidor es quien sirvió esta página. */
 function configDesdeUrl(): LanClientConfig {
@@ -162,6 +163,15 @@ export function instalarPuenteWeb(): void {
     listeners: crearListeners(),
     fetch: (input, init) => window.fetch(input, init),
     httpTimeoutMs: 15_000,
+    // La sesión se comparte entre pestañas: si no, cada módulo que se abre
+    // pediría iniciar sesión otra vez.
+    session: {
+      load: () => localStorage.getItem(SESION_KEY),
+      save: (t) => {
+        if (t) localStorage.setItem(SESION_KEY, t);
+        else localStorage.removeItem(SESION_KEY);
+      },
+    },
   };
   const api = createApiBridge('client', lanCfg, io);
   (window as unknown as { stockflow: unknown }).stockflow = api;

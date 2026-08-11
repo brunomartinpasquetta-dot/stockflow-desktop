@@ -73,16 +73,17 @@ export function EmbeddedWindow() {
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background px-8 text-center">
         <p className="text-sm font-medium">Sesión cerrada</p>
         <p className="text-xs text-muted-foreground">
-          Volvé a la ventana principal para iniciar sesión.
+          Iniciá sesión para seguir trabajando.
         </p>
         <button
           type="button"
           onClick={() => {
-            void api.desktopWindow.closeSelf()
+            if ((window as { __stockflowWeb?: boolean }).__stockflowWeb) window.location.hash = '#/login'
+            else void api.desktopWindow.closeSelf()
           }}
           className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
         >
-          Cerrar ventana
+          {(window as { __stockflowWeb?: boolean }).__stockflowWeb ? 'Iniciar sesión' : 'Cerrar ventana'}
         </button>
       </div>
     )
@@ -127,9 +128,25 @@ export function EmbeddedWindow() {
   }
 
   const Component = def.component
+  const enNavegador = (window as { __stockflowWeb?: boolean }).__stockflowWeb === true
 
   return (
-    <div className="h-screen overflow-auto bg-secondary/30 p-4">
+    <div className="flex h-screen flex-col bg-secondary/30">
+      {/* En el navegador todo pasa en una sola pestaña: hace falta una forma
+          clara de volver al menú principal, porque no hay ventanas que cerrar. */}
+      {enNavegador && (
+        <div className="flex shrink-0 items-center gap-3 border-b bg-background px-3 py-2">
+          <button
+            type="button"
+            onClick={() => { window.location.hash = '#/' }}
+            className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+          >
+            ← Volver al inicio
+          </button>
+          <span className="text-sm font-medium">{def.title}</span>
+        </div>
+      )}
+      <div className={enNavegador ? 'min-h-0 flex-1 overflow-auto p-4' : 'h-screen overflow-auto p-4'}>
       {/*
         WindowManagerProvider también acá: páginas como Compras usan `useWindowNav`
         (→ useWindowManager) para abrir OTRAS ventanas nativas desde adentro. En el
@@ -151,6 +168,7 @@ export function EmbeddedWindow() {
           </Suspense>
         </WindowSelfProvider>
       </WindowManagerProvider>
+      </div>
     </div>
   )
 }

@@ -44,6 +44,16 @@ export interface BridgeIO {
   fetch?: typeof fetch;
   /** Inyección del timeout (ms); default 10s. */
   httpTimeoutMs?: number;
+  /**
+   * Guardado del token de sesión. En Electron alcanza con tenerlo en memoria
+   * porque todas las ventanas comparten el proceso; en el navegador cada
+   * pestaña es un mundo aparte, así que hay que persistirlo o cada módulo
+   * abriría pidiendo login de nuevo.
+   */
+  session?: {
+    load: () => string | null;
+    save: (token: string | null) => void;
+  };
 }
 
 export const LAN_ROUTED_GROUPS = new Set([
@@ -141,7 +151,11 @@ export function createCaller(
   lanCfg: LanClientConfig | undefined,
   io: BridgeIO,
 ): (channel: string, payload?: unknown) => Promise<IpcResponse<unknown>> {
-  const state: LanState = { sessionToken: null };
+  const state: LanState = { sessionToken: io.session?.load() ?? null };
+  const setToken = (t: string | null): void => {
+    state.sessionToken = t;
+    io.session?.save(t);
+  };
   const doFetch: typeof fetch = io.fetch ?? (globalThis.fetch as typeof fetch);
   const timeoutMs = io.httpTimeoutMs ?? 10_000;
 
@@ -168,7 +182,7 @@ export function createCaller(
         return { ok: false, code: 'INTERNAL', message: 'Respuesta inválida del servidor LAN' };
       }
       if (res.status === 401) {
-        state.sessionToken = null;
+        setToken(null);
         return body.ok
           ? { ok: false, code: 'UNAUTHENTICATED', message: 'Sesión expirada' }
           : body;
@@ -177,14 +191,14 @@ export function createCaller(
       if (channel === 'auth:login' && body.ok) {
         const data = body.data as LoginResultDTO & { _lanSessionToken?: string };
         if (typeof data._lanSessionToken === 'string') {
-          state.sessionToken = data._lanSessionToken;
+          setToken(data._lanSessionToken);
           const { _lanSessionToken: _drop, ...rest } = data;
           void _drop;
           return { ok: true, data: rest as LoginResultDTO };
         }
       }
       if (channel === 'auth:logout') {
-        state.sessionToken = null;
+        setToken(null);
       }
       return body;
     } catch (err) {

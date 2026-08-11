@@ -137,15 +137,12 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
     }
     const params = buildParams(input)
 
-    // En el navegador no hay ventanas del sistema: cada módulo se abre en una
-    // pestaña, que es lo más parecido para el usuario (cambia con Ctrl+Tab y
-    // puede tener Ventas y Artículos abiertos a la vez, como en la app).
+    // En el navegador no hay ventanas del sistema. El módulo se abre en la
+    // MISMA pestaña (el usuario trabaja en una sola ventana, como pidió el
+    // comercio) y vuelve al inicio con el botón de la barra superior.
     if ((window as { __stockflowWeb?: boolean }).__stockflowWeb) {
       const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : ''
-      const url = `${window.location.pathname}#/embedded/${input.pageKey}${qs}`
-      const tab = window.open(url, `stockflow-${input.pageKey}`)
-      if (tab) tab.focus()
-      else window.location.hash = `#/embedded/${input.pageKey}${qs}`  // si bloquea las pestañas
+      window.location.hash = `#/embedded/${input.pageKey}${qs}`
       return
     }
 
