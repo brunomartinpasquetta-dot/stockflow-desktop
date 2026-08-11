@@ -24,6 +24,21 @@ import type { IpcResponse } from '../../electron/ipc/types';
 
 const PIN_KEY = 'stockflow.web.pin';
 const SESION_KEY = 'stockflow.web.sesion';
+const IMPRESORA_KEY = 'stockflow.web.impresora';
+
+/**
+ * Ancho de papel de ESTA terminal. Cada puesto puede tener su impresora (una
+ * de 58mm en el mostrador, una A4 en la oficina), así que la configuración es
+ * de la máquina y no del sistema: se guarda en el navegador de cada PC.
+ */
+export function anchoImpresora(): '58mm' | '80mm' | 'A4' {
+  const v = localStorage.getItem(IMPRESORA_KEY);
+  return v === '58mm' || v === '80mm' || v === 'A4' ? v : '58mm';
+}
+
+export function guardarAnchoImpresora(v: '58mm' | '80mm' | 'A4'): void {
+  localStorage.setItem(IMPRESORA_KEY, v);
+}
 
 /** El servidor es quien sirvió esta página. */
 function configDesdeUrl(): LanClientConfig {
@@ -94,13 +109,25 @@ function responderLocal(channel: string): IpcResponse<unknown> {
   }
 
   if (grupo === 'print') {
-    // La impresión real la hace el navegador desde el renderer.
-    if (metodo === 'getConfig') return ok({ width: '80', copies: 1, mode: 'dialog' });
+    if (metodo === 'getConfig') return ok({ paperFormat: anchoImpresora(), copies: 1, mode: 'dialog' });
+    if (metodo === 'setConfig') return ok({ ok: true });
     return ok({ ok: true });
   }
 
   if (grupo === 'hardware') {
-    if (metodo === 'listPrinters') return ok([]);
+    // El ancho de papel es de ESTA terminal, no del servidor: cada puesto
+    // puede tener su impresora. Lo guarda el propio navegador de esa PC.
+    if (channel === 'hardware:printer:get-config') {
+      return ok({ kind: 'system', paperFormat: anchoImpresora(), copies: 1 });
+    }
+    if (channel === 'hardware:printer:set-config') return ok({ ok: true });
+    // Imprimir sale por el diálogo del navegador + driver de Windows, igual
+    // que la factura A4 en la app. Lo que NO hay es el envío directo de
+    // comandos a la térmica (necesita acceso al puerto).
+    if (channel.startsWith('hardware:printer:print')) {
+      return noAplica('La impresión directa a la térmica');
+    }
+    if (channel === 'hardware:printer:list-system') return ok([]);
     return noAplica('El manejo directo de impresora y cajón');
   }
 

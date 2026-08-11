@@ -140,7 +140,17 @@ function PrinterSection() {
     paperFormat !== 'A4' && !showDialog && systemName.trim() !== '' ? systemName.trim() : null
 
   const saveMut = useMutation({
-    mutationFn: (cfg: PrinterConfigDTO) => api.hardware.printer.setConfig(cfg),
+    mutationFn: async (cfg: PrinterConfigDTO) => {
+      // Desde el navegador, la impresora es de ESA terminal: el ancho de papel
+      // se guarda en esa PC y no en el servidor, porque cada puesto puede
+      // tener la suya (58mm en el mostrador, A4 en la oficina).
+      if ((window as { __stockflowWeb?: boolean }).__stockflowWeb) {
+        const { guardarAnchoImpresora } = await import('@/web/webBridge')
+        guardarAnchoImpresora((cfg.paperFormat ?? '58mm') as '58mm' | '80mm' | 'A4')
+        return cfg
+      }
+      return api.hardware.printer.setConfig(cfg)
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['hardware', 'printer', 'config'] })
       toast.success('Configuración de impresora guardada')
