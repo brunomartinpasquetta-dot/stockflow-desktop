@@ -252,8 +252,11 @@ def inspeccionar() -> None:
     print("=" * 62)
     sin_cb = qn(con, "SELECT COUNT(*) FROM ARTICULO WHERE CODIGO2 IS NULL OR CODIGO2 = ''")
     print(f"  Artículos sin código de barras: {sin_cb}  -> se les genera uno interno")
-    neg = qn(con, "SELECT COUNT(*) FROM ARTICULO WHERE CANTIDAD1 < 0")
-    print(f"  Artículos con stock negativo:   {neg}  -> se cargan en 0 y se informan")
+    # OJO: el stock vive en STOCK. CANTIDAD1 existe pero está vacía en las bases
+    # reales (Leo Citzia: 0 filas con valor) — leerla daba un tranquilizador
+    # "0 artículos con stock negativo" que era falso.
+    neg = qn(con, "SELECT COUNT(*) FROM ARTICULO WHERE STOCK < 0")
+    print(f"  Artículos con stock negativo:   {neg}  -> se migran TAL CUAL (se permite vender sin stock)")
 
     print("\n  PRECIOS — hay que confirmar con el cliente cuál es cuál:")
     for r in q(con, "SELECT FIRST 3 CODIGO, DETALLE, PRECIO1, PRECIO2, PRECIO3, PRECIO4, PRECIOU, IVA FROM ARTICULO"):
@@ -387,10 +390,14 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             cand = ean13_interno(r["IDARTICULO"] or 0)
         barcode = cand
         barcodes_usados.add(barcode)
+        # El stock viaja TAL CUAL, negativos incluidos. En comercios con miles de
+        # artículos es normal vender sin haber cargado la compra, y el stock
+        # queda en negativo: es información real del comercio y ponerla en 0
+        # sería inventar un dato. StockFlow permite vender sin stock
+        # (`companies.allow_negative_stock`, que la migración deja en 1).
         stock = r["STOCK"] or 0
         if stock and Decimal(str(stock)) < 0:
-            rep.aviso(f"stock negativo en '{desc[:30]}' ({stock}) -> se carga 0")
-            stock = 0
+            rep.suma("Artículos con stock negativo (se respeta)", 1)
         # Mapeo confirmado con el comercio:
         #   PRECIO1 = costo | PRECIO2 = venta al público | PRECIO3/4 = listas
         #   especiales (mayorista, etc.)
@@ -656,6 +663,12 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             rep.suma("Cuentas corrientes", 1)
         except sqlite3.Error as e:
             rep.aviso(f"cuenta corriente no migrada: {e}")
+
+    # El comercio vende sin haber cargado la compra: sin esto el sistema le
+    # bloquearía la venta de todo lo que quedó en negativo.
+    sq.execute("UPDATE companies SET allow_negative_stock = 1")
+    if sq.execute("SELECT COUNT(*) FROM companies").fetchone()[0] == 0:
+        rep.aviso("no hay ficha de comercio: activá 'vender sin stock' en Configuración")
 
     sq.commit()
     sq.close()
