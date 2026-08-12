@@ -525,7 +525,72 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             rep.suma("Clientes", 1)
     sq.commit()
 
-    # ---- CAJA sintética para colgar el historial ----
+    # ---- MEDIOS DE PAGO ----
+    # StockFlow trae cuatro; el comercio usa nueve. Si MercadoPago (7.029
+    # ventas) entrara como efectivo, el reparto efectivo/electrónico de la
+    # Caja General quedaría mal desde el día uno.
+    pm_id: dict[str, str] = {}
+    for fila in sq.execute("SELECT id, name FROM payment_methods"):
+        pm_id[fila[1].upper()] = fila[0]
+
+    def pm_para(nombre: str) -> str | None:
+        """FORMAPAGO de StockFácil -> medio de pago de StockFlow (lo crea si falta)."""
+        n = txt(nombre).upper().strip()
+        if not n:
+            return None
+        equivalencias = {
+            "CONTADO": "Efectivo",
+            "TARJETA DE CREDITO": "Tarjeta de Crédito",
+            "TARJETA DE CREDITO  VISA": "Tarjeta de Crédito",
+            "TARJETA DE DEBITO": "Tarjeta de Débito",
+            "TRANSFERENCIA BANCARIA": "Transferencia",
+        }
+        destino = equivalencias.get(n, txt(nombre).title())
+        clave = destino.upper()
+        if clave in pm_id:
+            return pm_id[clave]
+        # Efectivo de verdad: sólo lo que entra al cajón.
+        fisico = 1 if ("CONTADO" in n or "EFECTIVO" in n) else 0
+        nid = uuid7()
+        orden = (sq.execute("SELECT COALESCE(MAX(sort_order),0) FROM payment_methods").fetchone()[0] or 0) + 1
+        sq.execute(
+            "INSERT INTO payment_methods (id,name,type,is_physical_cash,commission_pct,"
+            "active,sort_order,created_at,updated_at) VALUES (?,?,'other',?,'0.0000',1,?,?,?)",
+            (nid, destino[:40], fisico, orden, ahora, ahora))
+        pm_id[clave] = nid
+        rep.suma("Medios de pago creados", 1)
+        return nid
+
+    # ---- CAJAS DIARIAS ----
+    # Se migran las 641 cajas reales, no una sintética: sin esto se perdía el
+    # historial de cajas y el resumen de qué se vendió en cada una (VENTA.IDCAJA
+    # dice a qué caja pertenece cada venta).
+    #
+    # Todas entran CERRADAS aunque en StockFácil 444 quedaron en "ABIERTO":
+    # son historia, y StockFlow espera una sola caja abierta a la vez. La caja
+    # del día la abre el comercio desde el sistema.
+    caja_map: dict[int, str] = {}
+    aperturas: dict[int, Decimal] = {}
+    for r in leer(con, "LINEACAJA", ["CAJA", "MOTIVO", "INGRESO"]) if "LINEACAJA" in hay else []:
+        if txt(r["MOTIVO"]).upper().startswith("INICIO"):
+            aperturas[r["CAJA"]] = Decimal(str(r["INGRESO"] or 0))
+
+    for r in leer(con, "CAJA", ["IDCAJA", "FECHAINICIO", "FECHACIERRE", "HORAINICIO",
+                               "HORACIERRE", "SALDO", "ESTADO"], "ORDER BY IDCAJA") if "CAJA" in hay else []:
+        idc = r["IDCAJA"]
+        abre = ms(r["FECHAINICIO"], r["HORAINICIO"])
+        cierra = ms(r["FECHACIERRE"], r["HORACIERRE"]) if r["FECHACIERRE"] else abre
+        cid = uuid7()
+        sq.execute(
+            "INSERT INTO cash_registers (id,number,open_date,close_date,opening_amount,"
+            "closing_amount,status,user_id,notes,created_at) VALUES (?,?,?,?,?,?,'closed',?,?,?)",
+            (cid, idc, abre, cierra, dec(aperturas.get(idc, 0)), dec(r["SALDO"] or 0), uid,
+             None if txt(r["ESTADO"]).upper() == "CERRADO"
+             else "Quedó abierta en StockFácil; se cierra al migrar", abre))
+        caja_map[idc] = cid
+        rep.suma("Cajas diarias", 1)
+
+    # Caja de respaldo para lo que no tenga IDCAJA válido.
     caja_id = uuid7()
     nro = (sq.execute("SELECT COALESCE(MAX(number),0) FROM cash_registers").fetchone()[0] or 0) + 1
     sq.execute(
@@ -540,7 +605,8 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     # ---- VENTAS ----
     venta_map: dict[int, str] = {}
     campos_v = ["IDVENTA", "FECHA", "HORA", "NUMERO", "LETRA", "TOTAL", "IVA", "DESCUENTO",
-                "IDPERSONA", "IDCLIENTE", "ESTADO", "CAE", "CODIGOCAE", "ESTADOFE"]
+                "IDPERSONA", "IDCLIENTE", "ESTADO", "CAE", "CODIGOCAE", "ESTADOFE",
+                "IDCAJA", "FORMAPAGO"]
     for r in leer(con, "VENTA", campos_v, "ORDER BY IDVENTA") if "VENTA" in hay else []:
         total = r["TOTAL"]
         if total is None:
@@ -560,7 +626,8 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             "INSERT INTO sales (id,number,type,date,customer_id,seller_id,cash_register_id,"
             "is_account_sale,subtotal,discount,vat_amount,total,status,afip_cae,"
             "created_at,updated_at) VALUES (?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?)",
-            (vid, r["NUMERO"] or 0, letra(r["LETRA"]), fecha, cliente, uid, caja_id,
+            (vid, r["NUMERO"] or 0, letra(r["LETRA"]), fecha, cliente, uid,
+             caja_map.get(r["IDCAJA"]) or caja_id,
              dec(neto), dec(r["DESCUENTO"]), dec(iva), dec(total),
              "voided" if anulada else "completed", txt(r["CAE"]) or None, fecha, fecha))
         venta_map[r["IDVENTA"]] = vid
@@ -708,6 +775,39 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             rep.suma("Cuentas corrientes", 1)
         except sqlite3.Error as e:
             rep.aviso(f"cuenta corriente no migrada: {e}")
+
+    # ---- MOVIMIENTOS DE CAJA ----
+    # StockFlow reconstruye el saldo de una caja desde sus movimientos, así que
+    # cada línea de LINEACAJA tiene que viajar: sin esto las cajas quedaban
+    # todas en cero y no había forma de ver qué se vendió en cada una.
+    # El medio de pago va en cada movimiento porque de ahí sale el reparto
+    # efectivo/electrónico de la Caja General.
+    for r in leer(con, "LINEACAJA", ["CAJA", "MOTIVO", "DETALLE", "INGRESO", "EGRESO",
+                                     "IDVENTA", "IDMOVIMIENTOS"]) if "LINEACAJA" in hay else []:
+        motivo = txt(r["MOTIVO"]).upper()
+        if motivo.startswith("INICIO"):
+            continue                      # ya viajó como saldo de apertura
+        cid = caja_map.get(r["CAJA"])
+        if not cid:
+            continue
+        # Se trabaja con el NETO: hay líneas con INGRESO negativo (anulaciones de
+        # pagos de cuenta corriente) que son plata que SALE. Tomando "ingreso si
+        # ing>0, si no egreso" quedaban como movimientos de $0 y se perdían
+        # $534.220 de la historia de caja.
+        neto = Decimal(str(r["INGRESO"] or 0)) - Decimal(str(r["EGRESO"] or 0))
+        if neto == 0:
+            continue
+        tipo = "income" if neto > 0 else "expense"
+        monto = neto if neto > 0 else -neto
+        venta = venta_map.get(r["IDVENTA"]) if motivo.startswith("VENTA") else None
+        compra = compra_map.get(r["IDVENTA"]) if motivo.startswith("COMPRA") else None
+        sq.execute(
+            "INSERT INTO cash_movements (id,cash_register_id,type,description,amount,date,"
+            "user_id,related_sale_id,related_purchase_id,payment_method_id,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (uuid7(), cid, tipo, txt(r["MOTIVO"])[:80] or "Movimiento", dec(monto),
+             ahora, uid, venta, compra, pm_para(r["DETALLE"]), ahora))
+        rep.suma("Movimientos de caja", 1)
 
     # El comercio vende sin haber cargado la compra: sin esto el sistema le
     # bloquearía la venta de todo lo que quedó en negativo.
