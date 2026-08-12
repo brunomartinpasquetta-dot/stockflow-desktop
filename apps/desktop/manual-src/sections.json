@@ -172,6 +172,26 @@
           "tips": [
             "¿No sabés qué hace un botón o un ícono? Dejá el mouse quieto encima un segundo: aparece un cartelito (tooltip) que explica qué es y qué hace. Funciona en todos los íconos del sistema."
           ]
+        },
+        {
+          "heading": "Usar StockFlow desde el navegador, sin instalarlo",
+          "paragraphs": [
+            "Una PC puede trabajar con StockFlow sin tener el programa instalado: entra por Chrome a la dirección del servidor. Sirve para computadoras viejas donde el sistema no se puede instalar, para la máquina del depósito o de la oficina, o para mirar el negocio desde otro equipo.",
+            "Funciona igual que el programa: mismos módulos, mismos usuarios, mismos datos, y también imprime. Todo pasa por la red del local, así que no necesita internet.",
+            "Cada máquina configura su propia impresora (58mm, 80mm o A4) en Configuración → Impresora, porque cada puesto puede tener la suya."
+          ],
+          "steps": [
+            "En el servidor: Configuración → Red. Anotá la IP y el PIN de 6 dígitos.",
+            "En la otra PC: abrí Chrome y entrá a http://LA-IP:7777/?pin=EL-PIN (el PIN se pide una sola vez).",
+            "Iniciá sesión con el usuario de siempre.",
+            "Configuración → Impresora: elegí el ancho de papel de esa máquina.",
+            "Para que quede cómodo: poné esa dirección como página de inicio de Chrome."
+          ],
+          "tips": [
+            "Los módulos abren en la misma pestaña, con un botón «Volver al inicio» arriba.",
+            "Si dice «token inválido», el PIN está mal: volvé a entrar con la dirección que lo incluye.",
+            "Donde se cobra con ticketera conviene el programa instalado: manda el ticket directo y abre el cajón solo."
+          ]
         }
       ],
       "screenshots": [
@@ -295,6 +315,22 @@
           "tips": [
             "Si Flowy no encuentra la respuesta, te ofrece opciones parecidas para elegir con un clic.",
             "Las preguntas que no supo responder quedan registradas (solo en tu PC) para mejorar el asistente en futuras versiones."
+          ]
+        },
+        {
+          "heading": "Flowy ahora responde con los datos de tu negocio",
+          "paragraphs": [
+            "Además de explicarte cómo se hace cada cosa, Flowy puede mirar el sistema y contestarte con el número concreto. En vez de decirte dónde buscar, te lo dice.",
+            "Preguntale con tus palabras: \"cuánto vendí hoy\", \"cuánto hay en caja\", \"quién me debe\", \"cuánto cuesta la resma A4\", \"tengo stock de biromes\", \"qué tengo que reponer\".",
+            "Las respuestas salen de tu propia base en ese momento, así que son exactas. Si Flowy no está seguro de lo que le preguntaste, prefiere explicarte dónde mirarlo antes que arriesgar un número."
+          ],
+          "steps": [
+            "Abrí Flowy con el botón que está al lado del buscador.",
+            "Escribí la pregunta como se la harías a un compañero.",
+            "Si preguntás por un artículo y hay varios parecidos, te los lista con precio y stock."
+          ],
+          "tips": [
+            "No hace falta escribir bien los acentos ni usar palabras técnicas."
           ]
         }
       ]
@@ -2754,6 +2790,21 @@
             "Durante offline prolongado (sin conexión al servidor), StockFlow sigue en read-only, pero sigue sincronizando datos locales.",
             "Ningún dato se pierde si la licencia expira; todo vuelve a la normalidad cuando se reactiva.",
             "Es recomendable tener un plan de backup/restauración si la licencia está próxima a vencer."
+          ]
+        },
+        {
+          "heading": "Ver qué terminales están conectadas",
+          "paragraphs": [
+            "En el servidor, Configuración → Red muestra «Terminales conectadas»: cada puesto que se comunicó en el último minuto, con su dirección en la red, si entró por el programa o por el navegador, qué usuario está trabajando y hace cuánto se lo vio.",
+            "Un punto verde significa que está activa; uno rojo, que dejó de responder. Sirve para saber si hay comunicación entre las máquinas sin tener que ir a mirar cada una."
+          ],
+          "steps": [
+            "En el servidor: Configuración → Red.",
+            "Mirá la lista de «Terminales conectadas».",
+            "Si no aparece ninguna, tocá «Revisar»: casi siempre es el firewall bloqueando el puerto."
+          ],
+          "tips": [
+            "Que cada empleado tenga su usuario: así sabés quién trabaja en cada puesto."
           ]
         }
       ],

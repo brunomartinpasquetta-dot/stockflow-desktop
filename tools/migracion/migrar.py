@@ -331,8 +331,16 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 personas[r["IDPERSONA"]] = r
 
     def nombre_de(p: dict, alt: str) -> str:
-        n = (txt(p.get("APELLIDO")) + " " + txt(p.get("NOMBRE"))).strip()
-        return n or alt
+        """Apellido y nombre, sin repetir cuando el APELLIDO ya trae los dos.
+
+        En bases reales el comercio carga todo junto en APELLIDO ("AGUAISOL
+        EDUARDO") y además llena NOMBRE ("EDUARDO"): concatenar a ciegas
+        dejaba "AGUAISOL EDUARDO EDUARDO"."""
+        ape = txt(p.get("APELLIDO"))
+        nom = txt(p.get("NOMBRE"))
+        if not nom or nom.upper() in ape.upper().split():
+            return ape or nom or alt
+        return f"{ape} {nom}".strip() or alt
 
     # ---- PROVEEDORES ----
     prov_id: dict[int, str] = {}
@@ -453,7 +461,7 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 "INSERT INTO customers (id,last_name,first_name,doc_type,doc_number,address,"
                 "phone,mobile,email,category,credit_limit,created_at,updated_at) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (cid, apellido[:60], txt(p.get("NOMBRE") if p else None)[:60] or None,
+                (cid, apellido[:60], None,   # el nombre ya va en apellido
                  ("CUIT" if len(doc.replace("-", "")) == 11 else "DNI") if doc else None,
                  doc or None, txt(p.get("DOMICILIO") if p else None) or None,
                  txt(p.get("TEL") if p else None) or None,

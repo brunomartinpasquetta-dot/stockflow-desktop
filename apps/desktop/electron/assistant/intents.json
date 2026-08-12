@@ -4096,6 +4096,50 @@
           ],
           "answer": "Nada que tengas que hacer vos: si se corta internet, seguís trabajando tranquilo, y cuando la conexión vuelve el sistema verifica la licencia solo, en silencio, y la deja al día. No hay que tocar nada ni cargar claves de nuevo.",
           "steps": []
+        },
+        {
+          "id": "terminal-por-navegador",
+          "canonical": "¿Puedo usar StockFlow sin instalarlo, desde el navegador?",
+          "patterns": [
+            "usar sin instalar",
+            "entrar desde el navegador",
+            "abrir en chrome",
+            "stockflow en el navegador",
+            "terminal sin instalar",
+            "desde otra pc sin instalar"
+          ],
+          "answer": "Sí. La PC que hace de servidor puede servir el sistema a las demás: en la otra máquina abrís Chrome y entrás con la dirección del servidor (por ejemplo http://192.168.0.15:7777). No hay que instalar nada y funciona igual, incluso para imprimir. Es la forma de usar StockFlow en computadoras viejas donde el programa no se puede instalar.",
+          "steps": [
+            "En el servidor: Configuración → Red. Anotá la IP y el PIN.",
+            "En la otra PC: abrí Chrome y entrá a http://LA-IP:7777/?pin=EL-PIN",
+            "Iniciá sesión con tu usuario de siempre.",
+            "Configuración → Impresora: elegí el ancho de papel de ESA máquina."
+          ]
+        },
+        {
+          "id": "terminal-navegador-sin-internet",
+          "canonical": "La terminal por navegador, ¿necesita internet?",
+          "patterns": [
+            "necesita internet el navegador",
+            "funciona sin internet",
+            "se corta internet y sigo trabajando",
+            "hace falta internet"
+          ],
+          "answer": "No. La terminal le habla al servidor por la red del local, no por internet. Si se corta internet podés seguir vendiendo, cobrando y cerrando caja igual. Lo único que necesita internet es la facturación electrónica de ARCA, porque el CAE se lo pide a ellos.",
+          "steps": []
+        },
+        {
+          "id": "ver-terminales-conectadas",
+          "canonical": "¿Cómo sé si las terminales están conectadas?",
+          "patterns": [
+            "ver terminales conectadas",
+            "estan conectadas las pc",
+            "hay comunicacion entre las pc",
+            "que terminales estan andando",
+            "ver puestos conectados"
+          ],
+          "answer": "En el servidor: Configuración → Red → \"Terminales conectadas\". Ahí ves cada puesto con su dirección, si entró por la app o por el navegador, qué usuario está trabajando y hace cuánto se lo vio, con un punto verde o rojo. Si no aparece ninguna, tocá \"Revisar\" y fijate el firewall.",
+          "steps": []
         }
       ]
     },
@@ -11932,6 +11976,112 @@
             "contame algo"
           ],
           "answer": "¡Jaja, me encantaría charlar de eso, pero yo soy medio monotema: sé todo de StockFlow! Contame en qué te doy una mano con el sistema.",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "area": "consultas-datos",
+      "synonyms": [
+        "cuanto vendi",
+        "cuanto hay",
+        "quien me debe",
+        "stock de",
+        "precio de",
+        "datos del negocio"
+      ],
+      "intents": [
+        {
+          "id": "flowy-cuanto-vendi",
+          "canonical": "¿Cuánto vendí hoy?",
+          "patterns": [
+            "cuanto vendi hoy",
+            "cuanto vendimos hoy",
+            "ventas de hoy",
+            "cuanto facture hoy",
+            "como venimos hoy",
+            "cuanto lleve vendido"
+          ],
+          "answer": "Preguntámelo directamente y te digo el número: escribí \"cuánto vendí hoy\" y te respondo con la cantidad de ventas y el total del día. No hace falta que entres a ningún módulo.",
+          "steps": []
+        },
+        {
+          "id": "flowy-cuanto-hay-en-caja",
+          "canonical": "¿Cuánto efectivo hay en la caja?",
+          "patterns": [
+            "cuanto hay en caja",
+            "cuanto tengo en caja",
+            "efectivo en caja",
+            "cuanta plata hay en el cajon",
+            "saldo de caja"
+          ],
+          "answer": "Escribime \"cuánto hay en caja\" y te digo el efectivo que debería haber en el cajón, contando la apertura y todos los movimientos del día. Si no hay caja abierta, te aviso.",
+          "steps": []
+        },
+        {
+          "id": "flowy-caja-general-saldo",
+          "canonical": "¿Cuánto hay en Caja General?",
+          "patterns": [
+            "cuanto hay en caja general",
+            "saldo de caja general",
+            "cuanto tengo en la caja fuerte",
+            "plata en caja general"
+          ],
+          "answer": "Escribime \"cuánto hay en caja general\" y te digo el total, cuánto es efectivo y cuánto electrónico.",
+          "steps": []
+        },
+        {
+          "id": "flowy-quien-me-debe",
+          "canonical": "¿Quién me debe plata?",
+          "patterns": [
+            "quien me debe",
+            "quienes me deben",
+            "cuanto me deben",
+            "deudores",
+            "clientes que me deben",
+            "total por cobrar"
+          ],
+          "answer": "Escribime \"quién me debe\" y te listo los clientes con saldo pendiente, ordenados de mayor a menor, con el total que te deben entre todos.",
+          "steps": []
+        },
+        {
+          "id": "flowy-precio-articulo",
+          "canonical": "¿Cuánto cuesta un artículo?",
+          "patterns": [
+            "cuanto cuesta",
+            "cuanto sale",
+            "que precio tiene",
+            "precio de",
+            "a cuanto esta"
+          ],
+          "answer": "Escribime \"cuánto cuesta\" y el nombre del artículo (por ejemplo: cuánto cuesta la resma A4) y te digo el precio y cuánto stock queda. Si hay varios parecidos, te los muestro todos.",
+          "steps": []
+        },
+        {
+          "id": "flowy-stock-articulo",
+          "canonical": "¿Tengo stock de un artículo?",
+          "patterns": [
+            "tengo stock de",
+            "hay stock de",
+            "cuantos me quedan de",
+            "stock de",
+            "queda stock"
+          ],
+          "answer": "Escribime \"tengo stock de\" y el nombre del artículo y te digo cuántas unidades quedan y a qué precio está.",
+          "steps": []
+        },
+        {
+          "id": "flowy-reponer",
+          "canonical": "¿Qué artículos tengo que reponer?",
+          "patterns": [
+            "que tengo que reponer",
+            "stock bajo",
+            "articulos con poco stock",
+            "que me falta comprar",
+            "que tengo que pedir",
+            "articulos sin stock"
+          ],
+          "answer": "Escribime \"qué artículos tengo que reponer\" y te listo los que están por debajo del stock mínimo que configuraste, con las unidades que quedan de cada uno.",
           "steps": []
         }
       ]

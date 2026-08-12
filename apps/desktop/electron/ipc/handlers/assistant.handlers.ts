@@ -10,6 +10,7 @@ import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { type HandlerDeps, type HandlerMap, unguarded } from '../handler-context';
+import { responderConDatos } from '../../assistant/consultas';
 import { answerQuestion } from '../../assistant/engine';
 
 export interface AssistantMessage {
@@ -48,8 +49,25 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
   return {
     'assistant:ask': unguarded(
       deps,
-      (payload: { messages: AssistantMessage[]; conversationId?: string }, d): AssistantAskResult => {
+      async (
+        payload: { messages: AssistantMessage[]; conversationId?: string },
+        d,
+      ): Promise<AssistantAskResult> => {
         const question = lastUserMessage(payload?.messages ?? []);
+
+        // Primero: ¿es una pregunta por datos del negocio? ("cuánto vendí hoy",
+        // "tengo stock de X"). Se contesta con el número real en vez de
+        // explicar dónde mirarlo.
+        const repos = d.repos;
+        if (repos && question.trim()) {
+          try {
+            const dato = await responderConDatos({ repos }, question);
+            if (dato) return { reply: dato, suggestions: [], image: null };
+          } catch {
+            /* si falla, sigue el motor de conocimiento */
+          }
+        }
+
         const ans = answerQuestion(question, payload?.conversationId ?? 'default');
         if (ans.kind === 'fallback' && question.trim()) logMiss(d.userDataDir, question.trim());
         return { reply: ans.reply, suggestions: ans.suggestions, image: ans.image };
