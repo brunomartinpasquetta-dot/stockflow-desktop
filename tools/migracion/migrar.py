@@ -313,8 +313,25 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     uid = usuario[0]
 
     # ---- FAMILIAS ----
+    # No todas las instalaciones tienen tabla FAMILIA. La de Leo Citzia guarda
+    # las familias en RELLENO, una tabla de listas genéricas donde conviven con
+    # las tarjetas de crédito (se distinguen por TABLA='FAMILIA'), y ARTICULO
+    # apunta ahí por IDRELLENO. Sin este camino se perdían las 38 familias y
+    # los 1.816 artículos quedaban sin rubro.
     fam_id: dict[str, str] = {}
-    if "FAMILIA" in hay:
+    if "FAMILIA" not in hay and "RELLENO" in hay:
+        for r in leer(con, "RELLENO", ["IDRELLENO", "CONCEPTO", "TABLA"]):
+            if txt(r["TABLA"]).upper() != "FAMILIA":
+                continue
+            nombre = txt(r["CONCEPTO"])
+            if not nombre:
+                continue
+            fid = uuid7()
+            sq.execute("INSERT INTO families (id,name,created_at) VALUES (?,?,?)",
+                       (fid, nombre[:60], ahora))
+            fam_id[txt(r["IDRELLENO"])] = fid
+            rep.suma("Familias", 1)
+    elif "FAMILIA" in hay:
         for r in leer(con, "FAMILIA", ["CODIGO", "DETALLE"]):
             nombre = txt(r["DETALLE"]) or txt(r["CODIGO"])
             if not nombre:
@@ -348,7 +365,32 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     # ---- PROVEEDORES ----
     prov_id: dict[int, str] = {}
     prov_por_persona: dict[int, str] = {}
-    if "PROVEEDOR" in hay:
+    # En la base de Leo Citzia la tabla PROVEEDOR está VACÍA y los proveedores
+    # reales viven en EMPRESA (ONCE, PLAST, DIPACK…), a la que ARTICULO apunta
+    # por IDEMPRESA. Sin esto, 2.108 artículos quedaban sin proveedor.
+    if "EMPRESA" in hay and qn(con, "SELECT COUNT(*) FROM PROVEEDOR") == 0:
+        for r in leer(con, "EMPRESA", ["IDEMPRESA", "RAZON", "CUIT", "DOMICILIO",
+                                       "TEL", "CEL", "INGBRUTOS", "CODIGO"]):
+            ide = r["IDEMPRESA"]
+            nombre = txt(r["RAZON"])
+            # La fila 1 se llama literalmente "PROVEEDOR": es el encabezado de
+            # la lista, no un proveedor. Las sin nombre sí se crean, porque hay
+            # artículos colgando de ellas y perderlos sería peor.
+            if ide == 1 and nombre.upper() == "PROVEEDOR":
+                continue
+            if not nombre:
+                nombre = f"Proveedor {ide}"
+            pid = uuid7()
+            sq.execute(
+                "INSERT INTO suppliers (id,code,name,cuit,address,ing_brutos,phone,mobile,"
+                "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (pid, (txt(r["CODIGO"]) or f"PROV-{ide:04d}")[:20], nombre[:80],
+                 txt(r["CUIT"]) or None, txt(r["DOMICILIO"]) or None,
+                 txt(r["INGBRUTOS"]) or None, txt(r["TEL"]) or None,
+                 txt(r["CEL"]) or None, ahora, ahora))
+            prov_id[ide] = pid
+            rep.suma("Proveedores", 1)
+    elif "PROVEEDOR" in hay:
         for i, r in enumerate(leer(con, "PROVEEDOR",
                                    ["IDPROVEEDOR", "IDPERSONA", "IDEMPRESA", "CODIGO",
                                     "NOMBRE", "RAZON", "DETALLE"]), start=1):
@@ -375,7 +417,7 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     barcodes_usados: set[str] = set()
     campos_art = ["IDARTICULO", "CODIGO", "CODIGO2", "INTCOD", "DETALLE", "MARCA", "IVA",
                   "PRECIO1", "PRECIO2", "PRECIO3", "PRECIO4", "PRECIOU",
-                  "STOCK", "STOCKMIN", "FAMILIA", "CLASIFICACION", "OBSERVA"]
+                  "STOCK", "STOCKMIN", "FAMILIA", "CLASIFICACION", "OBSERVA", "PROVEEDOR"]
     for r in leer(con, "ARTICULO", campos_art) if "ARTICULO" in hay else []:
         desc = txt(r["DETALLE"]) or f"Artículo sin descripción #{r['IDARTICULO']}"
         # El código tiene que ser único. En bases reales hay miles de artículos
@@ -425,11 +467,12 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         aid = uuid7()
         try:
             sq.execute(
-                "INSERT INTO articles (id,barcode,description,brand,family_id,vat_rate,"
+                "INSERT INTO articles (id,barcode,description,brand,family_id,supplier_id,vat_rate,"
                 "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
-                "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
                 (aid, barcode[:40], desc[:120], txt(r["MARCA"])[:40] or None,
-                 fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva,
+                 fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])),
+                 prov_id.get(r["PROVEEDOR"]), iva,
                  dec(costo), dec(venta), dec(lista2), dec(lista3), dec(mayor),
                  dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), ahora, ahora))
             art_id[r["IDARTICULO"]] = aid
@@ -439,11 +482,12 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             try:
                 alt = ean13_interno((r["IDARTICULO"] or 0) + 5_000_000)
                 sq.execute(
-                    "INSERT INTO articles (id,barcode,description,brand,family_id,vat_rate,"
+                    "INSERT INTO articles (id,barcode,description,brand,family_id,supplier_id,vat_rate,"
                     "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
-                    "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                    "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
                     (aid, alt, desc[:120], txt(r["MARCA"])[:40] or None,
-                     fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])), iva,
+                     fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])),
+                     prov_id.get(r["PROVEEDOR"]), iva,
                      dec(costo), dec(venta), dec(lista2), dec(lista3), dec(mayor),
                      dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), ahora, ahora))
                 art_id[r["IDARTICULO"]] = aid
@@ -583,7 +627,8 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         sq.execute(
             "INSERT INTO purchases (id,number,type,date,supplier_id,payment_type,subtotal,"
             "discount,vat_amount,total,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (cid, r["NUMERO"] or 0, letra(r["LETRA"]), fecha, prov, "cash",
+            (cid, int(txt(r["NUMERO"]) or 0) or (r["IDCOMPRA"] or 0),
+             letra(r["LETRA"]), fecha, prov, "cash",
              dec(sub), dec(r["DESCUENTO"]), dec(iva),
              dec(Decimal(str(sub)) + Decimal(str(iva))),
              "voided" if txt(r["ESTADO"]).upper().startswith("ANUL") else "completed", fecha, fecha))
