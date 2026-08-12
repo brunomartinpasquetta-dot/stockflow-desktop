@@ -56,7 +56,7 @@ const CONSULTAS: Consulta[] = [
     ],
     async responder({ repos }) {
       const { desde, hasta } = hoy();
-      const ventas = await repos.sales.findByDateRange({ from: desde, to: hasta });
+      const ventas = await repos.sales.findByDateRange(desde, hasta);
       const validas = ventas.filter((v) => v.status !== 'voided');
       if (validas.length === 0) return 'Todavía no hay ventas registradas hoy.';
       const total = validas.reduce((a, v) => a + Number(v.total), 0);
@@ -173,7 +173,7 @@ async function consultarArticulo(ctx: ConsultaCtx, pregunta: string): Promise<st
   }
   if (!termino || termino.length < 3) return null;
 
-  const encontrados = await ctx.repos.articles.searchByText(termino, 5);
+  const encontrados = await ctx.repos.articles.searchByText(termino);
   if (!encontrados.length) {
     return `No encontré ningún artículo que se llame "${termino}". Probá con otra palabra.`;
   }

@@ -38,6 +38,29 @@ let lanServer: LanServer | null = null;
 let updaterController: UpdaterController | null = null;
 let desktopWindows: DesktopWindowsManager | null = null;
 let quittingForBackup = false;
+/**
+ * true mientras se está instalando una actualización. El instalador reemplaza
+ * los archivos del programa apenas la app cierra, así que el cierre tiene que
+ * ser INMEDIATO: si se demora (backup pre-quit, servidor LAN sin cerrar), el
+ * instalador escribe sobre archivos todavía en uso y falla con errores de
+ * escritura.
+ */
+let instalandoActualizacion = false;
+
+/** Cierra lo que retiene archivos/puertos y avisa cuando terminó. */
+export async function prepararseParaActualizar(): Promise<void> {
+  instalandoActualizacion = true;
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+  if (mpCronTimer) { clearInterval(mpCronTimer); mpCronTimer = null; }
+  updaterController?.dispose?.();
+  try { desktopWindows?.closeAll(); } catch { /* */ }
+  try { await hardwareManager?.dispose(); } catch { /* */ }
+  if (lanServer) {
+    try { await lanServer.stop(); } catch { /* */ }   // ESPERAR: libera el puerto y suelta la UI servida
+    lanServer = null;
+  }
+  try { shutdown(dbHandle); } catch { /* */ }          // cierra la base
+}
 
 const PRELOAD_PATH = path.join(HERE, 'preload.cjs');
 const PROD_INDEX_HTML = path.join(HERE, '..', 'dist', 'index.html');
@@ -228,6 +251,7 @@ function bootstrap(): { lanArgs: string[] } {
       mainWindow?.focus();
     },
     updater: updaterController,
+    prepareForUpdate: prepararseParaActualizar,
     desktopWindows,
     lanExtras: {
       applyAndRestart,
@@ -407,6 +431,7 @@ if (!app.requestSingleInstanceLock()) {
     // Backup pre-quit (si está configurado) CON watchdog: una copia que se cuelga
     // no debe impedir el cierre (era otra causa de proceso zombie).
     if (
+      !instalandoActualizacion &&      // actualizando: el cierre debe ser inmediato
       !quittingForBackup &&
       hardwareManager?.getConfig().backup.autoOnAppQuit &&
       backupService

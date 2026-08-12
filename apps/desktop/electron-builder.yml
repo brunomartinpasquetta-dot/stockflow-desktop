@@ -67,6 +67,12 @@ win:
   icon: build/icon.ico
 
 nsis:
+  # Descarga COMPLETA siempre (sin diferencial por bloques). El diferencial
+  # necesita el instalador de la versión anterior en la caché del updater, y en
+  # las PC donde StockFlow se instaló a mano (pendrive) esa caché no existe: la
+  # actualización tiraba error de escritura, reintentaba y volvía a bajar varias
+  # veces. Baja unos MB más, pero anda siempre. (Leo Citzia, 12-ago-2026)
+  differentialPackage: false
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

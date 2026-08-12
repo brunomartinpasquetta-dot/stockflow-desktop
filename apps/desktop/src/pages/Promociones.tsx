@@ -193,7 +193,7 @@ function PromoFormDialog(props: {
           !chosen.has(a.id) &&
           (a.description.toLowerCase().includes(q) || a.barcode.toLowerCase().includes(q) || (a.brand ?? '').toLowerCase().includes(q)),
       )
-      .slice(0, 8)
+      .slice(0, 50)
   }, [articles, search, items])
 
   const cost = items.reduce((acc, i) => acc + Number(i.quantity || '0') * Number(i.costPrice), 0)

@@ -30,6 +30,18 @@ export function OutdatedBanner() {
   const [downloadedVersion, setDownloadedVersion] = useState<string | null>(null)
 
   useEffect(() => {
+    // El evento puede haber llegado ANTES de que este banner existiera (la
+    // descarga arranca a los 5 s de abrir el programa) o perderse si se recarga
+    // la ventana: sin esto el aviso no aparecía hasta el chequeo siguiente, 4
+    // horas después. Por eso además se PREGUNTA si ya hay algo descargado.
+    void api.updater
+      .getPending()
+      .then((p) => {
+        if (p) setDownloadedVersion(p.version)
+      })
+      .catch(() => {
+        /* versión vieja del servidor: sigue andando por eventos */
+      })
     // Auto-update real: en Windows baja el .exe solo y dispara este evento.
     const offDownloaded = api.updater.onDownloaded((next) => setDownloadedVersion(next.version))
     // Fallback manual (mac sin firma / si el auto-update falla).

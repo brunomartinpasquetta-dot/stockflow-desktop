@@ -33,11 +33,19 @@ export interface HandlerDeps {
   updater?: {
     checkNow: () => Promise<{ status: string; version?: string }>;
     quitAndInstall: () => void;
+    /** Actualización ya descargada y esperando instalarse, si la hay. */
+    getPending?: () => { version: string } | null;
     getAutoCheck: () => boolean;
     setAutoCheck: (v: boolean) => void;
     getChannel?: () => 'stable' | 'beta';
     setChannel?: (c: 'stable' | 'beta') => void;
   };
+  /**
+   * Suelta todo lo que tiene archivos/puertos abiertos ANTES de que el
+   * instalador reemplace el programa. Sin esto el instalador escribe sobre
+   * archivos en uso y la actualización queda a medias.
+   */
+  prepareForUpdate?: () => Promise<void>;
   /** Token store seguro para credenciales MercadoPago. */
   mpTokenStore?: MpTokenStoreLike;
   /** Extras LAN (server-side): inyectados por main.ts cuando hay LanServer. */

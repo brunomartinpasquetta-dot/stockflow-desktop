@@ -1936,6 +1936,8 @@ export interface ApiSurface {
   updater: {
     checkNow(): Res<{ status: string; version?: string }>;
     quitAndInstall(): Res<{ ok: true }>;
+    /** Actualización ya descargada y lista para instalar, si la hay. */
+    getPending(): Res<{ version: string } | null>;
     getAutoCheck(): Res<{ autoCheck: boolean }>;
     setAutoCheck(payload: { autoCheck: boolean }): Res<{ ok: true }>;
     getChannel(): Res<{ channel: 'stable' | 'beta' }>;

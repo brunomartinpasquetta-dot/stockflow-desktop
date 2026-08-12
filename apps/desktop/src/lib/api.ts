@@ -551,6 +551,7 @@ export const api = {
   updater: {
     checkNow: () => unwrap(sf().updater.checkNow()),
     quitAndInstall: () => unwrap(sf().updater.quitAndInstall()),
+    getPending: () => unwrap(sf().updater.getPending()),
     getAutoCheck: () => unwrap(sf().updater.getAutoCheck()),
     setAutoCheck: (autoCheck: boolean) => unwrap(sf().updater.setAutoCheck({ autoCheck })),
     getChannel: () => unwrap(sf().updater.getChannel()),

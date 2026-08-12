@@ -11,9 +11,22 @@ export function buildUpdaterHandlers(deps: HandlerDeps): HandlerMap {
       return deps.updater.checkNow();
     }),
     'updater:quitAndInstall': unguarded(deps, async (): Promise<{ ok: true }> => {
+      // Antes de instalar hay que SOLTAR todo lo que tiene archivos abiertos
+      // (servidor de red, base, puertos) y esperar a que cierre de verdad. Si
+      // no, el instalador empieza a reemplazar archivos en uso y falla con
+      // errores de escritura, dejando la instalación a medias.
+      try {
+        await deps.prepareForUpdate?.();
+      } catch {
+        /* si algo no cierra, se intenta instalar igual */
+      }
       deps.updater?.quitAndInstall();
       return { ok: true };
     }),
+    'updater:getPending': unguarded(
+      deps,
+      async (): Promise<{ version: string } | null> => deps.updater?.getPending?.() ?? null,
+    ),
     'updater:getAutoCheck': unguarded(deps, async (): Promise<{ autoCheck: boolean }> => ({
       autoCheck: deps.updater?.getAutoCheck() ?? true,
     })),

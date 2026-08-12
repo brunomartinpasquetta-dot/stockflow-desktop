@@ -191,6 +191,8 @@ export async function checkForOutdatedVersion(opts: {
 
 export interface UpdaterController {
   checkNow: () => Promise<{ status: string; version?: string }>;
+  /** Actualización ya descargada esperando instalarse (el evento pudo perderse). */
+  getPending?: () => { version: string } | null;
   quitAndInstall: () => void;
   getAutoCheck: () => boolean;
   setAutoCheck: (v: boolean) => void;
@@ -296,12 +298,19 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   autoUpdater.on('update-available', (info: { version: string }) => {
     ctx.getWindow()?.webContents.send('updater:available', { version: info.version });
   });
+  // Se RECUERDA la última descarga lista: el evento puede llegar antes de que
+  // la pantalla esté montada (o perderse si se recarga la ventana), y entonces
+  // el aviso no aparecía nunca hasta el chequeo siguiente — 4 horas después.
+  // Con esto la UI puede preguntar "¿hay algo listo?" al abrir.
   autoUpdater.on('update-downloaded', (info: { version: string }) => {
+    descargada = { version: info.version };
     ctx.getWindow()?.webContents.send('updater:downloaded', { version: info.version });
   });
   autoUpdater.on('error', (err: Error) => {
     console.warn('[updater] error silencioso:', err?.message ?? err);
   });
+
+  let descargada: { version: string } | null = null;
 
   function checkInternal(): void {
     if (isMac) return; // en mac sólo vale el chequeo manual (updater:outdated)
@@ -327,6 +336,7 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
       }
       return r;
     },
+    getPending: () => descargada,
     quitAndInstall: () => autoUpdater.quitAndInstall(false, true),
     getAutoCheck: () => prefs.autoCheck,
     setAutoCheck: (v: boolean) => {

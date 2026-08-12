@@ -560,6 +560,7 @@ export function createApiBridge(
     updater: {
       checkNow: () => c<never>('updater:checkNow'),
       quitAndInstall: () => c<never>('updater:quitAndInstall'),
+      getPending: () => c<never>('updater:getPending'),
       getAutoCheck: () => c<never>('updater:getAutoCheck'),
       setAutoCheck: (p) => c<never>('updater:setAutoCheck', p),
       getChannel: () => c<never>('updater:getChannel'),
