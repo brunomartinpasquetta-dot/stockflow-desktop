@@ -17,6 +17,13 @@ jobs:
   build:
     strategy:
       fail-fast: false
+      # DE A UNO. En paralelo, los dos jobs consultaban "¿existe el release?",
+      # los dos veían que no y los dos lo creaban: el segundo moría con
+      # "422 already_exists" y quedaba la versión publicada para un solo sistema
+      # operativo (pasó en la v0.4.6, con el cliente esperando el .exe).
+      # Serializado, macOS crea el release y Windows sube los suyos al que ya
+      # está. Tarda unos minutos más y sale siempre.
+      max-parallel: 1
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
