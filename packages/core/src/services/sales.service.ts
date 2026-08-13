@@ -62,14 +62,17 @@ export interface CreateSaleResult {
   accountReceivable: AccountReceivable | null;
 }
 
-function customerCanUseAccount(customer: Customer): boolean {
-  return (
-    customer.docType != null &&
-    customer.docType !== 'CF' &&
-    customer.docNumber != null &&
-    customer.docNumber.trim() !== ''
-  );
-}
+/*
+ * Cualquier cliente cargado puede comprar en cuenta corriente.
+ *
+ * Antes se exigía tipo y número de documento y la venta se frenaba con "falta
+ * documento identificatorio". No tiene fundamento: fiarle a un cliente NO es
+ * emitir un comprobante fiscal —el documento hace falta para la Factura A, y
+ * eso se valida al facturar— y el comercio ya lo tiene identificado por su
+ * ficha. En Leo Citzia, 60 de 63 clientes no tenían documento porque nunca lo
+ * necesitaron: la regla dejaba la cuenta corriente inutilizable justo en el
+ * cliente que más la usa.
+ */
 
 export class SalesService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -111,12 +114,6 @@ export class SalesService {
     const customer = await repos.customers.findById(draft.customerId);
     if (!customer) throw new NotFoundError('Cliente', draft.customerId);
 
-    if (isAccountSale && !customerCanUseAccount(customer)) {
-      throw new BusinessRuleError(
-        'customer_not_account_eligible',
-        `El cliente "${customer.lastName}" no puede operar en cuenta corriente (falta documento identificatorio)`,
-      );
-    }
     if (!isAccountSale && payments.length === 0) {
       throw new BusinessRuleError('no_payments', 'La venta debe registrar al menos un pago');
     }

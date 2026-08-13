@@ -5941,7 +5941,7 @@
           "steps": [
             "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
             "Si NO ves el cuadradito: es porque la venta está a 'Consumidor Final'. Elegí un cliente de verdad con el botón 'Cliente' de arriba.",
-            "Si al tildarlo aparece en rojo 'El cliente no puede operar en cuenta corriente (falta documento identificatorio)': andá a la pantalla de Clientes (tecla F6), abrí su ficha y cargale el DNI o CUIT.",
+            "No hace falta cargarle el DNI ni el CUIT para fiarle: cualquier cliente de tu lista puede comprar en cuenta corriente. El documento sólo se necesita si después le vas a hacer una Factura A.",
             "Si aparece en rojo 'Se supera el límite de crédito': la deuda que ya tiene más esta venta pasan el tope que le pusiste. Podés cobrarle algo de la deuda vieja primero, o subirle el límite en su ficha de Clientes.",
             "Cuando todo está bien, en vez de rojo ves un aviso gris que dice 'Queda en cuenta corriente' con el saldo antes y después."
           ],

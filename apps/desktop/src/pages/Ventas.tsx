@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X } from 'lucide-react'
 
@@ -423,7 +422,12 @@ function PromoPicker({
 }
 
 function NoCash() {
-  const navigate = useNavigate()
+  // Se abre la VENTANA de Caja, no `navigate('/caja')`: esa ruta no existe en
+  // el router —el mapeo /caja→caja es del registro de ventanas— así que el
+  // botón no hacía absolutamente nada, y el cajero quedaba trabado sin poder
+  // vender. Con el gestor de ventanas funciona igual en la app y en las
+  // terminales por navegador.
+  const abrirVentana = useWindowNav()
   return (
     <div className="flex h-full items-center justify-center">
       <Card className="w-full max-w-md">
@@ -433,7 +437,7 @@ function NoCash() {
           </div>
           <p className="text-base font-medium">No hay caja abierta</p>
           <p className="text-sm text-muted-foreground">Para registrar ventas primero hay que abrir la caja.</p>
-          <Button onClick={() => navigate('/caja')}>Ir a Caja</Button>
+          <Button onClick={() => abrirVentana('caja')}>Ir a Caja</Button>
         </CardContent>
       </Card>
     </div>
@@ -719,11 +723,10 @@ function PDV() {
   }
 
   // --- cuenta corriente ---
-  const accountEligible =
-    selectedCustomer != null &&
-    selectedCustomer.docType != null &&
-    selectedCustomer.docType !== 'CF' &&
-    !!selectedCustomer.docNumber
+  // Cualquier cliente cargado puede comprar en cuenta corriente: fiar no es
+  // emitir un comprobante fiscal. El documento se valida al FACTURAR, que es
+  // donde de verdad hace falta.
+  const accountEligible = selectedCustomer != null
   const creditLimitNum = Number(selectedCustomer?.creditLimit ?? '0')
   const overCredit = accountSale && creditLimitNum > 0 && Number(customerDebt) + totalNum > creditLimitNum
   const noMethods = !accountSale && activeMethods.length === 0
@@ -1318,9 +1321,7 @@ function PDV() {
           )}
           {accountSale ? (
             <div className="text-xs">
-              {!accountEligible ? (
-                <p className="text-destructive">El cliente no puede operar en cuenta corriente (falta documento identificatorio).</p>
-              ) : overCredit ? (
+              {overCredit ? (
                 <p className="text-destructive">Se supera el límite de crédito ({formatCurrency(selectedCustomer!.creditLimit)}).</p>
               ) : (
                 <p className="text-muted-foreground">
