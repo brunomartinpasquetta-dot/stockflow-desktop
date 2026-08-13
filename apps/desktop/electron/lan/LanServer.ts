@@ -312,9 +312,19 @@ export class LanServer {
     };
     try {
       const contenido = await fsp.readFile(archivo);
+      // El index.html va SIN CACHE (`no-store`, no `no-cache`): cada versión
+      // renombra los archivos de la aplicación, así que una terminal que se
+      // queda con el index viejo pide archivos que ya no existen y muestra
+      // PANTALLA BLANCA. Con `no-cache` Chrome igual podía reusar la copia
+      // guardada; `no-store` le prohíbe guardarla. Los demás archivos llevan el
+      // hash en el nombre, así que se pueden cachear un año sin riesgo.
+      const esHtml = ext === '.html';
       res.writeHead(200, {
         'Content-Type': tipos[ext] ?? 'application/octet-stream',
-        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=86400',
+        'Cache-Control': esHtml
+          ? 'no-store, no-cache, must-revalidate'
+          : 'public, max-age=31536000, immutable',
+        ...(esHtml ? { Pragma: 'no-cache', Expires: '0' } : {}),
         'Access-Control-Allow-Origin': '*',
       });
       res.end(contenido);
