@@ -793,10 +793,10 @@ export function Articulos() {
                         {formatCurrency(a.listPrice1)}
                       </TableCell>
                       <TableCell className="py-0.5 text-right tabular-nums text-muted-foreground">
-                        {Number(a.listPrice2) ? formatCurrency(a.listPrice2) : ''}
+                        {formatCurrency(a.listPrice2)}
                       </TableCell>
                       <TableCell className="py-0.5 text-right tabular-nums text-muted-foreground">
-                        {Number(a.listPrice3) ? formatCurrency(a.listPrice3) : ''}
+                        {formatCurrency(a.listPrice3)}
                       </TableCell>
                     </TableRow>
                   )
