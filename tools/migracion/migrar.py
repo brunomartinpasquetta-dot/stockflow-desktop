@@ -121,6 +121,20 @@ def ean13_interno(n: int) -> str:
     return base + str((10 - suma % 10) % 10)
 
 
+def tipo_doc(p: dict | None, doc: str) -> str:
+    """CUIT o DNI. Manda TIPOCUIT, no la cantidad de dígitos.
+
+    Contar dígitos falla con los CUIT mal tipeados por el comercio: en Leo
+    Citzia, 'GEZHOUBA - ECOSUR BAHIA S.A.' tenía '0-71827058-4' (le falta el
+    30 adelante) y entraba como DNI, que después impide emitirle Factura A."""
+    t = txt(p.get("TIPOCUIT") if p else None).upper()
+    if t.startswith("CUIT"):
+        return "CUIT"
+    if t.startswith("DNI"):
+        return "DNI"
+    return "CUIT" if len(doc.replace("-", "")) == 11 else "DNI"
+
+
 def categoria_iva(v) -> str:
     """CATEGORIA de StockFácil → categoría fiscal de StockFlow."""
     s = txt(v).upper()
@@ -318,7 +332,7 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     # ---- PERSONAS (base de clientes y proveedores) ----
     personas: dict[int, dict] = {}
     if "PERSONA" in hay:
-        for r in leer(con, "PERSONA", ["IDPERSONA", "APELLIDO", "NOMBRE", "DNI", "CUIT",
+        for r in leer(con, "PERSONA", ["IDPERSONA", "APELLIDO", "NOMBRE", "DNI", "CUIT", "TIPOCUIT",
                                        "DOMICILIO", "CEL", "TEL", "EMAIL", "CATEGORIA", "LIMITE"]):
             if r["IDPERSONA"] is not None:
                 personas[r["IDPERSONA"]] = r
@@ -567,7 +581,7 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 "phone,mobile,email,category,credit_limit,created_at,updated_at) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (cid, apellido[:60], None,   # el nombre ya va en apellido
-                 ("CUIT" if len(doc.replace("-", "")) == 11 else "DNI") if doc else None,
+                 tipo_doc(p, doc) if doc else None,
                  doc or None, txt(p.get("DOMICILIO") if p else None) or None,
                  txt(p.get("TEL") if p else None) or None,
                  txt(p.get("CEL") if p else None) or None,
@@ -836,7 +850,7 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 "phone,mobile,email,category,credit_limit,created_at,updated_at) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (cliente, nombre[:60], txt(p.get("NOMBRE") if p else None)[:60] or None,
-                 ("CUIT" if len(doc.replace("-", "")) == 11 else "DNI") if doc else None,
+                 tipo_doc(p, doc) if doc else None,
                  doc or None, txt(p.get("DOMICILIO") if p else None) or None,
                  txt(p.get("TEL") if p else None) or None,
                  txt(p.get("CEL") if p else None) or None,
