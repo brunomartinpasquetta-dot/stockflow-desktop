@@ -24,8 +24,14 @@ jobs:
       # Serializado, macOS crea el release y Windows sube los suyos al que ya
       # está. Tarda unos minutos más y sale siempre.
       max-parallel: 1
+      # WINDOWS PRIMERO. El release se publica apenas termina el primer job y
+      # GitHub ya lo reporta como "la última versión": si arranca macOS, el
+      # cliente (Windows) recibe el aviso de versión nueva ~7 minutos ANTES de
+      # que exista su .exe y su latest.yml. Resultado: aviso sin nada que
+      # descargar y el update automático sin arrancar. Pasó con la v0.4.14, con
+      # el cliente mirando la pantalla.
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
