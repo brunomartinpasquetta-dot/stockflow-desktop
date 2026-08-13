@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Undo2, FileDown, ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2, Printer, ReceiptText } from 'lucide-react'
+import { Undo2, FileDown, FileSpreadsheet, ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2, Printer, ReceiptText } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useCompany, useCustomerBalances, usePaymentMethods } from '@/lib/hooks'
@@ -9,6 +9,7 @@ import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { ReturnSaleDialog } from '@/components/ReturnDialogs'
 import { exportReceiptPdf } from '@/lib/receiptDoc'
+import { exportStatementPdf, exportStatementExcel } from '@/lib/statementDoc'
 import { printPaymentReceiptSilent } from '@/lib/printPaymentReceipt'
 import type { SaleTicketData } from '@/print/SaleTicket'
 import type { PaymentReceiptData } from '@/print/PaymentReceipt'
@@ -445,6 +446,21 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
     }
   }
 
+  /** Datos del resumen, compartidos por PDF y Excel (respetan el filtro de fechas). */
+  function statementDocData() {
+    const company = companyQuery.data
+    if (!company || !customer) return null
+    return {
+      company,
+      customer,
+      entries: filteredEntries,
+      balance,
+      range: rangeActive
+        ? { from: fromMs ?? filteredEntries[0]?.date ?? Date.now(), to: toMs ?? Date.now() }
+        : null,
+    }
+  }
+
   function printReceipt(e: StatementEntryDTO): void {
     const data = receiptDataFor(e)
     if (data) void printPaymentReceiptSilent(data, printerCfgQuery.data ?? null)
@@ -480,6 +496,28 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
               Saldo: <span className="text-lg font-bold tabular-nums">{formatCurrency(balance)}</span>
             </CardContent>
           </Card>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const d = statementDocData()
+              if (d) exportStatementPdf(d)
+            }}
+            disabled={filteredEntries.length === 0 || !companyQuery.data}
+            title="Descargar el resumen de cuenta en PDF para mandarle al cliente"
+          >
+            <FileDown className="mr-1.5 h-4 w-4" /> Resumen PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const d = statementDocData()
+              if (d) void exportStatementExcel(d)
+            }}
+            disabled={filteredEntries.length === 0 || !companyQuery.data}
+            title="Descargar el resumen de cuenta en Excel"
+          >
+            <FileSpreadsheet className="mr-1.5 h-4 w-4" /> Resumen Excel
+          </Button>
           <Button
             disabled={!canCobrar || !hasBalance}
             title={
