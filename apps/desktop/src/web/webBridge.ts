@@ -24,6 +24,27 @@ import type { IpcResponse } from '../../electron/ipc/types';
 
 const PIN_KEY = 'stockflow.web.pin';
 const SESION_KEY = 'stockflow.web.sesion';
+/**
+ * Marca de "esta corrida del navegador". Vive en sessionStorage, así que
+ * desaparece al cerrar la ventana pero sobrevive a las recargas y al abrir
+ * módulos. Sirve para distinguir "recargué" de "abrí el acceso de nuevo".
+ */
+const CORRIDA_KEY = 'stockflow.web.corrida';
+
+/**
+ * Versión del servidor. Se pide una sola vez al ping y se guarda la PROMESA,
+ * no el valor: la pantalla de ingreso la pide apenas monta y si guardáramos
+ * sólo el valor llegaría tarde y mostraría un guion.
+ */
+let versionServidor: Promise<string> | null = null;
+
+function pedirVersion(ip: string, puerto: number): Promise<string> {
+  versionServidor ??= fetch(`http://${ip}:${puerto}/lan/ping`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d: { version?: string | null } | null) => d?.version ?? 'servidor')
+    .catch(() => 'servidor');
+  return versionServidor;
+}
 const IMPRESORA_KEY = 'stockflow.web.impresora';
 
 /**
@@ -83,7 +104,7 @@ const noAplica = (que: string): IpcResponse<never> => ({
  *    crudos, que necesita acceso directo al puerto de la impresora.
  *  - `updater` / `desktopWindow`: no tienen sentido en una pestaña.
  */
-function responderLocal(channel: string): IpcResponse<unknown> {
+async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
   const [grupo, metodo] = channel.split(':');
 
   if (grupo === 'lan') {
@@ -136,6 +157,13 @@ function responderLocal(channel: string): IpcResponse<unknown> {
   }
 
   if (grupo === 'system') {
+    // La versión la sabe el servidor y la manda en el ping: en una pestaña no
+    // hay proceso de Electron al que preguntarle. Se muestra en la pantalla de
+    // ingreso para que el comercio sepa con qué versión está trabajando.
+    if (metodo === 'getVersion') {
+      const cfg = configDesdeUrl();
+      return ok({ version: await pedirVersion(cfg.serverIp, cfg.serverPort) });
+    }
     return ok({ ok: true });
   }
 
@@ -185,13 +213,32 @@ function crearListeners(): BridgeIO['listeners'] {
 /** Monta `window.stockflow` en el navegador. Se llama antes de renderizar. */
 export function instalarPuenteWeb(): void {
   const lanCfg = configDesdeUrl();
+
+  // ¿Es una corrida NUEVA del navegador (se abrió el acceso) o una recarga?
+  // sessionStorage muere al cerrar la ventana y sobrevive a las recargas, así
+  // que su ausencia significa "recién abierto" → se cierra la sesión anterior
+  // y la terminal arranca siempre en el ingreso.
+  try {
+    if (!sessionStorage.getItem(CORRIDA_KEY)) {
+      sessionStorage.setItem(CORRIDA_KEY, String(Date.now()));
+      localStorage.removeItem(SESION_KEY);
+    }
+  } catch {
+    /* navegador sin almacenamiento: se pide ingreso igual */
+  }
+
+  // Se dispara ya, así está lista cuando la pantalla de ingreso la pida.
+  void pedirVersion(lanCfg.serverIp, lanCfg.serverPort);
   const io: BridgeIO = {
-    invoke: async (channel) => responderLocal(channel),
+    invoke: (channel) => responderLocal(channel),
     listeners: crearListeners(),
     fetch: (input, init) => window.fetch(input, init),
     httpTimeoutMs: 15_000,
     // La sesión se comparte entre pestañas: si no, cada módulo que se abre
-    // pediría iniciar sesión otra vez.
+    // pediría iniciar sesión otra vez. Pero NO sobrevive a cerrar el acceso:
+    // al abrirlo de nuevo se pide usuario y contraseña. En un mostrador con
+    // varios cajeros, dejar la sesión del turno anterior abierta hace que las
+    // ventas queden a nombre de quien no las hizo.
     session: {
       load: () => localStorage.getItem(SESION_KEY),
       save: (t) => {

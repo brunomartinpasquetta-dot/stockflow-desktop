@@ -298,6 +298,7 @@ function bootstrap(): { lanArgs: string[] } {
       // navegador (necesario en PC donde Electron ya no corre, ej. Windows 7).
       // getAppPath() apunta al .asar empaquetado y a apps/desktop en
       // desarrollo: la interfaz compilada vive en dist/ en los dos casos.
+      appVersion: app.getVersion(),
       webRoot: path.join(app.getAppPath(), 'dist'),
       resolveUser: async (userId: string) => {
         const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;

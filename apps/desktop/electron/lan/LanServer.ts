@@ -68,6 +68,8 @@ export interface LanServerOptions {
    * comercio), así que necesitan poder consultarla.
    */
   licenseStatus?: () => 'active' | 'readOnly' | 'unlicensed' | 'revoked';
+  /** Versión del servidor, para que los puestos por navegador la muestren. */
+  appVersion?: string;
   /** Carpeta con la interfaz compilada, para servirla al navegador. */
   webRoot?: string;
 }
@@ -355,6 +357,11 @@ export class LanServer {
         ok: true,
         timestamp: Date.now(),
         license: this.opts.licenseStatus ? this.opts.licenseStatus() : 'active',
+        // La versión viaja acá para que los puestos por navegador puedan
+        // mostrarla: en una pestaña no hay proceso de Electron al que
+        // preguntarle, y el comercio necesita saber con qué versión trabaja
+        // para reportar un problema.
+        version: this.opts.appVersion ?? null,
       });
       return;
     }
