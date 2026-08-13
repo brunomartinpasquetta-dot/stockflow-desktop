@@ -197,6 +197,14 @@ export function Articulos() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState<string>('')
+  // Los dados de baja quedan fuera salvo que se pidan: en una base migrada son
+  // 10.303 de 12.413 y tapan por completo lo que el comercio usa todos los días.
+  const [verBajas, setVerBajas] = useState(false)
+  // Se dibujan las primeras filas nomás. Con 12.000 artículos, pintar la grilla
+  // entera congelaba la pantalla varios segundos —peor en las terminales, que
+  // además reciben todo por red—. Es lo mismo que hace StockFácil con su
+  // "Mostrar todo".
+  const [verTodas, setVerTodas] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('description')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   // Imagen que el usuario eligió en `create` y todavía no se subió.
@@ -266,6 +274,7 @@ export function Articulos() {
     const q = search.trim()
     const base = articles.data ?? []
     let filteredRows = q ? base.filter((a) => articleMatches(a, q, searchCtx)) : base
+    if (!verBajas) filteredRows = filteredRows.filter((a) => a.active)
     if (brandFilter) filteredRows = filteredRows.filter((a) => a.brand === brandFilter)
     const dir = sortDir === 'asc' ? 1 : -1
     // Valor a comparar (familyId → nombre de familia; el resto, el campo crudo).
@@ -286,7 +295,20 @@ export function Articulos() {
       if (bothNum) return (an - bn) * dir
       return av.localeCompare(bv, 'es', { numeric: true, sensitivity: 'base' }) * dir
     })
-  }, [articles.data, search, brandFilter, sortKey, sortDir, familyName, searchCtx])
+  }, [articles.data, search, brandFilter, verBajas, sortKey, sortDir, familyName, searchCtx])
+
+  /** Cuántos hay en total según el filtro de bajas (para el contador). */
+  const totalActivos = useMemo(
+    () => (articles.data ?? []).filter((a) => verBajas || a.active).length,
+    [articles.data, verBajas],
+  )
+
+  /** Lo que realmente se dibuja (ver `verTodas`). */
+  const TOPE_FILAS = 300
+  const visibles = useMemo(
+    () => (verTodas ? filtered : filtered.slice(0, TOPE_FILAS)),
+    [filtered, verTodas],
+  )
 
   function selectArticle(a: ArticleDTO): void {
     setSelectedId(a.id)
@@ -626,7 +648,7 @@ export function Articulos() {
         <div className="flex-1" />
         <select
           value={brandFilter}
-          onChange={(e) => setBrandFilter(e.target.value)}
+          onChange={(e) => { setBrandFilter(e.target.value); setVerTodas(false) }}
           title="Filtrar por marca"
           className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
@@ -642,21 +664,50 @@ export function Articulos() {
           <Input
             ref={searchRef}
             value={search}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setVerTodas(false) }}
             placeholder="Buscar (Ctrl+F)…"
             className="pl-8"
           />
         </div>
       </div>
 
+      {/* Contador + qué se muestra. StockFácil dice "1000 resultados de 2109" y
+          tiene un "Mostrar todo": la misma idea, porque es lo que el comercio
+          ya sabe leer y evita el susto de "me faltan artículos". */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span className="tabular-nums">
+          {visibles.length === filtered.length
+            ? `${filtered.length.toLocaleString('es-AR')} artículo${filtered.length === 1 ? '' : 's'}`
+            : `${visibles.length.toLocaleString('es-AR')} de ${filtered.length.toLocaleString('es-AR')} resultados`}
+          {totalActivos !== filtered.length && ` · ${totalActivos.toLocaleString('es-AR')} en total`}
+        </span>
+        {visibles.length < filtered.length && (
+          <button
+            type="button"
+            className="font-medium text-primary hover:underline"
+            onClick={() => setVerTodas(true)}
+          >
+            Mostrar todos
+          </button>
+        )}
+        <label className="flex cursor-pointer items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={verBajas}
+            onChange={(e) => { setVerBajas(e.target.checked); setVerTodas(false) }}
+          />
+          Incluir dados de baja
+        </label>
+      </div>
+
       {/* Grilla */}
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div ref={tableContainerRef} className="min-h-0 flex-1 overflow-auto">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead
-                  className="cursor-pointer select-none"
+                  className="w-[9rem] cursor-pointer select-none"
                   onClick={() => toggleSort('barcode')}
                 >
                   Código{sortIcon('barcode')}
@@ -667,44 +718,46 @@ export function Articulos() {
                 >
                   Detalle{sortIcon('description')}
                 </TableHead>
-                <TableHead>Marca</TableHead>
+                <TableHead className="w-[7.5rem]">Marca</TableHead>
                 <TableHead
-                  className="cursor-pointer select-none"
+                  className="w-[9rem] cursor-pointer select-none"
                   onClick={() => toggleSort('familyId')}
                 >
                   Familia{sortIcon('familyId')}
                 </TableHead>
                 <TableHead
-                  className="cursor-pointer select-none text-right"
-                  onClick={() => toggleSort('listPrice1')}
-                >
-                  P. Venta{sortIcon('listPrice1')}
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer select-none text-right"
+                  className="w-[6.5rem] cursor-pointer select-none text-right"
                   onClick={() => toggleSort('stock')}
                 >
                   Stock{sortIcon('stock')}
                 </TableHead>
+                <TableHead
+                  className="w-[7rem] cursor-pointer select-none text-right"
+                  onClick={() => toggleSort('listPrice1')}
+                >
+                  P. Venta{sortIcon('listPrice1')}
+                </TableHead>
+                <TableHead className="w-[7rem] text-right">P. Lista 2</TableHead>
+                <TableHead className="w-[7rem] text-right">P. Lista 3</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {articles.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     Cargando artículos…
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     {articles.data && articles.data.length > 0
                       ? 'Sin resultados para la búsqueda actual'
                       : 'No hay artículos cargados'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((a) => {
+                visibles.map((a) => {
                   const isSel = a.id === selectedId
                   return (
                     <TableRow
@@ -720,19 +773,30 @@ export function Articulos() {
                         (isSel ? 'bg-blue-100/60 dark:bg-blue-900/40' : '')
                       }
                     >
-                      <TableCell className="font-mono text-xs">{a.barcode}</TableCell>
-                      <TableCell>{a.description}</TableCell>
-                      <TableCell>{a.brand ?? ''}</TableCell>
-                      <TableCell>
+                      <TableCell className="truncate py-0.5 font-mono text-xs">{a.barcode}</TableCell>
+                      <TableCell className="truncate py-0.5" title={a.description}>
+                        {a.description}
+                      </TableCell>
+                      <TableCell className="truncate py-0.5">{a.brand ?? ''}</TableCell>
+                      <TableCell className="truncate py-0.5">
                         {a.familyId ? (familyName.get(a.familyId) ?? '—') : '—'}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(a.listPrice1)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={stockBadgeVariant(a.stock, a.minStock, a.idealStock)}>
+                      <TableCell className="py-0.5 text-right">
+                        <Badge
+                          className="px-1.5 py-0"
+                          variant={stockBadgeVariant(a.stock, a.minStock, a.idealStock)}
+                        >
                           {formatQty(a.stock)}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="py-0.5 text-right tabular-nums">
+                        {formatCurrency(a.listPrice1)}
+                      </TableCell>
+                      <TableCell className="py-0.5 text-right tabular-nums text-muted-foreground">
+                        {Number(a.listPrice2) ? formatCurrency(a.listPrice2) : ''}
+                      </TableCell>
+                      <TableCell className="py-0.5 text-right tabular-nums text-muted-foreground">
+                        {Number(a.listPrice3) ? formatCurrency(a.listPrice3) : ''}
                       </TableCell>
                     </TableRow>
                   )
@@ -744,7 +808,7 @@ export function Articulos() {
       </Card>
 
       {/* Panel de detalle / formulario */}
-      <Card className="flex h-[48%] min-h-[320px] flex-shrink-0 flex-col overflow-hidden border-t-2">
+      <Card className="flex h-[36%] min-h-[240px] flex-shrink-0 flex-col overflow-hidden border-t-2">
         {mode === 'idle' ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             Seleccioná un artículo de la lista o presioná <kbd className="mx-1 rounded border bg-muted px-1">Nuevo</kbd>.
