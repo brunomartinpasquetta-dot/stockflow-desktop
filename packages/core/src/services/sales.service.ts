@@ -235,6 +235,17 @@ export class SalesService {
       repos.saleLines.findBySale(saleId),
       repos.salePayments.findBySale(saleId),
     ]);
-    return { sale, lines, payments };
+    // La descripción de cada artículo viaja CON la línea. Antes la pantalla
+    // resolvía los nombres bajando el catálogo entero: en Leo Citzia son 6,6 MB
+    // por cada venta que se abre —y por red, a una terminal Windows 7—, para
+    // mostrar tres renglones. Son unas pocas consultas por id contra la misma
+    // base que ya estamos leyendo.
+    const conNombre = await Promise.all(
+      lines.map(async (l) => {
+        const a = await repos.articles.findById(l.articleId);
+        return { ...l, articleDescription: a?.description ?? null };
+      }),
+    );
+    return { sale, lines: conNombre, payments };
   }
 }

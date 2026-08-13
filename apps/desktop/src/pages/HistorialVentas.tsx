@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Undo2, Loader2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
-import { useArticles, useCompany, useCustomers, usePaymentMethods } from '@/lib/hooks'
+import { useCompany, useCustomers, usePaymentMethods } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput } from '@/lib/format'
@@ -50,7 +50,10 @@ function SaleDetailDialog({
 }) {
   const qc = useQueryClient()
   const detailQuery = useQuery({ queryKey: ['sale', saleId], queryFn: () => api.sales.get(saleId) })
-  const articlesQuery = useArticles()
+  // NO se baja el catálogo: la descripción de cada artículo ya viene con la
+  // línea de la venta. Antes, abrir una venta para ver tres renglones bajaba
+  // los 12.413 artículos —6,6 MB por red a una terminal Windows 7—, y eso era
+  // lo que se sentía como "el sistema anda lento".
   const methodsQuery = usePaymentMethods()
   const companyQuery = useCompany()
   const printerCfgQuery = useQuery({
@@ -58,7 +61,10 @@ function SaleDetailDialog({
     queryFn: () => api.hardware.printer.getConfig(),
     staleTime: 30_000,
   })
-  const descById = useMemo(() => new Map((articlesQuery.data ?? []).map((a) => [a.id, a.description])), [articlesQuery.data])
+  const descById = useMemo(
+    () => new Map((detailQuery.data?.lines ?? []).map((l) => [l.articleId, l.articleDescription ?? '—'])),
+    [detailQuery.data],
+  )
   const pmNameById = useMemo(() => new Map((methodsQuery.data ?? []).map((m) => [m.id, m.name])), [methodsQuery.data])
   const [confirming, setConfirming] = useState(false)
   const [returning, setReturning] = useState(false)

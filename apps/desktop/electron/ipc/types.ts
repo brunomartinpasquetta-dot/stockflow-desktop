@@ -275,6 +275,8 @@ export interface SaleLineDTO {
   id: string;
   saleId: string;
   articleId: string;
+  /** Descripción del artículo, resuelta por el servidor (ver SalesService.getSale). */
+  articleDescription?: string | null;
   lineNumber: number;
   quantity: string;
   unitPrice: string;

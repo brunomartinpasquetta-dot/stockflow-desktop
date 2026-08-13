@@ -269,8 +269,15 @@ export function instalarPuenteWeb(): void {
     /* navegador sin almacenamiento: se pide ingreso igual */
   }
 
-  // Se dispara ya, así está lista cuando la pantalla de ingreso la pida.
-  void pedirVersion(lanCfg.serverIp, lanCfg.serverPort);
+  // Se dispara ya, así está lista cuando la pantalla de ingreso la pida, y de
+  // paso se pone en el TÍTULO de la ventana: la terminal muestra lo mismo que
+  // el servidor ("StockFlow - Sistema de Gestión Comercial v0.4.21"), así el
+  // comercio puede leer su versión sin entrar a ninguna pantalla.
+  void pedirVersion(lanCfg.serverIp, lanCfg.serverPort).then((v) => {
+    if (v && v !== 'servidor') {
+      document.title = `StockFlow - Sistema de Gestión Comercial v${v}`;
+    }
+  });
   const io: BridgeIO = {
     invoke: (channel) => responderLocal(channel),
     listeners: crearListeners(),
