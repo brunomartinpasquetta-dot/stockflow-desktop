@@ -39,6 +39,11 @@ try:
 except ImportError:
     sys.exit("Falta el driver: pip3 install firebirdsql passlib")
 
+try:
+    import bcrypt as _bcrypt
+except ImportError:
+    _bcrypt = None   # sin bcrypt se migran los usuarios con una clave provisoria
+
 IMAGEN = "jacobalberty/firebird:2.5-ss"
 CONTENEDOR = "stockfacil-migracion"
 WORK = "/tmp/stockfacil-migracion"
@@ -310,7 +315,66 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     if not usuario:
         sq.close(); con.close()
         sys.exit("La base destino no tiene usuarios. Abrí StockFlow una vez antes de migrar.")
+    # ---- PERSONAS (base de clientes y proveedores) ----
+    personas: dict[int, dict] = {}
+    if "PERSONA" in hay:
+        for r in leer(con, "PERSONA", ["IDPERSONA", "APELLIDO", "NOMBRE", "DNI", "CUIT",
+                                       "DOMICILIO", "CEL", "TEL", "EMAIL", "CATEGORIA", "LIMITE"]):
+            if r["IDPERSONA"] is not None:
+                personas[r["IDPERSONA"]] = r
+
+    def nombre_de(p: dict, alt: str) -> str:
+        """Apellido y nombre, sin repetir cuando el APELLIDO ya trae los dos.
+
+        En bases reales el comercio carga todo junto en APELLIDO ("AGUAISOL
+        EDUARDO") y además llena NOMBRE ("EDUARDO"): concatenar a ciegas
+        dejaba "AGUAISOL EDUARDO EDUARDO"."""
+        ape = txt(p.get("APELLIDO"))
+        nom = txt(p.get("NOMBRE"))
+        if not nom or nom.upper() in ape.upper().split():
+            return ape or nom or alt
+        return f"{ape} {nom}".strip() or alt
+
     uid = usuario[0]
+
+    # ---- USUARIOS ----
+    # StockFácil guarda la contraseña EN TEXTO PLANO (USUARIO.PASS), así que
+    # cada uno entra a StockFlow con el mismo usuario y la misma clave de
+    # siempre: nadie tiene que aprender nada nuevo. Se rehashea con bcrypt
+    # cost 10, que es lo que valida StockFlow (user.repository.ts).
+    # El usuario queda TAL CUAL está en StockFácil (en mayúscula): el login
+    # distingue mayúsculas de minúsculas y tienen que escribir lo mismo que hoy.
+    # El `admin` que crea StockFlow NO se toca: es la puerta de entrada del
+    # soporte si alguien se olvida la clave.
+    def hashear(clave: str) -> str:
+        if _bcrypt is None:
+            return "$2b$10$463wf07yJXEVBvgzqLDx0O8RBvuTCkzXLSrzCqkNcSeMPTIZ7BoHC"  # 'admin'
+        return _bcrypt.hashpw(clave.encode("utf-8")[:72],
+                              _bcrypt.gensalt(rounds=10, prefix=b"2b")).decode()
+
+    ROLES = {"ADMINISTRADOR": "admin", "SUPERVISOR": "manager",
+             "ENCARGADO": "manager", "VENDEDOR": "seller", "CAJERO": "seller"}
+    usuario_map: dict[int, str] = {}
+    for r in leer(con, "USUARIO", ["IDUSUARIO", "IDPERSONA", "TIPO", "PASS", "USUARIO"]
+                  ) if "USUARIO" in hay else []:
+        nombre = txt(r["USUARIO"])
+        if not nombre or nombre.lower() == "admin":
+            continue
+        clave = txt(r["PASS"]) or nombre
+        p = personas.get(r["IDPERSONA"]) if r["IDPERSONA"] is not None else None
+        completo = nombre_de(p, nombre) if p else nombre
+        uidn = uuid7()
+        try:
+            sq.execute(
+                "INSERT INTO users (id,username,password_hash,full_name,role,active,"
+                "created_at,updated_at) VALUES (?,?,?,?,?,1,?,?)",
+                (uidn, nombre[:40], hashear(clave), completo[:80],
+                 ROLES.get(txt(r["TIPO"]).upper(), "seller"), ahora, ahora))
+            usuario_map[r["IDUSUARIO"]] = uidn
+            rep.suma("Usuarios", 1)
+            rep.aviso(f"usuario '{nombre}' entra con su misma clave de StockFácil")
+        except sqlite3.IntegrityError:
+            rep.aviso(f"el usuario '{nombre}' ya existía: se deja el de StockFlow")
 
     # ---- FAMILIAS ----
     # No todas las instalaciones tienen tabla FAMILIA. La de Leo Citzia guarda
@@ -341,26 +405,6 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                        (fid, nombre[:60], ahora))
             fam_id[txt(r["CODIGO"])] = fid
             rep.suma("Familias", 1)
-
-    # ---- PERSONAS (base de clientes y proveedores) ----
-    personas: dict[int, dict] = {}
-    if "PERSONA" in hay:
-        for r in leer(con, "PERSONA", ["IDPERSONA", "APELLIDO", "NOMBRE", "DNI", "CUIT",
-                                       "DOMICILIO", "CEL", "TEL", "EMAIL", "CATEGORIA", "LIMITE"]):
-            if r["IDPERSONA"] is not None:
-                personas[r["IDPERSONA"]] = r
-
-    def nombre_de(p: dict, alt: str) -> str:
-        """Apellido y nombre, sin repetir cuando el APELLIDO ya trae los dos.
-
-        En bases reales el comercio carga todo junto en APELLIDO ("AGUAISOL
-        EDUARDO") y además llena NOMBRE ("EDUARDO"): concatenar a ciegas
-        dejaba "AGUAISOL EDUARDO EDUARDO"."""
-        ape = txt(p.get("APELLIDO"))
-        nom = txt(p.get("NOMBRE"))
-        if not nom or nom.upper() in ape.upper().split():
-            return ape or nom or alt
-        return f"{ape} {nom}".strip() or alt
 
     # ---- PROVEEDORES ----
     prov_id: dict[int, str] = {}
