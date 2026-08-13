@@ -122,7 +122,9 @@ function PrinterSection() {
       const fmt: PaperFormatDTO =
         cfgQuery.data.paperFormat ?? (cfgQuery.data.width === 58 ? '58mm' : '80mm')
       setPaperFormat(fmt)
-      if (cfgQuery.data.kind === 'system') setSystemName(cfgQuery.data.interface)
+      // `?? ''`: si la config viniera incompleta, el `.trim()` de más abajo
+      // reventaba la pantalla entera en vez de mostrarla vacía.
+      if (cfgQuery.data.kind === 'system') setSystemName(cfgQuery.data.interface ?? '')
     }
   }
 

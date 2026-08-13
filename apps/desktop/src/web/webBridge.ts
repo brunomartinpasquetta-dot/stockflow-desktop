@@ -142,6 +142,9 @@ async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
   if (grupo === 'print') {
     if (metodo === 'getConfig') return ok({ paperFormat: anchoImpresora(), copies: 1, mode: 'dialog' });
     if (metodo === 'setConfig') return ok({ ok: true });
+    // Devuelve ARRAY: la pantalla hace `.length` sobre esto. Un `{ok:true}`
+    // ahí no rompe hoy, pero es una bomba de tiempo.
+    if (metodo === 'listElectron') return ok([]);
     return ok({ ok: true });
   }
 
@@ -149,7 +152,23 @@ async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
     // El ancho de papel es de ESTA terminal, no del servidor: cada puesto
     // puede tener su impresora. Lo guarda el propio navegador de esa PC.
     if (channel === 'hardware:printer:get-config') {
-      return ok({ kind: 'system', paperFormat: anchoImpresora(), copies: 1 });
+      // La forma tiene que estar COMPLETA. Devolverla a medias rompía la
+      // pantalla de Configuración Hardware: `interface` llegaba undefined y el
+      // componente hace `systemName.trim()` -> "Cannot read properties of
+      // undefined". No alcanza con que las consultas no fallen; los datos
+      // tienen que tener la forma que la pantalla espera.
+      const ancho = anchoImpresora();
+      return ok({
+        kind: 'system',
+        interface: '',
+        width: ancho === '58mm' ? 58 : 80,
+        characterSet: 'PC858_EURO',
+        autoOpenDrawer: false,
+        paperFormat: ancho,
+        copies: 1,
+        silentPrint: false,      // en el navegador siempre sale por el diálogo
+        autoPrintOnSale: true,
+      });
     }
     if (channel === 'hardware:printer:set-config') return ok({ ok: true });
     // Imprimir sale por el diálogo del navegador + driver de Windows, igual
