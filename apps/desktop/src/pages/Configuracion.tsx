@@ -210,7 +210,10 @@ function PrinterSection() {
   }
 
   function onSave(): void {
-    if (!systemName.trim()) {
+    // En el navegador NO hay impresora que elegir (no se puede listar) y lo
+    // único que se guarda es el ancho de papel de ESA terminal: exigir una
+    // impresora dejaba el botón inservible y no se podía cambiar el ancho.
+    if (!esWeb && !systemName.trim()) {
       toast.error('Elegí una impresora del sistema')
       return
     }
