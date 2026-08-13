@@ -36,6 +36,13 @@ const FILE_NAME = 'updater.json';
 // pedido HTTP diminuto contra GitHub; el costo es cero al lado de tener al
 // cliente esperando un fix. (Leo Citzia, 12-ago-2026)
 const MEDIA_HORA_MS = 30 * 60 * 1000;
+
+/**
+ * En mac el auto-update NO puede aplicarse: Squirrel.Mac necesita la app
+ * firmada y notarizada. Por eso allá vale el aviso manual (bajar el .dmg) y en
+ * Windows NO: ahí el update se baja e instala solo con un clic.
+ */
+const isMac = process.platform === 'darwin';
 const FIVE_SECONDS_MS = 5_000;
 
 function readPrefs(userDataDir: string): UpdaterPrefs {
@@ -232,7 +239,14 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
       const r = await checkForOutdatedVersion({
         appVersion: ctx.appVersion,
         isPackaged: ctx.isPackaged,
-        onOutdated: (info) => ctx.getWindow()?.webContents.send('updater:outdated', info),
+        // El banner "Bajar instalador" es EXCLUSIVO de mac. En Windows el
+        // update se baja e instala solo; ofrecer además una descarga manual
+        // (que abre GitHub en el navegador) confunde y compite con el camino
+        // que sí funciona.
+        onOutdated: (info) => {
+          if (!isMac) return;
+          ctx.getWindow()?.webContents.send('updater:outdated', info);
+        },
         channel: prefs.channel,
       });
       return r.outdated
@@ -294,7 +308,6 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   // en mac NO auto-descargamos (no se dispara `updater:downloaded`) y dejamos sólo
   // el aviso manual (`updater:outdated` → banner "Bajar instalador" → .dmg, que sí
   // funciona). En Windows el auto-update de un clic queda intacto.
-  const isMac = process.platform === 'darwin';
   autoUpdater.autoDownload = !isMac;
   autoUpdater.autoInstallOnAppQuit = false;
   // Solo el canal 'beta' baja prereleases; en 'stable' electron-updater las ignora.
@@ -332,6 +345,7 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   // fallaba, el usuario no se enteraba NUNCA de que había versión nueva, que es
   // exactamente lo que pasó con la descarga diferencial rota.
   const periodicManual = setInterval(() => {
+    if (!isMac) return;          // en Windows manda el auto-update, no el aviso manual
     if (!prefs.autoCheck) return;
     void manualCheck();
   }, MEDIA_HORA_MS);

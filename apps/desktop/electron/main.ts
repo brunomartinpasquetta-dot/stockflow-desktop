@@ -368,17 +368,23 @@ if (!app.requestSingleInstanceLock()) {
       mainWindow?.once('ready-to-show', () => startLicenseHeartbeat());
       // 10 segundos después de mostrar la ventana, chequear si la versión instalada
       // quedó atrás respecto a GitHub Releases (Squirrel.Mac falla sin firma).
-      mainWindow?.once('ready-to-show', () => {
-        setTimeout(() => {
-          void checkForOutdatedVersion({
-            appVersion: app.getVersion(),
-            isPackaged: app.isPackaged,
-            onOutdated: (info) => {
-              mainWindow?.webContents.send('updater:outdated', info);
-            },
-          });
-        }, 10_000);
-      });
+      // SÓLO EN MAC. En Windows la actualización se baja e instala sola con un
+      // clic; mostrar además "bajá el instalador" y mandar al usuario a una
+      // página de GitHub es confuso y contradice el camino bueno. En mac es el
+      // único aviso posible: Squirrel.Mac no puede aplicar un update sin firma.
+      if (process.platform === 'darwin') {
+        mainWindow?.once('ready-to-show', () => {
+          setTimeout(() => {
+            void checkForOutdatedVersion({
+              appVersion: app.getVersion(),
+              isPackaged: app.isPackaged,
+              onOutdated: (info) => {
+                mainWindow?.webContents.send('updater:outdated', info);
+              },
+            });
+          }, 10_000);
+        });
+      }
       app.on('activate', () => {
         // Clic en el ícono del Dock / barra con la app YA abierta: NO crear otra
         // ventana principal (se veían "dos sistemas"). Si la principal existe,
