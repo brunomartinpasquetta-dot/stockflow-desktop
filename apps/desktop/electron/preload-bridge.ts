@@ -87,6 +87,11 @@ export const LAN_ROUTED_GROUPS = new Set([
   'audit',
   'maintenance',
   'fiscal',
+  // Flowy VA AL SERVIDOR. Estaba como local porque su clave de API vivía en el
+  // main, pero hace rato que funciona 100% offline y, sobre todo, sus
+  // respuestas con datos del negocio ("¿cuánto vendí hoy?") necesitan LA BASE,
+  // que sólo tiene el servidor. En los puestos quedaba sin contestar nada.
+  'assistant',
 ]);
 
 export const LOCAL_GROUPS = new Set([
@@ -97,9 +102,6 @@ export const LOCAL_GROUPS = new Set([
   'license',
   'print',
   'desktopWindow',
-  // El asistente llama a la API de Claude desde el main de cada máquina (la key
-  // vive en el main, no viaja por LAN). Por eso es local, no ruteado al servidor.
-  'assistant',
 ]);
 
 interface LanState {

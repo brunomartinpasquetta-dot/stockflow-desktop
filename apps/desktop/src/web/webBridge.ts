@@ -113,6 +113,10 @@ async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
       return ok({ mode: 'client', serverIp: cfg.serverIp, serverPort: cfg.serverPort });
     }
     if (metodo === 'getLocalIp') return ok({ ip: null });
+    // Idem: la pestaña Red las pide al abrirse. Las terminales conectadas las
+    // sabe el servidor, no el puesto.
+    if (metodo === 'getConnectedClients') return ok([]);
+    if (metodo === 'getStatus') return ok({ running: true, mode: 'client' });
     return noAplica('La configuración de red');
   }
 
@@ -126,6 +130,12 @@ async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
     if (metodo === 'getState' || metodo === 'check') {
       return ok({ status: 'idle', currentVersion: 'web', availableVersion: null });
     }
+    // La pestaña Actualizaciones las pide al abrirse: si se rechazan, no abre.
+    // El puesto no se actualiza solo (se actualiza el servidor), pero la
+    // pantalla tiene que poder mostrarse.
+    if (metodo === 'getAutoCheck') return ok({ autoCheck: true });
+    if (metodo === 'getChannel') return ok({ channel: 'stable' });
+    if (metodo === 'getPending') return ok(null);
     return noAplica('Las actualizaciones');
   }
 
@@ -149,7 +159,20 @@ async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
       return noAplica('La impresión directa a la térmica');
     }
     if (channel === 'hardware:printer:list-system') return ok([]);
-    return noAplica('El manejo directo de impresora y cajón');
+    // Estas tres las pide la pestaña Hardware AL ABRIRSE. Si se rechazan, la
+    // pestaña entera no abre —era el bug: "no puedo entrar a Configuración
+    // Hardware desde la terminal"—. Se contestan vacías: el puesto no tiene
+    // puerto serie ni balanza propios, y así la pantalla abre y muestra lo que
+    // sí le sirve (el ancho de papel de ESTA terminal).
+    if (channel === 'hardware:printer:list-serial') return ok([]);
+    if (channel === 'hardware:printer:list-usb') return ok([]);
+    if (channel === 'hardware:scale:get-config') {
+      return ok({ portPath: '', baudRate: 9600, protocol: 'generic', mode: 'request' });
+    }
+    // Lo que SÍ toca un aparato (probar impresora, abrir cajón, leer balanza)
+    // se rechaza con un mensaje claro: son acciones que dispara el usuario, no
+    // datos que la pantalla necesite para abrir.
+    return noAplica('El manejo directo de impresora, cajón y balanza');
   }
 
   if (grupo === 'desktopWindow' || grupo === 'windows') {
