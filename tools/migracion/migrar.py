@@ -621,12 +621,20 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         fisico = 1 if ("CONTADO" in n or "EFECTIVO" in n) else 0
         nid = uuid7()
         orden = (sq.execute("SELECT COALESCE(MAX(sort_order),0) FROM payment_methods").fetchone()[0] or 0) + 1
+        # NACEN INACTIVOS. Los medios que trae StockFlow son los que el comercio
+        # debe usar; lo que viene de StockFácil existe sólo para que el
+        # historial de caja conserve con qué se cobró cada cosa. Muchos ni
+        # siquiera son medios de pago: son etiquetas de movimiento ("Pagos de
+        # Cuentas de Clientes", "Anulacion de Pagos") y hasta basura tipeada
+        # ("Ç"). Si aparecen en la pantalla de venta, el cajero elige
+        # cualquiera. El comercio activa desde Medios de Pago los que de
+        # verdad use (MercadoPago, Cuenta DNI...).
         sq.execute(
             "INSERT INTO payment_methods (id,name,type,is_physical_cash,commission_pct,"
-            "active,sort_order,created_at,updated_at) VALUES (?,?,'other',?,'0.0000',1,?,?,?)",
+            "active,sort_order,created_at,updated_at) VALUES (?,?,'other',?,'0.0000',0,?,?,?)",
             (nid, destino[:40], fisico, orden, ahora, ahora))
         pm_id[clave] = nid
-        rep.suma("Medios de pago creados", 1)
+        rep.suma("Medios de pago de StockFácil (inactivos)", 1)
         return nid
 
     # ---- CAJAS DIARIAS ----
