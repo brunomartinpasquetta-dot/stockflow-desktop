@@ -183,7 +183,6 @@ function PromoFormDialog(props: {
   // Candidatos: activos, que no sean promos (el back igual lo valida) y no agregados.
   const candidates = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (q.length < 2) return []
     const chosen = new Set(items.map((i) => i.articleId))
     return articles
       .filter(
@@ -191,7 +190,7 @@ function PromoFormDialog(props: {
           a.active &&
           a.brand !== 'PROMO' &&
           !chosen.has(a.id) &&
-          (a.description.toLowerCase().includes(q) || a.barcode.toLowerCase().includes(q) || (a.brand ?? '').toLowerCase().includes(q)),
+          (!q || a.description.toLowerCase().includes(q) || a.barcode.toLowerCase().includes(q) || (a.brand ?? '').toLowerCase().includes(q)),
       )
       .slice(0, 50)
   }, [articles, search, items])
