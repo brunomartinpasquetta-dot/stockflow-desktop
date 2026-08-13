@@ -30,7 +30,12 @@ interface UpdaterPrefs {
 }
 
 const FILE_NAME = 'updater.json';
-const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+// Cada media hora, no cada 4 horas. El comercio abre el sistema a la mañana y
+// lo deja abierto todo el día: con 4 horas, un arreglo publicado al mediodía no
+// le llegaba hasta la tarde, y si cerraba antes no le llegaba nunca. Es un
+// pedido HTTP diminuto contra GitHub; el costo es cero al lado de tener al
+// cliente esperando un fix. (Leo Citzia, 12-ago-2026)
+const MEDIA_HORA_MS = 30 * 60 * 1000;
 const FIVE_SECONDS_MS = 5_000;
 
 function readPrefs(userDataDir: string): UpdaterPrefs {
@@ -321,7 +326,15 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   }
 
   const startupCheck = setTimeout(checkInternal, FIVE_SECONDS_MS);
-  const periodicCheck = setInterval(checkInternal, FOUR_HOURS_MS);
+  const periodicCheck = setInterval(checkInternal, MEDIA_HORA_MS);
+  // El chequeo contra la API de GitHub también se repite. Antes sólo corría al
+  // arrancar (main.ts) y con el botón "Verificar": si la descarga automática
+  // fallaba, el usuario no se enteraba NUNCA de que había versión nueva, que es
+  // exactamente lo que pasó con la descarga diferencial rota.
+  const periodicManual = setInterval(() => {
+    if (!prefs.autoCheck) return;
+    void manualCheck();
+  }, MEDIA_HORA_MS);
 
   return {
     checkNow: async () => {
@@ -352,6 +365,7 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
     dispose: () => {
       clearTimeout(startupCheck);
       clearInterval(periodicCheck);
+      clearInterval(periodicManual);
     },
   };
 }

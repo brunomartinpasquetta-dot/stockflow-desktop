@@ -57,8 +57,27 @@ function useEntityMutations<T>(
 }
 
 // --- Artículos ---
+/**
+ * El catálogo completo.
+ *
+ * Vive más tiempo en cache que el resto (5 min contra los 30 s del default):
+ * son MILES de artículos —12.413 en Leo Citzia— y con el default se volvía a
+ * pedir la lista entera al abrir la pantalla y cada vez que se enfocaba la
+ * ventana. En las terminales, que lo reciben por red, eso se sentía como que el
+ * sistema "anda lento".
+ *
+ * No hay riesgo de quedarse con datos viejos propios: alta, baja y modificación
+ * invalidan `['articles']` y refrescan al instante. Lo único que puede demorar
+ * hasta 5 minutos es un cambio hecho en OTRO puesto.
+ */
+const CATALOGO_STALE_MS = 5 * 60_000
+
 export function useArticles() {
-  return useQuery<ArticleDTO[]>({ queryKey: ['articles'], queryFn: api.articles.list })
+  return useQuery<ArticleDTO[]>({
+    queryKey: ['articles'],
+    queryFn: api.articles.list,
+    staleTime: CATALOGO_STALE_MS,
+  })
 }
 export function useArticleMutations() {
   return useEntityMutations<ArticleDTO>('articles', api.articles.create, api.articles.update, api.articles.delete)
@@ -74,7 +93,11 @@ export function useCustomerMutations() {
 
 // --- Proveedores ---
 export function useSuppliers() {
-  return useQuery<SupplierDTO[]>({ queryKey: ['suppliers'], queryFn: api.suppliers.list })
+  return useQuery<SupplierDTO[]>({
+    queryKey: ['suppliers'],
+    queryFn: api.suppliers.list,
+    staleTime: CATALOGO_STALE_MS,
+  })
 }
 export function useSupplierMutations() {
   return useEntityMutations<SupplierDTO>('suppliers', api.suppliers.create, api.suppliers.update, api.suppliers.delete)
@@ -86,7 +109,11 @@ export function usePromotions() {
 }
 
 export function useFamilies() {
-  return useQuery<FamilyDTO[]>({ queryKey: ['families'], queryFn: api.families.list })
+  return useQuery<FamilyDTO[]>({
+    queryKey: ['families'],
+    queryFn: api.families.list,
+    staleTime: CATALOGO_STALE_MS,
+  })
 }
 export function useFamilyMutations() {
   return useEntityMutations<FamilyDTO>('families', api.families.create, api.families.update, api.families.delete)
