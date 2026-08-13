@@ -461,7 +461,8 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     barcodes_usados: set[str] = set()
     campos_art = ["IDARTICULO", "CODIGO", "CODIGO2", "INTCOD", "DETALLE", "MARCA", "IVA",
                   "PRECIO1", "PRECIO2", "PRECIO3", "PRECIO4", "PRECIOU",
-                  "STOCK", "STOCKMIN", "FAMILIA", "CLASIFICACION", "OBSERVA", "PROVEEDOR"]
+                  "STOCK", "STOCKMIN", "FAMILIA", "CLASIFICACION", "OBSERVA", "PROVEEDOR",
+                  "VISIBLE"]
     for r in leer(con, "ARTICULO", campos_art) if "ARTICULO" in hay else []:
         desc = txt(r["DETALLE"]) or f"Artículo sin descripción #{r['IDARTICULO']}"
         # El código tiene que ser único. En bases reales hay miles de artículos
@@ -481,6 +482,13 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         # queda en negativo: es información real del comercio y ponerla en 0
         # sería inventar un dato. StockFlow permite vender sin stock
         # (`companies.allow_negative_stock`, que la migración deja en 1).
+        # ARTICULO.VISIBLE está AL REVÉS de lo que sugiere el nombre: StockFácil
+        # lista los que lo tienen VACÍO —en Leo Citzia son 2.109, el número que
+        # muestra su pantalla— y los marcados con 1 son bajas del comercio.
+        # Se migran TODOS (1.709 de los dados de baja tienen ventas en el
+        # historial y 1.945 tienen stock) pero INACTIVOS, así el listado de
+        # todos los días muestra lo mismo que el comercio venía viendo.
+        activo = 0 if (r["VISIBLE"] == 1) else 1
         stock = r["STOCK"] or 0
         if stock and Decimal(str(stock)) < 0:
             rep.suma("Artículos con stock negativo (se respeta)", 1)
@@ -513,14 +521,16 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             sq.execute(
                 "INSERT INTO articles (id,barcode,description,brand,family_id,supplier_id,vat_rate,"
                 "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
-                "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (aid, barcode[:40], desc[:120], txt(r["MARCA"])[:40] or None,
                  fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])),
                  prov_id.get(r["PROVEEDOR"]), iva,
                  dec(costo), dec(venta), dec(lista2), dec(lista3), dec(mayor),
-                 dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), ahora, ahora))
+                 dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), activo, ahora, ahora))
             art_id[r["IDARTICULO"]] = aid
             rep.suma("Artículos", 1)
+            if not activo:
+                rep.suma("  …dados de baja en StockFácil (inactivos)", 1)
         except sqlite3.IntegrityError:
             # No debería pasar con el código interno; si pasa, se reintenta.
             try:
@@ -528,12 +538,12 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 sq.execute(
                     "INSERT INTO articles (id,barcode,description,brand,family_id,supplier_id,vat_rate,"
                     "cost_price,list_price1,list_price2,list_price3,wholesale_price,stock,"
-                    "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)",
+                    "min_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (aid, alt, desc[:120], txt(r["MARCA"])[:40] or None,
                      fam_id.get(txt(r["FAMILIA"]) or txt(r["CLASIFICACION"])),
                      prov_id.get(r["PROVEEDOR"]), iva,
                      dec(costo), dec(venta), dec(lista2), dec(lista3), dec(mayor),
-                     dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), ahora, ahora))
+                     dec(stock, 3), dec(r["STOCKMIN"] or 0, 3), activo, ahora, ahora))
                 art_id[r["IDARTICULO"]] = aid
                 rep.suma("Artículos", 1)
             except sqlite3.Error as e:
@@ -771,11 +781,45 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     # del cliente y no de un comprobante puntual. Se crea una venta de "saldo
     # anterior" por cada deudor: el saldo queda trazable y el cliente ve de
     # dónde viene en su cuenta.
+    # Los RENGLONES de cada cuenta (qué compró) están en LINEACUENTA y las
+    # ENTREGAS DE DINERO en PAGOS: sin ellos, abrir una cuenta corriente en
+    # StockFlow mostraba una sola línea "saldo anterior" y nada más.
+    #
+    # OJO: LINEACUENTA sólo conserva los renglones recientes — suman $4.966.079
+    # contra $50.845.810 facturados en total. Por eso el saldo y el total SIEMPRE
+    # salen de CUENTAS (que es lo que el comercio da por bueno: TOTAL - PAGADO =
+    # SALDO cierra en las 51 cuentas) y la diferencia va en un renglón aparte,
+    # dicho con todas las letras. No se inventa detalle que no está.
+    lineas_cta: dict[int, list[dict]] = {}
+    for l in leer(con, "LINEACUENTA", ["IDCUENTA", "IDARTICULO", "CODIGO", "DETALLE",
+                                       "CANTIDAD", "PRECIO", "TOTAL", "FECHA", "TIPO"]
+                  ) if "LINEACUENTA" in hay else []:
+        if txt(l["TIPO"]).lower() != "linea":
+            continue          # los 'pago' viajan por PAGOS
+        lineas_cta.setdefault(l["IDCUENTA"], []).append(l)
+
+    pagos_cta: dict[int, list[dict]] = {}
+    for pg in leer(con, "PAGOS", ["IDCUENTA", "ENTREGA", "FECHA"]) if "PAGOS" in hay else []:
+        pagos_cta.setdefault(pg["IDCUENTA"], []).append(pg)
+
+    efectivo_id = pm_id.get("EFECTIVO") or next(iter(pm_id.values()), None)
+
+    art_saldo_id = uuid7()
+    sq.execute(
+        "INSERT INTO articles (id,barcode,description,vat_rate,cost_price,list_price1,"
+        "stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,0,?,?)",
+        (art_saldo_id, ean13_interno(999998),
+         "Consumos anteriores de cuenta corriente (StockFácil)",
+         "21.00", dec(0), dec(0), dec(0, 3), ahora, ahora))
+
     nro_saldo = (sq.execute("SELECT COALESCE(MAX(number),0) FROM sales").fetchone()[0] or 0)
     for r in leer(con, "CUENTAS", ["IDCUENTA", "IDCLIENTE", "TOTAL", "SALDO", "FECHAINI"]
                   ) if "CUENTAS" in hay else []:
-        saldo = r["SALDO"] or 0
-        if Decimal(str(saldo)) <= 0:
+        saldo = Decimal(str(r["SALDO"] or 0))
+        total_cta = Decimal(str(r["TOTAL"] or 0))
+        # Se migran TODAS las cuentas, también las saldadas: el comercio quiere
+        # ver el historial del cliente aunque hoy no deba nada.
+        if total_cta <= 0 and saldo <= 0 and not lineas_cta.get(r["IDCUENTA"]):
             continue
         cliente = cli_id.get(r["IDCLIENTE"]) or cli_por_persona.get(r["IDCLIENTE"])
         if not cliente:
@@ -800,7 +844,9 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                  categoria_iva(p.get("CATEGORIA") if p else None), dec(0), ahora, ahora))
             cli_id[r["IDCLIENTE"]] = cliente
             rep.suma("Clientes", 1)
-            rep.aviso(f"'{nombre[:34]}' estaba dado de baja pero debe {saldo}: se recuperó")
+            rep.aviso(f"'{nombre[:34]}' estaba dado de baja"
+                      + (f" pero debe {saldo}" if saldo > 0 else " y su cuenta estaba saldada")
+                      + ": se recuperó")
         try:
             nro_saldo += 1
             vid = uuid7()
@@ -810,12 +856,55 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 "is_account_sale,subtotal,discount,vat_amount,total,status,notes,"
                 "created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,?,?,?,?,'completed',?,?,?)",
                 (vid, nro_saldo, "X", fecha, cliente, uid, caja_id,
-                 dec(saldo), dec(0), dec(0), dec(saldo),
+                 dec(total_cta), dec(0), dec(0), dec(total_cta),
                  "Saldo de cuenta corriente traído de StockFácil", fecha, fecha))
+
+            # Los artículos que compró.
+            nlin = 0
+            suma_lin = Decimal(0)
+            for l in lineas_cta.get(r["IDCUENTA"], []):
+                aid = art_id.get(l["IDARTICULO"])
+                if not aid:
+                    continue
+                nlin += 1
+                imp = Decimal(str(l["TOTAL"] or 0))
+                suma_lin += imp
+                sq.execute(
+                    "INSERT INTO sale_lines (id,sale_id,article_id,line_number,quantity,"
+                    "unit_price,discount,vat_rate,line_total,created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (uuid7(), vid, aid, nlin, dec(l["CANTIDAD"] or 0, 3),
+                     dec(l["PRECIO"] or 0), dec(0), "21.00", dec(imp), ms(l["FECHA"])))
+                rep.suma("Renglones de cuenta corriente", 1)
+
+            # Lo consumido antes de lo que guarda LINEACUENTA, dicho como lo que
+            # es: un arrastre. Sin este renglón la cuenta no cerraría contra el
+            # total que el comercio tiene por bueno.
+            resto = total_cta - suma_lin
+            if resto > 0 and art_saldo_id:
+                sq.execute(
+                    "INSERT INTO sale_lines (id,sale_id,article_id,line_number,quantity,"
+                    "unit_price,discount,vat_rate,line_total,created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (uuid7(), vid, art_saldo_id, nlin + 1, dec(1, 3), dec(resto),
+                     dec(0), "21.00", dec(resto), fecha))
+
+            arid = uuid7()
+            estado = "open" if saldo > 0 else "paid"
             sq.execute(
                 "INSERT INTO accounts_receivable (id,customer_id,sale_id,total,balance,"
-                "status,created_at,updated_at) VALUES (?,?,?,?,?,'open',?,?)",
-                (uuid7(), cliente, vid, dec(saldo), dec(saldo), fecha, ahora))
+                "status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (arid, cliente, vid, dec(total_cta), dec(saldo), estado, fecha, ahora))
+
+            # Las entregas de dinero.
+            for pg in pagos_cta.get(r["IDCUENTA"], []):
+                sq.execute(
+                    "INSERT INTO payments (id,account_id,amount,date,payment_method_id,"
+                    "notes,created_at) VALUES (?,?,?,?,?,?,?)",
+                    (uuid7(), arid, dec(pg["ENTREGA"] or 0), ms(pg["FECHA"]),
+                     efectivo_id, "Entrega registrada en StockFácil", ahora))
+                rep.suma("Entregas de dinero", 1)
+
             rep.suma("Cuentas corrientes", 1)
         except sqlite3.Error as e:
             rep.aviso(f"cuenta corriente no migrada: {e}")
