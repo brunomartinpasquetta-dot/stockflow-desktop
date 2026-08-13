@@ -31,7 +31,11 @@ const runtimeDeps = Object.keys(pkg.dependencies ?? {});
 // el .asar. Ej.: `archiver` se copiaba sin zip-stream/compress-commons/archiver-utils,
 // y `import('archiver')` reventaba con MODULE_NOT_FOUND → "No se pudo crear el backup".
 // Bundlearlas con esbuild inlinea todo el grafo y evita depender del node_modules empaquetado.
-const BUNDLE_IN = new Set(['archiver']);
+// Se bundlean con esbuild en vez de dejarse como externas: con pnpm,
+// electron-builder copia el paquete pero NO sus dependencias transitivas
+// symlinkeadas, y en la app empaquetada revientan con MODULE_NOT_FOUND.
+// node-forge firma el pedido a ARCA — si falta, no se puede facturar.
+const BUNDLE_IN = new Set(['archiver', 'node-forge']);
 const external = [
   'electron',
   ...runtimeDeps.filter((d) => !d.startsWith('@stockflow/') && !BUNDLE_IN.has(d)),

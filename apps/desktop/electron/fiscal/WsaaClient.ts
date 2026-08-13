@@ -13,15 +13,17 @@
  * siga vigente (error "El CEE ya posee un TA valido"). Sin cache, el segundo
  * login del día falla.
  *
- * La firma CMS se hace con el `openssl` del sistema (presente en macOS, Windows
- * 10+ y Linux) para no arrastrar una dependencia de criptografía pesada.
+ * La firma CMS se arma DENTRO del programa, con node-forge.
+ *
+ * Antes se ejecutaba el `openssl` del sistema. Windows NO trae openssl —el que
+ * existe es el de Git o el de WSL, que un comercio no tiene—, así que la
+ * facturación electrónica fallaba en TODA instalación Windows con
+ * "spawn openssl ENOENT", justo el sistema operativo de todos los clientes.
+ * Apareció en Leo Citzia el 13-ago-2026, con la primera factura por emitir.
  */
-import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { promisify } from 'node:util';
-
-const execFileP = promisify(execFile);
+import forge from 'node-forge';
 
 export interface AccessTicket {
   token: string;
@@ -160,49 +162,54 @@ export class WsaaClient {
   }
 
   /**
-   * Firma el TRA en CMS/PKCS#7 (DER, base64) con openssl.
+   * Firma el TRA en CMS/PKCS#7 (DER, base64), que es lo que espera `LoginCms`.
    *
-   * Equivale a:
-   *   openssl cms -sign -in tra.xml -signer cert.crt -inkey key.pem \
-   *     -nodetach -outform DER
+   * Equivale a `openssl cms -sign -nodetach -outform DER`, pero hecho en
+   * proceso: no depende de que haya un openssl instalado.
    */
   async signTra(tra: string): Promise<string> {
-    mkdirSync(this.opts.cacheDir, { recursive: true });
-    const traPath = path.join(this.opts.cacheDir, `tra-${Date.now()}.xml`);
-    writeFileSync(traPath, tra, 'utf8');
     try {
-      const { stdout } = await execFileP(
-        'openssl',
-        [
-          'cms',
-          '-sign',
-          '-in',
-          traPath,
-          '-signer',
-          this.opts.certPath,
-          '-inkey',
-          this.opts.keyPath,
-          '-nodetach',
-          '-outform',
-          'DER',
+      const certPem = readFileSync(this.opts.certPath, 'utf8');
+      const keyPem = readFileSync(this.opts.keyPath, 'utf8');
+      const cert = forge.pki.certificateFromPem(certPem);
+      const key = forge.pki.privateKeyFromPem(keyPem);
+
+      // El certificado tiene que estar vigente: si no, ARCA rechaza el login
+      // con un mensaje que no explica nada. Mejor decirlo acá.
+      const ahora = new Date();
+      if (ahora < cert.validity.notBefore || ahora > cert.validity.notAfter) {
+        throw new Error(
+          `el certificado está fuera de vigencia (vale del ` +
+            `${cert.validity.notBefore.toLocaleDateString('es-AR')} al ` +
+            `${cert.validity.notAfter.toLocaleDateString('es-AR')})`,
+        );
+      }
+
+      const p7 = forge.pkcs7.createSignedData();
+      p7.content = forge.util.createBuffer(tra, 'utf8');
+      p7.addCertificate(cert);
+      p7.addSigner({
+        key,
+        certificate: cert,
+        // Los OID vienen tipados como opcionales, pero son constantes de la
+        // librería: siempre están.
+        digestAlgorithm: forge.pki.oids.sha256!,
+        authenticatedAttributes: [
+          { type: forge.pki.oids.contentType!, value: forge.pki.oids.data! },
+          { type: forge.pki.oids.messageDigest! },
+          { type: forge.pki.oids.signingTime!, value: ahora as unknown as string },
         ],
-        { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 },
-      );
-      return Buffer.from(stdout).toString('base64');
+      });
+      // Sin `detached`: el TRA viaja DENTRO del CMS, que es lo que pide ARCA.
+      p7.sign();
+      return forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Errores típicos: certificado vencido, clave que no corresponde al cert,
-      // o rutas mal configuradas.
       throw new Error(
-        `No se pudo firmar con el certificado. Revisá que el .crt y la clave se ' +
-        'correspondan y que el certificado no esté vencido. Detalle: ${msg}`,
+        'No se pudo firmar con el certificado. Revisá que el .crt y la clave ' +
+          `se correspondan y que el certificado no esté vencido. Detalle: ${msg}`,
+        { cause: err },
       );
-    } finally {
-      try {
-        unlinkSync(traPath);
-      } catch {
-        /* noop */
-      }
     }
   }
 
