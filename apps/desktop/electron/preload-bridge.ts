@@ -329,6 +329,8 @@ export function createApiBridge(
       issueNote: (p) => c<never>('fiscal:issueNote', p),
       getVoucherForSale: (p) => c<never>('fiscal:getVoucherForSale', p),
       listVouchers: (p) => c<never>('fiscal:listVouchers', p),
+      getPdfFolder: () => c<never>('fiscal:getPdfFolder'),
+      openPdfFolder: () => c<never>('fiscal:openPdfFolder'),
     },
     maintenance: {
       resetOperationalData: (p) => c<never>('maintenance:resetOperationalData', p),

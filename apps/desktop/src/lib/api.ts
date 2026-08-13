@@ -255,6 +255,8 @@ export const api = {
       unwrap(sf().fiscal.getVoucherForSale({ saleId })),
     listVouchers: (payload: { from?: number; to?: number; limit?: number } = {}): Promise<FiscalVoucherDTO[]> =>
       unwrap(sf().fiscal.listVouchers(payload)),
+    getPdfFolder: (): Promise<{ folder: string }> => unwrap(sf().fiscal.getPdfFolder()),
+    openPdfFolder: (): Promise<{ ok: true }> => unwrap(sf().fiscal.openPdfFolder()),
   },
   maintenance: {
     resetOperationalData: (payload: { password: string }): Promise<ResetOperationalResultDTO> =>

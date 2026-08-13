@@ -8,6 +8,7 @@ import { FiscalService, type ArcaGateway } from '@stockflow/core';
 import { PermissionDeniedError, ValidationError } from '@stockflow/core';
 
 import { ArcaGatewayImpl } from '../../fiscal/ArcaGatewayImpl';
+import { archivarFacturaPdf, carpetaFacturas, type DatosFactura } from '../../fiscal/archivoFacturas';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
   FiscalConfigDTO,
@@ -43,6 +44,76 @@ function requireAdmin(role: string | undefined): void {
       'manage_fiscal',
       'Solo un administrador puede configurar la facturación electrónica',
     );
+  }
+}
+
+/**
+ * Arma los datos del comprobante y lo guarda en PDF. Best-effort: si algo falla
+ * se registra y sigue — el CAE ya está y una factura no se pierde por un
+ * problema de archivo.
+ */
+async function archivar(
+  deps: HandlerDeps,
+  saleId: string,
+  v: IssuedVoucherDTO,
+): Promise<void> {
+  try {
+    const sale = await deps.repos.sales.findById(saleId);
+    if (!sale) return;
+    const lines = await deps.repos.saleLines.findBySale(saleId);
+    const empresa = await deps.repos.company.getOrCreate();
+    const cfg = deps.repos.fiscal.getConfig();
+    const cliente = sale.customerId ? await deps.repos.customers.findById(sale.customerId) : null;
+
+    const articulos = new Map<string, string>();
+    for (const l of lines) {
+      const a = await deps.repos.articles.findById(l.articleId);
+      if (a) articulos.set(l.articleId, a.description);
+    }
+
+    const datos: DatosFactura = {
+      comercio: {
+        nombre: cfg?.businessName || empresa?.name || 'StockFlow',
+        domicilio: cfg?.address ?? empresa?.address ?? null,
+        cuit: cfg?.cuit ?? empresa?.cuit ?? null,
+        ingBrutos: cfg?.grossIncome ?? null,
+        condicionIva: cfg?.vatCondition === 'RI' ? 'IVA Responsable Inscripto' : 'Monotributo',
+        inicioActividad: null,
+      },
+      cliente: cliente
+        ? {
+            nombre: `${cliente.lastName}${cliente.firstName ? ' ' + cliente.firstName : ''}`.trim(),
+            documento:
+              cliente.docNumber ? `${cliente.docType ?? 'Doc'}: ${cliente.docNumber}` : null,
+            condicionIva: null,
+          }
+        : null,
+      comprobante: {
+        etiqueta: v.label,
+        letra: v.letter,
+        puntoVenta: v.salePoint,
+        numero: v.number,
+        fecha: sale.date,
+        cae: v.cae,
+        vencimientoCae: v.caeExpiry,
+      },
+      lineas: lines.map((l: (typeof lines)[number]) => ({
+        descripcion: articulos.get(l.articleId) ?? 'Artículo',
+        cantidad: String(Number(l.quantity)),
+        precioUnitario: l.unitPrice,
+        total: l.lineTotal,
+      })),
+      totales: {
+        neto: sale.subtotal,
+        iva: sale.vatAmount,
+        total: sale.total,
+      },
+    };
+
+    const ruta = archivarFacturaPdf(deps.userDataDir, datos);
+    if (ruta) console.log('[facturas] archivada:', ruta);
+  } catch (err) {
+    console.error('[facturas] no se pudo archivar el comprobante:', err);
   }
 }
 
@@ -141,6 +212,21 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
 
     /* ------------------------------- Emisión ------------------------------- */
 
+    /** Dónde quedan los PDF, y abrir esa carpeta. */
+    'fiscal:getPdfFolder': withSession(deps, async (): Promise<{ folder: string }> => ({
+      folder: carpetaFacturas(deps.userDataDir),
+    })),
+    'fiscal:openPdfFolder': withSession(deps, async (): Promise<{ ok: true }> => {
+      const { shell } = await import('electron');
+      const { mkdirSync } = await import('node:fs');
+      const carpeta = carpetaFacturas(deps.userDataDir);
+      // Se crea si todavía no hay facturas: abrir una carpeta inexistente no
+      // hace nada y parece que el botón está roto.
+      mkdirSync(carpeta, { recursive: true });
+      await shell.openPath(carpeta);
+      return { ok: true };
+    }),
+
     'fiscal:issueInvoice': withSession(
       deps,
       async (
@@ -148,7 +234,12 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
         ctx,
       ): Promise<IssuedVoucherDTO> => {
         const svc = new FiscalService(ctx, buildGateway(deps));
-        return (await svc.issueInvoiceForSale(payload)) as IssuedVoucherDTO;
+        const v = (await svc.issueInvoiceForSale(payload)) as IssuedVoucherDTO;
+        // El PDF se archiva ACÁ, donde llega el CAE: así queda guardado aunque
+        // la factura la haya emitido una terminal por navegador y aunque el
+        // cajero cierre la ventana enseguida. Nunca frena la respuesta.
+        void archivar(deps, payload.saleId, v);
+        return v;
       },
     ),
 

@@ -12,7 +12,7 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { CheckCircle2, FileKey, Loader2, Plug, Plus, ShieldCheck, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, FileKey, FolderOpen, Loader2, Plug, Plus, ShieldCheck, Trash2, XCircle } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -232,7 +232,23 @@ function FacturacionInner() {
               {testMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
               Probar conexión con ARCA
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void api.fiscal.openPdfFolder().catch(() => {
+                  toast.error('No se pudo abrir la carpeta de facturas')
+                })
+              }}
+              title="Cada comprobante autorizado se guarda acá en PDF, ordenado por año y mes"
+            >
+              <FolderOpen className="h-4 w-4" />
+              Abrir carpeta de facturas
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Cada comprobante que ARCA autoriza se guarda solo en PDF, ordenado por año y mes.
+            La carpeta vive junto a la base de datos y las actualizaciones no la tocan.
+          </p>
 
           {testResult && (
             <div

@@ -35,7 +35,7 @@ const runtimeDeps = Object.keys(pkg.dependencies ?? {});
 // electron-builder copia el paquete pero NO sus dependencias transitivas
 // symlinkeadas, y en la app empaquetada revientan con MODULE_NOT_FOUND.
 // node-forge firma el pedido a ARCA — si falta, no se puede facturar.
-const BUNDLE_IN = new Set(['archiver', 'node-forge']);
+const BUNDLE_IN = new Set(['archiver', 'node-forge', 'jspdf', 'jspdf-autotable']);
 const external = [
   'electron',
   ...runtimeDeps.filter((d) => !d.startsWith('@stockflow/') && !BUNDLE_IN.has(d)),

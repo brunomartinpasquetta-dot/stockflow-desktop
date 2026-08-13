@@ -1630,6 +1630,9 @@ export interface ApiSurface {
     issueNote(payload: { relatedVoucherId: string; kind: 'credit_note' | 'debit_note'; total?: string; reason?: string }): Res<IssuedVoucherDTO>;
     getVoucherForSale(payload: { saleId: string }): Res<FiscalVoucherDTO | null>;
     listVouchers(payload: { from?: number; to?: number; limit?: number }): Res<FiscalVoucherDTO[]>;
+    /** Carpeta donde se archivan los PDF de los comprobantes. */
+    getPdfFolder(): Res<{ folder: string }>;
+    openPdfFolder(): Res<{ ok: true }>;
   };
   maintenance: {
     resetOperationalData(payload: { password: string }): Res<ResetOperationalResultDTO>;
