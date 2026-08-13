@@ -77,6 +77,7 @@ function TestTicket({ paperFormat }: { paperFormat: PaperFormatDTO }) {
 
 function PrinterSection() {
   const qc = useQueryClient()
+  const esWeb = Boolean((window as { __stockflowWeb?: boolean }).__stockflowWeb)
   const cfgQuery = useQuery({
     queryKey: ['hardware', 'printer', 'config'],
     queryFn: () => api.hardware.printer.getConfig(),
@@ -236,7 +237,25 @@ function PrinterSection() {
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
-        <div className="col-span-2 flex flex-col gap-1">
+        {esWeb && (
+          // Desde el navegador NO se puede leer la lista de impresoras de la PC:
+          // no existe forma de hacerlo, ninguna página web puede. Sin este
+          // cartel, el desplegable vacío parece un sistema roto.
+          <div className="col-span-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+            <p className="font-medium">Esta terminal entra por el navegador</p>
+            <p className="mt-1 text-muted-foreground">
+              El navegador no puede ver las impresoras de esta PC, así que la lista sale vacía.
+              Los tickets salen por la <strong>impresora predeterminada de Windows</strong>: para
+              cambiarla, Panel de control → Dispositivos e impresoras → clic derecho en la
+              impresora → «Establecer como predeterminada».
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              Lo que sí se configura acá, y queda guardado <strong>en esta terminal</strong>, es el{' '}
+              <strong>ancho de papel</strong>.
+            </p>
+          </div>
+        )}
+        <div className={esWeb ? 'col-span-2 hidden' : 'col-span-2 flex flex-col gap-1'}>
           <div className="flex items-center justify-between">
             <Label>Impresora del sistema</Label>
             <button
