@@ -36,10 +36,26 @@ export interface PurchaseReturnDraft {
 export class ReturnsService {
   constructor(private readonly ctx: ServiceContext) {}
 
+  /**
+   * La caja abierta con la que se hace el reintegro.
+   *
+   * NO alcanza con mirar la sesión: `currentCashRegister` sólo lo tiene la
+   * sesión que ABRIÓ la caja. Si la abrió otro usuario, o desde el servidor y
+   * la devolución se hace en una terminal, la sesión viene vacía y el sistema
+   * decía "tiene que haber una caja abierta" con la caja abierta delante. Las
+   * ventas ya resolvían esto mirando la base; las devoluciones no.
+   */
+  private async cajaAbierta() {
+    const c = this.ctx.currentCashRegister;
+    if (c && c.status === 'open') return c;
+    return this.ctx.repos.cashRegisters.getCurrentOpen();
+  }
+
   async createSaleReturn(input: SaleReturnDraft): Promise<SaleReturnResult> {
-    const { repos, currentUser, currentCashRegister } = this.ctx;
+    const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'void_sale');
     if (!currentUser) throw new BusinessRuleError('no_session', 'Sesión requerida');
+    const currentCashRegister = await this.cajaAbierta();
     if (input.refundMethod === 'cash' && !currentCashRegister) {
       throw new BusinessRuleError(
         'no_open_cash',
@@ -62,9 +78,10 @@ export class ReturnsService {
   }
 
   async createPurchaseReturn(input: PurchaseReturnDraft): Promise<PurchaseReturnResult> {
-    const { repos, currentUser, currentCashRegister } = this.ctx;
+    const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'manage_purchases');
     if (!currentUser) throw new BusinessRuleError('no_session', 'Sesión requerida');
+    const currentCashRegister = await this.cajaAbierta();
     if (input.refundMethod === 'cash' && !currentCashRegister) {
       throw new BusinessRuleError(
         'no_open_cash',
