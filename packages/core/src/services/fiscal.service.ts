@@ -167,8 +167,16 @@ export class FiscalService {
     const voucherCode = resolveVoucherCode(letter, 'invoice');
 
     // Desglose de IVA por alícuota. ARCA exige base y monto por cada una.
-    const lines = await repos.sales.findLines(input.saleId);
-    const company = await repos.companies.get();
+    // `repos.sales.findLines` NO EXISTE: emitir cualquier factura reventaba con
+    // "TypeError: findLines is not a function", que la capa IPC mostraba como
+    // "Error interno" — el comercio veía "ARCA no la autorizó: Error interno"
+    // sin que ARCA hubiera visto nada. Las líneas están en su propio
+    // repositorio.
+    const lines = await repos.saleLines.findBySale(input.saleId);
+    // `repos.companies` tampoco existe (el repositorio es `company`, singular).
+    // Segunda llamada rota en la misma función: emitir una factura reventaba
+    // dos veces antes de llegar a ARCA.
+    const company = await repos.company.getOrCreate();
     const priceMode = company?.priceMode === 'net' ? 'net' : 'gross';
 
     const byRate = new Map<string, { base: string; vat: string }>();
@@ -178,7 +186,10 @@ export class FiscalService {
       const acc = byRate.get(rate) ?? { base: '0.0000', vat: '0.0000' };
       byRate.set(rate, {
         base: addDecimal(acc.base, br.net, 4),
-        vat: addDecimal(acc.vat, br.vatAmount, 4),
+        // `vatBreakdown` devuelve `vat`, no `vatAmount`: el IVA por alícuota se
+        // sumaba con `undefined` y el desglose que se le manda a ARCA salía en
+        // cero. En Factura A eso es el dato que mira el fisco.
+        vat: addDecimal(acc.vat, br.vat, 4),
       });
     }
 

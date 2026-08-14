@@ -183,6 +183,16 @@ function SaleDetailDialog({
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo anular la venta'),
   })
 
+  /** El QR de ARCA como imagen; se dibuja localmente. */
+  async function qrComoImagen(url: string): Promise<string | null> {
+    try {
+      const QR = await import('qrcode')
+      return await QR.toDataURL(url, { margin: 0, width: 220 })
+    } catch {
+      return null
+    }
+  }
+
   // Reimprime el ticket de una venta histórica reusando el MISMO path de
   // impresión silenciosa que el flujo de venta (útil si la auto-impresión falló
   // o se trabó el papel). Reconstruye el ticket desde el detalle guardado.
@@ -208,6 +218,17 @@ function SaleDetailDialog({
         methodName: pmNameById.get(p.paymentMethodId) ?? 'Medio de pago',
         amount: p.amount,
       })),
+      // El pie fiscal también en la REIMPRESIÓN. Es el camino que se usa
+      // cuando se factura después (porque ARCA falló, o faltaba el punto de
+      // venta) y salía sin CAE ni QR: el comprobante así no es válido.
+      fiscal: voucherQuery.data?.cae
+        ? {
+            cae: voucherQuery.data.cae,
+            caeExpiry: voucherQuery.data.caeExpiry,
+            qrDataUrl: voucherQuery.data.qrUrl ? await qrComoImagen(voucherQuery.data.qrUrl) : null,
+            letter: voucherQuery.data.letter,
+          }
+        : null,
     }
     await printSaleTicketSilent(ticketData, printerCfgQuery.data ?? null)
   }
