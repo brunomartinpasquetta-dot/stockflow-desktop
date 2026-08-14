@@ -38,6 +38,12 @@ export interface SaleTicketLine {
   quantity: string
   unitPrice: string
   lineTotal: string
+  /** Código del artículo. Lo usa la columna CÓDIGO del A4; el térmico lo ignora. */
+  code?: string | null
+  /** Alícuota del renglón ("21.00"); se discrimina sólo en Factura A. */
+  vatRate?: string | null
+  /** Descuento del renglón. */
+  discount?: string | null
 }
 
 export interface SaleTicketPayment {
@@ -55,6 +61,11 @@ export interface SaleTicketData {
   customerName: string | null
   /** Documento del cliente ("DNI 12345678"); `null` si no aplica. */
   customerDoc: string | null
+  /**
+   * Condición del cliente frente al IVA ("Responsable Inscripto"). Es un dato
+   * obligatorio del comprobante; si no se conoce, el A4 asume Consumidor Final.
+   */
+  customerVatCondition?: string | null
   /** Nombre del vendedor que registró la venta; `null` si no se conoce. */
   sellerName: string | null
   isAccountSale: boolean

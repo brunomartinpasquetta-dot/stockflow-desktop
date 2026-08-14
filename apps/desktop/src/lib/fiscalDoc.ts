@@ -8,8 +8,19 @@
 import QRCode from 'qrcode'
 
 import type { FormalDocData } from '@/print/FormalDocA4'
-import type { CompanyDTO, FiscalVoucherDTO, SaleDTO, SaleLineDTO } from '@/types/api'
+import type { CompanyDTO, FiscalCategory, FiscalVoucherDTO, SaleDTO, SaleLineDTO } from '@/types/api'
 import { formatDate } from '@/lib/format'
+
+/**
+ * Condición del cliente frente al IVA, tal como sale impresa en el comprobante:
+ * es un dato obligatorio y va escrito entero, no con la sigla.
+ */
+export const VAT_CONDITION_LABELS: Record<FiscalCategory, string> = {
+  RI: 'Responsable Inscripto',
+  MT: 'Monotributo',
+  CF: 'Consumidor Final',
+  EX: 'Exento',
+}
 
 /** Nombre legible del comprobante para el título del documento. */
 export function fiscalTitle(v: Pick<FiscalVoucherDTO, 'letter' | 'kind'>): string {

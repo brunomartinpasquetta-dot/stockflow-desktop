@@ -14,6 +14,12 @@ export interface FormalDocLine {
   quantity: string
   unitPrice: string
   lineTotal: string
+  /** Código del artículo. Si ninguna línea lo trae, la columna no se dibuja. */
+  code?: string | null
+  /** Alícuota de IVA del renglón ("21.00"). Sólo se muestra en Factura A. */
+  vatRate?: string | null
+  /** Descuento del renglón. Si ninguna línea tiene, la columna no se dibuja. */
+  discount?: string | null
 }
 
 export interface FormalDocMeta {
@@ -39,7 +45,22 @@ export interface FormalDocData {
   /** Filas de metadatos (Fecha, Vendedor, Vigencia…). */
   meta: FormalDocMeta[]
   /** Datos del cliente; null = Consumidor Final (igual se muestra el rótulo). */
-  customer: { name: string; doc?: string | null } | null
+  customer: { name: string; doc?: string | null; vatCondition?: string | null; address?: string | null } | null
+  /**
+   * ORIGINAL / DUPLICADO / TRIPLICADO. Va arriba de todo, como en cualquier
+   * talonario: quien recibe el papel tiene que saber qué copia tiene en la mano.
+   */
+  copyLabel?: string | null
+  /** Condición de venta ("Contado", "Cuenta corriente"). */
+  saleCondition?: string | null
+  /**
+   * DETALLE DE ALÍCUOTAS: cuánto IVA corresponde a cada tasa. Es lo primero que
+   * mira el contador en una Factura A. Sólo tiene sentido cuando el IVA se
+   * discrimina (letra A); en B y C el impuesto va dentro del precio.
+   */
+  vatBreakdown?: { rate: string; base: string; amount: string }[] | null
+  /** Leyendas legales al pie (una por renglón). */
+  legalNotes?: string[] | null
   lines: FormalDocLine[]
   totals: FormalDocTotals
   /** Desglose de pagos (opcional, para el ticket de venta). */
@@ -77,12 +98,24 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
   const {
     company, title, number, meta, customer, lines, totals,
     payments, paymentNote, notes, footerNote, showCompanyHeader = true, fiscal,
+    copyLabel, saleCondition, vatBreakdown, legalNotes,
   } = data
   const discountNum = Number(totals.discount ?? 0)
   const vatNum = Number(totals.vatAmount ?? 0)
 
+  // Las columnas opcionales sólo se dibujan si hay algo que poner. Una columna
+  // vacía en las 40 líneas de una factura es peor que no tenerla: come ancho
+  // que necesita la descripción.
+  const showCode = lines.some((l) => (l.code ?? '').trim().length > 0)
+  const showDiscount = lines.some((l) => Number(l.discount ?? 0) > 0)
+  // El IVA por renglón se discrimina SÓLO en la A. En B y C está dentro del
+  // precio y mostrarlo aparte es un error fiscal.
+  const showVatCol = fiscal?.letter === 'A' && lines.some((l) => l.vatRate != null)
+  const descWidth = 100 - (showCode ? 14 : 0) - 10 - 14 - (showDiscount ? 8 : 0) - (showVatCol ? 7 : 0) - 14
+
   return (
     <div className="doc-a4">
+      {copyLabel && <div className="doc-copy">{copyLabel}</div>}
       {/* Encabezado: empresa (izq) + recuadro del comprobante (der) */}
       <div className="doc-head">
         <div>
@@ -125,6 +158,10 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
           <div className="doc-party-label">Cliente</div>
           <div>{customer?.name ?? 'Consumidor Final'}</div>
           {customer?.doc && <div>{customer.doc}</div>}
+          {customer?.address && <div>{customer.address}</div>}
+          {/* Condición frente al IVA del receptor: obligatoria en el comprobante. */}
+          <div>{customer?.vatCondition ?? 'Consumidor Final'}</div>
+          {saleCondition && <div>Condición de venta: {saleCondition}</div>}
         </div>
         <div className="doc-party" style={{ maxWidth: '70mm' }}>
           {meta.map((m, i) => (
@@ -140,18 +177,28 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
       <table className="doc-items">
         <thead>
           <tr>
-            <th style={{ width: '50%' }}>Descripción</th>
-            <th className="num">Cant.</th>
-            <th className="num">P. unit.</th>
-            <th className="num">Importe</th>
+            {showCode && <th style={{ width: '14%' }}>Código</th>}
+            <th style={{ width: `${descWidth}%` }}>Descripción</th>
+            <th className="num" style={{ width: '10%' }}>Cant.</th>
+            <th className="num" style={{ width: '14%' }}>P. unit.</th>
+            {showDiscount && <th className="num" style={{ width: '8%' }}>Dto.</th>}
+            {showVatCol && <th className="num" style={{ width: '7%' }}>IVA</th>}
+            <th className="num" style={{ width: '14%' }}>Importe</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((l, i) => (
             <tr key={i} style={{ pageBreakInside: 'avoid' }}>
+              {showCode && <td className="doc-code">{l.code ?? ''}</td>}
               <td>{l.description}</td>
               <td className="num">{formatQty(l.quantity)}</td>
               <td className="num">{formatCurrency(l.unitPrice)}</td>
+              {showDiscount && (
+                <td className="num">
+                  {Number(l.discount ?? 0) > 0 ? formatCurrency(l.discount ?? '0') : ''}
+                </td>
+              )}
+              {showVatCol && <td className="num">{l.vatRate ? `${Number(l.vatRate)}%` : ''}</td>}
               <td className="num">{formatCurrency(l.lineTotal)}</td>
             </tr>
           ))}
@@ -162,6 +209,31 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
           comprobante ocupa la página entera en vez de quedar amontonado
           arriba, como en los talonarios preimpresos. */}
       <div className="doc-fill" />
+
+      {/* DETALLE DE ALÍCUOTAS — lo primero que mira el contador en una A. */}
+      {vatBreakdown && vatBreakdown.length > 0 && (
+        <div className="doc-vat-breakdown">
+          <div className="doc-party-label">Detalle de alícuotas</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Alícuota</th>
+                <th className="num">Neto gravado</th>
+                <th className="num">IVA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vatBreakdown.map((v, i) => (
+                <tr key={i}>
+                  <td>IVA {Number(v.rate)}%</td>
+                  <td className="num">{formatCurrency(v.base)}</td>
+                  <td className="num">{formatCurrency(v.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Totales */}
       <div className="doc-totals">
@@ -217,6 +289,12 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
             {fiscal.caeExpiry && <div><strong>Vencimiento del CAE:</strong> {fiscal.caeExpiry}</div>}
             <div className="doc-fiscal-note">Comprobante autorizado por ARCA</div>
           </div>
+        </div>
+      )}
+
+      {legalNotes && legalNotes.length > 0 && (
+        <div className="doc-legal">
+          {legalNotes.map((t, i) => <div key={i}>{t}</div>)}
         </div>
       )}
 

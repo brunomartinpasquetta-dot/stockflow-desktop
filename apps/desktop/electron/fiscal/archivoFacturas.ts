@@ -34,6 +34,12 @@ export interface LineaFactura {
   cantidad: string;
   precioUnitario: string;
   total: string;
+  /** Código del artículo. Si ninguna línea lo trae, la columna no se dibuja. */
+  codigo?: string | null;
+  /** Alícuota del renglón ("21.00"); se discrimina sólo en Factura A. */
+  alicuota?: string | null;
+  /** Descuento del renglón. */
+  descuento?: string | null;
 }
 
 export interface DatosFactura {
@@ -59,6 +65,10 @@ export interface DatosFactura {
   };
   lineas: LineaFactura[];
   totales: { neto?: string | null; iva?: string | null; total: string };
+  /** Condición de venta ("Contado", "Cuenta corriente"). */
+  condicionVenta?: string | null;
+  /** DETALLE DE ALÍCUOTAS. Sólo en Factura A, que es donde el IVA se discrimina. */
+  alicuotas?: { tasa: string; base: string; importe: string }[] | null;
   /**
    * QR de ARCA (RG 4892), ya renderizado como data URL. Es OBLIGATORIO en el
    * comprobante: el PDF archivado tiene que ser igual al que se le entrega al
@@ -152,28 +162,66 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
   doc.setDrawColor(180).line(14, y, 200, y);
   y += 6;
 
-  // ── Cliente
+  // ── Cliente. La condición frente al IVA es un dato obligatorio del
+  //    comprobante: si no se conoce, es Consumidor Final.
   doc.setFontSize(9).setFont('helvetica', 'bold');
   doc.text(d.cliente ? d.cliente.nombre : 'Consumidor Final', 14, y);
   doc.setFont('helvetica', 'normal');
-  const datosCliente = [d.cliente?.documento, d.cliente?.condicionIva].filter(Boolean) as string[];
+  const datosCliente = [
+    d.cliente?.documento,
+    d.cliente?.condicionIva ?? 'Consumidor Final',
+    d.condicionVenta ? `Condición de venta: ${d.condicionVenta}` : null,
+  ].filter(Boolean) as string[];
   if (datosCliente.length > 0) {
     y += 4.5;
     doc.text(datosCliente.join('   ·   '), 14, y);
   }
 
-  // ── Detalle
+  // ── Detalle. Las columnas opcionales sólo aparecen si hay algo que poner:
+  //    una columna vacía en 40 renglones come el ancho que necesita la
+  //    descripción. El IVA por renglón va SÓLO en la A.
+  const conCodigo = d.lineas.some((l) => (l.codigo ?? '').trim().length > 0);
+  const conDescuento = d.lineas.some((l) => Number(l.descuento ?? 0) > 0);
+  const conAlicuota = c.letra === 'A' && d.lineas.some((l) => l.alicuota != null);
+
+  const head = [
+    ...(conCodigo ? ['Código'] : []),
+    'Descripción',
+    'Cant.',
+    'P. unitario',
+    ...(conDescuento ? ['Dto.'] : []),
+    ...(conAlicuota ? ['IVA'] : []),
+    'Importe',
+  ];
+  const body = d.lineas.map((l) => [
+    ...(conCodigo ? [l.codigo ?? ''] : []),
+    l.descripcion,
+    l.cantidad,
+    money(l.precioUnitario),
+    ...(conDescuento ? [Number(l.descuento ?? 0) > 0 ? money(l.descuento) : ''] : []),
+    ...(conAlicuota ? [l.alicuota ? `${Number(l.alicuota)}%` : ''] : []),
+    money(l.total),
+  ]);
+
+  // Los anchos se declaran por índice y ese índice se corre según qué columnas
+  // existan, así que se arma sobre la marcha en vez de hardcodearlo.
+  const columnStyles: Record<number, { halign: 'right' | 'left'; cellWidth: number }> = {};
+  let col = 0;
+  if (conCodigo) columnStyles[col++] = { halign: 'left', cellWidth: 24 };
+  col++; // descripción: ancho automático, se queda con lo que sobra
+  columnStyles[col++] = { halign: 'right', cellWidth: 16 };
+  columnStyles[col++] = { halign: 'right', cellWidth: 24 };
+  if (conDescuento) columnStyles[col++] = { halign: 'right', cellWidth: 18 };
+  if (conAlicuota) columnStyles[col++] = { halign: 'right', cellWidth: 13 };
+  columnStyles[col] = { halign: 'right', cellWidth: 26 };
+
   autoTable(doc, {
     startY: y + 5,
-    head: [['Descripción', 'Cant.', 'P. unitario', 'Importe']],
-    body: d.lineas.map((l) => [l.descripcion, l.cantidad, money(l.precioUnitario), money(l.total)]),
-    styles: { fontSize: 8.5, cellPadding: 1.6 },
+    head: [head],
+    body,
+    styles: { fontSize: 8.5, cellPadding: 1.6, overflow: 'linebreak' },
     headStyles: { fillColor: [27, 82, 204] },
-    columnStyles: {
-      1: { halign: 'right', cellWidth: 20 },
-      2: { halign: 'right', cellWidth: 28 },
-      3: { halign: 'right', cellWidth: 30 },
-    },
+    columnStyles,
     margin: { left: 14, right: 10 },
   });
   const finDetalle = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
@@ -182,7 +230,11 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
   // abajo en vez de quedar pegados al detalle con media página en blanco. A4
   // son 297mm; se reservan 62mm para totales + pie.
   const ALTO_A4 = 297;
-  const yTotales = Math.max(finDetalle + 6, ALTO_A4 - 62);
+  // El detalle de alícuotas ocupa lugar abajo: si no se reserva, se monta con
+  // el pie fiscal.
+  const alicuotas = c.letra === 'A' ? (d.alicuotas ?? []) : [];
+  const reservaPie = 62 + (alicuotas.length > 0 ? 6 + alicuotas.length * 5 : 0);
+  const yTotales = Math.max(finDetalle + 6, ALTO_A4 - reservaPie);
 
   // Marco del detalle hasta donde arrancan los totales: así la hoja se ve
   // completa, como un talonario preimpreso.
@@ -192,6 +244,26 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
   doc.line(14, yTotales - 4, 200, yTotales - 4);
 
   y = yTotales;
+
+  // ── DETALLE DE ALÍCUOTAS, abajo a la izquierda, enfrentado a los totales. Es
+  //    lo primero que mira el contador en una Factura A.
+  if (alicuotas.length > 0) {
+    let yA = yTotales;
+    doc.setFontSize(7.5).setFont('helvetica', 'bold');
+    doc.text('DETALLE DE ALÍCUOTAS', 14, yA);
+    doc.setFont('helvetica', 'normal').setFontSize(8);
+    yA += 4.5;
+    doc.text('Alícuota', 14, yA);
+    doc.text('Neto gravado', 62, yA, { align: 'right' });
+    doc.text('IVA', 86, yA, { align: 'right' });
+    doc.setDrawColor(180).line(14, yA + 1, 86, yA + 1);
+    for (const a of alicuotas) {
+      yA += 5;
+      doc.text(`IVA ${Number(a.tasa)}%`, 14, yA);
+      doc.text(money(a.base), 62, yA, { align: 'right' });
+      doc.text(money(a.importe), 86, yA, { align: 'right' });
+    }
+  }
 
   // ── Totales. El IVA se discrimina SÓLO en la Factura A. En B y C va dentro
   //    del precio y mostrarlo aparte es un error fiscal: al consumidor final no

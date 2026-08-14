@@ -279,6 +279,8 @@ export interface SaleLineDTO {
   articleId: string;
   /** Descripción del artículo, resuelta por el servidor (ver SalesService.getSale). */
   articleDescription?: string | null;
+  /** Código/código de barras del artículo, para la columna CÓDIGO de la factura. */
+  articleCode?: string | null;
   lineNumber: number;
   quantity: string;
   unitPrice: string;

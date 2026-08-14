@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { SaleDTO, VoucherType } from '@/types/api'
 import type { SaleTicketData } from '@/print/SaleTicket'
+import { VAT_CONDITION_LABELS } from '@/lib/fiscalDoc'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 
 function todayIso(): string {
@@ -189,6 +190,10 @@ function SaleDetailDialog({
     [detailQuery.data],
   )
   const pmNameById = useMemo(() => new Map((methodsQuery.data ?? []).map((m) => [m.id, m.name])), [methodsQuery.data])
+  // La condición del cliente frente al IVA va impresa en el comprobante, así
+  // que la reimpresión tiene que resolverla igual que la venta original: si no,
+  // el papel reimpreso dice "Consumidor Final" en la factura de un RI.
+  const customersQuery = useCustomers()
   const [confirming, setConfirming] = useState(false)
   const [returning, setReturning] = useState(false)
   const [reason, setReason] = useState('')
@@ -328,13 +333,22 @@ function SaleDetailDialog({
       sale: d.sale,
       priceMode: company.priceMode,
       lines: d.lines.map((l) => ({
-        description: descById.get(l.articleId) ?? '—',
+        // La descripción y el código los resuelve el servidor y viajan con la
+        // línea (ver SalesService.getSale): la pantalla no baja el catálogo.
+        description: l.articleDescription ?? descById.get(l.articleId) ?? '—',
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         lineTotal: l.lineTotal,
+        code: l.articleCode ?? null,
+        vatRate: l.vatRate,
+        discount: l.discount,
       })),
       customerName: customerName || null,
       customerDoc: null,
+      customerVatCondition: (() => {
+        const c = (customersQuery.data ?? []).find((x) => x.id === d.sale.customerId)
+        return c ? (VAT_CONDITION_LABELS[c.category] ?? null) : null
+      })(),
       sellerName: null,
       isAccountSale: d.sale.isAccountSale,
       payments: d.payments.map((p) => ({

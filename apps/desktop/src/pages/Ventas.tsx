@@ -25,6 +25,7 @@ import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQ
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
+import { VAT_CONDITION_LABELS } from '@/lib/fiscalDoc'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { ReturnSaleDialog } from '@/components/ReturnDialogs'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
@@ -842,12 +843,15 @@ function PDV() {
   function buildTicket(result: CreateSaleResultDTO): SaleTicketData {
     const customer = selectedCustomer
     const cf = isCfCustomer(customer)
-    const descById = new Map(cart.map((l) => [l.article.id, l.article.description]))
+    const artById = new Map(cart.map((l) => [l.article.id, l.article]))
     const lines: SaleTicketLine[] = result.lines.map((l) => ({
-      description: descById.get(l.articleId) ?? '—',
+      description: artById.get(l.articleId)?.description ?? '—',
       quantity: l.quantity,
       unitPrice: l.unitPrice,
       lineTotal: l.lineTotal,
+      code: artById.get(l.articleId)?.barcode ?? null,
+      vatRate: l.vatRate,
+      discount: l.discount,
     }))
     const ticketPayments: SaleTicketPayment[] = result.payments.map((p) => ({
       methodName: methodNameById.get(p.paymentMethodId) ?? 'Medio de pago',
@@ -861,6 +865,7 @@ function PDV() {
       customerName:
         cf || !customer ? null : `${customer.lastName}${customer.firstName ? `, ${customer.firstName}` : ''}`,
       customerDoc: !cf && customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
+      customerVatCondition: cf || !customer ? null : VAT_CONDITION_LABELS[customer.category] ?? null,
       sellerName: currentUser?.fullName ?? null,
       isAccountSale: result.sale.isAccountSale,
       payments: ticketPayments,

@@ -297,7 +297,9 @@ export class SalesService {
     const conNombre = await Promise.all(
       lines.map(async (l) => {
         const a = await repos.articles.findById(l.articleId);
-        return { ...l, articleDescription: a?.description ?? null };
+        // El código va en la factura A (columna CÓDIGO): es lo que el cliente
+        // usa para volver a pedir el mismo artículo.
+        return { ...l, articleDescription: a?.description ?? null, articleCode: a?.barcode ?? null };
       }),
     );
     return { sale, lines: conNombre, payments };

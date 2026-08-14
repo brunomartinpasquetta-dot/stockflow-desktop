@@ -30,6 +30,35 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
   const meta: FormalDocData['meta'] = [{ label: 'Fecha', value: formatDateTime(data.sale.date) }]
   if (data.sellerName) meta.push({ label: 'Vendedor', value: data.sellerName })
   const single = data.payments.length === 1 ? data.payments[0]!.methodName : null
+  const esFacturaA = data.sale.type === 'A'
+
+  // DETALLE DE ALÍCUOTAS: se arma agrupando los renglones por tasa. Sólo en la
+  // Factura A, que es donde el IVA se discrimina. El neto de cada renglón sale
+  // de sacarle el impuesto al importe cuando los precios se cargan CON IVA
+  // (`priceMode: 'gross'`, que es como trabaja el comercio); si se cargan netos,
+  // el importe YA es el neto.
+  const vatBreakdown = esFacturaA
+    ? [
+        ...data.lines
+          .reduce((acc, l) => {
+            const rate = Number(l.vatRate ?? 0)
+            if (!Number.isFinite(rate)) return acc
+            const importe = Number(l.lineTotal)
+            const base = data.priceMode === 'gross' ? importe / (1 + rate / 100) : importe
+            const prev = acc.get(rate) ?? { base: 0, amount: 0 }
+            acc.set(rate, { base: prev.base + base, amount: prev.amount + base * (rate / 100) })
+            return acc
+          }, new Map<number, { base: number; amount: number }>())
+          .entries(),
+      ]
+        .sort((a, b) => a[0] - b[0])
+        .map(([rate, v]) => ({
+          rate: String(rate),
+          base: v.base.toFixed(2),
+          amount: v.amount.toFixed(2),
+        }))
+    : null
+
   return {
     company: data.company,
     // Un comprobante fiscal SIN CAE no es una factura válida: el título lo
@@ -40,7 +69,13 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
         : VOUCHER_LABELS[data.sale.type].toUpperCase(),
     number: String(data.sale.number).padStart(8, '0'),
     meta,
-    customer: data.customerName ? { name: data.customerName, doc: data.customerDoc } : null,
+    customer: data.customerName
+      ? { name: data.customerName, doc: data.customerDoc, vatCondition: data.customerVatCondition }
+      : null,
+    // ORIGINAL sólo en comprobantes fiscales: en un remito X no significa nada.
+    copyLabel: data.sale.type !== 'X' ? 'Original' : null,
+    saleCondition: data.isAccountSale ? 'Cuenta corriente' : (single ?? 'Contado'),
+    vatBreakdown,
     lines: data.lines,
     totals: {
       subtotal: data.sale.subtotal,
@@ -63,6 +98,14 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
           letter: data.fiscal.letter,
         }
       : null,
+    // Leyendas al pie. Sólo en comprobantes fiscales: un remito X no las lleva.
+    legalNotes:
+      data.sale.type !== 'X'
+        ? [
+            'Los importes consignados en este comprobante incluyen los impuestos correspondientes según la condición fiscal del emisor.',
+            'Reclamos por diferencias o faltantes dentro de las 48 horas de recibida la mercadería.',
+          ]
+        : null,
     footerNote: '¡Gracias por su compra!',
   }
 }

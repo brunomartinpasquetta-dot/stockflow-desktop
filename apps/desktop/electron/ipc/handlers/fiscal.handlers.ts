@@ -72,6 +72,14 @@ async function qrComoImagen(url: string | null): Promise<string | null> {
   }
 }
 
+/** Condición del receptor frente al IVA, escrita como va en el comprobante. */
+const CONDICION_IVA_CLIENTE: Record<string, string> = {
+  RI: 'IVA Responsable Inscripto',
+  MT: 'Responsable Monotributo',
+  CF: 'Consumidor Final',
+  EX: 'IVA Exento',
+};
+
 async function archivar(
   deps: HandlerDeps,
   saleId: string,
@@ -86,10 +94,25 @@ async function archivar(
     const cfg = deps.repos.fiscal.getConfig();
     const cliente = sale.customerId ? await deps.repos.customers.findById(sale.customerId) : null;
 
-    const articulos = new Map<string, string>();
+    const articulos = new Map<string, { descripcion: string; codigo: string | null }>();
     for (const l of lines) {
       const a = await deps.repos.articles.findById(l.articleId);
-      if (a) articulos.set(l.articleId, a.description);
+      if (a) articulos.set(l.articleId, { descripcion: a.description, codigo: a.barcode ?? null });
+    }
+
+    // DETALLE DE ALÍCUOTAS: se agrupan los renglones por tasa. Sólo en la A. El
+    // neto sale de sacarle el impuesto al importe cuando los precios se cargan
+    // CON IVA (`priceMode: 'gross'`); si se cargan netos, el importe ya es neto.
+    const porTasa = new Map<number, { base: number; importe: number }>();
+    if (v.letter === 'A') {
+      for (const l of lines) {
+        const tasa = Number(l.vatRate ?? 0);
+        if (!Number.isFinite(tasa)) continue;
+        const total = Number(l.lineTotal);
+        const base = empresa.priceMode === 'gross' ? total / (1 + tasa / 100) : total;
+        const prev = porTasa.get(tasa) ?? { base: 0, importe: 0 };
+        porTasa.set(tasa, { base: prev.base + base, importe: prev.importe + base * (tasa / 100) });
+      }
     }
 
     const datos: DatosFactura = {
@@ -107,7 +130,7 @@ async function archivar(
             nombre: `${cliente.lastName}${cliente.firstName ? ' ' + cliente.firstName : ''}`.trim(),
             documento:
               cliente.docNumber ? `${cliente.docType ?? 'Doc'}: ${cliente.docNumber}` : null,
-            condicionIva: null,
+            condicionIva: CONDICION_IVA_CLIENTE[cliente.category] ?? null,
           }
         : null,
       comprobante: {
@@ -120,16 +143,27 @@ async function archivar(
         vencimientoCae: v.caeExpiry,
       },
       lineas: lines.map((l: (typeof lines)[number]) => ({
-        descripcion: articulos.get(l.articleId) ?? 'Artículo',
+        descripcion: articulos.get(l.articleId)?.descripcion ?? 'Artículo',
         cantidad: String(Number(l.quantity)),
         precioUnitario: l.unitPrice,
         total: l.lineTotal,
+        codigo: articulos.get(l.articleId)?.codigo ?? null,
+        alicuota: l.vatRate,
+        descuento: l.discount,
       })),
       totales: {
         neto: sale.subtotal,
         iva: sale.vatAmount,
         total: sale.total,
       },
+      condicionVenta: sale.isAccountSale ? 'Cuenta corriente' : 'Contado',
+      alicuotas: [...porTasa.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([tasa, x]) => ({
+          tasa: String(tasa),
+          base: x.base.toFixed(2),
+          importe: x.importe.toFixed(2),
+        })),
       qrDataUrl: await qrComoImagen(v.qrUrl ?? sale.afipQrUrl ?? null),
     };
 
