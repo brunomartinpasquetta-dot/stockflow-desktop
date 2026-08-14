@@ -141,6 +141,13 @@
       "when": 1780200000000,
       "tag": "0020_company_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1786725681774,
+      "tag": "0021_articulo_rapido",
+      "breakpoints": true
     }
   ]
 }

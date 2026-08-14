@@ -147,7 +147,11 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
         }
 
         // Stock: VUELVE. Si la línea es un artículo espejo de promo → componentes.
-        const artIds = [...new Set(computed.map((c) => c.articleId))];
+        // Los artículos rápidos no tienen artículo: no pueden ser espejo de
+        // promo y romperían el inArray con un null.
+        const artIds = [
+          ...new Set(computed.map((c) => c.articleId).filter((x): x is string => x != null)),
+        ];
         const promoRows = tx
           .select({
             mirrorArticleId: promotions.articleId,
@@ -172,12 +176,14 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
             .run();
         };
         for (const c of computed) {
-          const comps = compsByMirror.get(c.articleId);
+          // Artículo rápido: la venta no descontó stock, así que la devolución
+          // no repone nada. Sólo se reintegra la plata.
+          const comps = c.articleId ? compsByMirror.get(c.articleId) : undefined;
           if (comps && comps.length > 0) {
             for (const comp of comps) {
               bumpStock(comp.componentId, (Number(c.quantity) * Number(comp.componentQty)).toFixed(3));
             }
-          } else {
+          } else if (c.articleId) {
             bumpStock(c.articleId, c.quantity);
           }
         }

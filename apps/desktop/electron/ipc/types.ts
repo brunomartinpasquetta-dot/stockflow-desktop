@@ -276,7 +276,10 @@ export interface SaleDTO {
 export interface SaleLineDTO {
   id: string;
   saleId: string;
-  articleId: string;
+  /** null = ARTÍCULO RÁPIDO: se vendió algo fuera del catálogo (ver `description`). */
+  articleId: string | null;
+  /** Descripción escrita a mano. Sólo cuando no hay artículo. */
+  description?: string | null;
   /** Descripción del artículo, resuelta por el servidor (ver SalesService.getSale). */
   articleDescription?: string | null;
   /** Código/código de barras del artículo, para la columna CÓDIGO de la factura. */
@@ -398,7 +401,10 @@ export interface LoginResultDTO {
 }
 
 export interface SaleLineDraftDTO {
-  articleId: string;
+  /** Si falta, es un ARTÍCULO RÁPIDO: requiere `description` y `unitPrice`. */
+  articleId?: string;
+  /** Descripción escrita a mano. Sólo artículo rápido. */
+  description?: string;
   quantity: string;
   /** Si se omite, lo resuelve el servicio (lista del cliente / mayorista). */
   unitPrice?: string;
@@ -453,7 +459,8 @@ export interface ReturnLineDTO {
   id: string;
   returnId: string;
   saleLineId: string;
-  articleId: string;
+  /** null = se devolvió un artículo rápido: sólo se reintegra la plata. */
+  articleId: string | null;
   quantity: string;
   unitPrice: string;
   lineTotal: string;

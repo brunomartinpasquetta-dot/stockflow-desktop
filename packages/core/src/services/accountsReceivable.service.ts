@@ -89,7 +89,8 @@ export interface CustomerBalance {
 export interface AccountDetailLine {
   id: string;
   saleId: string;
-  articleId: string;
+  /** null = artículo rápido: la descripción la trae la propia línea. */
+  articleId: string | null;
   lineNumber: number;
   quantity: string;
   unitPrice: string;
@@ -338,7 +339,11 @@ export class AccountsReceivableService {
     const sale = (await repos.sales.findById(account.saleId)) ?? null;
     const rawLines = await repos.saleLines.findBySale(account.saleId);
 
-    const articleIds = [...new Set(rawLines.map((l) => l.articleId))];
+    // Los artículos rápidos no tienen artículo que buscar: su descripción ya
+    // viaja en la línea.
+    const articleIds = [
+      ...new Set(rawLines.map((l) => l.articleId).filter((x): x is string => x != null)),
+    ];
     const articlesById = new Map<string, { description: string; brand: string | null }>();
     for (const id of articleIds) {
       const art = await repos.articles.findById(id);
@@ -350,8 +355,10 @@ export class AccountsReceivableService {
       .sort((a, b) => a.lineNumber - b.lineNumber)
       .map((l) => ({
         ...l,
-        description: articlesById.get(l.articleId)?.description ?? l.articleId,
-        brand: articlesById.get(l.articleId)?.brand ?? null,
+        description: l.articleId
+          ? (articlesById.get(l.articleId)?.description ?? l.articleId)
+          : (l.description ?? 'Artículo rápido'),
+        brand: l.articleId ? (articlesById.get(l.articleId)?.brand ?? null) : null,
       }));
 
     const pmById = await repos.paymentMethods.byId();

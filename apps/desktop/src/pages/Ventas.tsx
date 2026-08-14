@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X } from 'lucide-react'
+import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X, Zap } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import {
@@ -25,6 +25,7 @@ import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQ
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
+import { ArticuloRapidoDialog, type ArticuloRapido } from '@/components/ArticuloRapidoDialog'
 import { VAT_CONDITION_LABELS } from '@/lib/fiscalDoc'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { ReturnSaleDialog } from '@/components/ReturnDialogs'
@@ -42,11 +43,24 @@ import { useQuery } from '@tanstack/react-query'
 import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, PriceMode, PrinterConfigDTO, VoucherType } from '@/types/api'
 
 interface CartLine {
-  article: ArticleDTO
+  /**
+   * Falta en el ARTÍCULO RÁPIDO: se está cobrando algo que no está en el
+   * catálogo. En ese caso la línea se describe sola con `description`.
+   */
+  article?: ArticleDTO
+  /** Descripción escrita a mano. Sólo en el artículo rápido. */
+  description?: string
+  /** IVA de la línea: del artículo, o el elegido a mano en el rápido. */
+  vatRate: string
   quantity: string
   unitPrice: string
   discount: string
   priceManuallySet: boolean
+}
+
+/** Cómo se muestra una línea, venga del catálogo o escrita a mano. */
+function cartLineLabel(l: CartLine): string {
+  return l.article?.description ?? l.description ?? 'Artículo rápido'
 }
 
 // Opciones del comprobante. Cuando la facturación electrónica está configurada
@@ -551,6 +565,7 @@ function PDV() {
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [articlePickerOpen, setArticlePickerOpen] = useState(false)
   const [promoPickerOpen, setPromoPickerOpen] = useState(false)
+  const [rapidoOpen, setRapidoOpen] = useState(false)
   const canDevolver = usePermission('void_sale') && canWrite
   const [devolucionPickerOpen, setDevolucionPickerOpen] = useState(false)
   const [returningSaleId, setReturningSaleId] = useState<string | null>(null)
@@ -606,7 +621,7 @@ function PDV() {
     setSelectedMethodId(fallback?.id ?? null)
   }
 
-  const lineInputs = cart.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, discount: l.discount, vatRate: l.article.vatRate }))
+  const lineInputs = cart.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice, discount: l.discount, vatRate: l.vatRate }))
   // Subtotal sin descuento global, base para traducir el % a importe.
   const subtotalBase = Number(calculateSaleTotals(lineInputs, '0', priceMode).subtotal)
   const globalDiscountAbs = discountIsPct
@@ -630,7 +645,7 @@ function PDV() {
   }
   function addArticleWithQty(article: ArticleDTO, qty: string): void {
     setCart((prev) => {
-      const idx = prev.findIndex((l) => l.article.id === article.id)
+      const idx = prev.findIndex((l) => l.article?.id === article.id)
       if (idx >= 0) {
         const next = [...prev]
         const line = next[idx]!
@@ -644,9 +659,34 @@ function PDV() {
       }
       return [
         ...prev,
-        { article, quantity: qty, unitPrice: resolvePrice(article, selectedCustomer, qty, selectedPriceList), discount: '0', priceManuallySet: false },
+        {
+          article,
+          vatRate: article.vatRate,
+          quantity: qty,
+          unitPrice: resolvePrice(article, selectedCustomer, qty, selectedPriceList),
+          discount: '0',
+          priceManuallySet: false,
+        },
       ]
     })
+  }
+  /**
+   * Agrega una línea escrita a mano. No busca ni crea artículo: la descripción
+   * y el precio son los que puso el cajero, y el precio NUNCA se recalcula por
+   * lista de cliente (no hay ficha de la que sacarlo).
+   */
+  function addArticuloRapido(r: ArticuloRapido): void {
+    setCart((prev) => [
+      ...prev,
+      {
+        description: r.description,
+        vatRate: r.vatRate,
+        quantity: r.quantity,
+        unitPrice: r.unitPrice,
+        discount: '0',
+        priceManuallySet: true,
+      },
+    ])
   }
   function removeLine(i: number): void {
     setCart((prev) => prev.filter((_, idx) => idx !== i))
@@ -658,7 +698,10 @@ function PDV() {
       next[i] = {
         ...line,
         quantity: value,
-        unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(line.article, selectedCustomer, value, selectedPriceList),
+        unitPrice:
+          line.priceManuallySet || !line.article
+            ? line.unitPrice
+            : resolvePrice(line.article, selectedCustomer, value, selectedPriceList),
       }
       return next
     })
@@ -701,7 +744,13 @@ function PDV() {
     const rawList = Number(c.priceList)
     const list: 1 | 2 | 3 = rawList === 2 ? 2 : rawList === 3 ? 3 : 1
     setSelectedPriceList(list)
-    setCart((prev) => prev.map((l) => (l.priceManuallySet ? l : { ...l, unitPrice: resolvePrice(l.article, c, l.quantity, list) })))
+    setCart((prev) =>
+      prev.map((l) =>
+        l.priceManuallySet || !l.article
+          ? l
+          : { ...l, unitPrice: resolvePrice(l.article, c, l.quantity, list) },
+      ),
+    )
     if (isCfCustomer(c)) setIsAccountSale(false)
     barcodeRef.current?.focus()
   }
@@ -709,7 +758,13 @@ function PDV() {
   // Cambio manual del selector de lista: re-resolver las líneas NO editadas a mano.
   function changePriceList(list: 1 | 2 | 3): void {
     setSelectedPriceList(list)
-    setCart((prev) => prev.map((l) => (l.priceManuallySet ? l : { ...l, unitPrice: resolvePrice(l.article, selectedCustomer, l.quantity, list) })))
+    setCart((prev) =>
+      prev.map((l) =>
+        l.priceManuallySet || !l.article
+          ? l
+          : { ...l, unitPrice: resolvePrice(l.article, selectedCustomer, l.quantity, list) },
+      ),
+    )
   }
 
   // --- búsqueda de productos ---
@@ -843,16 +898,22 @@ function PDV() {
   function buildTicket(result: CreateSaleResultDTO): SaleTicketData {
     const customer = selectedCustomer
     const cf = isCfCustomer(customer)
-    const artById = new Map(cart.map((l) => [l.article.id, l.article]))
-    const lines: SaleTicketLine[] = result.lines.map((l) => ({
-      description: artById.get(l.articleId)?.description ?? '—',
-      quantity: l.quantity,
-      unitPrice: l.unitPrice,
-      lineTotal: l.lineTotal,
-      code: artById.get(l.articleId)?.barcode ?? null,
-      vatRate: l.vatRate,
-      discount: l.discount,
-    }))
+    const artById = new Map(
+      cart.filter((l) => l.article).map((l) => [l.article!.id, l.article!]),
+    )
+    const lines: SaleTicketLine[] = result.lines.map((l) => {
+      // Artículo rápido: no hay ficha que consultar, la línea se describe sola.
+      const art = l.articleId ? artById.get(l.articleId) : undefined
+      return {
+        description: art?.description ?? l.description ?? '—',
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal,
+        code: art?.barcode ?? null,
+        vatRate: l.vatRate,
+        discount: l.discount,
+      }
+    })
     const ticketPayments: SaleTicketPayment[] = result.payments.map((p) => ({
       methodName: methodNameById.get(p.paymentMethodId) ?? 'Medio de pago',
       amount: p.amount,
@@ -916,11 +977,12 @@ function PDV() {
         discount: globalDiscountAbs,
         notes: null,
         lines: cart.map((l) => ({
-          articleId: l.article.id,
+          articleId: l.article?.id,
+          description: l.article ? undefined : l.description,
           quantity: parseCurrencyInput(l.quantity),
           unitPrice: parseCurrencyInput(l.unitPrice),
           discount: parseCurrencyInput(l.discount),
-          vatRate: l.article.vatRate,
+          vatRate: l.vatRate,
         })),
       })
       // La venta YA quedó registrada y pegó en caja. Avisamos al operador y
@@ -1034,11 +1096,12 @@ function PDV() {
         discount: globalDiscountAbs,
         notes: mpPaymentId ? `MP Payment ID: ${mpPaymentId}` : null,
         lines: cart.map((l) => ({
-          articleId: l.article.id,
+          articleId: l.article?.id,
+          description: l.article ? undefined : l.description,
           quantity: parseCurrencyInput(l.quantity),
           unitPrice: parseCurrencyInput(l.unitPrice),
           discount: parseCurrencyInput(l.discount),
-          vatRate: l.article.vatRate,
+          vatRate: l.vatRate,
         })),
       })
       await api.mpQr.linkOrderToSale(orderId, result.sale.id).catch(() => {})
@@ -1087,6 +1150,12 @@ function PDV() {
         e.preventDefault()
         e.stopPropagation()
         setMixedMode((m) => !m)
+        return
+      }
+      if (e.key === 'F10') {
+        e.preventDefault()
+        e.stopPropagation()
+        setRapidoOpen(true)
         return
       }
       if (e.key === 'Escape' && barcode.trim() === '' && cart.length > 0) {
@@ -1238,6 +1307,16 @@ function PDV() {
             <BadgePercent className="mr-2 h-4 w-4" />
             Promos
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            onClick={() => setRapidoOpen(true)}
+            title="Cobrar algo que no está en el catálogo (F10)"
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            Rápido [F10]
+          </Button>
           {canDevolver && (
             <Button
               type="button"
@@ -1274,17 +1353,27 @@ function PDV() {
                 </tr>
               ) : (
                 cart.map((l, i) => {
-                  const overStock = Number(l.quantity) > Number(l.article.stock)
+                  // El artículo rápido no tiene stock que controlar: no está en
+                  // el inventario, por definición.
+                  const overStock = l.article ? Number(l.quantity) > Number(l.article.stock) : false
                   return (
-                    <tr key={l.article.id} className="border-t">
+                    <tr key={l.article?.id ?? `rapido-${i}`} className="border-t">
                       <td className="px-2 py-1">
-                        <div className="font-medium">{l.article.description}</div>
+                        <div className="font-medium">{cartLineLabel(l)}</div>
                         <div className="font-mono text-xs text-muted-foreground">
-                          {l.article.barcode}
-                          {overStock && <span className="ml-2 text-destructive">Stock: {formatQty(l.article.stock)}</span>}
+                          {l.article ? (
+                            l.article.barcode
+                          ) : (
+                            <span className="rounded bg-amber-500/15 px-1 py-0.5 text-amber-700 dark:text-amber-400">
+                              artículo rápido
+                            </span>
+                          )}
+                          {overStock && l.article && (
+                            <span className="ml-2 text-destructive">Stock: {formatQty(l.article.stock)}</span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-2 py-1 text-sm text-muted-foreground">{l.article.brand ?? ''}</td>
+                      <td className="px-2 py-1 text-sm text-muted-foreground">{l.article?.brand ?? ''}</td>
                       <td className="px-2 py-1">
                         <Input
                           className="h-8 text-right tabular-nums"
@@ -1312,7 +1401,7 @@ function PDV() {
                         {formatCurrency(lineTotal(l))}
                         {priceMode === 'net' && (
                           <div className="text-[10px] font-normal text-muted-foreground">
-                            c/IVA {formatCurrency(vatBreakdown(lineTotal(l), l.article.vatRate, 'net').gross.toFixed(4))}
+                            c/IVA {formatCurrency(vatBreakdown(lineTotal(l), l.vatRate, 'net').gross.toFixed(4))}
                           </div>
                         )}
                       </td>
@@ -1548,6 +1637,15 @@ function PDV() {
           onClose={() => setReturningSaleId(null)}
           onDone={() => {
             void articlesQuery.refetch()
+          }}
+        />
+      )}
+      {rapidoOpen && (
+        <ArticuloRapidoDialog
+          onAdd={addArticuloRapido}
+          onClose={() => {
+            setRapidoOpen(false)
+            barcodeRef.current?.focus()
           }}
         />
       )}

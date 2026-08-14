@@ -109,7 +109,8 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             4,
           );
           return {
-            articleId: line.articleId,
+            articleId: line.articleId ?? null,
+            description: line.description ?? null,
             lineNumber: idx + 1,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
@@ -181,7 +182,11 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
 
         // PROMOS: si alguna línea es el artículo espejo de una promoción, el
         // stock se mueve sobre sus COMPONENTES (el stock del espejo no se toca).
-        const lineArticleIds = [...new Set(computedLines.map((l) => l.articleId))];
+        // Las líneas de artículo rápido no tienen artículo: no pueden ser espejo
+        // de una promoción y romperían el inArray con un null.
+        const lineArticleIds = [
+          ...new Set(computedLines.map((l) => l.articleId).filter((x): x is string => x != null)),
+        ];
         const promoRows = lineArticleIds.length
           ? tx
               .select({
@@ -226,7 +231,11 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         // Líneas + descuento de stock.
         const insertedLines: SaleLine[] = [];
         for (const l of computedLines) {
-          const promoComponents = promoComponentsByMirror.get(l.articleId);
+          // Artículo rápido (sin artículo): no hay nada en inventario que
+          // descontar. Si igual moviéramos stock habría que inventar un
+          // artículo por venta, que es lo que dejó el catálogo de StockFácil
+          // con 10.323 artículos fantasma en negativo.
+          const promoComponents = l.articleId ? promoComponentsByMirror.get(l.articleId) : undefined;
           if (promoComponents && promoComponents.length > 0) {
             for (const comp of promoComponents) {
               discountStock(
@@ -235,13 +244,14 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
                 `"${comp.componentDesc}" (componente de la promo)`,
               );
             }
-          } else {
+          } else if (l.articleId) {
             discountStock(l.articleId, l.quantity, `el artículo ${l.articleId}`);
           }
 
           const lineRow: NewSaleLine = {
             saleId: insertedSale.id,
             articleId: l.articleId,
+            description: l.description,
             lineNumber: l.lineNumber,
             quantity: l.quantity,
             unitPrice: l.unitPrice,
@@ -384,7 +394,9 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         const lines = tx.select().from(saleLines).where(eq(saleLines.saleId, id)).all();
         // PROMOS: las líneas cuyo artículo es un espejo de promoción restauran
         // el stock de sus COMPONENTES (espejo intacto), igual que al vender.
-        const voidArticleIds = [...new Set(lines.map((l) => l.articleId))];
+        const voidArticleIds = [
+          ...new Set(lines.map((l) => l.articleId).filter((x): x is string => x != null)),
+        ];
         const voidPromoRows = voidArticleIds.length
           ? tx
               .select({
@@ -413,12 +425,14 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             .run();
         };
         for (const line of lines) {
-          const comps = voidComponentsByMirror.get(line.articleId);
+          // Artículo rápido: al vender no descontó stock, así que al anular no
+          // hay nada que devolver. Restaurarlo inventaría mercadería.
+          const comps = line.articleId ? voidComponentsByMirror.get(line.articleId) : undefined;
           if (comps && comps.length > 0) {
             for (const comp of comps) {
               restoreStock(comp.componentId, mulDecimal(line.quantity, comp.componentQty, 3));
             }
-          } else {
+          } else if (line.articleId) {
             restoreStock(line.articleId, line.quantity);
           }
         }

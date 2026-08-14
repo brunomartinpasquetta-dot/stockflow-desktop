@@ -390,6 +390,48 @@ async function main(): Promise<void> {
     acctVatPurch.ok ? `len=${acctVatPurch.data.length}` : JSON.stringify(acctVatPurch),
   );
 
+  // ARTÍCULO RÁPIDO: línea sin artículo. Lo que hay que verificar es que se
+  // cobre bien y que NO toque el inventario — si moviera stock habría que
+  // inventar un artículo por venta, que es lo que dejó el catálogo de StockFácil
+  // con 10.323 artículos fantasma.
+  const stockAntesRapido = await invoke<{ stock: string } | null>(handlers, 'articles:get', { id: created.data.id });
+  const ventaRapida = await invoke<{ sale: { total: string }; lines: Array<{ articleId: string | null; description: string | null }> }>(
+    handlers,
+    'sales:create',
+    {
+      type: 'B',
+      customerId: cf.id,
+      payments: [{ paymentMethodId: 'pm-efectivo', amount: '1500.0000' }],
+      lines: [{ description: 'FLETE', quantity: '1.000', unitPrice: '1500.0000', vatRate: '21.00' }],
+    },
+  );
+  check(
+    'sales:create con ARTÍCULO RÁPIDO (sin articleId)',
+    ventaRapida.ok &&
+      ventaRapida.data.sale.total === '1500.0000' &&
+      ventaRapida.data.lines[0]?.articleId === null &&
+      ventaRapida.data.lines[0]?.description === 'FLETE',
+    JSON.stringify(ventaRapida).slice(0, 220),
+  );
+  const stockDespuesRapido = await invoke<{ stock: string } | null>(handlers, 'articles:get', { id: created.data.id });
+  check(
+    'el artículo rápido NO tocó el stock',
+    stockAntesRapido.ok && stockDespuesRapido.ok &&
+      stockAntesRapido.data?.stock === stockDespuesRapido.data?.stock,
+    `antes=${stockAntesRapido.ok ? stockAntesRapido.data?.stock : '?'} después=${stockDespuesRapido.ok ? stockDespuesRapido.data?.stock : '?'}`,
+  );
+  const rapidoSinDesc = await invoke(handlers, 'sales:create', {
+    type: 'B',
+    customerId: cf.id,
+    payments: [{ paymentMethodId: 'pm-efectivo', amount: '100.0000' }],
+    lines: [{ quantity: '1.000', unitPrice: '100.0000' }],
+  });
+  check(
+    'artículo rápido SIN descripción es rechazado',
+    !rapidoSinDesc.ok,
+    JSON.stringify(rapidoSinDesc).slice(0, 160),
+  );
+
   // sales:voidRange — anulación en lote del día. Va AL FINAL a propósito: anula
   // la venta que usaron todos los checks anteriores, así que mover esto para
   // arriba los rompe. Lo que importa verificar es que no sea un borrado suelto:
@@ -401,7 +443,7 @@ async function main(): Promise<void> {
   );
   check(
     'sales:voidRange anula las ventas del rango',
-    voidRange.ok && voidRange.data.anuladas === 1 && voidRange.data.conCAE === 0 && voidRange.data.omitidas.length === 0,
+    voidRange.ok && voidRange.data.anuladas === 2 && voidRange.data.conCAE === 0 && voidRange.data.omitidas.length === 0,
     JSON.stringify(voidRange),
   );
   const stockTrasAnular = await invoke<{ stock: string } | null>(handlers, 'articles:get', { id: created.data.id });

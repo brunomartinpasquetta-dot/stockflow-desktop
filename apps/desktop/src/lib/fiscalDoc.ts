@@ -61,7 +61,7 @@ export interface BuildFiscalDocInput {
   company: CompanyDTO
   voucher: FiscalVoucherDTO
   sale?: SaleDTO | null
-  lines?: (SaleLineDTO & { description?: string })[]
+  lines?: SaleLineDTO[]
   descriptionById?: Map<string, string>
   sellerName?: string | null
   paymentNote?: string | null
@@ -81,7 +81,8 @@ export async function buildFiscalDoc(input: BuildFiscalDocInput): Promise<Formal
   const docLines =
     lines && lines.length > 0
       ? lines.map((l) => ({
-          description: l.description ?? descriptionById?.get(l.articleId) ?? 'Artículo',
+          description:
+            l.description ?? (l.articleId ? descriptionById?.get(l.articleId) : null) ?? 'Artículo',
           quantity: l.quantity,
           unitPrice: l.unitPrice,
           lineTotal: l.lineTotal,

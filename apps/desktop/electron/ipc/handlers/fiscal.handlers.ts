@@ -94,8 +94,10 @@ async function archivar(
     const cfg = deps.repos.fiscal.getConfig();
     const cliente = sale.customerId ? await deps.repos.customers.findById(sale.customerId) : null;
 
+    // Los artículos rápidos no tienen ficha: su descripción viaja en la línea.
     const articulos = new Map<string, { descripcion: string; codigo: string | null }>();
     for (const l of lines) {
+      if (!l.articleId) continue;
       const a = await deps.repos.articles.findById(l.articleId);
       if (a) articulos.set(l.articleId, { descripcion: a.description, codigo: a.barcode ?? null });
     }
@@ -143,11 +145,12 @@ async function archivar(
         vencimientoCae: v.caeExpiry,
       },
       lineas: lines.map((l: (typeof lines)[number]) => ({
-        descripcion: articulos.get(l.articleId)?.descripcion ?? 'Artículo',
+        descripcion:
+          (l.articleId ? articulos.get(l.articleId)?.descripcion : l.description) ?? 'Artículo',
         cantidad: String(Number(l.quantity)),
         precioUnitario: l.unitPrice,
         total: l.lineTotal,
-        codigo: articulos.get(l.articleId)?.codigo ?? null,
+        codigo: l.articleId ? (articulos.get(l.articleId)?.codigo ?? null) : null,
         alicuota: l.vatRate,
         descuento: l.discount,
       })),

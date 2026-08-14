@@ -412,7 +412,8 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
       sale: d.sale,
       priceMode: company.priceMode,
       lines: d.lines.map((l) => ({
-        description: descById.get(l.articleId) ?? '—',
+        // Artículo rápido: la descripción viaja en la propia línea.
+        description: (l.articleId ? descById.get(l.articleId) : l.description) ?? '—',
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         lineTotal: l.lineTotal,

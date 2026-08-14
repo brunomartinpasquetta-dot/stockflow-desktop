@@ -15,7 +15,8 @@
     "db:generate:local": "drizzle-kit generate --config=drizzle.config.ts",
     "db:push:local": "drizzle-kit push --config=drizzle.config.ts",
     "test:smoke": "tsx src/__tests__/local.smoke.ts",
-    "test:smoke:repos": "tsx src/tests/repositories.smoke.ts"
+    "test:smoke:repos": "tsx src/tests/repositories.smoke.ts",
+    "test:migracion": "tsx src/__tests__/migracion.smoke.ts"
   },
   "dependencies": {
     "@stockflow/shared": "workspace:*",

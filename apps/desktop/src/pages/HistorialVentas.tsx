@@ -186,7 +186,12 @@ function SaleDetailDialog({
     staleTime: 30_000,
   })
   const descById = useMemo(
-    () => new Map((detailQuery.data?.lines ?? []).map((l) => [l.articleId, l.articleDescription ?? '—'])),
+    () =>
+      new Map(
+        (detailQuery.data?.lines ?? [])
+          .filter((l): l is typeof l & { articleId: string } => l.articleId != null)
+          .map((l) => [l.articleId, l.articleDescription ?? '—']),
+      ),
     [detailQuery.data],
   )
   const pmNameById = useMemo(() => new Map((methodsQuery.data ?? []).map((m) => [m.id, m.name])), [methodsQuery.data])
@@ -335,7 +340,8 @@ function SaleDetailDialog({
       lines: d.lines.map((l) => ({
         // La descripción y el código los resuelve el servidor y viajan con la
         // línea (ver SalesService.getSale): la pantalla no baja el catálogo.
-        description: l.articleDescription ?? descById.get(l.articleId) ?? '—',
+        description:
+          l.articleDescription ?? (l.articleId ? descById.get(l.articleId) : null) ?? '—',
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         lineTotal: l.lineTotal,
@@ -401,7 +407,11 @@ function SaleDetailDialog({
                 <TableBody>
                   {(detailQuery.data?.lines ?? []).map((l) => (
                     <TableRow key={l.id}>
-                      <TableCell>{descById.get(l.articleId) ?? '—'}</TableCell>
+                      <TableCell>
+                        {l.articleDescription ??
+                          (l.articleId ? descById.get(l.articleId) : l.description) ??
+                          '—'}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{l.quantity}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(l.unitPrice)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(l.lineTotal)}</TableCell>

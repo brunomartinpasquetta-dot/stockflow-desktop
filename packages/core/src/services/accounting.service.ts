@@ -196,7 +196,9 @@ export class AccountingService {
     const articleCostById = new Map(articles.map((a) => [a.id, a.costPrice]));
     let cmv = '0.0000';
     for (const l of salesLinesByCompleted) {
-      const cost = articleCostById.get(l.articleId) ?? '0.0000';
+      // Artículo rápido: no está en el catálogo, así que no tiene costo cargado
+      // y no suma al CMV. Su venta SÍ cuenta en la facturación.
+      const cost = l.articleId ? (articleCostById.get(l.articleId) ?? '0.0000') : '0.0000';
       cmv = sumDecimals([cmv, mulDecimal(l.quantity, cost, 4)]);
     }
 

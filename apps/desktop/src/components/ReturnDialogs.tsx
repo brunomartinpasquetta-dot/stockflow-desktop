@@ -26,7 +26,8 @@ import { Select } from '@/components/ui/select'
 
 interface LineState {
   lineId: string
-  articleId: string
+  /** null = artículo rápido: se devuelve sólo la plata, no vuelve stock. */
+  articleId: string | null
   description: string
   sold: number
   returned: number
@@ -35,7 +36,13 @@ interface LineState {
 }
 
 function buildLineStates(
-  lines: Array<{ id: string; articleId: string; quantity: string; lineTotal: string }>,
+  lines: Array<{
+    id: string
+    articleId: string | null
+    description?: string | null
+    quantity: string
+    lineTotal: string
+  }>,
   returnedByLine: Map<string, number>,
   descByArticle: Map<string, string>,
 ): LineState[] {
@@ -45,7 +52,10 @@ function buildLineStates(
     return {
       lineId: l.id,
       articleId: l.articleId,
-      description: descByArticle.get(l.articleId) ?? l.articleId,
+      // Artículo rápido: la descripción la trae la línea, no hay ficha.
+      description: l.articleId
+        ? (descByArticle.get(l.articleId) ?? l.articleId)
+        : (l.description ?? 'Artículo rápido'),
       sold,
       returned,
       unitEff: sold > 0 ? Number(l.lineTotal) / sold : 0,

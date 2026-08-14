@@ -429,9 +429,17 @@ export const saleLines = sqliteTable(
     saleId: text('sale_id')
       .notNull()
       .references(() => sales.id, { onDelete: 'cascade' }),
-    articleId: text('article_id')
-      .notNull()
-      .references(() => articles.id),
+    /**
+     * NULL = ARTÍCULO RÁPIDO: se vendió algo que no está en el catálogo y la
+     * línea se describe sola (ver `description`). No mueve stock, porque no hay
+     * nada en inventario que descontar.
+     */
+    articleId: text('article_id').references(() => articles.id),
+    /**
+     * Descripción escrita a mano. Sólo se usa cuando NO hay artículo; si lo
+     * hay, la descripción sale de él, así sigue al artículo si lo renombran.
+     */
+    description: text('description'),
     lineNumber: integer('line_number').notNull(),
     quantity: text('quantity').notNull(),
     unitPrice: text('unit_price').notNull(),
@@ -491,9 +499,8 @@ export const returnLines = sqliteTable(
     saleLineId: text('sale_line_id')
       .notNull()
       .references(() => saleLines.id),
-    articleId: text('article_id')
-      .notNull()
-      .references(() => articles.id),
+    /** null = se devolvió un artículo rápido: sólo se reintegra la plata. */
+    articleId: text('article_id').references(() => articles.id),
     quantity: text('quantity').notNull(),
     unitPrice: text('unit_price').notNull(),
     lineTotal: text('line_total').notNull(),

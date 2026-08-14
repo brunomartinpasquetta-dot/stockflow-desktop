@@ -241,17 +241,23 @@ export class ReportsService {
     const lines = (await this.ctx.repos.saleLines.findAll()).filter((l) => saleIds.has(l.saleId));
     const articles = await this.ctx.repos.articles.findAll();
     const descById = new Map(articles.map((a) => [a.id, a.description]));
+    // Los artículos rápidos NO se agrupan por artículo (no tienen): se agrupan
+    // por su descripción, así "FLETE" vendido diez veces sale como un renglón y
+    // no como diez. La clave lleva prefijo para no chocar con un id real.
     const agg = new Map<string, { quantity: string; amount: string }>();
     for (const l of lines) {
-      const cur = agg.get(l.articleId) ?? { quantity: '0.000', amount: '0.0000' };
+      const clave = l.articleId ?? `rapido:${(l.description ?? 'Sin descripción').toUpperCase()}`;
+      const cur = agg.get(clave) ?? { quantity: '0.000', amount: '0.0000' };
       cur.quantity = sumDecimals([cur.quantity, l.quantity], 3);
       cur.amount = sumDecimals([cur.amount, l.lineTotal]);
-      agg.set(l.articleId, cur);
+      agg.set(clave, cur);
     }
     return [...agg.entries()]
-      .map(([articleId, v]) => ({
-        articleId,
-        description: descById.get(articleId) ?? articleId,
+      .map(([clave, v]) => ({
+        articleId: clave,
+        description: clave.startsWith('rapido:')
+          ? `${clave.slice(7)} (artículo rápido)`
+          : (descById.get(clave) ?? clave),
         quantity: v.quantity,
         amount: v.amount,
       }))

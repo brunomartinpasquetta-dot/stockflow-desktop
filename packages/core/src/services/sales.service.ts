@@ -25,7 +25,13 @@ import {
 
 /** Línea tal como llega del front: el precio puede resolverse automáticamente. */
 export interface SaleLineDraft {
-  articleId: string;
+  /**
+   * Si falta, es un ARTÍCULO RÁPIDO: algo que no está en el catálogo. Entonces
+   * `description` y `unitPrice` son obligatorios y la línea no mueve stock.
+   */
+  articleId?: string;
+  /** Descripción escrita a mano. Sólo para artículo rápido. */
+  description?: string;
   quantity: string;
   /** Si se omite, se resuelve por lista del cliente / precio mayorista. */
   unitPrice?: string;
@@ -120,13 +126,34 @@ export class SalesService {
 
     // Resolver precios e IVA línea por línea.
     const resolvedLines = [] as Array<{
-      articleId: string;
+      articleId?: string;
+      description?: string;
       quantity: string;
       unitPrice: string;
       discount: string;
       vatRate: string;
     }>;
     for (const line of lines) {
+      // ARTÍCULO RÁPIDO: sin artículo no hay lista de precios ni IVA de ficha
+      // que consultar, así que el precio y la alícuota vienen de la pantalla.
+      if (!line.articleId) {
+        const description = line.description?.trim();
+        if (!description) {
+          throw new ValidationError('lines', 'Un artículo rápido necesita una descripción');
+        }
+        if (!line.unitPrice) {
+          throw new ValidationError('lines', `Falta el precio de "${description}"`);
+        }
+        resolvedLines.push({
+          description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          discount: line.discount ?? '0.0000',
+          vatRate: line.vatRate ?? '21.00',
+        });
+        continue;
+      }
+
       const article = await repos.articles.findById(line.articleId);
       if (!article) throw new NotFoundError('Artículo', line.articleId);
       const unitPrice = line.unitPrice ?? resolvePrice(article, customer, line.quantity);
@@ -296,6 +323,11 @@ export class SalesService {
     // base que ya estamos leyendo.
     const conNombre = await Promise.all(
       lines.map(async (l) => {
+        // Artículo rápido: la descripción la trae la propia línea y no hay
+        // código que mostrar.
+        if (!l.articleId) {
+          return { ...l, articleDescription: l.description ?? null, articleCode: null };
+        }
         const a = await repos.articles.findById(l.articleId);
         // El código va en la factura A (columna CÓDIGO): es lo que el cliente
         // usa para volver a pedir el mismo artículo.
