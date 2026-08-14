@@ -57,6 +57,21 @@ function requireAdmin(role: string | undefined): void {
  * se registra y sigue — el CAE ya está y una factura no se pierde por un
  * problema de archivo.
  */
+/**
+ * El QR de ARCA como imagen para meter en el PDF. Se genera LOCALMENTE: el
+ * comprobante tiene que poder emitirse e imprimirse sin internet.
+ */
+async function qrComoImagen(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const QR = await import('qrcode');
+    return await QR.toDataURL(url, { margin: 0, width: 220 });
+  } catch (err) {
+    console.error('[facturas] no se pudo generar el QR:', err);
+    return null;
+  }
+}
+
 async function archivar(
   deps: HandlerDeps,
   saleId: string,
@@ -114,6 +129,7 @@ async function archivar(
         iva: sale.vatAmount,
         total: sale.total,
       },
+      qrDataUrl: await qrComoImagen(v.qrUrl ?? sale.afipQrUrl ?? null),
     };
 
     if (soloSiFalta && yaArchivado(deps.userDataDir, datos.comprobante)) return false;
@@ -235,30 +251,36 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       async (_p, ctx): Promise<{ archivadas: number; total: number }> => {
         requireAdmin(ctx.currentUser?.role);
-        const vouchers = deps.repos.fiscal.listVouchers({});
+        // Punto de venta configurado: las ventas migradas no lo guardan.
+        const puntos = deps.repos.fiscal.listSalePoints();
+        const puntoDeVenta = puntos[0]?.number ?? 1;
+        // Se recorren las VENTAS con CAE y no `fiscal_vouchers`: en una base
+        // migrada desde StockFácil esa tabla está VACÍA —el CAE viejo vive en
+        // la venta— y las 8.014 facturas históricas no se archivarían nunca.
+        const ventas = await deps.repos.sales.findByDateRange(0, Date.now());
+        const conCae = ventas.filter((s) => s.afipCAE && s.afipCAE.trim() !== '');
         let archivadas = 0;
-        for (const v of vouchers) {
-          if (!v.saleId || v.status !== 'approved' || !v.cae) continue;
+        for (const venta of conCae) {
           const ok = await archivar(
             deps,
-            v.saleId,
+            venta.id,
             {
-              id: v.id,
-              label: `${v.kind === 'invoice' ? 'Factura' : 'Nota'} ${v.letter}`,
-              letter: v.letter,
-              salePoint: v.salePoint,
-              number: v.number,
-              cae: v.cae,
-              caeExpiry: v.caeExpiry,
-              total: v.total,
-              qrUrl: v.qrUrl,
+              id: venta.id,
+              label: `Factura ${venta.type}`,
+              letter: venta.type as 'A' | 'B' | 'C',
+              salePoint: puntoDeVenta,
+              number: venta.number,
+              cae: venta.afipCAE!,
+              caeExpiry: venta.afipExpiry ?? null,
+              total: venta.total,
+              qrUrl: venta.afipQrUrl ?? null,
               observations: [],
             } as IssuedVoucherDTO,
             true,
           );
           if (ok) archivadas += 1;
         }
-        return { archivadas, total: vouchers.length };
+        return { archivadas, total: conCae.length };
       },
     ),
 

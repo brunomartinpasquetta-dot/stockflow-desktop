@@ -57,6 +57,12 @@ export interface DatosFactura {
   };
   lineas: LineaFactura[];
   totales: { neto?: string | null; iva?: string | null; total: string };
+  /**
+   * QR de ARCA (RG 4892), ya renderizado como data URL. Es OBLIGATORIO en el
+   * comprobante: el PDF archivado tiene que ser igual al que se le entrega al
+   * cliente, si no sirve de respaldo a medias.
+   */
+  qrDataUrl?: string | null;
 }
 
 /** Carpeta donde vive el archivo. NO se borra nunca. */
@@ -175,19 +181,27 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
   doc.text('TOTAL', 140, y);
   doc.text(money(d.totales.total), 200, y, { align: 'right' });
 
-  // ── Pie fiscal
+  // ── Pie fiscal: QR obligatorio (RG 4892) + CAE y vencimiento.
   y += 10;
   doc.setDrawColor(180).line(14, y, 200, y);
   y += 5;
+  if (d.qrDataUrl) {
+    try {
+      doc.addImage(d.qrDataUrl, 'PNG', 14, y - 2, 26, 26);
+    } catch {
+      /* si el QR no se pudo dibujar, el resto del comprobante igual sale */
+    }
+  }
+  const xPie = d.qrDataUrl ? 44 : 14;
   doc.setFontSize(9).setFont('helvetica', 'bold');
-  doc.text(`CAE N°: ${c.cae}`, 14, y);
+  doc.text(`CAE N°: ${c.cae}`, xPie, y);
   doc.setFont('helvetica', 'normal');
   if (c.vencimientoCae) {
     doc.text(`Vencimiento del CAE: ${fecha(c.vencimientoCae)}`, 200, y, { align: 'right' });
   }
   y += 6;
   doc.setFontSize(7.5).setTextColor(110);
-  doc.text('Comprobante autorizado por ARCA · Documento generado automáticamente por StockFlow', 14, y);
+  doc.text('Comprobante autorizado por ARCA · Documento generado automáticamente por StockFlow', xPie, y);
 
   return doc.output('arraybuffer');
 }
