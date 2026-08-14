@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Undo2, FileDown, FileSpreadsheet, ArrowLeft, ChevronDown, ChevronRight, Landmark, Loader2, Printer, ReceiptText } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, FileDown, FileSpreadsheet, Landmark, Loader2, Printer, ReceiptText, Search, Undo2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useCompany, useCustomerBalances, usePaymentMethods } from '@/lib/hooks'
@@ -777,6 +777,20 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
 function ClientesTab() {
   const balances = useCustomerBalances()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [busca, setBusca] = useState('')
+
+  // Cobrar es lo que más se hace acá y con 34 cuentas abiertas había que
+  // buscar al cliente a ojo. Filtra por nombre y por teléfono.
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const todos = balances.data ?? []
+    if (!q) return todos
+    return todos.filter(
+      (b) =>
+        b.customerName.toLowerCase().includes(q) ||
+        (b.phone ?? '').toLowerCase().includes(q),
+    )
+  }, [balances.data, busca])
 
   if (selectedId) {
     return <CustomerDetail customerId={selectedId} onBack={() => setSelectedId(null)} />
@@ -784,6 +798,22 @@ function ClientesTab() {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative w-80">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar cliente…"
+            className="pl-8"
+          />
+        </div>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {filtrados.length === (balances.data ?? []).length
+            ? `${filtrados.length} con saldo`
+            : `${filtrados.length} de ${(balances.data ?? []).length}`}
+        </span>
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -801,15 +831,17 @@ function ClientesTab() {
                 <TableRow>
                   <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell>
                 </TableRow>
-              ) : (balances.data ?? []).length === 0 ? (
+              ) : filtrados.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                     <Landmark className="mx-auto mb-2 h-7 w-7 opacity-40" />
-                    No hay clientes con saldo en cuenta corriente.
+                    {busca
+                      ? `Ningún cliente coincide con «${busca}».`
+                      : 'No hay clientes con saldo en cuenta corriente.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                (balances.data ?? []).map((b) => (
+                filtrados.map((b) => (
                   <TableRow key={b.customerId} className="cursor-pointer" onClick={() => setSelectedId(b.customerId)}>
                     <TableCell className="font-medium">{b.customerName}</TableCell>
                     <TableCell className="text-right tabular-nums">{b.openInvoicesCount}</TableCell>

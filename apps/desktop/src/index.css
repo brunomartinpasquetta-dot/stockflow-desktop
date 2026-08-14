@@ -111,7 +111,19 @@
    `body.printing-a4` usa A4 para reportes de oficina.
    ────────────────────────────────────────────────────────────────── */
 #print-area { display: none; }
-body.printing #print-area { display: block; }
+/* Al imprimir hay que MONTAR el ticket en el documento, pero NO se tiene que
+   ver en el monitor: con `display:block` a secas aparecía un pantallazo del
+   ticket encima de la interfaz en cada venta (peor en las terminales, donde la
+   impresión es automática y el flash no lo justifica nada). Se lo manda fuera
+   de la pantalla; el bloque `@media print` de abajo lo trae de vuelta a 0,0
+   con `!important` para el papel. */
+body.printing #print-area {
+  display: block;
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  pointer-events: none;
+}
 
 @media print {
   body * { visibility: hidden !important; }

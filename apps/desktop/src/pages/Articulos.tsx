@@ -197,6 +197,7 @@ export function Articulos() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState<string>('')
+  const [familyFilter, setFamilyFilter] = useState<string>('')
   // Los dados de baja quedan fuera salvo que se pidan: en una base migrada son
   // 10.303 de 12.413 y tapan por completo lo que el comercio usa todos los días.
   const [verBajas, setVerBajas] = useState(false)
@@ -267,6 +268,16 @@ export function Articulos() {
     [articles.data],
   )
 
+  // Familias que REALMENTE tienen artículos: listar las 38 cuando sólo 35 se
+  // usan hace buscar en opciones vacías.
+  const familyOptions = useMemo(
+    () =>
+      (families.data ?? [])
+        .filter((f) => (articles.data ?? []).some((a) => a.familyId === f.id))
+        .sort((x, y) => x.name.localeCompare(y.name)),
+    [families.data, articles.data],
+  )
+
   const searchCtx = useMemo(() => buildSearchContext(families.data, suppliers.data), [families.data, suppliers.data])
   // Lista filtrada + ordenada. El buscador matchea CUALQUIER propiedad
   // (código, descripción, marca, familia, proveedor).
@@ -276,6 +287,7 @@ export function Articulos() {
     let filteredRows = q ? base.filter((a) => articleMatches(a, q, searchCtx)) : base
     if (!verBajas) filteredRows = filteredRows.filter((a) => a.active)
     if (brandFilter) filteredRows = filteredRows.filter((a) => a.brand === brandFilter)
+    if (familyFilter) filteredRows = filteredRows.filter((a) => a.familyId === familyFilter)
     const dir = sortDir === 'asc' ? 1 : -1
     // Valor a comparar (familyId → nombre de familia; el resto, el campo crudo).
     const getVal = (a: ArticleDTO): string =>
@@ -295,7 +307,7 @@ export function Articulos() {
       if (bothNum) return (an - bn) * dir
       return av.localeCompare(bv, 'es', { numeric: true, sensitivity: 'base' }) * dir
     })
-  }, [articles.data, search, brandFilter, verBajas, sortKey, sortDir, familyName, searchCtx])
+  }, [articles.data, search, brandFilter, familyFilter, verBajas, sortKey, sortDir, familyName, searchCtx])
 
   /** Cuántos hay en total según el filtro de bajas (para el contador). */
   const totalActivos = useMemo(
@@ -656,6 +668,19 @@ export function Articulos() {
           {brandOptions.map((b) => (
             <option key={b} value={b}>
               {b}
+            </option>
+          ))}
+        </select>
+        <select
+          value={familyFilter}
+          onChange={(e) => { setFamilyFilter(e.target.value); setVerTodas(false) }}
+          title="Filtrar por familia"
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <option value="">Todas las familias</option>
+          {familyOptions.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
             </option>
           ))}
         </select>
