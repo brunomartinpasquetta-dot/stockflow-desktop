@@ -365,6 +365,7 @@ export function createApiBridge(
     sales: {
       create: (p) => c<never>('sales:create', p),
       void: (p) => c<never>('sales:void', p),
+      voidRange: (p) => c<never>('sales:voidRange', p),
       get: (p) => c<never>('sales:get', p),
       listByDateRange: (p) => c<never>('sales:listByDateRange', p),
       getNextNumber: (p) => c<never>('sales:getNextNumber', p),

@@ -1708,6 +1708,10 @@ export interface ApiSurface {
   sales: {
     create(payload: CreateSaleInputDTO): Res<CreateSaleResultDTO>;
     void(payload: IdPayload): Res<SaleDTO>;
+    /** Anulación en lote de un rango. `omitidas` son las que no se pudieron anular. */
+    voidRange(
+      payload: DateRangeDTO,
+    ): Res<{ anuladas: number; conCAE: number; omitidas: { number: number; motivo: string }[] }>;
     get(payload: IdPayload): Res<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }>;
     listByDateRange(payload: DateRangeDTO): Res<SaleDTO[]>;
     getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;

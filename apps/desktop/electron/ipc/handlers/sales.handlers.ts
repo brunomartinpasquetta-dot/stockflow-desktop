@@ -21,6 +21,17 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: { id: string }, ctx): Promise<SaleDTO> => new SalesService(ctx).voidSale(payload.id),
     ),
+    // Anulación en lote de un rango (la pantalla la usa para "las ventas de
+    // hoy"). Devuelve el detalle de lo que quedó afuera en vez de fallar: ver
+    // `voidSalesInRange`.
+    'sales:voidRange': withSession(
+      deps,
+      (
+        payload: { from: number; to: number },
+        ctx,
+      ): Promise<{ anuladas: number; conCAE: number; omitidas: { number: number; motivo: string }[] }> =>
+        new SalesService(ctx).voidSalesInRange(payload.from, payload.to),
+    ),
     'sales:get': withSession(
       deps,
       (

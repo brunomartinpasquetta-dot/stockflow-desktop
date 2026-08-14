@@ -225,6 +225,60 @@ export class SalesService {
     return voided;
   }
 
+  /**
+   * Anula EN LOTE las ventas de un rango. Nació para limpiar de un saque las
+   * ventas de prueba del día cuando se está poniendo en marcha un local: a mano
+   * son decenas de confirmaciones.
+   *
+   * Dos decisiones:
+   *
+   * 1. **No borra: anula.** Cada venta pasa por `voidSale`, así que el stock y
+   *    la caja se revierten exactamente igual que anulando una por una. Las
+   *    ventas siguen en el historial marcadas como anuladas, que es lo que
+   *    corresponde y lo que después mira el contador.
+   *
+   * 2. **No se corta ante el primer problema.** Una venta a cuenta corriente
+   *    que ya recibió un pago no se puede anular; si eso abortara el lote,
+   *    quedaría todo a medias y sin saber dónde cortó. Se saltea, se sigue, y
+   *    al final se informa cuáles quedaron afuera y por qué.
+   *
+   * Ojo con `conCAE`: el CAE ya lo otorgó ARCA y anular acá NO lo da de baja
+   * allá. Eso se arregla emitiendo una nota de crédito.
+   */
+  async voidSalesInRange(
+    from: number,
+    to: number,
+  ): Promise<{
+    anuladas: number;
+    conCAE: number;
+    omitidas: { number: number; motivo: string }[];
+  }> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'void_sale');
+
+    const enRango = await repos.sales.findByDateRange(from, to);
+    const pendientes = enRango.filter((s) => s.status !== 'voided');
+
+    let anuladas = 0;
+    let conCAE = 0;
+    const omitidas: { number: number; motivo: string }[] = [];
+
+    for (const venta of pendientes) {
+      try {
+        await this.voidSale(venta.id);
+        anuladas += 1;
+        if (venta.afipCAE) conCAE += 1;
+      } catch (err) {
+        omitidas.push({
+          number: venta.number,
+          motivo: err instanceof Error ? err.message : 'No se pudo anular',
+        });
+      }
+    }
+
+    return { anuladas, conCAE, omitidas };
+  }
+
   async getSale(
     saleId: string,
   ): Promise<{ sale: Sale; lines: SaleLine[]; payments: SalePayment[] }> {

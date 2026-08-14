@@ -390,6 +390,36 @@ async function main(): Promise<void> {
     acctVatPurch.ok ? `len=${acctVatPurch.data.length}` : JSON.stringify(acctVatPurch),
   );
 
+  // sales:voidRange — anulación en lote del día. Va AL FINAL a propósito: anula
+  // la venta que usaron todos los checks anteriores, así que mover esto para
+  // arriba los rompe. Lo que importa verificar es que no sea un borrado suelto:
+  // tiene que devolver el stock igual que anulando a mano.
+  const voidRange = await invoke<{ anuladas: number; conCAE: number; omitidas: unknown[] }>(
+    handlers,
+    'sales:voidRange',
+    { from: Date.now() - 86_400_000, to: Date.now() + 86_400_000 },
+  );
+  check(
+    'sales:voidRange anula las ventas del rango',
+    voidRange.ok && voidRange.data.anuladas === 1 && voidRange.data.conCAE === 0 && voidRange.data.omitidas.length === 0,
+    JSON.stringify(voidRange),
+  );
+  const stockTrasAnular = await invoke<{ stock: string } | null>(handlers, 'articles:get', { id: created.data.id });
+  check(
+    'sales:voidRange devolvió el stock (18 → 20)',
+    stockTrasAnular.ok && stockTrasAnular.data?.stock === '20.000',
+    stockTrasAnular.ok ? `stock=${stockTrasAnular.data?.stock}` : JSON.stringify(stockTrasAnular),
+  );
+  const voidRangeVacio = await invoke<{ anuladas: number }>(handlers, 'sales:voidRange', {
+    from: Date.now() - 86_400_000,
+    to: Date.now() + 86_400_000,
+  });
+  check(
+    'sales:voidRange sobre ventas ya anuladas no las vuelve a tocar',
+    voidRangeVacio.ok && voidRangeVacio.data.anuladas === 0,
+    JSON.stringify(voidRangeVacio),
+  );
+
   // logout → vuelve a UNAUTHENTICATED
   await invoke(handlers, 'auth:logout');
   const afterLogout = await invoke(handlers, 'articles:list');

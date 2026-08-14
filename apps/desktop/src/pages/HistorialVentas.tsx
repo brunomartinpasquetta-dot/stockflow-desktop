@@ -37,6 +37,129 @@ function dayEnd(iso: string): number {
 const VOUCHER_LABELS: Record<VoucherType, string> = { A: 'Factura A', B: 'Factura B', C: 'Factura C', X: 'Remito X' }
 const PAGE_SIZE = 50
 
+/**
+ * ANULAR TODAS LAS VENTAS DE HOY.
+ *
+ * Existe para la puesta en marcha de un local: se hacen decenas de ventas de
+ * prueba con las terminales y anularlas una por una es media hora de clicks.
+ *
+ * Es la acción más destructiva de la pantalla, así que:
+ *  - muestra ANTES qué va a tocar (cuántas ventas, cuánta plata, cuántas con CAE),
+ *  - obliga a escribir ANULAR (no alcanza con un botón: se aprieta sin leer),
+ *  - avisa aparte de las que tienen CAE, porque anularlas acá NO las da de baja
+ *    en ARCA —eso se hace con una nota de crédito— y esa confusión sale cara.
+ *
+ * No borra nada: cada venta se anula como si se anulara a mano, revirtiendo
+ * stock y caja, y queda en el historial marcada como anulada.
+ */
+function AnularVentasDeHoyDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const qc = useQueryClient()
+  const [confirmacion, setConfirmacion] = useState('')
+
+  const hoy = todayIso()
+  const ventasDeHoyQuery = useQuery({
+    queryKey: ['salesHistory', hoy, hoy],
+    queryFn: () => api.sales.listByDateRange(dayStart(hoy), dayEnd(hoy)),
+  })
+
+  const aAnular = useMemo(
+    () => (ventasDeHoyQuery.data ?? []).filter((s) => s.status !== 'voided'),
+    [ventasDeHoyQuery.data],
+  )
+  const totalAAnular = aAnular.reduce((acc, s) => acc + Number(s.total), 0)
+  const conCAE = aAnular.filter((s) => s.afipCAE).length
+
+  const anularMut = useMutation({
+    mutationFn: () => api.sales.voidRange(dayStart(hoy), dayEnd(hoy)),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ['salesHistory'] })
+      void qc.invalidateQueries({ queryKey: ['articles'] })
+      void qc.invalidateQueries({ queryKey: ['cash'] })
+      void qc.invalidateQueries({ queryKey: ['accounts'] })
+      if (r.omitidas.length > 0) {
+        toast.warning(
+          `Se anularon ${r.anuladas} venta(s). No se pudieron anular ${r.omitidas.length}: ` +
+            r.omitidas.map((o) => `N° ${o.number} (${o.motivo})`).join(' · '),
+          { duration: 15000 },
+        )
+      } else {
+        toast.success(`Se anularon ${r.anuladas} venta(s) de hoy`)
+      }
+      if (r.conCAE > 0) {
+        toast.warning(
+          `${r.conCAE} de esas ventas tenían CAE. En ARCA siguen emitidas: para darlas de baja hay que hacer una nota de crédito.`,
+          { duration: 20000 },
+        )
+      }
+      onClose()
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudieron anular'),
+  })
+
+  const puedeConfirmar = confirmacion.trim().toUpperCase() === 'ANULAR' && aAnular.length > 0
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-destructive">Anular todas las ventas de hoy</DialogTitle>
+        </DialogHeader>
+
+        {ventasDeHoyQuery.isPending ? (
+          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Buscando las ventas de hoy…
+          </div>
+        ) : aAnular.length === 0 ? (
+          <p className="py-6 text-sm text-muted-foreground">
+            Hoy no hay ventas para anular.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              Se van a anular <strong>{aAnular.length} venta(s)</strong> de hoy, por un total de{' '}
+              <strong>{formatCurrency(String(totalAAnular))}</strong>.
+              <br />
+              Se devuelve el stock y se revierten los movimientos de caja. Quedan en el historial
+              como anuladas.
+            </div>
+
+            {conCAE > 0 && (
+              <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+                <strong>{conCAE} tienen CAE de ARCA.</strong> Anularlas acá no las da de baja en
+                ARCA: siguen emitidas y hay que hacerles una <strong>nota de crédito</strong>.
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1">
+              <Label>Para confirmar, escribí ANULAR</Label>
+              <Input
+                value={confirmacion}
+                onChange={(e) => setConfirmacion(e.target.value)}
+                placeholder="ANULAR"
+                autoFocus
+              />
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={!puedeConfirmar || anularMut.isPending}
+            onClick={() => anularMut.mutate()}
+          >
+            {anularMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Anular {aAnular.length > 0 ? `${aAnular.length} venta(s)` : ''}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function SaleDetailDialog({
   saleId,
   customerName,
@@ -501,6 +624,7 @@ export function HistorialVentas() {
   const [searchNumber, setSearchNumber] = useState('')
   const [page, setPage] = useState(0)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [anulandoHoy, setAnulandoHoy] = useState(false)
 
   // Deep-link: `?saleId=<id>` abre el detalle. Si la venta no está en el rango
   // actual, ampliamos el rango y resolvemos el cliente con get().
@@ -556,7 +680,19 @@ export function HistorialVentas() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-lg font-semibold">Historial de Ventas</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold">Historial de Ventas</h1>
+        {/* Sólo el administrador, y sólo si puede anular. Es para la puesta en
+            marcha de un local: limpiar las ventas de prueba del día. */}
+        {isAdmin && canVoid && (
+          <Button variant="outline" size="sm" onClick={() => setAnulandoHoy(true)}>
+            <Undo2 className="h-4 w-4" />
+            Anular ventas de hoy
+          </Button>
+        )}
+      </div>
+
+      {anulandoHoy && <AnularVentasDeHoyDialog onClose={() => setAnulandoHoy(false)} />}
 
       <Card>
         <CardContent className="grid grid-cols-2 gap-3 pt-4 md:grid-cols-6">

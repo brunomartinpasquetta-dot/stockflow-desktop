@@ -213,6 +213,11 @@ export const api = {
   sales: {
     create: (input: CreateSaleInputDTO): Promise<CreateSaleResultDTO> => unwrap(sf().sales.create(input)),
     void: (id: string): Promise<SaleDTO> => unwrap(sf().sales.void({ id })),
+    voidRange: (
+      from: number,
+      to: number,
+    ): Promise<{ anuladas: number; conCAE: number; omitidas: { number: number; motivo: string }[] }> =>
+      unwrap(sf().sales.voidRange({ from, to })),
     get: (id: string): Promise<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }> =>
       unwrap(sf().sales.get({ id })),
     listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
