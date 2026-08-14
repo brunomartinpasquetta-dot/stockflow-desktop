@@ -25,6 +25,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import forge from 'node-forge';
 
+/**
+ * Error del login contra ARCA. Se marca con este `name` para que la capa IPC lo
+ * muestre TAL CUAL en vez de convertirlo en "Error interno": lo que dice ARCA
+ * es lo único que permite saber qué hay que corregir.
+ */
+export class WsaaApiError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = 'WsfeApiError';
+  }
+}
+
 export interface AccessTicket {
   token: string;
   sign: string;
@@ -109,7 +121,7 @@ export function parseAccessTicket(soapResponse: string): AccessTicket {
   const inner = extractTag(soapResponse, 'loginCmsReturn');
   if (!inner) {
     const fault = extractTag(soapResponse, 'faultstring');
-    throw new Error(fault ? `ARCA rechazó la autenticación: ${fault}` : 'Respuesta de ARCA inválida');
+    throw new WsaaApiError(fault ? `ARCA rechazó la autenticación: ${fault}` : 'Respuesta de ARCA inválida');
   }
   const xml = inner
     .replace(/&lt;/g, '<')
@@ -119,7 +131,7 @@ export function parseAccessTicket(soapResponse: string): AccessTicket {
   const token = extractTag(xml, 'token');
   const sign = extractTag(xml, 'sign');
   const expiration = extractTag(xml, 'expirationTime');
-  if (!token || !sign) throw new Error('El ticket de ARCA no trae token/sign');
+  if (!token || !sign) throw new WsaaApiError('El ticket de ARCA no trae token/sign');
   return {
     token,
     sign,
@@ -178,7 +190,7 @@ export class WsaaClient {
       // con un mensaje que no explica nada. Mejor decirlo acá.
       const ahora = new Date();
       if (ahora < cert.validity.notBefore || ahora > cert.validity.notAfter) {
-        throw new Error(
+        throw new WsaaApiError(
           `el certificado está fuera de vigencia (vale del ` +
             `${cert.validity.notBefore.toLocaleDateString('es-AR')} al ` +
             `${cert.validity.notAfter.toLocaleDateString('es-AR')})`,
@@ -205,7 +217,7 @@ export class WsaaClient {
       return forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(
+      throw new WsaaApiError(
         'No se pudo firmar con el certificado. Revisá que el .crt y la clave ' +
           `se correspondan y que el certificado no esté vencido. Detalle: ${msg}`,
         { cause: err },
@@ -223,10 +235,10 @@ export class WsaaClient {
       if (cached) return cached;
     }
     if (!existsSync(this.opts.certPath)) {
-      throw new Error(`No se encuentra el certificado en ${this.opts.certPath}`);
+      throw new WsaaApiError(`No se encuentra el certificado en ${this.opts.certPath}`);
     }
     if (!existsSync(this.opts.keyPath)) {
-      throw new Error(`No se encuentra la clave privada en ${this.opts.keyPath}`);
+      throw new WsaaApiError(`No se encuentra la clave privada en ${this.opts.keyPath}`);
     }
 
     const tra = buildTra(this.service);
@@ -244,7 +256,7 @@ export class WsaaClient {
     const text = await res.text();
     if (!res.ok && !text.includes('loginCmsReturn')) {
       const fault = extractTag(text, 'faultstring');
-      throw new Error(fault ?? `ARCA respondió ${res.status} al autenticar`);
+      throw new WsaaApiError(fault ?? `ARCA respondió ${res.status} al autenticar`);
     }
     const ta = parseAccessTicket(text);
     this.writeCache(ta);

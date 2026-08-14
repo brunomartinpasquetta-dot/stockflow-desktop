@@ -30,6 +30,20 @@ export function serializeError(err: unknown): IpcErr {
   if (err instanceof BusinessRuleError) {
     return { ok: false, code: 'BUSINESS_RULE', message: err.message, rule: err.rule };
   }
+  // Los errores de ARCA SE MUESTRAN TAL CUAL. Antes caían acá y se convertían
+  // en "Error interno": el comercio veía "ARCA no la autorizó: Error interno" y
+  // ni él ni nosotros teníamos forma de saber si era el punto de venta, el CUIT
+  // del cliente o la condición del emisor. El motivo lo escribe ARCA y está
+  // pensado para leerse.
+  if (err instanceof Error && err.name === 'WsfeApiError') {
+    return {
+      ok: false,
+      code: 'BUSINESS_RULE',
+      message: err.message,
+      rule: 'arca',
+    } as IpcErr;
+  }
+
   // DatabaseError o cualquier otra cosa inesperada → INTERNAL (se loguea completo).
   // En el proceso main, `console.error` está redirigido a electron-log (ver main.ts).
   console.error('[ipc] INTERNAL error:', err);
