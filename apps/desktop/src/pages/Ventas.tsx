@@ -52,12 +52,16 @@ interface CartLine {
 // y activa, las facturas se emiten con CAE real; si no, quedan marcadas
 // "requiere ARCA" y solo el Remito X (no fiscal) es utilizable.
 function voucherOptions(fiscalEnabled: boolean): { value: VoucherType; label: string }[] {
-  const suffix = fiscalEnabled ? 'con CAE' : 'requiere ARCA'
+  // Sin facturación electrónica ACTIVA sólo se puede emitir Remito X. Antes se
+  // ofrecían A/B/C igual y la venta salía impresa como "FACTURA A" SIN CAE: un
+  // papel que parece fiscal y no lo es. Le pasó a Leo Citzia — creyó que estaba
+  // facturando y no había ni un comprobante emitido.
+  if (!fiscalEnabled) return [{ value: 'X', label: 'Remito X (no fiscal)' }]
   return [
     { value: 'X', label: 'Remito X (no fiscal)' },
-    { value: 'A', label: `Factura A (${suffix})` },
-    { value: 'B', label: `Factura B (${suffix})` },
-    { value: 'C', label: `Factura C (${suffix})` },
+    { value: 'A', label: 'Factura A (con CAE)' },
+    { value: 'B', label: 'Factura B (con CAE)' },
+    { value: 'C', label: 'Factura C (con CAE)' },
   ]
 }
 
@@ -932,6 +936,16 @@ function PDV() {
       // llegado. Si ARCA falla, la venta YA está registrada: se avisa y se
       // imprime igual, para reintentar después desde el Historial.
       let fiscal: SaleTicketData['fiscal'] = null
+      // Comprobante fiscal sin poder emitirlo: se avisa fuerte. Imprimir una
+      // "FACTURA A" sin CAE es entregar un documento inválido.
+      if (voucherType !== 'X' && (!fiscalEnabled || effectiveSalePoint == null)) {
+        toast.error(
+          !fiscalEnabled
+            ? 'La facturación electrónica está DESACTIVADA: la venta quedó como comprobante interno, sin CAE. Activala en Contabilidad → Facturación Electrónica.'
+            : 'Falta elegir el punto de venta: la venta quedó sin CAE.',
+          { duration: 15_000 },
+        )
+      }
       if (fiscalEnabled && voucherType !== 'X' && effectiveSalePoint != null) {
         try {
           const v = await api.fiscal.issueInvoice({

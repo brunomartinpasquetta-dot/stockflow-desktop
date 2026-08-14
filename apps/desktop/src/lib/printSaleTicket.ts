@@ -32,7 +32,12 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
   const single = data.payments.length === 1 ? data.payments[0]!.methodName : null
   return {
     company: data.company,
-    title: VOUCHER_LABELS[data.sale.type].toUpperCase(),
+    // Un comprobante fiscal SIN CAE no es una factura válida: el título lo
+    // dice, para que nadie entregue un papel que aparenta serlo.
+    title:
+      data.sale.type !== 'X' && !data.fiscal?.cae
+        ? `${VOUCHER_LABELS[data.sale.type].toUpperCase()} — SIN AUTORIZAR (documento no válido)`
+        : VOUCHER_LABELS[data.sale.type].toUpperCase(),
     number: String(data.sale.number).padStart(8, '0'),
     meta,
     customer: data.customerName ? { name: data.customerName, doc: data.customerDoc } : null,
