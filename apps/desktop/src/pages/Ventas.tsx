@@ -796,6 +796,19 @@ function PDV() {
         ? split.isComplete && activeMethods.length > 0
         : selectedMethod != null)
 
+  /**
+   * El QR de ARCA como imagen. Se dibuja LOCALMENTE: el comprobante tiene que
+   * poder imprimirse aunque no haya internet en el momento.
+   */
+  async function qrComoImagen(url: string): Promise<string | null> {
+    try {
+      const QR = await import('qrcode')
+      return await QR.toDataURL(url, { margin: 0, width: 220 })
+    } catch {
+      return null
+    }
+  }
+
   function buildTicket(result: CreateSaleResultDTO): SaleTicketData {
     const customer = selectedCustomer
     const cf = isCfCustomer(customer)
@@ -887,26 +900,40 @@ function PDV() {
       // Facturación electrónica: si está activa y el comprobante es fiscal, se
       // pide el CAE a ARCA. La VENTA ya está registrada, así que un fallo acá no
       // la pierde: se avisa y queda para reintentar desde el Historial.
+      // Se ESPERA el CAE antes de imprimir. Antes se pedía en paralelo y el
+      // ticket salía sin CAE ni QR —un comprobante fiscal así no es válido—
+      // porque cuando se imprimía la respuesta de ARCA todavía no había
+      // llegado. Si ARCA falla, la venta YA está registrada: se avisa y se
+      // imprime igual, para reintentar después desde el Historial.
+      let fiscal: SaleTicketData['fiscal'] = null
       if (fiscalEnabled && voucherType !== 'X' && effectiveSalePoint != null) {
-        void api.fiscal
-          .issueInvoice({ saleId: result.sale.id, salePoint: effectiveSalePoint, letter: voucherType })
-          .then((v) => {
-            toast.success(
-              `${v.label} ${String(v.salePoint).padStart(5, '0')}-${String(v.number).padStart(8, '0')} — CAE ${v.cae}`,
-              { duration: 10_000 },
-            )
-            if (v.observations.length > 0) {
-              toast.warning(`ARCA observó: ${v.observations.join(' · ')}`, { duration: 12_000 })
-            }
+        try {
+          const v = await api.fiscal.issueInvoice({
+            saleId: result.sale.id,
+            salePoint: effectiveSalePoint,
+            letter: voucherType,
           })
-          .catch((err: unknown) => {
-            toast.error(
-              `La venta quedó registrada pero ARCA no la autorizó: ${
-                err instanceof Error ? err.message : 'error desconocido'
-              }. Podés reintentar desde el Historial de Ventas.`,
-              { duration: 15_000 },
-            )
-          })
+          fiscal = {
+            cae: v.cae,
+            caeExpiry: v.caeExpiry,
+            qrDataUrl: v.qrUrl ? await qrComoImagen(v.qrUrl) : null,
+            letter: v.letter,
+          }
+          toast.success(
+            `${v.label} ${String(v.salePoint).padStart(5, '0')}-${String(v.number).padStart(8, '0')} — CAE ${v.cae}`,
+            { duration: 10_000 },
+          )
+          if (v.observations.length > 0) {
+            toast.warning(`ARCA observó: ${v.observations.join(' · ')}`, { duration: 12_000 })
+          }
+        } catch (err: unknown) {
+          toast.error(
+            `La venta quedó registrada pero ARCA no la autorizó: ${
+              err instanceof Error ? err.message : 'error desconocido'
+            }. Podés reintentar desde el Historial de Ventas.`,
+            { duration: 15_000 },
+          )
+        }
       }
 
       clearSale()
@@ -924,7 +951,7 @@ function PDV() {
         }
       }
       // Guardamos SIEMPRE el último ticket para "Imprimir último ticket".
-      const ticketData = buildTicket(result)
+      const ticketData = { ...buildTicket(result), fiscal }
       setLastSaleResult({ ticketData, printerCfg })
       // Impresión AISLADA: no se await-ea → nunca bloquea el reset.
       // Sólo se imprime si el toggle "Imprimir ticket automáticamente" está ON.

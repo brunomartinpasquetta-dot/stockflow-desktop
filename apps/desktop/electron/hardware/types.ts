@@ -122,6 +122,9 @@ export interface SaleTicketData {
   total: string;
   payments: SaleTicketPaymentData[];
   accountSale?: boolean;
+  /** CAE del comprobante autorizado por ARCA: sin él la factura no es válida. */
+  fiscalCae?: string | null;
+  fiscalCaeExpiry?: number | null;
 }
 
 export interface CashCloseReportData {

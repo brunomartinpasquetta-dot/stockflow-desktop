@@ -60,10 +60,21 @@ export interface SaleTicketData {
   isAccountSale: boolean
   /** Desglose de pagos (vacío si es venta a cuenta corriente). */
   payments: SaleTicketPayment[]
+  /**
+   * Comprobante autorizado por ARCA. Va en el ticket Y en el A4: un comprobante
+   * fiscal SIN el CAE y el QR no es válido, y hasta ahora no se imprimían en
+   * ninguno de los dos formatos.
+   */
+  fiscal?: {
+    cae: string
+    caeExpiry?: number | null
+    qrDataUrl?: string | null
+    letter?: 'A' | 'B' | 'C'
+  } | null
 }
 
 export function SaleTicket({ data }: { data: SaleTicketData }) {
-  const { company, sale, priceMode, lines, customerName, customerDoc, sellerName, isAccountSale, payments } = data
+  const { company, sale, priceMode, lines, customerName, customerDoc, sellerName, isAccountSale, payments, fiscal } = data
   const discountNum = Number(sale.discount)
   const vatNum = Number(sale.vatAmount)
 
@@ -156,6 +167,24 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
       ) : null}
 
       <div className="ticket-sep">{SEP_EQ}</div>
+
+      {/* ── Pie fiscal: sin CAE y QR el comprobante no es válido ── */}
+      {fiscal?.cae && (
+        <>
+          <div className="ticket-center ticket-small">CAE N° {fiscal.cae}</div>
+          {fiscal.caeExpiry && (
+            <div className="ticket-center ticket-small">
+              Vto. CAE: {new Date(fiscal.caeExpiry).toLocaleDateString('es-AR')}
+            </div>
+          )}
+          {fiscal.qrDataUrl && (
+            <div className="ticket-center">
+              <img className="ticket-qr" src={fiscal.qrDataUrl} alt="Código QR del comprobante" />
+            </div>
+          )}
+          <div className="ticket-sep">{SEP_EQ}</div>
+        </>
+      )}
 
       {/* ── Pie ─────────────────────────────────────────────── */}
       <div className="ticket-center ticket-bold">¡Gracias por su compra!</div>

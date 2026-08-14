@@ -510,6 +510,18 @@ export class PrinterService {
       for (const p of sale.payments) push(`${leftRight(p.method, p.amount, cols)}\n`);
     }
 
+    // Pie fiscal: un comprobante autorizado por ARCA tiene que llevar el CAE
+    // impreso. Hasta ahora la térmica lo salteaba.
+    if (sale.fiscalCae) {
+      push(`${'-'.repeat(cols)}\n`);
+      parts.push(ALIGN_CENTER);
+      push(`CAE N: ${sale.fiscalCae}\n`);
+      if (sale.fiscalCaeExpiry) {
+        push(`Vto. CAE: ${new Date(sale.fiscalCaeExpiry).toLocaleDateString('es-AR')}\n`);
+      }
+      parts.push(ALIGN_LEFT);
+    }
+
     parts.push(LF);
     parts.push(ALIGN_CENTER);
     push('¡Gracias por su compra!\n');

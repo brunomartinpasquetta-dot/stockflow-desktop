@@ -2082,6 +2082,14 @@ export interface SaleTicketDataDTO {
   total: string;
   payments: SaleTicketPaymentDataDTO[];
   accountSale?: boolean;
+  /**
+   * Comprobante autorizado por ARCA. En la impresión DIRECTA a la térmica el
+   * CAE también tiene que salir: sin él el comprobante no es válido. El QR no
+   * se manda por acá — la térmica por ESC/POS no imprime imágenes de forma
+   * confiable en todos los modelos; para el QR está la impresión por diálogo.
+   */
+  fiscalCae?: string | null;
+  fiscalCaeExpiry?: number | null;
 }
 
 /** Recibo de cobranza de cuenta corriente (importe entregado + saldos). */

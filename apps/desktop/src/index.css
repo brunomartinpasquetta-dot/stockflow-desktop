@@ -125,6 +125,10 @@ body.printing #print-area {
   pointer-events: none;
 }
 
+/* QR del comprobante en el ticket térmico. 28mm entra cómodo en 58mm de papel
+   y sigue siendo legible por el lector de ARCA. */
+.ticket-qr { width: 28mm; height: 28mm; margin: 2mm auto; display: block; }
+
 @media print {
   body * { visibility: hidden !important; }
   #print-area, #print-area * { visibility: visible !important; }

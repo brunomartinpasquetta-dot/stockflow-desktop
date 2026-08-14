@@ -46,6 +46,18 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
     },
     payments: data.isAccountSale || data.payments.length <= 1 ? undefined : data.payments,
     paymentNote: data.isAccountSale ? 'Cuenta corriente' : single,
+    // El pie fiscal (CAE + QR) NO se pasaba: el A4 salía sin ellos aunque la
+    // venta estuviera facturada. Un comprobante fiscal sin CAE no es válido.
+    fiscal: data.fiscal?.cae
+      ? {
+          cae: data.fiscal.cae,
+          caeExpiry: data.fiscal.caeExpiry
+            ? new Date(data.fiscal.caeExpiry).toLocaleDateString('es-AR')
+            : null,
+          qrDataUrl: data.fiscal.qrDataUrl ?? null,
+          letter: data.fiscal.letter,
+        }
+      : null,
     footerNote: '¡Gracias por su compra!',
   }
 }
@@ -78,6 +90,8 @@ export function toEscPosTicketDTO(data: SaleTicketData): SaleTicketDataDTO {
     total: data.sale.total,
     payments: data.payments.map((p) => ({ method: p.methodName, amount: p.amount })),
     accountSale: data.isAccountSale,
+    fiscalCae: data.fiscal?.cae ?? null,
+    fiscalCaeExpiry: data.fiscal?.caeExpiry ?? null,
   }
 }
 
