@@ -967,6 +967,33 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     # El comercio vende sin haber cargado la compra: sin esto el sistema le
     # bloquearía la venta de todo lo que quedó en negativo.
     sq.execute("UPDATE companies SET allow_negative_stock = 1")
+
+    # ---- FICHA DEL COMERCIO ----
+    # Los datos están en MIEMPRESA, pero con los campos CORRIDOS: el programa
+    # usa ese registro para el encabezado de la factura y guardó el CUIT en la
+    # columna EMAIL y los Ingresos Brutos en WEB. Sin esto había que recargar
+    # nombre, domicilio, CUIT e IIBB a mano después de cada migración.
+    if "MIEMPRESA" in hay:
+        for r in leer(con, "MIEMPRESA", ["NOMBRE", "DOMICILIO", "TEL", "EMAIL", "WEB"]):
+            nombre = txt(r["NOMBRE"])
+            if not nombre:
+                continue
+            cuit = re.sub(r"\D", "", txt(r["EMAIL"]))
+            iibb = txt(r["WEB"])
+            sq.execute(
+                "UPDATE companies SET name = ?, address = ?, phone = ?, "
+                "cuit = COALESCE(NULLIF(?, ''), cuit), "
+                "ing_brutos = COALESCE(NULLIF(?, ''), ing_brutos)",
+                (nombre[:80], txt(r["DOMICILIO"])[:120] or None,
+                 txt(r["TEL"])[:40] or None,
+                 cuit if len(cuit) == 11 else "", iibb),
+            )
+            rep.aviso(
+                f"ficha del comercio: '{nombre}'"
+                + (f" · CUIT {cuit}" if len(cuit) == 11 else " · SIN CUIT (cargarlo a mano)")
+                + (f" · IIBB {iibb} (CONFIRMAR con el cliente)" if iibb else "")
+            )
+            break
     if sq.execute("SELECT COUNT(*) FROM companies").fetchone()[0] == 0:
         rep.aviso("no hay ficha de comercio: activá 'vender sin stock' en Configuración")
 

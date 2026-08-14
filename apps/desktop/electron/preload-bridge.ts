@@ -443,6 +443,7 @@ export function createApiBridge(
       getMachineId: () => c<never>('system:getMachineId'),
       getVersion: () => c<never>('system:getVersion'),
       getDbPath: () => c<never>('system:getDbPath'),
+      showInFolder: (p) => c<never>('system:showInFolder', p),
       getInfo: () => c<never>('system:getInfo'),
       openExternal: (p) => c<never>('system:openExternal', p),
     },

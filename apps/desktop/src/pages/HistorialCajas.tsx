@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useWindowNav } from '@/lib/useWindowNav'
 import { toast } from 'sonner'
 import { Loader2, Printer, History } from 'lucide-react'
 
@@ -52,6 +53,16 @@ function StatusBadge({ r }: { r: HistoricalCashRegisterDTO }) {
   return <Badge variant="success">Cerrada</Badge>
 }
 
+/**
+ * Abre el Historial de Ventas mostrando esa venta. Usa el deep-link que esa
+ * pantalla ya soporta (`?saleId=`), así funciona igual en la app y en las
+ * terminales por navegador.
+ */
+function useAbrirVenta() {
+  const abrirVentana = useWindowNav()
+  return (saleId: string) => abrirVentana('historial-ventas', { params: { saleId } })
+}
+
 function movementKindLabel(m: HistoricalCashMovementDTO): string {
   if (m.relatedSaleId) {
     const n = m.saleNumber != null ? ` N° ${m.saleNumber}` : ''
@@ -77,6 +88,7 @@ function HistoricalCashReportDialog({
   const reportQuery = useHistoricalCashReport(cashRegisterId)
   const companyQuery = useCompany()
   const printCashClose = usePrintCashCloseReport()
+  const abrirVenta = useAbrirVenta()
 
   const r = reportQuery.data
 
@@ -159,7 +171,23 @@ function HistoricalCashReportDialog({
                     ) : r.movementsDetail.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
-                        <TableCell className="text-xs">{movementKindLabel(m)}</TableCell>
+                        <TableCell className="text-xs">
+                          {m.relatedSaleId ? (
+                            // Clickeable: la pregunta natural al revisar una
+                            // caja es "¿qué fue esta venta?", y antes había que
+                            // anotar el número e ir a mano al Historial.
+                            <button
+                              type="button"
+                              className="text-primary hover:underline"
+                              onClick={() => abrirVenta(m.relatedSaleId!)}
+                              title="Ver el detalle de esta venta"
+                            >
+                              {movementKindLabel(m)}
+                            </button>
+                          ) : (
+                            movementKindLabel(m)
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs">{m.description}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{m.paymentMethodName ?? '—'}</TableCell>
                         <TableCell className="text-right tabular-nums">{m.type === 'income' ? formatCurrency(m.amount) : ''}</TableCell>
@@ -305,6 +333,7 @@ function DepositarCierreDialog({
 }
 
 export function HistorialCajas() {
+  const abrirVenta = useAbrirVenta()
   const { currentUser } = useAuth()
   const isAdmin = currentUser?.role === 'admin'
 
@@ -526,7 +555,20 @@ export function HistorialCajas() {
                   ) : reportQuery.data.movementsDetail.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
-                      <TableCell className="text-xs">{movementKindLabel(m)}</TableCell>
+                      <TableCell className="text-xs">
+                        {m.relatedSaleId ? (
+                          <button
+                            type="button"
+                            className="text-primary hover:underline"
+                            onClick={() => abrirVenta(m.relatedSaleId!)}
+                            title="Ver el detalle de esta venta"
+                          >
+                            {movementKindLabel(m)}
+                          </button>
+                        ) : (
+                          movementKindLabel(m)
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">{m.description}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{m.paymentMethodName ?? '—'}</TableCell>
                       <TableCell className="text-right tabular-nums text-success">{m.type === 'income' ? formatCurrency(m.amount) : ''}</TableCell>

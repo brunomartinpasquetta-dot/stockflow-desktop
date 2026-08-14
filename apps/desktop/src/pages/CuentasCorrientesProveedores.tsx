@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { FileDown, ArrowLeft, ChevronDown, ChevronRight, Loader2, ReceiptText, Truck, Undo2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, FileDown, Loader2, ReceiptText, Search, Truck, Undo2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useSupplierBalances } from '@/lib/hooks'
@@ -682,6 +682,14 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
 export function CuentasCorrientesProveedores() {
   const balances = useSupplierBalances()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [busca, setBusca] = useState('')
+
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const todos = balances.data ?? []
+    if (!q) return todos
+    return todos.filter((b) => b.supplierName.toLowerCase().includes(q))
+  }, [balances.data, busca])
 
   if (selectedId) {
     return <SupplierDetail supplierId={selectedId} onBack={() => setSelectedId(null)} />
@@ -689,6 +697,22 @@ export function CuentasCorrientesProveedores() {
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative w-80">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar proveedor…"
+            className="pl-8"
+          />
+        </div>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {filtrados.length === (balances.data ?? []).length
+            ? `${filtrados.length} con saldo`
+            : `${filtrados.length} de ${(balances.data ?? []).length}`}
+        </span>
+      </div>
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -705,7 +729,7 @@ export function CuentasCorrientesProveedores() {
                 <TableRow>
                   <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell>
                 </TableRow>
-              ) : (balances.data ?? []).length === 0 ? (
+              ) : filtrados.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
                     <Truck className="mx-auto mb-2 h-7 w-7 opacity-40" />
@@ -713,7 +737,7 @@ export function CuentasCorrientesProveedores() {
                   </TableCell>
                 </TableRow>
               ) : (
-                (balances.data ?? []).map((b) => (
+                filtrados.map((b) => (
                   <TableRow key={b.supplierId} className="cursor-pointer" onClick={() => setSelectedId(b.supplierId)}>
                     <TableCell className="font-medium">{b.supplierName}</TableCell>
                     <TableCell className="text-right tabular-nums">{b.openInvoicesCount}</TableCell>

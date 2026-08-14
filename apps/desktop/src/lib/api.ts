@@ -434,6 +434,7 @@ export const api = {
     getInfo: (): Promise<SystemInfoDTO> => unwrap(sf().system.getInfo()),
     getVersion: (): Promise<{ version: string }> => unwrap(sf().system.getVersion()),
     getDbPath: (): Promise<{ dbPath: string }> => unwrap(sf().system.getDbPath()),
+    showInFolder: (path: string): Promise<{ ok: true }> => unwrap(sf().system.showInFolder({ path })),
     openExternal: (url: string): Promise<{ ok: true }> => unwrap(sf().system.openExternal({ url })),
   },
   print: {

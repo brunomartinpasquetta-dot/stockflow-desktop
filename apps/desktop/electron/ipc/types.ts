@@ -1832,6 +1832,7 @@ export interface ApiSurface {
     getMachineId(): Res<{ machineId: string }>;
     getVersion(): Res<{ version: string }>;
     getDbPath(): Res<{ dbPath: string }>;
+    showInFolder(payload: { path: string }): Res<{ ok: true }>;
     getInfo(): Res<SystemInfoDTO>;
     openExternal(payload: { url: string }): Res<{ ok: true }>;
   };

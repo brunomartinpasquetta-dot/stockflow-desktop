@@ -541,6 +541,7 @@ function ScaleSection() {
 
 /* ----------------------- BACKUP ----------------------- */
 function BackupSection() {
+  const dbPathQuery = useQuery({ queryKey: ['system', 'dbPath'], queryFn: () => api.system.getDbPath() })
   const qc = useQueryClient()
   const cfgQuery = useQuery({ queryKey: ['backup', 'config'], queryFn: () => api.backup.getConfig() })
   const listQuery = useQuery({ queryKey: ['backup', 'list'], queryFn: () => api.backup.list() })
@@ -608,6 +609,27 @@ function BackupSection() {
         <div className="flex flex-col gap-1">
           <Label>Carpeta de destino</Label>
           <Input value={cfg.destination} onChange={(e) => setCfg((c) => ({ ...c, destination: e.target.value }))} placeholder="/Users/.../Documents/StockFlow Backups" />
+          {/* Dónde vive la base. Hace falta en cada migración, cada backup a
+              mano y cada soporte por teléfono: sin esto hay que dictar
+              %APPDATA%\@stockflow\desktop, que además está oculta. */}
+          <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium">Base de datos</p>
+              <p className="truncate font-mono text-[11px] text-muted-foreground" title={dbPathQuery.data?.dbPath}>
+                {dbPathQuery.data?.dbPath ?? '—'}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const ruta = dbPathQuery.data?.dbPath
+                if (ruta) void api.system.showInFolder(ruta).catch(() => toast.error('No se pudo abrir la carpeta'))
+              }}
+            >
+              Abrir carpeta
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground">
             Recomendamos un directorio sincronizado con la nube (Dropbox, Google Drive, OneDrive).
           </p>
@@ -727,7 +749,14 @@ function LanSection() {
         toast.success('Puerto habilitado en el firewall')
         setDiag(await api.lan.diagnose())
       } else if (r.needsAdmin) {
-        toast.error('Abrí StockFlow como administrador para habilitar el puerto')
+        // "Administrador" acá es el de WINDOWS, no el rol de StockFlow: el
+        // usuario que lee esto normalmente YA es admin del sistema y cree que
+        // es un bug de permisos. Le pasó a Leo Citzia.
+        toast.error(
+          'Windows pide permisos de administrador para tocar el firewall. ' +
+            'Cerrá StockFlow y abrilo con clic derecho → «Ejecutar como administrador».',
+          { duration: 12_000 },
+        )
       } else {
         toast.error(r.error ?? 'No se pudo habilitar el puerto')
       }

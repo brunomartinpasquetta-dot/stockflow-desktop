@@ -50,6 +50,15 @@ export function buildSystemHandlers(deps: HandlerDeps): HandlerMap {
     'system:getDbPath': unguarded(deps, async (): Promise<{ dbPath: string }> => ({
       dbPath: deps.dbPath,
     })),
+    /** Abre el explorador con ese archivo seleccionado. */
+    'system:showInFolder': unguarded(
+      deps,
+      async (payload: { path: string }): Promise<{ ok: true }> => {
+        const { shell } = await import('electron');
+        shell.showItemInFolder(payload.path);
+        return { ok: true };
+      },
+    ),
     'system:getInfo': unguarded(deps, async (): Promise<SystemInfoDTO> => ({
       version: deps.appVersion,
       machineId: deps.machineId,
