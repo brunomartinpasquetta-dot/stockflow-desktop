@@ -9,7 +9,6 @@
  * emitiendo remito X — nada cambia hasta que el usuario lo active a propósito.
  */
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CheckCircle2, FileKey, FolderOpen, Loader2, Plug, Plus, ShieldCheck, Trash2, XCircle } from 'lucide-react'
@@ -24,6 +23,7 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { SaveFiscalConfigDTO } from '@/types/api'
+import { SinPermiso } from '@/components/SinPermiso'
 
 const EMPTY: SaveFiscalConfigDTO = {
   environment: 'homologacion',
@@ -39,7 +39,7 @@ const EMPTY: SaveFiscalConfigDTO = {
 export function FacturacionElectronica() {
   const { currentUser } = useAuth()
   const isAdmin = currentUser?.role === 'admin'
-  if (!isAdmin) return <Navigate to="/" replace />
+  if (!isAdmin) return <SinPermiso area="Facturación Electrónica (ARCA)" />
   return <FacturacionInner />
 }
 

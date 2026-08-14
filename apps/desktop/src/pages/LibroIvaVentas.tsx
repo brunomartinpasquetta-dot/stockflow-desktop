@@ -3,7 +3,6 @@
  * Listado por período con desglose por alícuota, exportable a Excel/PDF.
  */
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { BookOpen, FileSpreadsheet, Printer } from 'lucide-react'
 
 import { useCompany, useVatBookSales } from '@/lib/hooks'
@@ -20,6 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { VatBookSaleRowDTO } from '@/types/api'
+import { SinPermiso } from '@/components/SinPermiso'
 
 function firstOfMonthIso(): string {
   const d = new Date()
@@ -81,7 +81,7 @@ export function LibroIvaVentas() {
     [data],
   )
 
-  if (!canView) return <Navigate to="/" replace />
+  if (!canView) return <SinPermiso area="El Libro de IVA Ventas" />
 
   function onExcel(): void {
     if (!applied || data.length === 0) return

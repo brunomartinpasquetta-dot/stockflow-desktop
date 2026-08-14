@@ -5,7 +5,6 @@
  * pre-cargadas.
  */
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 
 import { useWindowNav } from '@/lib/useWindowNav'
 import * as XLSX from 'xlsx'
@@ -20,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SinPermiso } from '@/components/SinPermiso'
 
 type Criterio = 'min' | 'ideal'
 
@@ -109,7 +109,7 @@ export function GeneradorCompras() {
     XLSX.writeFile(wb, `generador-compras-${todayIso()}.xlsx`)
   }
 
-  if (!canView) return <Navigate to="/" replace />
+  if (!canView) return <SinPermiso area="El Generador de Compras" />
 
   return (
     <div className="flex h-full flex-col gap-3">

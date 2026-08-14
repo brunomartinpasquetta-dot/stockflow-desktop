@@ -5,7 +5,6 @@
  * Gráficos con `recharts`. Export Excel multi-sheet.
  */
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
   BarChart,
@@ -32,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/format'
 import { usePermission } from '@/contexts/AuthContext'
+import { SinPermiso } from '@/components/SinPermiso'
 import {
   useTopProducts,
   useBottomProducts,
@@ -272,7 +272,7 @@ export function Estadisticas() {
     XLSX.writeFile(wb, `estadisticas-${fromIso}-${toIso}.xlsx`)
   }
 
-  if (!canView) return <Navigate to="/" replace />
+  if (!canView) return <SinPermiso area="Estadísticas" />
 
   return (
     <div className="flex h-full flex-col gap-3">

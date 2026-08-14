@@ -51,6 +51,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
 import { api } from '@/lib/api'
+import { toast } from 'sonner'
+
 import { hasPermissionFor, ROLE_LABELS, type PermissionAction } from '@/lib/permissions'
 import type { Role } from '@/types/api'
 import {
@@ -174,6 +176,22 @@ export function MenuBar() {
   const wm = useWindowManager()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
 
+  /**
+   * Explica por qué una opción está bloqueada. Dice el rol con el que se entró
+   * y quién puede cambiarlo, que es lo único que hace falta para resolverlo sin
+   * llamar a soporte.
+   */
+  function avisarSinPermiso(label: string): void {
+    const rol = currentUser ? (ROLE_LABELS[currentUser.role] ?? currentUser.role) : '—'
+    toast.warning(`"${label}" no está habilitado para tu usuario`, {
+      description:
+        `Entraste como ${currentUser?.fullName || currentUser?.username} con rol ${rol}. ` +
+        'Un Administrador puede cambiarlo en Configuración → Usuarios, o habilitar el área ' +
+        'para ese rol en Configuración → Roles.',
+      duration: 12000,
+    })
+  }
+
   function isEnabled(item: MenuItem): boolean {
     if (item.separator) return true
     if (item.action) return true
@@ -239,10 +257,16 @@ export function MenuBar() {
                 return (
                   <DropdownMenuItem
                     key={`${g.name}-${it.label}-${idx}`}
-                    disabled={!enabled}
+                    // NO se usa `disabled`: un ítem gris que al hacerle clic no
+                    // hace NADA se lee como "el sistema está roto", no como "no
+                    // tenés permiso". Le pasó a Leo Citzia con Contabilidad y
+                    // con Hardware, y las dos veces se buscó el problema donde
+                    // no estaba. Se deja clickeable sólo para explicar por qué:
+                    // la pantalla NO se abre.
                     onSelect={(e) => {
                       if (!enabled) {
                         e.preventDefault()
+                        avisarSinPermiso(it.label)
                         return
                       }
                       handleSelect(it)

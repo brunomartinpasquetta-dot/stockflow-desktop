@@ -3,7 +3,6 @@
  * Valuación al costo y a precio de venta + margen bruto teórico.
  */
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Boxes, FileSpreadsheet, Printer } from 'lucide-react'
 
@@ -15,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SinPermiso } from '@/components/SinPermiso'
 
 function todayIso(): string {
   const d = new Date()
@@ -86,7 +86,7 @@ export function InventarioArticulos() {
     XLSX.writeFile(wb, `inventario-${todayIso()}.xlsx`)
   }
 
-  if (!canView) return <Navigate to="/" replace />
+  if (!canView) return <SinPermiso area="Inventario de Artículos" />
   const data = reportQuery.data
 
   return (

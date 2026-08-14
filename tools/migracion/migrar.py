@@ -378,12 +378,22 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         p = personas.get(r["IDPERSONA"]) if r["IDPERSONA"] is not None else None
         completo = nombre_de(p, nombre) if p else nombre
         uidn = uuid7()
+        # El TIPO de StockFácil no siempre coincide con los que conocemos, y el
+        # que no se reconoce cae en "seller" — que casi no puede hacer nada. Le
+        # pasó al DUEÑO en Leo Citzia: entraba como vendedor y no veía
+        # Contabilidad ni Hardware, y se buscó el problema en el sistema. Si no
+        # se reconoce, se avisa FUERTE para revisarlo antes de entregar.
+        tipo = txt(r["TIPO"]).upper()
+        rol = ROLES.get(tipo, "seller")
+        if tipo not in ROLES:
+            rep.aviso(f"OJO: el usuario '{nombre}' tiene TIPO '{tipo or '(vacío)'}', "
+                      f"que no reconocemos: queda como VENDEDOR (casi sin permisos). "
+                      f"Revisar el rol en Configuración → Usuarios antes de entregar.")
         try:
             sq.execute(
                 "INSERT INTO users (id,username,password_hash,full_name,role,active,"
                 "created_at,updated_at) VALUES (?,?,?,?,?,1,?,?)",
-                (uidn, nombre[:40], hashear(clave), completo[:80],
-                 ROLES.get(txt(r["TIPO"]).upper(), "seller"), ahora, ahora))
+                (uidn, nombre[:40], hashear(clave), completo[:80], rol, ahora, ahora))
             usuario_map[r["IDUSUARIO"]] = uidn
             rep.suma("Usuarios", 1)
             rep.aviso(f"usuario '{nombre}' entra con su misma clave de StockFácil")

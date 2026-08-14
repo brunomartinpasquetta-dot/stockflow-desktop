@@ -3,7 +3,6 @@
  * Excluye ventas anuladas. Incluye % del total y barra visual SVG inline.
  */
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { BarChart3, FileSpreadsheet, Printer } from 'lucide-react'
 
@@ -16,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SinPermiso } from '@/components/SinPermiso'
 
 function todayIso(): string {
   const d = new Date()
@@ -68,7 +68,7 @@ export function VentasPorVendedor() {
     XLSX.writeFile(wb, `ventas-por-vendedor-${todayIso()}.xlsx`)
   }
 
-  if (!canView) return <Navigate to="/" replace />
+  if (!canView) return <SinPermiso area="Ventas por Vendedor" />
   const data = reportQuery.data
 
   return (

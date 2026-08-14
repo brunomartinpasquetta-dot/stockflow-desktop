@@ -3,7 +3,6 @@
  * Muestra activos, ventas, CMV, resultado bruto y posición IVA en un período.
  */
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { Calculator, FileText, Printer } from 'lucide-react'
 
 import { useCompany, useFinancialSummary } from '@/lib/hooks'
@@ -17,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SinPermiso } from '@/components/SinPermiso'
 
 function firstOfMonthIso(): string {
   const d = new Date()
@@ -51,7 +51,7 @@ export function Contabilidad() {
     setApplied({ from: dayStart(range.fromIso), to: dayEnd(range.toIso) })
   }
 
-  if (!canView) return <Navigate to="/" replace />
+  if (!canView) return <SinPermiso area="Contabilidad" />
   const data = summaryQuery.data
   const company = companyQuery.data
 

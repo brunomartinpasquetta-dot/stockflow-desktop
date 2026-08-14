@@ -7,7 +7,6 @@
  * automáticamente desde la capa IPC (withAudit), no requiere acción del usuario.
  */
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ScrollText } from 'lucide-react'
 
@@ -20,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { SinPermiso } from '@/components/SinPermiso'
 
 function todayIso(): string {
   const d = new Date()
@@ -97,7 +97,7 @@ export function Auditoria() {
     }
   }
 
-  if (!isAdmin) return <Navigate to="/" replace />
+  if (!isAdmin) return <SinPermiso area="Auditoría" />
 
   const rows = logQuery.data ?? []
 

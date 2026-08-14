@@ -7,7 +7,6 @@
  * historiales de ventas/cajas (pedido de Bruno, 2026-07).
  */
 import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Loader2, PlusCircle, MinusCircle, Wallet, Scale } from 'lucide-react'
 
@@ -28,6 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import type { CashGeneralCategoryDTO, CashGeneralMovementDTO } from '@/types/api'
+import { SinPermiso } from '@/components/SinPermiso'
 import { HistorialCajas } from './HistorialCajas'
 
 function todayIso(): string {
@@ -48,7 +48,7 @@ function dayEnd(iso: string): number {
 
 export function CajaGeneral() {
   const canView = usePermission('view_cash_general')
-  if (!canView) return <Navigate to="/" replace />
+  if (!canView) return <SinPermiso area="Caja General" />
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
       <CajaGeneralInner />
