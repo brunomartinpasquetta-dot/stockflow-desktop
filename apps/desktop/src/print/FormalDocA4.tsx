@@ -158,6 +158,11 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
         </tbody>
       </table>
 
+      {/* Empuja los totales y el pie fiscal AL FONDO de la hoja: así el
+          comprobante ocupa la página entera en vez de quedar amontonado
+          arriba, como en los talonarios preimpresos. */}
+      <div className="doc-fill" />
+
       {/* Totales */}
       <div className="doc-totals">
         <div className="row">

@@ -277,7 +277,19 @@ body.printing #print-area {
   /* Documentos formales A4 con marco (ticket A4 + presupuestos): a diferencia
      del ticket térmico 58/80, ocupan el ancho completo de la hoja y llevan
      recuadros, tabla con bordes y bloque de totales. */
-  .doc-a4 { width: 100%; color: #000; font-size: 10.5pt; line-height: 1.4; }
+  /* El comprobante ocupa la HOJA ENTERA. Sin esto quedaba todo amontonado
+     arriba y media página en blanco, que es lo que se notaba feo al lado de un
+     talonario preimpreso. A4 = 297mm menos los 18mm de margen de cada lado. */
+  .doc-a4 {
+    width: 100%;
+    color: #000;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+    min-height: 261mm;
+  }
+  .doc-a4 .doc-fill { flex: 1 1 auto; min-height: 8mm; }
   .doc-a4 .doc-head {
     display: flex; justify-content: space-between; align-items: flex-start;
     gap: 8mm; border: 1.2pt solid #000; padding: 5mm 6mm;
@@ -291,6 +303,12 @@ body.printing #print-area {
   .doc-a4 .doc-party { border: 1pt solid #000; padding: 3mm 4mm; flex: 1; }
   .doc-a4 .doc-party-label { font-size: 8pt; text-transform: uppercase; letter-spacing: .5pt; font-weight: 700; }
   .doc-a4 table.doc-items { width: 100%; border-collapse: collapse; margin-top: 5mm; font-size: 9.5pt; }
+  /* Anchos fijos: sin esto la descripción se come la fila y las columnas de
+     números bailan según el contenido. */
+  .doc-a4 table.doc-items th:nth-child(1) { width: auto; }
+  .doc-a4 table.doc-items th:nth-child(2) { width: 18mm; }
+  .doc-a4 table.doc-items th:nth-child(3) { width: 26mm; }
+  .doc-a4 table.doc-items th:nth-child(4) { width: 28mm; }
   .doc-a4 table.doc-items th, .doc-a4 table.doc-items td { border: 1pt solid #000; padding: 1.8mm 3mm; }
   .doc-a4 table.doc-items th { font-weight: 700; text-align: left; }
   .doc-a4 table.doc-items .num { text-align: right; white-space: nowrap; }

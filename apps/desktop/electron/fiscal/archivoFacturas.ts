@@ -176,7 +176,22 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
     },
     margin: { left: 14, right: 10 },
   });
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+  const finDetalle = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+
+  // El comprobante ocupa la HOJA ENTERA: los totales y el pie fiscal se anclan
+  // abajo en vez de quedar pegados al detalle con media página en blanco. A4
+  // son 297mm; se reservan 62mm para totales + pie.
+  const ALTO_A4 = 297;
+  const yTotales = Math.max(finDetalle + 6, ALTO_A4 - 62);
+
+  // Marco del detalle hasta donde arrancan los totales: así la hoja se ve
+  // completa, como un talonario preimpreso.
+  doc.setDrawColor(200);
+  doc.line(14, finDetalle, 14, yTotales - 4);
+  doc.line(200, finDetalle, 200, yTotales - 4);
+  doc.line(14, yTotales - 4, 200, yTotales - 4);
+
+  y = yTotales;
 
   // ── Totales. El IVA se discrimina SÓLO en la Factura A. En B y C va dentro
   //    del precio y mostrarlo aparte es un error fiscal: al consumidor final no
