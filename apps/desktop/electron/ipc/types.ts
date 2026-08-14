@@ -213,6 +213,8 @@ export interface CompanyDTO {
   priceMode: PriceMode;
   /** Permitir vender sin stock (stock negativo). Default ON. */
   allowNegativeStock: boolean;
+  /** Logo del comercio para la factura (data URL). */
+  logoDataUrl?: string | null;
   createdAt: number;
   updatedAt: number;
 }

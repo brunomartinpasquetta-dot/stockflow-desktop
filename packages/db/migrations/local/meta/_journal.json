@@ -134,6 +134,13 @@
       "when": 1780100000000,
       "tag": "0019_rebuild_cash_general",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1780200000000,
+      "tag": "0020_company_logo",
+      "breakpoints": true
     }
   ]
 }

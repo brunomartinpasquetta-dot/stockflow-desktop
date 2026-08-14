@@ -61,6 +61,13 @@ export const companies = sqliteTable(
      * bloquea la venta cuando stock < cantidad (BUG-OP-01).
      */
     allowNegativeStock: integer('allow_negative_stock', { mode: 'boolean' }).notNull().default(true),
+    /**
+     * Logo del comercio para la factura, como data URL. Se guarda la IMAGEN y
+     * no una ruta: una ruta se rompe si el archivo se mueve o se eligió desde
+     * un pendrive, y la factura sale sin logo sin avisar. Así viaja con el
+     * backup y sobrevive a las actualizaciones.
+     */
+    logoDataUrl: text('logo_data_url'),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },

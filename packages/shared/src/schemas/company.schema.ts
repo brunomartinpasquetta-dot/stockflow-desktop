@@ -18,6 +18,8 @@ export const CompanySchema = z.object({
   priceMode: priceModeSchema,
   /** Permitir vender sin stock (stock negativo). Default ON. */
   allowNegativeStock: z.boolean(),
+  /** Logo para la factura, como data URL. */
+  logoDataUrl: z.string().nullable(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -36,6 +38,7 @@ const companyBase = z.object({
   ingBrutos: z.string().nullish(),
   priceMode: priceModeSchema.optional(),
   allowNegativeStock: z.boolean().optional(),
+  logoDataUrl: z.string().nullable().optional(),
 });
 
 export const CreateCompanySchema = companyBase;

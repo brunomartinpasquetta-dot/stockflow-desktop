@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
@@ -22,6 +22,8 @@ interface FormState {
   ingBrutos: string
   priceMode: PriceMode
   allowNegativeStock: boolean
+  /** Logo para la factura, como data URL. `null` = sin logo. */
+  logoDataUrl: string | null
 }
 
 function fromCompany(c: CompanyDTO): FormState {
@@ -34,7 +36,35 @@ function fromCompany(c: CompanyDTO): FormState {
     ingBrutos: c.ingBrutos ?? '',
     priceMode: c.priceMode,
     allowNegativeStock: c.allowNegativeStock,
+    logoDataUrl: c.logoDataUrl ?? null,
   }
+}
+
+/** Máximo del logo guardado. Se reescala antes de guardar: una foto de celular
+ *  de 4 MB en la base engorda cada backup y no mejora nada impresa. */
+const LOGO_MAX_PX = 400
+
+/** Lee la imagen elegida, la reescala y devuelve el data URL listo para guardar. */
+async function leerLogo(file: File): Promise<string> {
+  const original = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result))
+    r.onerror = () => reject(new Error('No se pudo leer la imagen'))
+    r.readAsDataURL(file)
+  })
+  const img = new Image()
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('El archivo no es una imagen válida'))
+    img.src = original
+  })
+  const escala = Math.min(1, LOGO_MAX_PX / Math.max(img.width, img.height))
+  if (escala === 1 && original.length < 200_000) return original
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(img.width * escala)
+  canvas.height = Math.round(img.height * escala)
+  canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/png')
 }
 
 function PriceModeOption({
@@ -77,6 +107,7 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState>(() => fromCompany(company))
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
   const modeChanged = form.priceMode !== company.priceMode
 
@@ -88,6 +119,7 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
         cuit: form.cuit.trim() || null,
+        logoDataUrl: form.logoDataUrl,
         ingBrutos: form.ingBrutos.trim() || null,
         priceMode: form.priceMode,
         allowNegativeStock: form.allowNegativeStock,
@@ -144,6 +176,47 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
           <div className="flex flex-col gap-1">
             <Label htmlFor="emp-email">Email</Label>
             <Input id="emp-email" value={form.email} onChange={(e) => set('email', e.target.value)} />
+          </div>
+
+          {/* Logo: sale impreso arriba a la izquierda en la factura A4 y en el
+              PDF que se archiva. Se guarda dentro de la base, así viaja con el
+              backup y no se rompe si alguien mueve el archivo. */}
+          <div className="col-span-2 flex flex-col gap-1.5">
+            <Label>Logo para la factura</Label>
+            <div className="flex items-center gap-3">
+              <div className="flex h-20 w-40 items-center justify-center rounded-md border bg-muted/30">
+                {form.logoDataUrl ? (
+                  <img src={form.logoDataUrl} alt="Logo" className="max-h-[72px] max-w-[150px] object-contain" />
+                ) : (
+                  <span className="text-xs text-muted-foreground">Sin logo</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!file) return
+                    void leerLogo(file)
+                      .then((url) => set('logoDataUrl', url))
+                      .catch((err: Error) => toast.error(err.message))
+                  }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
+                  {form.logoDataUrl ? 'Cambiar logo…' : 'Elegir logo…'}
+                </Button>
+                {form.logoDataUrl && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => set('logoDataUrl', null)}>
+                    Quitar
+                  </Button>
+                )}
+                <p className="text-xs text-muted-foreground">PNG o JPG. Se achica solo.</p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

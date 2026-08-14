@@ -129,6 +129,10 @@ body.printing #print-area {
    y sigue siendo legible por el lector de ARCA. */
 .ticket-qr { width: 28mm; height: 28mm; margin: 2mm auto; display: block; }
 
+/* Logo del comercio en la factura A4. Alto acotado para que no empuje el resto
+   del encabezado, y `contain` para no deformar el logo del cliente. */
+.doc-logo { max-height: 18mm; max-width: 60mm; object-fit: contain; margin-bottom: 2mm; display: block; }
+
 @media print {
   body * { visibility: hidden !important; }
   #print-area, #print-area * { visibility: visible !important; }

@@ -88,6 +88,10 @@ export function FormalDocA4({ data }: { data: FormalDocData }) {
         <div>
           {showCompanyHeader ? (
             <>
+              {/* Logo del comercio, si lo cargó en Mi Empresa. */}
+              {company.logoDataUrl && (
+                <img className="doc-logo" src={company.logoDataUrl} alt="" />
+              )}
               <div className="doc-company-name">{company.name}</div>
               <div className="doc-company-meta">
                 {company.address && <div>{company.address}</div>}

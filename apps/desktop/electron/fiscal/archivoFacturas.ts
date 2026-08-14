@@ -39,6 +39,8 @@ export interface LineaFactura {
 export interface DatosFactura {
   comercio: {
     nombre: string;
+    /** Logo como data URL; sale arriba a la izquierda. */
+    logoDataUrl?: string | null;
     domicilio?: string | null;
     cuit?: string | null;
     ingBrutos?: string | null;
@@ -110,10 +112,21 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
 
   // ── Encabezado: emisor a la izquierda, comprobante a la derecha, con la
   //    letra en el recuadro del medio, como manda el formato de ARCA.
+  // Logo, si el comercio lo cargó. Se dibuja arriba a la izquierda y el resto
+  // del encabezado baja lo necesario.
+  let yTitulo = 20;
+  if (d.comercio.logoDataUrl) {
+    try {
+      doc.addImage(d.comercio.logoDataUrl, 'PNG', 14, 10, 0, 16, undefined, 'FAST');
+      yTitulo = 32;
+    } catch {
+      /* logo ilegible: sale sin él, la factura no se cae por esto */
+    }
+  }
   doc.setFontSize(14).setFont('helvetica', 'bold');
-  doc.text(d.comercio.nombre, 14, 20);
+  doc.text(d.comercio.nombre, 14, yTitulo);
   doc.setFontSize(8.5).setFont('helvetica', 'normal');
-  let y = 25;
+  let y = yTitulo + 5;
   for (const linea of [
     d.comercio.domicilio,
     d.comercio.cuit ? `CUIT: ${d.comercio.cuit}` : null,

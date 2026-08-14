@@ -95,6 +95,7 @@ async function archivar(
     const datos: DatosFactura = {
       comercio: {
         nombre: cfg?.businessName || empresa?.name || 'StockFlow',
+        logoDataUrl: empresa?.logoDataUrl ?? null,
         domicilio: cfg?.address ?? empresa?.address ?? null,
         cuit: cfg?.cuit ?? empresa?.cuit ?? null,
         ingBrutos: cfg?.grossIncome ?? null,
