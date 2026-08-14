@@ -1632,6 +1632,8 @@ export interface ApiSurface {
     issueNote(payload: { relatedVoucherId: string; kind: 'credit_note' | 'debit_note'; total?: string; reason?: string }): Res<IssuedVoucherDTO>;
     getVoucherForSale(payload: { saleId: string }): Res<FiscalVoucherDTO | null>;
     listVouchers(payload: { from?: number; to?: number; limit?: number }): Res<FiscalVoucherDTO[]>;
+    /** Genera los PDF que falten de comprobantes ya emitidos. */
+    archivarPendientes(): Res<{ archivadas: number; total: number }>;
     /** Carpeta donde se archivan los PDF de los comprobantes. */
     getPdfFolder(): Res<{ folder: string }>;
     openPdfFolder(): Res<{ ok: true }>;

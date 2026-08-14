@@ -235,6 +235,25 @@ function FacturacionInner() {
             <Button
               variant="outline"
               onClick={() => {
+                void api.fiscal
+                  .archivarPendientes()
+                  .then((r) => {
+                    toast.success(
+                      r.archivadas === 0
+                        ? `Ya estaban archivadas las ${r.total} facturas`
+                        : `Se archivaron ${r.archivadas} facturas que faltaban`,
+                    )
+                  })
+                  .catch(() => toast.error('No se pudieron archivar las facturas pendientes'))
+              }}
+              title="Genera el PDF de las facturas ya emitidas que todavía no estén archivadas"
+            >
+              <FileKey className="h-4 w-4" />
+              Archivar facturas pendientes
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
                 void api.fiscal.openPdfFolder().catch(() => {
                   toast.error('No se pudo abrir la carpeta de facturas')
                 })

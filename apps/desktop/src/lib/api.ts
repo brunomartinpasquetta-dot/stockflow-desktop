@@ -255,6 +255,8 @@ export const api = {
       unwrap(sf().fiscal.getVoucherForSale({ saleId })),
     listVouchers: (payload: { from?: number; to?: number; limit?: number } = {}): Promise<FiscalVoucherDTO[]> =>
       unwrap(sf().fiscal.listVouchers(payload)),
+    archivarPendientes: (): Promise<{ archivadas: number; total: number }> =>
+      unwrap(sf().fiscal.archivarPendientes()),
     getPdfFolder: (): Promise<{ folder: string }> => unwrap(sf().fiscal.getPdfFolder()),
     openPdfFolder: (): Promise<{ ok: true }> => unwrap(sf().fiscal.openPdfFolder()),
   },

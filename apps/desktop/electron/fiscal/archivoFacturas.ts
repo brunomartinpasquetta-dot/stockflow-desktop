@@ -64,6 +64,25 @@ export function carpetaFacturas(userDataDir: string): string {
   return path.join(userDataDir, 'facturas');
 }
 
+/** Ruta que le tocaría a un comprobante, exista o no el archivo. */
+export function rutaDeComprobante(
+  userDataDir: string,
+  c: DatosFactura['comprobante'],
+): string {
+  const f = new Date(c.fecha || Date.now());
+  return path.join(
+    carpetaFacturas(userDataDir),
+    String(f.getFullYear()),
+    String(f.getMonth() + 1).padStart(2, '0'),
+    nombreArchivo(c),
+  );
+}
+
+/** true si ese comprobante ya tiene su PDF archivado. */
+export function yaArchivado(userDataDir: string, c: DatosFactura['comprobante']): boolean {
+  return existsSync(rutaDeComprobante(userDataDir, c));
+}
+
 const money = (v: string | number | null | undefined): string =>
   `$ ${Number(v ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

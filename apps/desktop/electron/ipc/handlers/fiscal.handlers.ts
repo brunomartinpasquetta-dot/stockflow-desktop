@@ -8,7 +8,12 @@ import { FiscalService, type ArcaGateway } from '@stockflow/core';
 import { PermissionDeniedError, ValidationError } from '@stockflow/core';
 
 import { ArcaGatewayImpl } from '../../fiscal/ArcaGatewayImpl';
-import { archivarFacturaPdf, carpetaFacturas, type DatosFactura } from '../../fiscal/archivoFacturas';
+import {
+  archivarFacturaPdf,
+  carpetaFacturas,
+  yaArchivado,
+  type DatosFactura,
+} from '../../fiscal/archivoFacturas';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
   FiscalConfigDTO,
@@ -56,10 +61,11 @@ async function archivar(
   deps: HandlerDeps,
   saleId: string,
   v: IssuedVoucherDTO,
-): Promise<void> {
+  soloSiFalta = false,
+): Promise<boolean> {
   try {
     const sale = await deps.repos.sales.findById(saleId);
-    if (!sale) return;
+    if (!sale) return false;
     const lines = await deps.repos.saleLines.findBySale(saleId);
     const empresa = await deps.repos.company.getOrCreate();
     const cfg = deps.repos.fiscal.getConfig();
@@ -110,10 +116,14 @@ async function archivar(
       },
     };
 
+    if (soloSiFalta && yaArchivado(deps.userDataDir, datos.comprobante)) return false;
+
     const ruta = archivarFacturaPdf(deps.userDataDir, datos);
     if (ruta) console.log('[facturas] archivada:', ruta);
+    return ruta != null;
   } catch (err) {
     console.error('[facturas] no se pudo archivar el comprobante:', err);
+    return false;
   }
 }
 
@@ -213,6 +223,45 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
     /* ------------------------------- Emisión ------------------------------- */
 
     /** Dónde quedan los PDF, y abrir esa carpeta. */
+    /**
+     * Archiva los PDF que falten de comprobantes YA emitidos.
+     *
+     * El archivado automático corre al emitir, así que todo lo facturado antes
+     * de que existiera esa función —o mientras el servidor estuvo en una
+     * versión vieja— no tiene PDF. Sin esto, esas facturas no se archivan
+     * NUNCA y el comercio se entera cuando el contador se las pide.
+     */
+    'fiscal:archivarPendientes': withSession(
+      deps,
+      async (_p, ctx): Promise<{ archivadas: number; total: number }> => {
+        requireAdmin(ctx.currentUser?.role);
+        const vouchers = deps.repos.fiscal.listVouchers({});
+        let archivadas = 0;
+        for (const v of vouchers) {
+          if (!v.saleId || v.status !== 'approved' || !v.cae) continue;
+          const ok = await archivar(
+            deps,
+            v.saleId,
+            {
+              id: v.id,
+              label: `${v.kind === 'invoice' ? 'Factura' : 'Nota'} ${v.letter}`,
+              letter: v.letter,
+              salePoint: v.salePoint,
+              number: v.number,
+              cae: v.cae,
+              caeExpiry: v.caeExpiry,
+              total: v.total,
+              qrUrl: v.qrUrl,
+              observations: [],
+            } as IssuedVoucherDTO,
+            true,
+          );
+          if (ok) archivadas += 1;
+        }
+        return { archivadas, total: vouchers.length };
+      },
+    ),
+
     'fiscal:getPdfFolder': withSession(deps, async (): Promise<{ folder: string }> => ({
       folder: carpetaFacturas(deps.userDataDir),
     })),
