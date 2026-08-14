@@ -69,6 +69,22 @@ function buildEmbeddedHash(pageKey: string, params?: Record<string, unknown>): s
   return `/embedded/${encodeURIComponent(pageKey)}${query ? `?${query}` : ''}`;
 }
 
+/**
+ * Barra de título AZUL, igual que la ventana principal: si los módulos abren
+ * con la barra blanca del sistema, la app se ve partida en dos.
+ *   mac     → `hiddenInset`, el título lo dibuja el renderer.
+ *   Windows → `titleBarOverlay`, que la tiñe SIN perder los botones de
+ *             minimizar/maximizar/cerrar (con `hidden` a secas desaparecen).
+ */
+function barraDeTitulo(): Record<string, unknown> {
+  return process.platform === 'darwin'
+    ? { titleBarStyle: 'hiddenInset' as const }
+    : {
+        titleBarStyle: 'hidden' as const,
+        titleBarOverlay: { color: '#1B52CC', symbolColor: '#FFFFFF', height: 32 },
+      };
+}
+
 export class DesktopWindowsManager {
   private readonly windows = new Map<string, BrowserWindow>();
 
@@ -85,6 +101,7 @@ export class DesktopWindowsManager {
     }
 
     const win = new BrowserWindow({
+      ...barraDeTitulo(),
       width: input.width ?? 1100,
       height: input.height ?? 720,
       minWidth: input.minWidth ?? 480,

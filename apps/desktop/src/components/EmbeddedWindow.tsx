@@ -16,7 +16,7 @@
  * todo el RouterProvider en `main.tsx`, así que esta ruta los hereda. Sólo falta
  * `AuthProvider`, que lo aporta `AuthShell` arriba de las rutas.
  */
-import { Suspense, useEffect, useMemo } from 'react'
+import { type CSSProperties, Suspense, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/contexts/AuthContext'
@@ -129,11 +129,29 @@ export function EmbeddedWindow() {
 
   const Component = def.component
   const enNavegador = (window as { __stockflowWeb?: boolean }).__stockflowWeb === true
+  const esMac = navigator.userAgent.includes('Mac')
 
   return (
     <div className="flex h-screen flex-col bg-secondary/30">
       {/* En el navegador todo pasa en una sola pestaña: hace falta una forma
           clara de volver al menú principal, porque no hay ventanas que cerrar. */}
+      {/* Barra de título AZUL propia. La ventana nativa oculta la del sistema
+          (para poder teñirla), así que el título lo dibujamos acá — si no, la
+          ventana del módulo queda sin título. Arrastrable, como la principal. */}
+      {!enNavegador && (
+        <div
+          data-chrome="titlebar"
+          className="relative flex h-8 shrink-0 items-center bg-primary text-primary-foreground"
+          style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+        >
+          <span
+            className="pointer-events-none absolute inset-y-0 flex items-center justify-center text-[13px] font-semibold"
+            style={esMac ? { left: 0, right: 0 } : { left: 0, right: 140 }}
+          >
+            {def.title} — StockFlow
+          </span>
+        </div>
+      )}
       {enNavegador && (
         <div className="flex shrink-0 items-center gap-3 border-b bg-background px-3 py-2">
           <button
@@ -146,7 +164,7 @@ export function EmbeddedWindow() {
           <span className="text-sm font-medium">{def.title}</span>
         </div>
       )}
-      <div className={enNavegador ? 'min-h-0 flex-1 overflow-auto p-4' : 'h-screen overflow-auto p-4'}>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
       {/*
         WindowManagerProvider también acá: páginas como Compras usan `useWindowNav`
         (→ useWindowManager) para abrir OTRAS ventanas nativas desde adentro. En el
