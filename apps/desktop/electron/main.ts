@@ -108,10 +108,23 @@ function createWindow(extraArgs: string[]): void {
     minimizable: true,
     maximizable: true,
     fullscreenable: false,
-    // Barra de título propia (azul) SÓLO en macOS: ocultamos la nativa y dejamos
-    // los traffic lights inset; el título lo dibuja el renderer. En Windows/Linux
-    // NO se toca (hidden ocultaría los botones min/max/cerrar).
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
+    // Barra de título AZUL en las dos plataformas.
+    //   mac: `hiddenInset` — se oculta la nativa, quedan los traffic lights y
+    //        el título lo dibuja el renderer.
+    //   Windows: `titleBarOverlay` — Windows sigue dibujando los botones de
+    //        minimizar/maximizar/cerrar (con `hidden` a secas desaparecían) y
+    //        nosotros le damos el color. Es la forma soportada de teñirla sin
+    //        perder los controles.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const }
+      : {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: {
+            color: '#1B52CC',      // el azul de StockFlow (--primary)
+            symbolColor: '#FFFFFF',
+            height: 32,
+          },
+        }),
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

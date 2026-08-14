@@ -47,9 +47,11 @@ function LayoutInner() {
   const licenseStatus = useLicenseStatus()
   const { state: licenseState } = useLicense()
   const isTrial = licenseState?.trial === true
-  // Barra de título propia SÓLO en macOS (en Windows queda la nativa, con sus
-  // botones de min/max/cerrar).
+  // Barra de título propia en las DOS plataformas. En Windows el sistema sigue
+  // dibujando los botones de min/max/cerrar sobre la derecha (titleBarOverlay),
+  // así que el título se corre para no quedar debajo de ellos.
   const isMac = navigator.userAgent.includes('Mac')
+  const esWeb = Boolean((window as { __stockflowWeb?: boolean }).__stockflowWeb)
   // Versión de la app, para mostrarla al final del título de la ventana.
   const [appVersion, setAppVersion] = useState('')
   useEffect(() => {
@@ -65,15 +67,20 @@ function LayoutInner() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      {isMac && (
-        // Barra de título azul StockFlow. Arrastrable; los traffic lights de
-        // macOS se dibujan encima a la izquierda (titleBarStyle hiddenInset).
+      {!esWeb && (
+        // Barra de título azul StockFlow. Arrastrable. En mac los traffic
+        // lights van encima a la izquierda; en Windows los controles del
+        // sistema van a la derecha, por eso el título se centra dejándoles
+        // lugar. En el navegador NO va: ahí manda la ventana de Chrome.
         <div
           data-chrome="titlebar"
           className="relative flex h-8 shrink-0 items-center bg-primary text-primary-foreground"
           style={{ WebkitAppRegion: 'drag' } as CSSProperties}
         >
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold">
+          <span
+            className="pointer-events-none absolute inset-y-0 flex items-center justify-center text-[13px] font-semibold"
+            style={isMac ? { left: 0, right: 0 } : { left: 0, right: 140 }}
+          >
             StockFlow — Sistema de Gestión Comercial{appVersion ? ` v${appVersion}` : ''}
           </span>
         </div>

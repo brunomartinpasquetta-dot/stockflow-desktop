@@ -494,6 +494,9 @@ function PDV() {
   const isCF = isCfCustomer(selectedCustomer)
 
   const [voucherType, setVoucherType] = useState<VoucherType>('X')
+  // El usuario tocó el desplegable a propósito: a partir de ahí manda él y el
+  // sistema deja de cambiarlo solo.
+  const [tipoForzado, setTipoForzado] = useState(false)
   // Facturación electrónica: si está activa, al confirmar se pide el CAE.
   const fiscalConfigQuery = useQuery({
     queryKey: ['fiscal', 'configPublic'],
@@ -506,6 +509,23 @@ function PDV() {
     staleTime: 60_000,
   })
   const fiscalEnabled = fiscalConfigQuery.data?.enabled === true
+
+  // ── El tipo de comprobante lo decide el CLIENTE ──────────────────────────
+  // Emisor Responsable Inscripto: cliente RI → A, el resto → B.
+  // Emisor Monotributo: siempre C.
+  // El comercio factura decenas de ventas por día; elegir el tipo en cada una
+  // es fricción pura y se presta a error. El desplegable queda como override
+  // manual: si el usuario lo toca, manda él.
+  const tipoSugerido: VoucherType = useMemo(() => {
+    if (!fiscalEnabled) return 'X'
+    const emisor = fiscalConfigQuery.data?.vatCondition ?? 'RI'
+    if (emisor === 'MT') return 'C'
+    return selectedCustomer?.category === 'RI' ? 'A' : 'B'
+  }, [fiscalEnabled, fiscalConfigQuery.data, selectedCustomer])
+
+  if (!tipoForzado && voucherType !== tipoSugerido) {
+    setVoucherType(tipoSugerido)
+  }
   const activeSalePoints = useMemo(
     () => (salePointsQuery.data ?? []).filter((p) => p.active),
     [salePointsQuery.data],
@@ -652,6 +672,12 @@ function PDV() {
       return next
     })
   }
+  /** Cambiar de cliente vuelve a dejar que el tipo lo decida el sistema. */
+  function elegirCliente(id: string | null): void {
+    setCustomerId(id)
+    setTipoForzado(false)
+  }
+
   function clearSale(): void {
     setCart([])
     setGlobalDiscount('0')
@@ -662,7 +688,7 @@ function PDV() {
     barcodeRef.current?.focus()
   }
   function pickCustomer(c: CustomerDTO): void {
-    setCustomerId(c.id)
+    elegirCliente(c.id)
     setCustomerPickerOpen(false)
     // Autocompletar la lista de precios con la ASIGNADA al cliente (sin lista
     // válida → Lista 1). Vale también para clientes con documento "Consumidor
@@ -1085,7 +1111,13 @@ function PDV() {
         </div>
         <div className="flex flex-col gap-1">
           <Label>Comprobante</Label>
-          <Select value={voucherType} onChange={(e) => setVoucherType(e.target.value as VoucherType)}>
+          <Select
+            value={voucherType}
+            onChange={(e) => {
+              setVoucherType(e.target.value as VoucherType)
+              setTipoForzado(true)
+            }}
+          >
             {voucherOptions(fiscalEnabled).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
