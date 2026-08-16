@@ -804,8 +804,14 @@ function PDV() {
       toast.error('No se encontró el producto')
       return
     }
-    setBarcode('')
+    // La búsqueda NO se borra: la lista queda abierta y se puede seguir
+    // cargando de los mismos resultados, igual que haciendo clic.
+    //
+    // El texto queda SELECCIONADO para que el lector de códigos siga andando:
+    // el próximo escaneo lo pisa entero en vez de encadenarse al anterior.
+    // Escribiendo a mano pasa lo mismo, y con Escape se cierra la lista.
     barcodeRef.current?.focus()
+    barcodeRef.current?.select()
   }
 
   // --- cuenta corriente ---
@@ -1275,12 +1281,11 @@ function PDV() {
                     // cargan tres seguidas sin volver a escribir la búsqueda.
                     // Se cierra con Escape, o escribiendo otra cosa.
                     //
-                    // El Enter del lector de códigos sí limpia (ver
-                    // `commitBarcode`): ahí cada disparo es un producto distinto
-                    // y dejar el código puesto haría cargar el anterior de nuevo.
+                    // Se comporta igual por clic que por Enter (`commitBarcode`).
                     onClick={() => {
                       addArticle(a)
                       barcodeRef.current?.focus()
+                      barcodeRef.current?.select()
                     }}
                     className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent"
                   >
