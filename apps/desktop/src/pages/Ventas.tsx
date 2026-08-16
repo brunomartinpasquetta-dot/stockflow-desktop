@@ -733,6 +733,10 @@ function PDV() {
     setIsAccountSale(false)
     setMixedMode(false)
     split.reset()
+    // La búsqueda SÍ se limpia acá: durante la venta el desplegable queda
+    // abierto para cargar varios del mismo resultado, pero terminada la venta
+    // la siguiente arranca de cero, sin la lista de la anterior tapando.
+    setBarcode('')
     barcodeRef.current?.focus()
   }
   function pickCustomer(c: CustomerDTO): void {
