@@ -514,6 +514,32 @@ function PDV() {
   const isCF = isCfCustomer(selectedCustomer)
 
   const [voucherType, setVoucherType] = useState<VoucherType>('X')
+  /**
+   * FACTURAR SÍ / NO. Apagado, todas las ventas salen como Remito X.
+   *
+   * Es el modo en que trabaja el comercio, no una decisión por venta: se
+   * recuerda EN ESTA TERMINAL, así el cajero lo tilda una vez y sigue
+   * vendiendo. Se guarda en el navegador y no en la base a propósito, porque
+   * un puesto puede facturar y otro no.
+   */
+  const [facturar, setFacturar] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('stockflow.ventas.facturar') === '1'
+    } catch {
+      return false
+    }
+  })
+  function cambiarFacturar(valor: boolean): void {
+    setFacturar(valor)
+    // Al cambiar de modo vuelve a mandar la sugerencia: si venía forzado a mano
+    // en la venta anterior, ese override no tiene que sobrevivir al cambio.
+    setTipoForzado(false)
+    try {
+      localStorage.setItem('stockflow.ventas.facturar', valor ? '1' : '0')
+    } catch {
+      /* sin localStorage (modo privado): vale para esta sesión y listo */
+    }
+  }
   // El usuario tocó el desplegable a propósito: a partir de ahí manda él y el
   // sistema deja de cambiarlo solo.
   const [tipoForzado, setTipoForzado] = useState(false)
@@ -537,11 +563,13 @@ function PDV() {
   // es fricción pura y se presta a error. El desplegable queda como override
   // manual: si el usuario lo toca, manda él.
   const tipoSugerido: VoucherType = useMemo(() => {
-    if (!fiscalEnabled) return 'X'
+    // Sin el tilde de facturar, TODO sale como Remito X. Es el default: el
+    // comercio decide cuándo factura, no el sistema por él.
+    if (!fiscalEnabled || !facturar) return 'X'
     const emisor = fiscalConfigQuery.data?.vatCondition ?? 'RI'
     if (emisor === 'MT') return 'C'
     return selectedCustomer?.category === 'RI' ? 'A' : 'B'
-  }, [fiscalEnabled, fiscalConfigQuery.data, selectedCustomer])
+  }, [fiscalEnabled, facturar, fiscalConfigQuery.data, selectedCustomer])
 
   if (!tipoForzado && voucherType !== tipoSugerido) {
     setVoucherType(tipoSugerido)
@@ -1229,14 +1257,30 @@ function PDV() {
         </div>
         <div className="flex flex-col gap-1">
           <Label>Comprobante</Label>
+          {/* El tilde decide el MODO; el desplegable, la letra. Sin facturación
+              electrónica configurada no se muestra: no habría nada que tildar. */}
+          {fiscalEnabled && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={facturar}
+                onChange={(e) => cambiarFacturar(e.target.checked)}
+              />
+              <span className={facturar ? 'font-medium' : 'text-muted-foreground'}>
+                Facturar
+              </span>
+            </label>
+          )}
           <Select
             value={voucherType}
+            disabled={fiscalEnabled && !facturar}
             onChange={(e) => {
               setVoucherType(e.target.value as VoucherType)
               setTipoForzado(true)
             }}
           >
-            {voucherOptions(fiscalEnabled).map((o) => (
+            {voucherOptions(fiscalEnabled && facturar).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
