@@ -1335,9 +1335,14 @@ function PDV() {
                       barcodeRef.current?.focus()
                       barcodeRef.current?.select()
                     }}
+                    // SIN `hover:` del CSS a propósito: si el mouse pintara su
+                    // propio renglón, con el teclado en otro se verían DOS
+                    // marcados y no se sabría cuál carga el Enter. El resaltado
+                    // sale sólo de `highlight`, y el mouse lo mueve al entrar
+                    // (onMouseEnter), así teclado y mouse son la misma marca.
                     className={cn(
-                      'flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent',
-                      idx === highlight && 'bg-accent',
+                      'flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm',
+                      idx === highlight && 'bg-accent text-accent-foreground',
                     )}
                   >
                     <span className="min-w-0 flex-1 truncate">
