@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X, Zap } from 'lucide-react'
 
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import {
   useArticles,
   useCompany,
@@ -571,6 +572,13 @@ function PDV() {
   const [returningSaleId, setReturningSaleId] = useState<string | null>(null)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
+  /**
+   * Renglón marcado del desplegable, para moverse con las flechas.
+   * -1 = ninguno: Enter usa el criterio de siempre (código exacto, o el primer
+   * resultado), que es lo que necesita el lector de códigos.
+   */
+  const [highlight, setHighlight] = useState(-1)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
   // Medio de pago seleccionado en modo mono-medio (default: efectivo).
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
   // Modo mixto explícito (toggle "Pago Mixto"): expone el split N-filas.
@@ -797,10 +805,22 @@ function PDV() {
     return [...matches].sort((a, b) => rank(a) - rank(b)).slice(0, 300)
   }, [barcode, allArticles, pdvSearchCtx])
 
+  // Con 300 resultados la marca se va de pantalla enseguida: la lista la sigue.
+  // `block: 'nearest'` mueve lo mínimo, sin saltos molestos.
+  useEffect(() => {
+    if (highlight < 0) return
+    const fila = suggestionsRef.current?.children[highlight]
+    if (fila instanceof HTMLElement) fila.scrollIntoView({ block: 'nearest' })
+  }, [highlight])
+
   function commitBarcode(): void {
     const v = barcode.trim()
     if (!v) return
-    if (exactByBarcode) {
+    // Si el cajero se movió con las flechas, manda lo que eligió.
+    const marcado = highlight >= 0 ? suggestions[highlight] : undefined
+    if (marcado) {
+      addArticle(marcado)
+    } else if (exactByBarcode) {
       addArticle(exactByBarcode)
     } else if (suggestions.length > 0) {
       addArticle(suggestions[0]!)
@@ -1269,18 +1289,42 @@ function PDV() {
               className="h-11 pl-10 text-base"
               placeholder="Código o nombre del producto — escaneá o escribí y Enter"
               value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
+              onChange={(e) => {
+                setBarcode(e.target.value)
+                // Otra búsqueda, otra lista: la marca vuelve a cero.
+                setHighlight(-1)
+              }}
               onKeyDown={(e) => {
+                // Flechas para recorrer el desplegable sin soltar el teclado.
+                if (e.key === 'ArrowDown' && suggestions.length > 0) {
+                  e.preventDefault()
+                  setHighlight((h) => (h + 1 >= suggestions.length ? 0 : h + 1))
+                  return
+                }
+                if (e.key === 'ArrowUp' && suggestions.length > 0) {
+                  e.preventDefault()
+                  setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1))
+                  return
+                }
                 if (e.key === 'Enter') commitBarcode()
-                if (e.key === 'Escape' && barcode.trim() !== '') setBarcode('')
+                if (e.key === 'Escape' && barcode.trim() !== '') {
+                  setBarcode('')
+                  setHighlight(-1)
+                }
               }}
             />
             {suggestions.length > 0 && (
-              <div className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
-                {suggestions.map((a) => (
+              <div
+                ref={suggestionsRef}
+                className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border bg-popover shadow-md"
+              >
+                {suggestions.map((a, idx) => (
                   <button
                     key={a.id}
                     type="button"
+                    // Al pasar el mouse la marca lo sigue: si después usa las
+                    // flechas, arrancan de donde está mirando.
+                    onMouseEnter={() => setHighlight(idx)}
                     // La lista NO se cierra al agregar: buscando "lapicera" se
                     // cargan tres seguidas sin volver a escribir la búsqueda.
                     // Se cierra con Escape, o escribiendo otra cosa.
@@ -1291,7 +1335,10 @@ function PDV() {
                       barcodeRef.current?.focus()
                       barcodeRef.current?.select()
                     }}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent"
+                    className={cn(
+                      'flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent',
+                      idx === highlight && 'bg-accent',
+                    )}
                   >
                     <span className="min-w-0 flex-1 truncate">
                       <span className="font-mono text-xs text-muted-foreground">{a.barcode}</span> · {a.description}
