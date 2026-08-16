@@ -1289,20 +1289,33 @@ function PDV() {
           </Select>
           {/* Va DEBAJO del desplegable a propósito: leído en ese orden se
               entiende solo — "Comprobante: Factura B / Facturar todas las
-              ventas". Sin facturación electrónica configurada no aparece. */}
-          {fiscalEnabled && (
-            <label className="flex cursor-pointer items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 accent-primary"
-                checked={facturar}
-                onChange={(e) => cambiarFacturar(e.target.checked)}
-              />
-              <span className={facturar ? 'font-semibold text-primary' : 'text-muted-foreground'}>
-                Facturar todas las ventas
-              </span>
-            </label>
-          )}
+              ventas".
+              SIEMPRE se muestra, aunque ARCA no esté configurado en esta
+              máquina. Escondiéndolo el usuario no ve el tilde en ningún lado y
+              concluye que la función no existe (pasó). Si no se puede facturar,
+              se dice POR QUÉ y dónde se arregla. */}
+          <label className="flex cursor-pointer items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary"
+              checked={facturar}
+              onChange={(e) => {
+                if (!fiscalEnabled && e.target.checked) {
+                  toast.warning('En esta máquina no está configurada la facturación electrónica', {
+                    description:
+                      'Sin eso las ventas salen como Remito X, sin CAE. Se configura en Contabilidad → Facturación Electrónica (ARCA): certificado, CUIT y punto de venta.',
+                    duration: 12_000,
+                  })
+                  return
+                }
+                cambiarFacturar(e.target.checked)
+              }}
+            />
+            <span className={facturar ? 'font-semibold text-primary' : 'text-muted-foreground'}>
+              Facturar todas las ventas
+            </span>
+            {!fiscalEnabled && <span className="text-muted-foreground">— ARCA no configurado acá</span>}
+          </label>
           {fiscalEnabled && voucherType !== 'X' && activeSalePoints.length > 1 && (
             <Select
               value={String(effectiveSalePoint ?? '')}
