@@ -607,6 +607,13 @@ function PDV() {
    */
   const [highlight, setHighlight] = useState(-1)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+  /**
+   * Si el desplegable está a la vista. Es aparte del texto buscado: al hacer
+   * clic afuera se ESCONDE la lista pero NO se borra lo escrito, porque el
+   * cajero puede estar yendo a tocar otra cosa y volver.
+   */
+  const [listaAbierta, setListaAbierta] = useState(false)
+  const buscadorRef = useRef<HTMLDivElement>(null)
   // Medio de pago seleccionado en modo mono-medio (default: efectivo).
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
   // Modo mixto explícito (toggle "Pago Mixto"): expone el split N-filas.
@@ -832,6 +839,16 @@ function PDV() {
     // seguridad alto, igual que "Ver todos") y el desplegable scrollea.
     return [...matches].sort((a, b) => rank(a) - rank(b)).slice(0, 300)
   }, [barcode, allArticles, pdvSearchCtx])
+
+  // Clic fuera del buscador → se cierra la lista. `mousedown` y no `click`
+  // para que se cierre apenas se aprieta, sin esperar a soltar.
+  useEffect(() => {
+    function alClicAfuera(e: MouseEvent): void {
+      if (!buscadorRef.current?.contains(e.target as Node)) setListaAbierta(false)
+    }
+    document.addEventListener('mousedown', alClicAfuera)
+    return () => document.removeEventListener('mousedown', alClicAfuera)
+  }, [])
 
   // Con 300 resultados la marca se va de pantalla enseguida: la lista la sigue.
   // `block: 'nearest'` mueve lo mínimo, sin saltos molestos.
@@ -1257,24 +1274,8 @@ function PDV() {
         </div>
         <div className="flex flex-col gap-1">
           <Label>Comprobante</Label>
-          {/* El tilde decide el MODO; el desplegable, la letra. Sin facturación
-              electrónica configurada no se muestra: no habría nada que tildar. */}
-          {fiscalEnabled && (
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-primary"
-                checked={facturar}
-                onChange={(e) => cambiarFacturar(e.target.checked)}
-              />
-              <span className={facturar ? 'font-medium' : 'text-muted-foreground'}>
-                Facturar
-              </span>
-            </label>
-          )}
           <Select
             value={voucherType}
-            disabled={fiscalEnabled && !facturar}
             onChange={(e) => {
               setVoucherType(e.target.value as VoucherType)
               setTipoForzado(true)
@@ -1286,6 +1287,22 @@ function PDV() {
               </option>
             ))}
           </Select>
+          {/* Va DEBAJO del desplegable a propósito: leído en ese orden se
+              entiende solo — "Comprobante: Factura B / Facturar todas las
+              ventas". Sin facturación electrónica configurada no aparece. */}
+          {fiscalEnabled && (
+            <label className="flex cursor-pointer items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-primary"
+                checked={facturar}
+                onChange={(e) => cambiarFacturar(e.target.checked)}
+              />
+              <span className={facturar ? 'font-semibold text-primary' : 'text-muted-foreground'}>
+                Facturar todas las ventas
+              </span>
+            </label>
+          )}
           {fiscalEnabled && voucherType !== 'X' && activeSalePoints.length > 1 && (
             <Select
               value={String(effectiveSalePoint ?? '')}
@@ -1326,27 +1343,31 @@ function PDV() {
       {/* ── Zona central: carrito ── */}
       <div className="flex min-h-0 flex-1 flex-col gap-2 rounded-lg border bg-card p-3">
         <div className="flex items-center gap-2">
-          <div className="relative w-1/2">
+          <div className="relative w-1/2" ref={buscadorRef}>
             <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               ref={barcodeRef}
               className="h-11 pl-10 text-base"
               placeholder="Código o nombre del producto — escaneá o escribí y Enter"
               value={barcode}
+              onFocus={() => setListaAbierta(true)}
               onChange={(e) => {
                 setBarcode(e.target.value)
                 // Otra búsqueda, otra lista: la marca vuelve a cero.
                 setHighlight(-1)
+                setListaAbierta(true)
               }}
               onKeyDown={(e) => {
                 // Flechas para recorrer el desplegable sin soltar el teclado.
                 if (e.key === 'ArrowDown' && suggestions.length > 0) {
                   e.preventDefault()
+                  setListaAbierta(true)
                   setHighlight((h) => (h + 1 >= suggestions.length ? 0 : h + 1))
                   return
                 }
                 if (e.key === 'ArrowUp' && suggestions.length > 0) {
                   e.preventDefault()
+                  setListaAbierta(true)
                   setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1))
                   return
                 }
@@ -1354,10 +1375,11 @@ function PDV() {
                 if (e.key === 'Escape' && barcode.trim() !== '') {
                   setBarcode('')
                   setHighlight(-1)
+                  setListaAbierta(false)
                 }
               }}
             />
-            {suggestions.length > 0 && (
+            {listaAbierta && suggestions.length > 0 && (
               <div
                 ref={suggestionsRef}
                 className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border bg-popover shadow-md"
