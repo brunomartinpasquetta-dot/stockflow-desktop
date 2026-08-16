@@ -1271,9 +1271,15 @@ function PDV() {
                   <button
                     key={a.id}
                     type="button"
+                    // La lista NO se cierra al agregar: buscando "lapicera" se
+                    // cargan tres seguidas sin volver a escribir la búsqueda.
+                    // Se cierra con Escape, o escribiendo otra cosa.
+                    //
+                    // El Enter del lector de códigos sí limpia (ver
+                    // `commitBarcode`): ahí cada disparo es un producto distinto
+                    // y dejar el código puesto haría cargar el anterior de nuevo.
                     onClick={() => {
                       addArticle(a)
-                      setBarcode('')
                       barcodeRef.current?.focus()
                     }}
                     className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent"
