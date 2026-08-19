@@ -99,14 +99,19 @@ export function exportStatementPdf(data: StatementDocData): void {
   // el resumen. Los importes de esos renglones van en la columna de detalle:
   // las columnas Debe/Haber/Saldo son sólo del comprobante, para que la cuenta
   // siga cerrando.
+  // El PDF que se le manda al cliente NO lista las entregas una por una:
+  // pedido del comercio (19-ago-2026). Al cliente le interesa qué compró y
+  // cuánto debe; el historial de pagos queda en pantalla. La cuenta igual
+  // cierra a la vista: "Compras − Entregas = Saldo" va abajo, con el total de
+  // entregas sumado.
+  const visibles = data.entries.filter((e) => e.kind !== 'payment')
   const body: (string | { content: string; styles?: Record<string, unknown> })[][] = []
-  for (const e of data.entries) {
+  for (const e of visibles) {
     body.push([
       formatDate(e.date),
       etiqueta(e),
       Number(e.debit) ? formatCurrency(e.debit) : '',
       Number(e.credit) ? formatCurrency(e.credit) : '',
-      formatCurrency(e.runningBalance),
     ])
     for (const a of e.articles ?? []) {
       const cant = Number(a.quantity)
@@ -119,25 +124,23 @@ export function exportStatementPdf(data: StatementDocData): void {
         },
         '',
         '',
-        '',
       ])
     }
   }
   if (data.range && Math.abs(saldoAnterior) > 0.005) {
-    body.unshift(['', 'Saldo anterior', '', '', formatCurrency(String(saldoAnterior))])
+    body.unshift(['', 'Saldo anterior', formatCurrency(String(saldoAnterior)), ''])
   }
 
   autoTable(doc, {
     startY: y + 5,
-    head: [['Fecha', 'Detalle', 'Debe', 'Haber', 'Saldo']],
+    head: [['Fecha', 'Detalle', 'Compras', 'Devoluciones']],
     body,
     styles: { fontSize: 8.5, cellPadding: 1.6 },
     headStyles: { fillColor: [27, 82, 204] },
     columnStyles: {
       0: { cellWidth: 20 },
-      2: { halign: 'right', cellWidth: 26 },
-      3: { halign: 'right', cellWidth: 26 },
-      4: { halign: 'right', cellWidth: 28 },
+      2: { halign: 'right', cellWidth: 30 },
+      3: { halign: 'right', cellWidth: 30 },
     },
     margin: { left: 14, right: 10 },
   })
@@ -146,8 +149,10 @@ export function exportStatementPdf(data: StatementDocData): void {
   const cargos = data.entries.reduce((a, e) => a + Number(e.debit), 0)
   const entregas = data.entries.reduce((a, e) => a + Number(e.credit), 0)
   doc.setFontSize(9).setFont('helvetica', 'normal')
+  // Las entregas van SUMADAS en una línea, no listadas: así la cuenta cierra a
+  // la vista (Compras − Entregas = Saldo) sin exponer el historial de pagos.
   doc.text(
-    `Compras: ${formatCurrency(String(cargos))}   ·   Entregas: ${formatCurrency(String(entregas))}`,
+    `Compras: ${formatCurrency(String(cargos))}   ·   Entregas a cuenta: ${formatCurrency(String(entregas))}`,
     14,
     y,
   )

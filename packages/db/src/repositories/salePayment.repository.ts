@@ -33,6 +33,30 @@ export class SalePaymentRepository extends BaseRepository<
     }
   }
 
+  /**
+   * Pagos de VARIAS ventas en una sola consulta. El Historial de Ventas filtra
+   * por forma de pago y con una consulta por venta serían cientos por pantalla.
+   */
+  async findBySaleDateRange(from: number, to: number): Promise<SalePayment[]> {
+    try {
+      return this.db
+        .select({
+          id: salePayments.id,
+          saleId: salePayments.saleId,
+          paymentMethodId: salePayments.paymentMethodId,
+          amount: salePayments.amount,
+          reference: salePayments.reference,
+          createdAt: salePayments.createdAt,
+        })
+        .from(salePayments)
+        .innerJoin(sales, eq(sales.id, salePayments.saleId))
+        .where(and(gte(sales.date, from), lte(sales.date, to)))
+        .all() as SalePayment[];
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   /** Inserta los N pagos de una venta de forma atómica. */
   async createMany(saleId: string, items: SalePaymentInput[]): Promise<SalePayment[]> {
     try {

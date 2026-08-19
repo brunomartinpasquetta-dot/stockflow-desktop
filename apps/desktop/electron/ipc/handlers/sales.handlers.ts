@@ -42,7 +42,7 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
     ),
     'sales:listByDateRange': withSession(
       deps,
-      (payload: { from: number; to: number }, ctx): Promise<SaleDTO[]> => {
+      async (payload: { from: number; to: number }, ctx): Promise<SaleDTO[]> => {
         // El Historial de Ventas lo necesita quien VENDE (para revisar o corregir
         // lo que acaba de facturar), no solo quien ve reportes. Antes exigía
         // `view_reports` y un vendedor con reportes restringidos se quedaba sin
@@ -55,7 +55,23 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
           hasPermission(rol, 'view_reports');
         // Si no puede por ninguna vía, que el error mencione el permiso natural.
         if (!puede) requirePermission(ctx.currentUser, 'view_reports');
-        return ctx.repos.sales.findByDateRange(payload.from, payload.to);
+        // Cada venta viaja con SUS FORMAS DE PAGO, para poder filtrar el
+        // historial por "transferencia" o "débito". Son dos consultas para toda
+        // la pantalla: una por venta serían cientos.
+        const ventas = await ctx.repos.sales.findByDateRange(payload.from, payload.to);
+        const pagos = await ctx.repos.salePayments.findBySaleDateRange(payload.from, payload.to);
+        const nombres = await ctx.repos.paymentMethods.byId();
+        const porVenta = new Map<string, { paymentMethodId: string; name: string; amount: string }[]>();
+        for (const p of pagos) {
+          const lista = porVenta.get(p.saleId) ?? [];
+          lista.push({
+            paymentMethodId: p.paymentMethodId,
+            name: nombres.get(p.paymentMethodId)?.name ?? 'Medio eliminado',
+            amount: p.amount,
+          });
+          porVenta.set(p.saleId, lista);
+        }
+        return ventas.map((v) => ({ ...v, payments: porVenta.get(v.id) ?? [] }));
       },
     ),
     'sales:getNextNumber': withSession(

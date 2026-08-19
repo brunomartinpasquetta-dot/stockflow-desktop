@@ -646,6 +646,8 @@ export function HistorialVentas() {
   const [typeFilter, setTypeFilter] = useState<'all' | VoucherType>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'voided'>('all')
   const [searchNumber, setSearchNumber] = useState('')
+  /** Filtro por forma de pago: "cuánto vendí por transferencia" en el día. */
+  const [payMethod, setPayMethod] = useState('')
   const [page, setPage] = useState(0)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [anulandoHoy, setAnulandoHoy] = useState(false)
@@ -687,8 +689,34 @@ export function HistorialVentas() {
     if (typeFilter !== 'all') rows = rows.filter((s) => s.type === typeFilter)
     if (statusFilter !== 'all') rows = rows.filter((s) => s.status === statusFilter)
     if (term) rows = rows.filter((s) => String(s.number).includes(term))
+    if (payMethod) rows = rows.filter((s) => (s.payments ?? []).some((p) => p.paymentMethodId === payMethod))
     return [...rows].sort((a, b) => b.date - a.date)
-  }, [salesQuery.data, customerId, sellerId, typeFilter, statusFilter, searchNumber])
+  }, [salesQuery.data, customerId, sellerId, typeFilter, statusFilter, searchNumber, payMethod])
+
+  /** Formas de pago presentes en el rango, para poblar el desplegable. */
+  const mediosEnRango = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const v of salesQuery.data ?? []) {
+      for (const p of v.payments ?? []) m.set(p.paymentMethodId, p.name)
+    }
+    return [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [salesQuery.data])
+
+  /**
+   * Total cobrado POR ESE MEDIO en lo filtrado. No es el total de las ventas:
+   * en un pago mixto sólo cuenta la parte que entró por ese medio, que es lo
+   * que el comercio quiere saber.
+   */
+  const totalDelMedio = useMemo(() => {
+    if (!payMethod) return null
+    return filtered
+      .filter((s) => s.status === 'completed')
+      .reduce(
+        (acc, s) =>
+          acc + (s.payments ?? []).filter((p) => p.paymentMethodId === payMethod).reduce((a, p) => a + Number(p.amount), 0),
+        0,
+      )
+  }, [filtered, payMethod])
 
   const totalAmount = useMemo(
     () => filtered.filter((s) => s.status === 'completed').reduce((acc, s) => acc + Number(s.total), 0),
@@ -765,6 +793,15 @@ export function HistorialVentas() {
             </Select>
           </div>
           <div className="flex flex-col gap-1">
+            <Label>Forma de pago</Label>
+            <Select value={payMethod} onChange={(e) => resetPage(() => setPayMethod(e.target.value))}>
+              <option value="">Todas</option>
+              {mediosEnRango.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
             <Label>Buscar N°</Label>
             <Input value={searchNumber} onChange={(e) => resetPage(() => setSearchNumber(e.target.value))} placeholder="N° de comprobante" inputMode="numeric" />
           </div>
@@ -820,7 +857,17 @@ export function HistorialVentas() {
       </Card>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{filtered.length} venta(s) — total completadas: <span className="font-medium tabular-nums text-foreground">{formatCurrency(parseCurrencyInput(String(totalAmount)))}</span></span>
+        <span>
+          {filtered.length} venta(s) — total completadas: <span className="font-medium tabular-nums text-foreground">{formatCurrency(parseCurrencyInput(String(totalAmount)))}</span>
+          {/* Con un medio filtrado, lo que importa es cuánto entró POR ESE medio:
+              en un pago mixto solo cuenta esa parte, no el total de la venta. */}
+          {totalDelMedio != null && (
+            <>
+              {' · '}cobrado por {mediosEnRango.find((m) => m.id === payMethod)?.name ?? 'ese medio'}:{' '}
+              <span className="font-semibold tabular-nums text-foreground">{formatCurrency(parseCurrencyInput(String(totalDelMedio)))}</span>
+            </>
+          )}
+        </span>
         {pageCount > 1 && (
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Anterior</Button>

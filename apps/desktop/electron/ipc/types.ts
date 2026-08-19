@@ -271,6 +271,15 @@ export interface SaleDTO {
   notes: string | null;
   createdAt: number;
   updatedAt: number;
+  /** Formas de pago de la venta. Sólo la trae el listado por rango de fechas. */
+  payments?: SalePaymentSummaryDTO[];
+}
+
+/** Formas de pago de una venta, para filtrar el historial. */
+export interface SalePaymentSummaryDTO {
+  paymentMethodId: string;
+  name: string;
+  amount: string;
 }
 
 export interface SaleLineDTO {
