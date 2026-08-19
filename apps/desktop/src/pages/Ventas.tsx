@@ -178,6 +178,11 @@ function ArticlePicker({
    * que ya se estaba cargando.
    */
   const [pos, setPos] = useState({ x: 0, y: 0 })
+  /** Tamaño en píxeles. Arranca ocupando buena parte de la pantalla. */
+  const [tam] = useState(() => ({
+    w: Math.min(1100, Math.round(window.innerWidth * 0.92)),
+    h: Math.round(window.innerHeight * 0.85),
+  }))
   const arrastre = useRef<{ x: number; y: number } | null>(null)
 
   function empezarArrastre(e: React.MouseEvent): void {
@@ -225,22 +230,30 @@ function ArticlePicker({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      {/* La ventana se MUEVE arrastrando la barra del título y se AGRANDA
+          desde la esquina de abajo a la derecha.
+          El tamaño se maneja en píxeles y se anulan los topes de Tailwind
+          (`max-w`/`max-h`): con esos topes puestos, arrastrar la esquina no
+          agrandaba nada y parecia que la funcion no estuviera. */}
       <DialogContent
-        className="flex max-h-[85vh] w-[92vw] max-w-5xl flex-col"
+        className="flex flex-col overflow-hidden"
         style={{
           transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,
+          width: tam.w,
+          height: tam.h,
+          maxWidth: 'none',
+          maxHeight: 'none',
+          minWidth: 520,
+          minHeight: 320,
           resize: 'both',
-          overflow: 'auto',
         }}
       >
-        <DialogHeader>
-          <DialogTitle
-            onMouseDown={empezarArrastre}
-            className="cursor-move select-none"
-            title="Arrastrá para mover la ventana. La esquina de abajo a la derecha la agranda."
-          >
-            Listado de artículos
-          </DialogTitle>
+        <DialogHeader
+          onMouseDown={empezarArrastre}
+          className="-m-5 mb-0 cursor-move select-none border-b bg-muted/40 px-5 py-3"
+          title="Arrastra para mover la ventana. La esquina de abajo a la derecha la agranda."
+        >
+          <DialogTitle>Listado de artículos</DialogTitle>
         </DialogHeader>
 
         {/* Filtros */}
