@@ -149,6 +149,12 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
     [paymentMethodsQuery.data],
   )
 
+  /**
+   * Filtro por forma de pago sobre los movimientos del día. El comercio quiere
+   * mirar la caja y ver SOLO lo que entró por transferencia (o el medio que
+   * sea), con su total: la tabla se filtra y el pie suma lo filtrado.
+   */
+  const [filtroMedio, setFiltroMedio] = useState('')
   const [movOpen, setMovOpen] = useState(false)
   const [movType, setMovType] = useState<'income' | 'expense'>('income')
   const [movDesc, setMovDesc] = useState('')
@@ -173,6 +179,24 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
   }, [searchParamsOpen, setSearchParamsOpen])
 
   const r = report.data
+  const movimientosFiltrados = useMemo(() => {
+    const todos = r?.movements ?? []
+    if (!filtroMedio) return todos
+    // '__efectivo__' agrupa el medio Efectivo con los movimientos viejos sin
+    // medio asignado, que en la práctica eran efectivo.
+    return todos.filter((m) =>
+      filtroMedio === '__efectivo__'
+        ? m.paymentMethodId == null || pmById.get(m.paymentMethodId)?.isPhysicalCash === true
+        : m.paymentMethodId === filtroMedio,
+    )
+  }, [r, filtroMedio, pmById])
+  const totalFiltrado = useMemo(() => {
+    if (!filtroMedio) return null
+    return movimientosFiltrados.reduce(
+      (acc, m) => (m.relatedSaleStatus === 'voided' && m.type === 'income' ? acc : acc + (m.type === 'income' ? Number(m.amount) : -Number(m.amount))),
+      0,
+    )
+  }, [movimientosFiltrados, filtroMedio])
   const expected = r?.expectedCash ?? '0'
 
   function openMovDialog(): void {
@@ -376,6 +400,24 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
+            {/* Filtrar la caja por forma de pago, con el total de lo filtrado
+                al lado: "cuánto entró hoy por transferencia" sin salir de acá. */}
+            <Select
+              className="h-8 w-44 text-xs"
+              value={filtroMedio}
+              onChange={(e) => setFiltroMedio(e.target.value)}
+            >
+              <option value="">Todas las formas de pago</option>
+              <option value="__efectivo__">Efectivo</option>
+              {activeMethods.filter((m) => !m.isPhysicalCash).map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </Select>
+            {totalFiltrado != null && (
+              <span className="whitespace-nowrap text-xs tabular-nums">
+                Neto: <span className="font-semibold">{formatCurrency(String(totalFiltrado))}</span>
+              </span>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -407,14 +449,14 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
                     Cargando…
                   </TableCell>
                 </TableRow>
-              ) : !r || r.movements.length === 0 ? (
+              ) : !r || movimientosFiltrados.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
                     Sin movimientos todavía
                   </TableCell>
                 </TableRow>
               ) : (
-                [...r.movements]
+                [...movimientosFiltrados]
                   .sort((a, b) => b.date - a.date)
                   .map((m) => {
                     const anulada = m.relatedSaleStatus === 'voided' && m.type === 'income'

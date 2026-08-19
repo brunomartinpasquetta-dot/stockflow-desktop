@@ -342,6 +342,13 @@ function CajaGeneralFullList() {
   const [fromIso, setFromIso] = useState(() => isoDaysAgo(30))
   const [toIso, setToIso] = useState(() => todayIso())
   const [type, setType] = useState<'' | 'income' | 'expense' | 'transfer_from_daily'>('')
+  /**
+   * Filtro por medio. Caja General registra sus movimientos como EFECTIVO o
+   * ELECTRÓNICO (los depósitos de cierre entran en bloque, sin abrir por
+   * tarjeta/transferencia — ese detalle vive en la caja diaria y en el
+   * Historial de Ventas). Acá el filtro honesto es ese.
+   */
+  const [medioFiltro, setMedioFiltro] = useState<'' | 'cash' | 'electronic'>('')
   const movementsQ = useCashGeneralMovements({
     from: dayStart(fromIso),
     to: dayEnd(toIso),
@@ -382,8 +389,21 @@ function CajaGeneralFullList() {
     }
   }, [movementsQ.data, previoQ.data])
 
+  const movsFiltrados = useMemo(() => {
+    const movs = movementsQ.data ?? []
+    if (!medioFiltro) return movs
+    return movs.filter((m) => (medioFiltro === 'cash' ? m.isCash : !m.isCash))
+  }, [movementsQ.data, medioFiltro])
+  const netoFiltrado = useMemo(
+    () =>
+      medioFiltro
+        ? movsFiltrados.reduce((a, m) => a + (m.type === 'expense' ? -Number(m.amount) : Number(m.amount)), 0)
+        : null,
+    [movsFiltrados, medioFiltro],
+  )
+
   async function exportarExcel(): Promise<void> {
-    const rows = movementsQ.data ?? []
+    const rows = movsFiltrados
     if (rows.length === 0) {
       toast.info('No hay movimientos para exportar')
       return
@@ -457,6 +477,20 @@ function CajaGeneralFullList() {
             <option value="transfer_from_daily">Desde caja diaria</option>
           </Select>
         </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Medio</Label>
+          <Select value={medioFiltro} onChange={(e) => setMedioFiltro(e.target.value as typeof medioFiltro)}>
+            <option value="">Todos</option>
+            <option value="cash">Efectivo</option>
+            <option value="electronic">Electrónico</option>
+          </Select>
+        </div>
+        {netoFiltrado != null && (
+          <span className="self-end pb-2 text-xs tabular-nums">
+            Neto {medioFiltro === 'cash' ? 'efectivo' : 'electrónico'}:{' '}
+            <span className="font-semibold">{formatCurrency(String(netoFiltrado))}</span>
+          </span>
+        )}
         <Button variant="outline" onClick={() => void exportarExcel()}>Exportar Excel</Button>
       </div>
       <div className="max-h-72 overflow-auto rounded-md border bg-background">
@@ -473,9 +507,9 @@ function CajaGeneralFullList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(movementsQ.data ?? []).length === 0 ? (
+            {movsFiltrados.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="py-4 text-center text-muted-foreground">Sin movimientos en el rango</TableCell></TableRow>
-            ) : (movementsQ.data ?? []).map((m) => (
+            ) : movsFiltrados.map((m) => (
               <TableRow key={m.id}>
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(m.createdAt)}</TableCell>
                 <TableCell className="text-xs">{cashGeneralTypeLabel(m.type)}</TableCell>
@@ -543,7 +577,7 @@ function CajaGeneralFullList() {
         </div>
       )}
       <p className="px-1 text-[11px] text-muted-foreground">
-        {(movementsQ.data ?? []).length} movimiento(s) entre {fromIso.split('-').reverse().join('/')} y {toIso.split('-').reverse().join('/')}.
+        {movsFiltrados.length} movimiento(s) entre {fromIso.split('-').reverse().join('/')} y {toIso.split('-').reverse().join('/')}.
         El saldo de arriba es el acumulado de toda la historia, no el del período.
       </p>
     </div>

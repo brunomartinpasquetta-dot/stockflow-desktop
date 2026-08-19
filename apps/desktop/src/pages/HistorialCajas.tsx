@@ -5,6 +5,7 @@ import { Loader2, Printer, History } from 'lucide-react'
 
 import {
   useHistoricalCashRegisters,
+  usePaymentMethods,
   useHistoricalCashReport,
   useCompany,
   useUsers,
@@ -408,6 +409,39 @@ export function HistorialCajas() {
   const list = listQuery.data ?? []
   const selected = list.find((r) => r.id === selectedId) ?? null
 
+  /**
+   * Filtro por forma de pago sobre el detalle de la caja elegida. Es la
+   * pregunta de todos los días ("¿cuánto entró por transferencia en esta
+   * caja?"): la tabla se filtra y el encabezado suma el neto de lo filtrado.
+   */
+  const [filtroMedio, setFiltroMedio] = useState('')
+  const metodosQuery = usePaymentMethods()
+  const esEfectivo = useMemo(() => {
+    const fisicos = new Set((metodosQuery.data ?? []).filter((m) => m.isPhysicalCash).map((m) => m.id))
+    return (id: string | null) => id == null || fisicos.has(id)
+  }, [metodosQuery.data])
+  const detalleFiltrado = useMemo(() => {
+    const todos = reportQuery.data?.movementsDetail ?? []
+    if (!filtroMedio) return todos
+    return todos.filter((m) =>
+      filtroMedio === '__efectivo__' ? esEfectivo(m.paymentMethodId) : m.paymentMethodId === filtroMedio,
+    )
+  }, [reportQuery.data, filtroMedio, esEfectivo])
+  const netoFiltrado = useMemo(
+    () =>
+      filtroMedio
+        ? detalleFiltrado.reduce((a, m) => a + (m.type === 'income' ? Number(m.amount) : -Number(m.amount)), 0)
+        : null,
+    [detalleFiltrado, filtroMedio],
+  )
+  const mediosDeLaCaja = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of reportQuery.data?.movementsDetail ?? []) {
+      if (m.paymentMethodId && m.paymentMethodName) map.set(m.paymentMethodId, m.paymentMethodName)
+    }
+    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [reportQuery.data])
+
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -556,9 +590,27 @@ export function HistorialCajas() {
                 : 'Detalle de movimientos'}
             </span>
             {selected && (
-              <Button variant="outline" size="sm" onClick={() => setDetailId(selected.id)}>
-                Ver reporte completo
-              </Button>
+              <span className="flex items-center gap-2">
+                <Select
+                  className="h-8 w-44 text-xs"
+                  value={filtroMedio}
+                  onChange={(e) => setFiltroMedio(e.target.value)}
+                >
+                  <option value="">Todas las formas de pago</option>
+                  <option value="__efectivo__">Efectivo</option>
+                  {mediosDeLaCaja.filter((m) => !esEfectivo(m.id)).map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </Select>
+                {netoFiltrado != null && (
+                  <span className="whitespace-nowrap text-xs tabular-nums">
+                    Neto: <span className="font-semibold">{formatCurrency(String(netoFiltrado))}</span>
+                  </span>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setDetailId(selected.id)}>
+                  Ver reporte completo
+                </Button>
+              </span>
             )}
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
@@ -581,9 +633,9 @@ export function HistorialCajas() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reportQuery.data.movementsDetail.length === 0 ? (
+                  {detalleFiltrado.length === 0 ? (
                     <TableRow><TableCell colSpan={6} className="py-6 text-center text-muted-foreground">Sin movimientos.</TableCell></TableRow>
-                  ) : reportQuery.data.movementsDetail.map((m) => (
+                  ) : detalleFiltrado.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
                       <TableCell className="text-xs">
