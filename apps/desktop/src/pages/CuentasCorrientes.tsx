@@ -794,7 +794,18 @@ function ClientesTab() {
   }, [balances.data, busca])
 
   if (selectedId) {
-    return <CustomerDetail customerId={selectedId} onBack={() => setSelectedId(null)} />
+    return (
+      <CustomerDetail
+        customerId={selectedId}
+        onBack={() => {
+          setSelectedId(null)
+          // Volver del detalle = arrancar de nuevo. Si queda el texto de la
+          // búsqueda anterior, la lista aparece filtrada por un cliente que ya
+          // no se está mirando y parece que faltaran cuentas.
+          setBusca('')
+        }}
+      />
+    )
   }
 
   return (

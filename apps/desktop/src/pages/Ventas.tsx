@@ -53,6 +53,12 @@ interface CartLine {
   description?: string
   /** IVA de la línea: del artículo, o el elegido a mano en el rápido. */
   vatRate: string
+  /**
+   * Lista de precios con la que se cargó ESTE renglón. Se guarda por línea
+   * porque en una misma venta puede haber renglones de listas distintas: al
+   * cambiar la lista, lo ya cargado no se toca.
+   */
+  priceList?: 1 | 2 | 3
   quantity: string
   unitPrice: string
   discount: string
@@ -165,6 +171,29 @@ function ArticlePicker({
   const [familyId, setFamilyId] = useState('')
   const [brand, setBrand] = useState('')
   const [supplierId, setSupplierId] = useState('')
+  /**
+   * Corrimiento de la ventana respecto del centro. La ventana se puede ARRASTRAR
+   * de la barra del título y REDIMENSIONAR de la esquina de abajo a la derecha:
+   * con el listado abierto tapaba el carrito y no se podía comparar contra lo
+   * que ya se estaba cargando.
+   */
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const arrastre = useRef<{ x: number; y: number } | null>(null)
+
+  function empezarArrastre(e: React.MouseEvent): void {
+    arrastre.current = { x: e.clientX - pos.x, y: e.clientY - pos.y }
+    function mover(ev: MouseEvent): void {
+      if (!arrastre.current) return
+      setPos({ x: ev.clientX - arrastre.current.x, y: ev.clientY - arrastre.current.y })
+    }
+    function soltar(): void {
+      arrastre.current = null
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
 
   const familyName = useMemo(() => {
     const map = new Map<string, string>()
@@ -196,9 +225,22 @@ function ArticlePicker({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="flex max-h-[85vh] w-[92vw] max-w-5xl flex-col">
+      <DialogContent
+        className="flex max-h-[85vh] w-[92vw] max-w-5xl flex-col"
+        style={{
+          transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,
+          resize: 'both',
+          overflow: 'auto',
+        }}
+      >
         <DialogHeader>
-          <DialogTitle>Listado de artículos</DialogTitle>
+          <DialogTitle
+            onMouseDown={empezarArrastre}
+            className="cursor-move select-none"
+            title="Arrastrá para mover la ventana. La esquina de abajo a la derecha la agranda."
+          >
+            Listado de artículos
+          </DialogTitle>
         </DialogHeader>
 
         {/* Filtros */}
@@ -696,7 +738,9 @@ function PDV() {
         next[idx] = {
           ...line,
           quantity: newQty,
-          unitPrice: line.priceManuallySet ? line.unitPrice : resolvePrice(article, selectedCustomer, newQty, selectedPriceList),
+          unitPrice: line.priceManuallySet
+            ? line.unitPrice
+            : resolvePrice(article, selectedCustomer, newQty, line.priceList ?? selectedPriceList),
         }
         return next
       }
@@ -705,6 +749,7 @@ function PDV() {
         {
           article,
           vatRate: article.vatRate,
+          priceList: selectedPriceList,
           quantity: qty,
           unitPrice: resolvePrice(article, selectedCustomer, qty, selectedPriceList),
           discount: '0',
@@ -744,7 +789,7 @@ function PDV() {
         unitPrice:
           line.priceManuallySet || !line.article
             ? line.unitPrice
-            : resolvePrice(line.article, selectedCustomer, value, selectedPriceList),
+            : resolvePrice(line.article, selectedCustomer, value, line.priceList ?? selectedPriceList),
       }
       return next
     })
@@ -791,27 +836,28 @@ function PDV() {
     const rawList = Number(c.priceList)
     const list: 1 | 2 | 3 = rawList === 2 ? 2 : rawList === 3 ? 3 : 1
     setSelectedPriceList(list)
-    setCart((prev) =>
-      prev.map((l) =>
-        l.priceManuallySet || !l.article
-          ? l
-          : { ...l, unitPrice: resolvePrice(l.article, c, l.quantity, list) },
-      ),
-    )
+    // NO se re-precia lo que ya está en el carrito, misma regla que al cambiar
+    // la lista a mano: lo cargado queda con el precio que tenía y el cliente
+    // nuevo rige de acá en adelante. Repreciar por atrás cambiaba importes que
+    // el cajero ya le había cantado al cliente.
     if (isCfCustomer(c)) setIsAccountSale(false)
     barcodeRef.current?.focus()
   }
 
   // Cambio manual del selector de lista: re-resolver las líneas NO editadas a mano.
+  /**
+   * Cambia la lista de precios de la venta.
+   *
+   * Lo que YA está cargado NO se re-precia: queda con el precio de la lista con
+   * la que entró. La lista nueva rige de acá en adelante. Así se puede armar una
+   * venta con renglones de listas distintas, que es lo que el comercio hace
+   * cuando a un cliente le cobra unos artículos a mayorista y otros no.
+   *
+   * Antes se recalculaba todo el carrito y cambiar la lista para el artículo
+   * siguiente pisaba los precios de los anteriores, sin avisar.
+   */
   function changePriceList(list: 1 | 2 | 3): void {
     setSelectedPriceList(list)
-    setCart((prev) =>
-      prev.map((l) =>
-        l.priceManuallySet || !l.article
-          ? l
-          : { ...l, unitPrice: resolvePrice(l.article, selectedCustomer, l.quantity, list) },
-      ),
-    )
   }
 
   // --- búsqueda de productos ---
@@ -873,14 +919,12 @@ function PDV() {
       toast.error('No se encontró el producto')
       return
     }
-    // La búsqueda NO se borra: la lista queda abierta y se puede seguir
-    // cargando de los mismos resultados, igual que haciendo clic.
-    //
-    // El texto queda SELECCIONADO para que el lector de códigos siga andando:
-    // el próximo escaneo lo pisa entero en vez de encadenarse al anterior.
-    // Escribiendo a mano pasa lo mismo, y con Escape se cierra la lista.
+    // Se limpia y se cierra, igual que al hacer clic: cada Enter es un
+    // producto distinto (así trabaja el lector de códigos).
+    setBarcode('')
+    setHighlight(-1)
+    setListaAbierta(false)
     barcodeRef.current?.focus()
-    barcodeRef.current?.select()
   }
 
   // --- cuenta corriente ---
@@ -1404,15 +1448,16 @@ function PDV() {
                     // Al pasar el mouse la marca lo sigue: si después usa las
                     // flechas, arrancan de donde está mirando.
                     onMouseEnter={() => setHighlight(idx)}
-                    // La lista NO se cierra al agregar: buscando "lapicera" se
-                    // cargan tres seguidas sin volver a escribir la búsqueda.
-                    // Se cierra con Escape, o escribiendo otra cosa.
-                    //
-                    // Se comporta igual por clic que por Enter (`commitBarcode`).
+                    // Al elegir un artículo la lista SE CIERRA y el buscador
+                    // queda limpio, listo para el siguiente. Se probó dejándola
+                    // abierta (v0.4.40–.44) y en el mostrador molestaba: tapaba
+                    // la pantalla. Para cargar de a varios está "Ver todos".
                     onClick={() => {
                       addArticle(a)
+                      setBarcode('')
+                      setHighlight(-1)
+                      setListaAbierta(false)
                       barcodeRef.current?.focus()
-                      barcodeRef.current?.select()
                     }}
                     // SIN `hover:` del CSS a propósito: si el mouse pintara su
                     // propio renglón, con el teclado en otro se verían DOS

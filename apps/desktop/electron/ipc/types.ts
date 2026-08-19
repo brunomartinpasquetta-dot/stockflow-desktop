@@ -754,6 +754,8 @@ export interface HistoricalCashRegisterDTO {
   depositedAmount: string;
   /** Cuánto podía ingresarse en total (efectivo contado + neto electrónico). */
   depositableAmount: string;
+  /** Ingresos de esa caja separados por forma de pago. */
+  incomeByPaymentMethod: { paymentMethodId: string | null; name: string; income: string }[];
 }
 
 export interface HistoricalCashMovementDTO {
@@ -878,6 +880,8 @@ export interface StatementEntryDTO {
   paymentMethodName: string | null;
   /** saldo del comprobante luego de este pago (sólo en cobranzas). */
   comprobanteBalance: string | null;
+  /** Artículos de la venta (sólo en entradas de tipo `sale`). */
+  articles?: { description: string; quantity: string; unitPrice: string; lineTotal: string }[];
 }
 
 export interface CustomerStatementDTO {

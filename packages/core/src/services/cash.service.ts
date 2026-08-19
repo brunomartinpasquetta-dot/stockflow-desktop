@@ -59,6 +59,13 @@ export interface HistoricalCashRegisterSummary {
   depositedAmount: string;
   /** Cuánto podía ingresarse en total (efectivo contado + neto electrónico). */
   depositableAmount: string;
+  /**
+   * Ingresos de esa caja separados por forma de pago. Va en el LISTADO —y no
+   * sólo en el detalle— porque la pregunta del comercio es "cuánto vendí por
+   * transferencia" en un día o en un mes, y respondiéndola caja por caja habría
+   * que abrir cada una.
+   */
+  incomeByPaymentMethod: { paymentMethodId: string | null; name: string; income: string }[];
 }
 
 export interface HistoricalCashMovement {
@@ -207,6 +214,23 @@ export class CashService {
       );
       const difference =
         r.closingAmount != null ? subDecimal(r.closingAmount, expectedAmount, 4) : null;
+
+      // Ingresos por forma de pago de esta caja. Los movimientos ya están
+      // cargados: no cuesta una consulta más.
+      const porMedio = new Map<string, { paymentMethodId: string | null; name: string; income: string }>();
+      for (const m of movements) {
+        if (m.type !== 'income') continue;
+        const clave = m.paymentMethodId ?? '__efectivo__';
+        const nombre = m.paymentMethodId
+          ? (pmById.get(m.paymentMethodId)?.name ?? 'Medio eliminado')
+          : 'Efectivo';
+        const prev = porMedio.get(clave);
+        porMedio.set(clave, {
+          paymentMethodId: m.paymentMethodId,
+          name: nombre,
+          income: prev ? addDecimal(prev.income, m.amount, 4) : m.amount,
+        });
+      }
       // Lo que ese cierre podía aportar a Caja General y lo que realmente
       // aportó: si aportó menos, el historial ofrece completar la diferencia.
       const netoElectronico = subDecimal(
@@ -236,6 +260,7 @@ export class CashService {
         movementCount: movements.length,
         depositedToGeneral: Number(yaDepositado) >= Number(depositable) - 0.005,
         depositedAmount: yaDepositado,
+        incomeByPaymentMethod: [...porMedio.values()],
         depositableAmount: depositable,
       });
     }

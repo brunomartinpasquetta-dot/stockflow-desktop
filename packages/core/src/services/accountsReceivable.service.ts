@@ -68,6 +68,12 @@ export interface StatementEntry {
   paymentMethodName: string | null;
   /** saldo del comprobante luego de este pago (sólo en cobranzas). */
   comprobanteBalance: string | null;
+  /**
+   * Qué se llevó en esa venta. Va en el resumen que se le manda al cliente:
+   * un renglón "Venta B #1234" no le dice nada, y la discusión siempre termina
+   * en "¿qué me cobraste acá?". Sólo en entradas de tipo `sale`.
+   */
+  articles?: { description: string; quantity: string; unitPrice: string; lineTotal: string }[];
 }
 
 export interface CustomerStatement {
@@ -251,7 +257,21 @@ export class AccountsReceivableService {
     const raw: RawEntry[] = [];
     for (const ac of accounts) {
       const sale = salesById.get(ac.saleId) ?? null;
+      // Detalle de la venta. La descripción sale del artículo, salvo en los
+      // artículos rápidos, que la traen en la propia línea.
+      const lineas = await repos.saleLines.findBySale(ac.saleId);
+      const articles: NonNullable<StatementEntry['articles']> = [];
+      for (const l of lineas) {
+        const art = l.articleId ? await repos.articles.findById(l.articleId) : null;
+        articles.push({
+          description: art?.description ?? l.description ?? 'Artículo',
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          lineTotal: l.lineTotal,
+        });
+      }
       raw.push({
+        articles,
         date: ac.createdAt,
         kind: 'sale',
         reference: sale ? `Venta ${sale.type} #${sale.number}` : `Cuenta ${ac.id}`,

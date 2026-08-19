@@ -93,13 +93,36 @@ export function exportStatementPdf(data: StatementDocData): void {
     ? Number(primero.runningBalance) - Number(primero.debit) + Number(primero.credit)
     : 0
 
-  const body = data.entries.map((e) => [
-    formatDate(e.date),
-    etiqueta(e),
-    Number(e.debit) ? formatCurrency(e.debit) : '',
-    Number(e.credit) ? formatCurrency(e.credit) : '',
-    formatCurrency(e.runningBalance),
-  ])
+  // Cada venta se abre en SUS ARTÍCULOS, en renglones sangrados debajo del
+  // comprobante. Un resumen que sólo dice "Venta B #1234 — $48.500" no le sirve
+  // al cliente que pregunta qué se le está cobrando, que es justo cuando pide
+  // el resumen. Los importes de esos renglones van en la columna de detalle:
+  // las columnas Debe/Haber/Saldo son sólo del comprobante, para que la cuenta
+  // siga cerrando.
+  const body: (string | { content: string; styles?: Record<string, unknown> })[][] = []
+  for (const e of data.entries) {
+    body.push([
+      formatDate(e.date),
+      etiqueta(e),
+      Number(e.debit) ? formatCurrency(e.debit) : '',
+      Number(e.credit) ? formatCurrency(e.credit) : '',
+      formatCurrency(e.runningBalance),
+    ])
+    for (const a of e.articles ?? []) {
+      const cant = Number(a.quantity)
+      const cantTxt = Number.isInteger(cant) ? String(cant) : String(cant)
+      body.push([
+        '',
+        {
+          content: `      ${cantTxt} × ${a.description} — ${formatCurrency(a.unitPrice)} c/u = ${formatCurrency(a.lineTotal)}`,
+          styles: { fontSize: 7.5, textColor: 110 },
+        },
+        '',
+        '',
+        '',
+      ])
+    }
+  }
   if (data.range && Math.abs(saldoAnterior) > 0.005) {
     body.unshift(['', 'Saldo anterior', '', '', formatCurrency(String(saldoAnterior))])
   }

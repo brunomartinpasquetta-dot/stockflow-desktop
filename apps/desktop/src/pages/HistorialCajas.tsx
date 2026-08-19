@@ -372,6 +372,23 @@ export function HistorialCajas() {
     return { income, expense, net: income - expense }
   }, [listQuery.data])
 
+  /**
+   * Ingresos del período agrupados por forma de pago, sumando TODAS las cajas
+   * del rango. Responde la pregunta que hace el comercio —"¿cuánto vendí por
+   * transferencia?"— sin tener que abrir caja por caja.
+   */
+  const porMedio = useMemo(() => {
+    const acc = new Map<string, number>()
+    for (const r of listQuery.data ?? []) {
+      for (const b of r.incomeByPaymentMethod ?? []) {
+        acc.set(b.name, (acc.get(b.name) ?? 0) + Number(b.income))
+      }
+    }
+    return [...acc.entries()]
+      .map(([name, income]) => ({ name, income }))
+      .sort((a, b) => b.income - a.income)
+  }, [listQuery.data])
+
   function calcular(): void {
     setAppliedRange({ from: dayStart(fromIso), to: dayEnd(toIso), userId: userId || undefined })
     setSelectedId(null)
@@ -505,6 +522,20 @@ export function HistorialCajas() {
               </TableBody>
             </Table>
           </div>
+          {porMedio.length > 0 && (
+            <div className="shrink-0 border-t bg-muted/20 px-3 py-2">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Ingresos por forma de pago — {list.length} caja(s) del período
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                {porMedio.map((m) => (
+                  <span key={m.name} className="tabular-nums">
+                    {m.name}: <span className="font-semibold">{formatCurrency(m.income)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex shrink-0 items-center justify-between border-t bg-muted/30 px-3 py-2 text-sm">
             <span className="text-muted-foreground">{list.length} caja(s)</span>
             <span className="tabular-nums">
