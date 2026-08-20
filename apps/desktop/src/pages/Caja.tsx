@@ -311,7 +311,7 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Caja</h1>
+          <h1 className="text-lg font-semibold">Caja diaria</h1>
           <p className="text-sm text-muted-foreground">
             {r ? `Caja #${r.register.number} abierta desde ${formatDateTime(r.register.openDate)}` : 'Cargando…'}
           </p>

@@ -118,7 +118,7 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'ventas', label: 'Ventas', icon: Receipt, shortcut: 'F5', requires: 'create_sale' },
       { pageKey: 'presupuestos', label: 'Presupuestos', icon: FileText, requires: 'view_quotes' },
       { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F2', requires: 'manage_purchases' },
-      { pageKey: 'caja', label: 'Caja', icon: Wallet, shortcut: 'F4' },
+      { pageKey: 'caja', label: 'Caja diaria', icon: Wallet, shortcut: 'F4' },
     ],
   },
   {

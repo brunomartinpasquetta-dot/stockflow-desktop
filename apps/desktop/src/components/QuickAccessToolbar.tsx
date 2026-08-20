@@ -50,7 +50,7 @@ const BUTTONS: QuickButton[] = [
   { pageKey: 'articulos', label: 'Artículos', fKey: 'F1', Icon: Package },
   { pageKey: 'compras', label: 'Compras', fKey: 'F2', Icon: ShoppingBag },
   { pageKey: 'proveedores', label: 'Proveedores', fKey: 'F3', Icon: Truck },
-  { pageKey: 'caja', label: 'Caja', fKey: 'F4', Icon: Wallet },
+  { pageKey: 'caja', label: 'Caja diaria', fKey: 'F4', Icon: Wallet },
   { pageKey: 'ventas', label: 'Ventas', fKey: 'F5', Icon: ShoppingCart },
   { pageKey: 'clientes', label: 'Clientes', fKey: 'F6', Icon: Users },
   { pageKey: 'historial-ventas', label: 'Historial Ventas', fKey: 'F7', Icon: History },

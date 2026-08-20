@@ -122,8 +122,8 @@ async function main(): Promise<void> {
   const cajas: string[] = [];
   let ventas = 0;
 
-  // ── Tres jornadas.
-  for (let dia = 2; dia >= 0; dia--) {
+  // ── Cinco jornadas, una por día.
+  for (let dia = 4; dia >= 0; dia--) {
     const abierta = await call<any>(h, 'cash:getCurrent');
     if (abierta) {
       const rep = await call<any>(h, 'cash:getReport', { registerId: abierta.id });
@@ -195,10 +195,23 @@ async function main(): Promise<void> {
       description: 'Flete proveedor (prueba)', paymentMethodId: PM.efectivo,
     });
 
-    // La caja de hoy queda ABIERTA; las anteriores cerradas.
+    // La caja de hoy queda ABIERTA; las anteriores cerradas Y DEPOSITADAS en
+    // Caja General (efectivo contado + neto electrónico), que es el flujo real.
+    // Sin el depósito, Caja General queda vacía y sus filtros parecen rotos.
     if (dia > 0) {
       const rep = await call<any>(h, 'cash:getReport', { registerId: caja.id });
       await call(h, 'cash:close', { registerId: caja.id, closingAmount: rep.expectedCash, notes: 'cierre de prueba' });
+      const efectivo = Number(rep.expectedCash);
+      const electronico = (rep.byPaymentMethod ?? [])
+        .filter((b: any) => !b.isPhysicalCash)
+        .reduce((a: number, b: any) => a + Number(b.net), 0);
+      const totalDep = (efectivo + electronico).toFixed(4);
+      await call(h, 'cashGeneral:transferFromClosed', {
+        cashRegisterId: caja.id,
+        amount: totalDep,
+        cashAmount: efectivo.toFixed(4),
+        electronicAmount: electronico.toFixed(4),
+      });
     }
   }
 
@@ -225,6 +238,7 @@ async function main(): Promise<void> {
     raw.prepare('UPDATE cash_registers SET open_date = open_date - ?, close_date = CASE WHEN close_date IS NULL THEN NULL ELSE close_date - ? END WHERE id = ?').run(desfase, desfase, id);
     raw.prepare('UPDATE cash_movements SET date = date - ? WHERE cash_register_id = ?').run(desfase, id);
     raw.prepare('UPDATE sales SET date = date - ? WHERE cash_register_id = ?').run(desfase, id);
+    raw.prepare("UPDATE cash_general_movements SET created_at = created_at - ? WHERE reference_id = ?").run(desfase, id);
   });
   const r = raw.prepare(`
     SELECT (SELECT COUNT(*) FROM sales) ventas,
