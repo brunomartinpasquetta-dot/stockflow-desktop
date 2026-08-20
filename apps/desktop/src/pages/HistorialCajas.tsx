@@ -93,6 +93,36 @@ function HistoricalCashReportDialog({
 
   const r = reportQuery.data
 
+  /**
+   * Filtro de la grilla de movimientos: por MEDIO de pago y/o SÓLO VENTAS.
+   * Es la pregunta con la que se abre este detalle ("¿cuánto vendí por
+   * transferencia en esta caja?"), así que se responde acá mismo, con el
+   * total de lo filtrado a la vista.
+   */
+  const [medioFiltro, setMedioFiltro] = useState('')
+  const [soloVentas, setSoloVentas] = useState(false)
+  const mediosDisponibles = useMemo(() => {
+    const set = new Map<string, string>()
+    for (const m of r?.movementsDetail ?? []) {
+      set.set(m.paymentMethodName ?? '__sin__', m.paymentMethodName ?? 'Sin medio')
+    }
+    return [...set.entries()].map(([key, name]) => ({ key, name }))
+  }, [r?.movementsDetail])
+  const movimientosFiltrados = useMemo(() => {
+    let lista = r?.movementsDetail ?? []
+    if (soloVentas) lista = lista.filter((m) => m.relatedSaleId != null)
+    if (medioFiltro) lista = lista.filter((m) => (m.paymentMethodName ?? '__sin__') === medioFiltro)
+    return lista
+  }, [r?.movementsDetail, medioFiltro, soloVentas])
+  const totalFiltrado = useMemo(
+    () =>
+      movimientosFiltrados.reduce(
+        (a, m) => a + (m.type === 'income' ? Number(m.amount) : -Number(m.amount)),
+        0,
+      ),
+    [movimientosFiltrados],
+  )
+
   async function handlePrint(): Promise<void> {
     if (!r || !companyQuery.data) return
     try {
@@ -153,7 +183,36 @@ function HistoricalCashReportDialog({
               </div>
             </div>
             <div>
-              <h3 className="mb-1 text-sm font-semibold">Movimientos ({r.movementsDetail.length})</h3>
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold">
+                  Movimientos ({movimientosFiltrados.length}
+                  {movimientosFiltrados.length !== r.movementsDetail.length ? ` de ${r.movementsDetail.length}` : ''})
+                </h3>
+                <Select
+                  className="h-7 w-44 px-2 text-xs"
+                  value={medioFiltro}
+                  onChange={(e) => setMedioFiltro(e.target.value)}
+                >
+                  <option value="">Todos los medios</option>
+                  {mediosDisponibles.map((m) => (
+                    <option key={m.key} value={m.key}>{m.name}</option>
+                  ))}
+                </Select>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-primary"
+                    checked={soloVentas}
+                    onChange={(e) => setSoloVentas(e.target.checked)}
+                  />
+                  Sólo ventas
+                </label>
+                {(medioFiltro || soloVentas) && (
+                  <span className="ml-auto text-xs tabular-nums">
+                    Total filtrado: <span className="font-semibold">{formatCurrency(totalFiltrado)}</span>
+                  </span>
+                )}
+              </div>
               <div className="max-h-60 overflow-auto rounded-md border">
                 <Table>
                   <TableHeader>
@@ -167,9 +226,9 @@ function HistoricalCashReportDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {r.movementsDetail.length === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="py-4 text-center text-muted-foreground">Sin movimientos</TableCell></TableRow>
-                    ) : r.movementsDetail.map((m) => (
+                    {movimientosFiltrados.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="py-4 text-center text-muted-foreground">Sin movimientos con ese filtro</TableCell></TableRow>
+                    ) : movimientosFiltrados.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
                         <TableCell className="text-xs">
