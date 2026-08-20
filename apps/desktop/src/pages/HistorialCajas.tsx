@@ -5,7 +5,6 @@ import { Loader2, Printer, History } from 'lucide-react'
 
 import {
   useHistoricalCashRegisters,
-  usePaymentMethods,
   useHistoricalCashReport,
   useCompany,
   useUsers,
@@ -16,7 +15,6 @@ import { api } from '@/lib/api'
 import { usePrintHistoricalCashReport, usePrintCashCloseReport } from '@/lib/usePrint'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { CurrencyInput } from '@/components/ui/currency-input'
-import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -393,14 +391,12 @@ function DepositarCierreDialog({
 }
 
 export function HistorialCajas() {
-  const abrirVenta = useAbrirVenta()
   const { currentUser } = useAuth()
   const isAdmin = currentUser?.role === 'admin'
 
   const [fromIso, setFromIso] = useState(() => isoDaysAgo(30))
   const [toIso, setToIso] = useState(() => todayIso())
   const [userId, setUserId] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [depositRegId, setDepositRegId] = useState<string | null>(null)
   const canWrite = useCanWrite()
@@ -417,7 +413,6 @@ export function HistorialCajas() {
     to: appliedRange.to,
     userId: appliedRange.userId || undefined,
   })
-  const reportQuery = useHistoricalCashReport(selectedId ?? undefined)
   const printRange = usePrintHistoricalCashReport()
 
   const userNameById = useMemo(
@@ -432,26 +427,8 @@ export function HistorialCajas() {
     return { income, expense, net: income - expense }
   }, [listQuery.data])
 
-  /**
-   * Ingresos del período agrupados por forma de pago, sumando TODAS las cajas
-   * del rango. Responde la pregunta que hace el comercio —"¿cuánto vendí por
-   * transferencia?"— sin tener que abrir caja por caja.
-   */
-  const porMedio = useMemo(() => {
-    const acc = new Map<string, number>()
-    for (const r of listQuery.data ?? []) {
-      for (const b of r.incomeByPaymentMethod ?? []) {
-        acc.set(b.name, (acc.get(b.name) ?? 0) + Number(b.income))
-      }
-    }
-    return [...acc.entries()]
-      .map(([name, income]) => ({ name, income }))
-      .sort((a, b) => b.income - a.income)
-  }, [listQuery.data])
-
   function calcular(): void {
     setAppliedRange({ from: dayStart(fromIso), to: dayEnd(toIso), userId: userId || undefined })
-    setSelectedId(null)
   }
 
   function imprimirRango(): void {
@@ -466,40 +443,6 @@ export function HistorialCajas() {
   }
 
   const list = listQuery.data ?? []
-  const selected = list.find((r) => r.id === selectedId) ?? null
-
-  /**
-   * Filtro por forma de pago sobre el detalle de la caja elegida. Es la
-   * pregunta de todos los días ("¿cuánto entró por transferencia en esta
-   * caja?"): la tabla se filtra y el encabezado suma el neto de lo filtrado.
-   */
-  const [filtroMedio, setFiltroMedio] = useState('')
-  const metodosQuery = usePaymentMethods()
-  const esEfectivo = useMemo(() => {
-    const fisicos = new Set((metodosQuery.data ?? []).filter((m) => m.isPhysicalCash).map((m) => m.id))
-    return (id: string | null) => id == null || fisicos.has(id)
-  }, [metodosQuery.data])
-  const detalleFiltrado = useMemo(() => {
-    const todos = reportQuery.data?.movementsDetail ?? []
-    if (!filtroMedio) return todos
-    return todos.filter((m) =>
-      filtroMedio === '__efectivo__' ? esEfectivo(m.paymentMethodId) : m.paymentMethodId === filtroMedio,
-    )
-  }, [reportQuery.data, filtroMedio, esEfectivo])
-  const netoFiltrado = useMemo(
-    () =>
-      filtroMedio
-        ? detalleFiltrado.reduce((a, m) => a + (m.type === 'income' ? Number(m.amount) : -Number(m.amount)), 0)
-        : null,
-    [detalleFiltrado, filtroMedio],
-  )
-  const mediosDeLaCaja = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const m of reportQuery.data?.movementsDetail ?? []) {
-      if (m.paymentMethodId && m.paymentMethodName) map.set(m.paymentMethodId, m.paymentMethodName)
-    }
-    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
-  }, [reportQuery.data])
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -565,9 +508,9 @@ export function HistorialCajas() {
                   list.map((r) => (
                     <TableRow
                       key={r.id}
-                      className={cn('cursor-pointer', selectedId === r.id && 'bg-primary/10')}
-                      onClick={() => setSelectedId(r.id)}
-                      onDoubleClick={() => setDetailId(r.id)}
+                      className="cursor-pointer"
+                      title="Ver los movimientos de esta caja"
+                      onClick={() => setDetailId(r.id)}
                     >
                       <TableCell className="whitespace-nowrap text-xs">{formatDateTime(r.openDate)}</TableCell>
                       <TableCell className="text-xs">{r.userName}</TableCell>
@@ -615,20 +558,6 @@ export function HistorialCajas() {
               </TableBody>
             </Table>
           </div>
-          {porMedio.length > 0 && (
-            <div className="shrink-0 border-t bg-muted/20 px-3 py-2">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Ingresos por forma de pago — {list.length} caja(s) del período
-              </div>
-              <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-                {porMedio.map((m) => (
-                  <span key={m.name} className="tabular-nums">
-                    {m.name}: <span className="font-semibold">{formatCurrency(m.income)}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
           <div className="flex shrink-0 items-center justify-between border-t bg-muted/30 px-3 py-2 text-sm">
             <span className="text-muted-foreground">{list.length} caja(s)</span>
             <span className="tabular-nums">
@@ -640,90 +569,9 @@ export function HistorialCajas() {
         </CardContent>
       </Card>
 
-      <Card className="flex min-h-0 flex-1 flex-col">
-        <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-          <div className="flex shrink-0 items-center justify-between border-b bg-muted/20 px-3 py-2 text-sm">
-            <span className="font-medium">
-              {selected
-                ? `Detalle — Caja #${selected.number} (${selected.userName})`
-                : 'Detalle de movimientos'}
-            </span>
-            {selected && (
-              <span className="flex items-center gap-2">
-                <Select
-                  className="h-8 w-44 text-xs"
-                  value={filtroMedio}
-                  onChange={(e) => setFiltroMedio(e.target.value)}
-                >
-                  <option value="">Todas las formas de pago</option>
-                  <option value="__efectivo__">Efectivo</option>
-                  {mediosDeLaCaja.filter((m) => !esEfectivo(m.id)).map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </Select>
-                {netoFiltrado != null && (
-                  <span className="whitespace-nowrap text-xs tabular-nums">
-                    Neto: <span className="font-semibold">{formatCurrency(String(netoFiltrado))}</span>
-                  </span>
-                )}
-                <Button variant="outline" size="sm" onClick={() => setDetailId(selected.id)}>
-                  Ver reporte completo
-                </Button>
-              </span>
-            )}
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto">
-            {!selected ? (
-              <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
-                Seleccioná una caja para ver el detalle.
-              </div>
-            ) : reportQuery.isLoading || !reportQuery.data ? (
-              <div className="flex h-full items-center justify-center p-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Hora</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Concepto</TableHead>
-                    <TableHead>Medio de pago</TableHead>
-                    <TableHead className="text-right">Ingreso</TableHead>
-                    <TableHead className="text-right">Egreso</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detalleFiltrado.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="py-6 text-center text-muted-foreground">Sin movimientos.</TableCell></TableRow>
-                  ) : detalleFiltrado.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(m.date)}</TableCell>
-                      <TableCell className="text-xs">
-                        {m.relatedSaleId ? (
-                          <button
-                            type="button"
-                            className="text-primary hover:underline"
-                            onClick={() => abrirVenta(m.relatedSaleId!)}
-                            title="Ver el detalle de esta venta"
-                          >
-                            {movementKindLabel(m)}
-                          </button>
-                        ) : (
-                          movementKindLabel(m)
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs">{m.description}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{m.paymentMethodName ?? '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums text-success">{m.type === 'income' ? formatCurrency(m.amount) : ''}</TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">{m.type === 'expense' ? formatCurrency(m.amount) : ''}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* SIN panel de detalle en la página: el detalle por movimiento vive en
+          el diálogo (doble clic sobre la caja), con su propio filtro por medio
+          de pago. Pedido de Bruno (20-ago-2026): la página es la grilla. */}
       {depositRegId && (() => {
         const reg = list.find((r) => r.id === depositRegId)
         return reg ? (
