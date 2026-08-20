@@ -505,7 +505,7 @@ export function HistorialCajas() {
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center gap-2">
         <History className="h-5 w-5 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Cajas diarias — arqueos y cierres</h1>
+        <h1 className="text-lg font-semibold">Historial de cajas diarias</h1>
       </div>
 
 

@@ -51,8 +51,10 @@ export function CajaGeneral() {
   if (!canView) return <SinPermiso area="Caja General" />
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
-      <CajaGeneralInner />
+      {/* El historial de cajas diarias va PRIMERO: es lo que el comercio abre
+          esta pantalla a mirar. Los movimientos de Caja General, abajo. */}
       <HistorialCajas />
+      <CajaGeneralInner />
     </div>
   )
 }
@@ -493,7 +495,7 @@ function CajaGeneralFullList() {
         )}
         <Button variant="outline" onClick={() => void exportarExcel()}>Exportar Excel</Button>
       </div>
-      <div className="max-h-72 overflow-auto rounded-md border bg-background">
+      <div className="max-h-[32rem] overflow-auto rounded-md border bg-background">
         <Table>
           <TableHeader>
             <TableRow>
@@ -536,50 +538,31 @@ function CajaGeneralFullList() {
         </Table>
       </div>
 
-      {/* Resumen del rango filtrado */}
-      <div className="grid gap-2 sm:grid-cols-3">
-        <div className="rounded-md border bg-background px-3 py-2">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-success">Ingresos del período</div>
-          <div className="text-lg font-semibold tabular-nums">{formatCurrency(totales.ingresos)}</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">
-            ventas depositadas y aportes
-          </div>
-        </div>
-        <div className="rounded-md border bg-background px-3 py-2">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-destructive">Egresos del período</div>
-          <div className="text-lg font-semibold tabular-nums">{formatCurrency(totales.egresos)}</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">
-            compras, servicios y retiros
-          </div>
-        </div>
-        <div className="rounded-md border bg-background px-3 py-2">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Resultado del período</div>
-          <div className={cn('text-lg font-semibold tabular-nums', totales.neto < 0 && 'text-destructive')}>
+      {/* Resumen del rango en UNA fila compacta: la protagonista de la pantalla
+          es la grilla, y las tarjetas grandes le comían el alto (pedido de
+          Bruno, 20-ago-2026). Misma información, tamaño de renglón. */}
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-md border bg-muted/30 px-3 py-1.5 text-xs tabular-nums">
+        <span className="text-muted-foreground">
+          Ingresos <b className="text-success">{formatCurrency(totales.ingresos)}</b>
+        </span>
+        <span className="text-muted-foreground">
+          Egresos <b className="text-destructive">{formatCurrency(totales.egresos)}</b>
+        </span>
+        <span className="text-muted-foreground">
+          Resultado{' '}
+          <b className={cn('text-foreground', totales.neto < 0 && 'text-destructive')}>
             {totales.neto >= 0 ? '+' : ''}{formatCurrency(totales.neto)}
-          </div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
-            efectivo {totales.variacionEfe >= 0 ? '+' : ''}{formatCurrency(totales.variacionEfe)} · electrónico {totales.variacionEle >= 0 ? '+' : ''}{formatCurrency(totales.variacionEle)}
-          </div>
-        </div>
+          </b>{' '}
+          (efe {totales.variacionEfe >= 0 ? '+' : ''}{formatCurrency(totales.variacionEfe)} · elec {totales.variacionEle >= 0 ? '+' : ''}{formatCurrency(totales.variacionEle)})
+        </span>
+        {totales.saldoFinal != null && (
+          <span className="ml-auto text-muted-foreground" title="Acumulado de toda la historia al último movimiento del período, no el resultado del período">
+            Saldo: efe <b className="text-foreground">{formatCurrency(totales.saldoFinalEfe ?? 0)}</b>
+            {' · '}elec <b className="text-foreground">{formatCurrency(totales.saldoFinalEle ?? 0)}</b>
+            {' = '}<b className="text-sm text-foreground">{formatCurrency(totales.saldoFinal)}</b>
+          </span>
+        )}
       </div>
-      {totales.saldoFinal != null && (
-        <div className="rounded-md border bg-background px-3 py-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Saldo al último movimiento del período
-            </div>
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm tabular-nums">
-              <span className="text-muted-foreground">efectivo <b className="text-foreground">{formatCurrency(totales.saldoFinalEfe ?? 0)}</b></span>
-              <span className="text-muted-foreground">electrónico <b className="text-foreground">{formatCurrency(totales.saldoFinalEle ?? 0)}</b></span>
-              <span className="text-base font-semibold">{formatCurrency(totales.saldoFinal)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-      <p className="px-1 text-[11px] text-muted-foreground">
-        {movsFiltrados.length} movimiento(s) entre {fromIso.split('-').reverse().join('/')} y {toIso.split('-').reverse().join('/')}.
-        El saldo de arriba es el acumulado de toda la historia, no el del período.
-      </p>
     </div>
   )
 }
