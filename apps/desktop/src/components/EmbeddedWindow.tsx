@@ -164,7 +164,13 @@ export function EmbeddedWindow() {
           <span className="text-sm font-medium">{def.title}</span>
         </div>
       )}
+      {/* REGLA GLOBAL DE FORMULARIOS (pedido de Bruno, 20-ago-2026): cada
+          módulo se ve SIEMPRE con su diseño de pantalla completa. Si la
+          ventana es más chica que el ancho mínimo del módulo, aparece scroll
+          horizontal — los elementos NO se apilan ni se desarman. El mínimo
+          sale del `minWidth` declarado en el registry (1000 si no declara). */}
       <div className="min-h-0 flex-1 overflow-auto p-4">
+        <div className="h-full" style={{ minWidth: (def.minWidth ?? 1000) - 32 }}>
       {/*
         WindowManagerProvider también acá: páginas como Compras usan `useWindowNav`
         (→ useWindowManager) para abrir OTRAS ventanas nativas desde adentro. En el
@@ -186,6 +192,7 @@ export function EmbeddedWindow() {
           </Suspense>
         </WindowSelfProvider>
       </WindowManagerProvider>
+        </div>
       </div>
     </div>
   )
