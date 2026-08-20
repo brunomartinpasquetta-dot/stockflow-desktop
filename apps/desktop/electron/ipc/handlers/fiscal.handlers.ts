@@ -4,6 +4,9 @@
  * La configuración (CUIT, certificado, entorno) es de administrador. La emisión
  * la puede hacer quien vende, porque facturar es parte de la venta.
  */
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
+
 import { FiscalService, type ArcaGateway } from '@stockflow/core';
 import { PermissionDeniedError, ValidationError } from '@stockflow/core';
 
@@ -23,6 +26,66 @@ import type {
   SaveFiscalConfigDTO,
 } from '../types';
 
+/**
+ * RESGUARDO DEL CERTIFICADO (regla de Bruno: el certificado NUNCA se pierde en
+ * una actualización). El sistema guarda la RUTA, y eso ya falló una vez: en
+ * Leo Citzia la ruta apuntaba a Archivos de programa, el update barrió el
+ * directorio y la facturación murió con "No se encuentra el certificado".
+ *
+ * Defensa en dos partes:
+ *  1. Al GUARDAR la config se copia cert + clave a {userData}/arca/ — carpeta
+ *     que sobrevive a todos los updates y no pide administrador.
+ *  2. Al ARMAR el gateway, si la ruta configurada no existe pero el resguardo
+ *     sí, se usa el resguardo y se corrige la config sola: la facturación
+ *     sigue andando sin que nadie tenga que tocar nada.
+ */
+function rutaClaveDe(certPath: string): string {
+  return certPath.replace(/\.(crt|pem|cer)$/i, '') + '.key';
+}
+
+function resguardoDir(userDataDir: string): string {
+  return path.join(userDataDir, 'arca');
+}
+
+function resguardarCertificado(userDataDir: string, certPath: string): string | null {
+  try {
+    const keyPath = rutaClaveDe(certPath);
+    if (!existsSync(certPath) || !existsSync(keyPath)) return null;
+    const dir = resguardoDir(userDataDir);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const certDest = path.join(dir, 'certificado' + path.extname(certPath).toLowerCase());
+    const keyDest = rutaClaveDe(certDest);
+    // Si la ruta elegida YA es el resguardo, no copiarse encima de sí mismo.
+    if (path.resolve(certPath) === path.resolve(certDest)) return certDest;
+    copyFileSync(certPath, certDest);
+    copyFileSync(keyPath, keyDest);
+    return certDest;
+  } catch (err) {
+    console.warn('[fiscal] no se pudo resguardar el certificado:', err);
+    return null;
+  }
+}
+
+function certificadoVigente(deps: HandlerDeps, certPath: string): string {
+  if (existsSync(certPath) && existsSync(rutaClaveDe(certPath))) return certPath;
+  // La ruta configurada murió (update, pendrive desenchufado, carpeta
+  // borrada): probar el resguardo y, si está sano, corregir la config.
+  for (const ext of ['.crt', '.pem', '.cer']) {
+    const candidato = path.join(resguardoDir(deps.userDataDir), 'certificado' + ext);
+    if (existsSync(candidato) && existsSync(rutaClaveDe(candidato))) {
+      console.warn(`[fiscal] certificado ausente en ${certPath} — usando resguardo ${candidato}`);
+      try {
+        const cfg = deps.repos.fiscal.getConfig();
+        if (cfg) deps.repos.fiscal.saveConfig({ ...cfg, certPath: candidato });
+      } catch {
+        /* si no se pudo persistir, igual se factura con el resguardo */
+      }
+      return candidato;
+    }
+  }
+  return certPath;
+}
+
 /** Arma el gateway con la config guardada. Lanza si falta algo. */
 function buildGateway(deps: HandlerDeps): ArcaGateway & ArcaGatewayImpl {
   const cfg = deps.repos.fiscal.getConfig();
@@ -32,12 +95,13 @@ function buildGateway(deps: HandlerDeps): ArcaGateway & ArcaGatewayImpl {
   if (!cfg.certPath) {
     throw new ValidationError('certPath', 'Falta cargar el certificado de ARCA');
   }
+  const certPath = certificadoVigente(deps, cfg.certPath);
   // La clave privada se guarda junto al certificado con extensión .key.
-  const keyPath = cfg.certPath.replace(/\.(crt|pem|cer)$/i, '') + '.key';
+  const keyPath = rutaClaveDe(certPath);
   return new ArcaGatewayImpl({
     environment: cfg.environment,
     cuit: cfg.cuit,
-    certPath: cfg.certPath,
+    certPath,
     keyPath,
     cacheDir: ArcaGatewayImpl.defaultCacheDir(deps.userDataDir),
   });
@@ -212,6 +276,14 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       async (payload: SaveFiscalConfigDTO, ctx): Promise<FiscalConfigDTO> => {
         requireAdmin(ctx.currentUser?.role);
+        // Resguardo en userData al guardar. Si la ruta elegida está DENTRO del
+        // directorio de instalación (el próximo update la borra), se guarda
+        // directamente la ruta del resguardo.
+        if (payload.certPath) {
+          const resguardo = resguardarCertificado(deps.userDataDir, payload.certPath);
+          const enInstalacion = /program files|archivos de programa/i.test(payload.certPath);
+          if (resguardo && enInstalacion) payload = { ...payload, certPath: resguardo };
+        }
         return deps.repos.fiscal.saveConfig(payload) as FiscalConfigDTO;
       },
     ),
