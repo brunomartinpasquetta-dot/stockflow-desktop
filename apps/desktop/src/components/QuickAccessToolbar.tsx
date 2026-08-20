@@ -94,15 +94,16 @@ export function QuickAccessToolbar() {
             }}
             title={btn.fKey ? `${btn.label} (${btn.fKey})` : btn.label}
             className={cn(
-              'group flex h-full w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-1 transition-colors xl:w-20',
-              '[@media(max-width:1199px)]:w-16',
+              // min-w y no ancho fijo: "Caja General" u "Historial Ventas" en
+              // DOS renglones desalineaba los íconos entre sí.
+              'group flex h-full min-w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-2 py-1 transition-colors',
               'hover:bg-accent focus:outline-none focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-primary/30',
               active && 'bg-accent text-accent-foreground ring-2 ring-primary/30 [&_.rounded.bg-muted]:bg-white/25 [&_.rounded.bg-muted]:text-inherit',
               !enabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
             )}
           >
             <Icon className="h-7 w-7 text-foreground/80 group-hover:text-foreground" strokeWidth={1.75} />
-            <span className="text-center text-[11px] leading-tight text-foreground/90 [@media(max-width:899px)]:hidden">
+            <span className="whitespace-nowrap text-center text-[11px] leading-tight text-foreground/90 [@media(max-width:899px)]:hidden">
               {btn.label}
             </span>
             {btn.fKey ? (

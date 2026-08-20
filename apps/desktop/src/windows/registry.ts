@@ -121,7 +121,11 @@ export const WINDOWS: Record<string, WindowDef> = {
     fKey: 8,
     component: lazy(() => import('@/pages/CajaGeneral').then((m) => ({ default: m.CajaGeneral }))),
     requires: 'view_cash_general',
-    minWidth: 900,
+    // Abre GRANDE a propósito: el encabezado de una sola fila (título +
+    // botones + saldos) necesita ancho; si abre angosto, los elementos se
+    // apilan y parece desarmado.
+    defaultSize: { width: 1280, height: 800 },
+    minWidth: 1100,
     minHeight: 560,
   },
   contabilidad: {

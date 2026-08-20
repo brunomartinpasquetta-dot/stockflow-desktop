@@ -273,49 +273,40 @@ function CajaGeneralInner() {
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 pt-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold">Caja General</h2>
-          </div>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="rounded-md border bg-muted/40 px-3 py-1.5 text-right">
-              <div className="text-[11px] text-muted-foreground">Efectivo</div>
-              <div className="text-lg font-semibold tabular-nums">
-                {balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.cash ?? '0')}
-              </div>
+        {/* Título, botones y saldos en UNA sola fila: cada fila de encabezado
+            que se ahorra es un renglón más de la grilla a la vista (pedido de
+            Bruno, 20-ago-2026). */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Wallet className="h-5 w-5 shrink-0 text-primary" />
+          <h2 className="whitespace-nowrap text-base font-semibold">Caja General</h2>
+          {canManage && (
+            <div className="ml-2 flex flex-wrap gap-1.5">
+              <Button size="sm" onClick={() => setOpenDialog('income')} className="bg-success text-success-foreground hover:bg-success/90">
+                <PlusCircle className="h-4 w-4" />
+                Ingreso
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => setOpenDialog('expense')}>
+                <MinusCircle className="h-4 w-4" />
+                Egreso
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setAjusteOpen(true)}>
+                <Scale className="h-4 w-4" />
+                Ajustar efe/elec
+              </Button>
             </div>
-            <div className="rounded-md border bg-muted/40 px-3 py-1.5 text-right">
-              <div className="text-[11px] text-muted-foreground">Electrónico</div>
-              <div className="text-lg font-semibold tabular-nums">
-                {balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.electronic ?? '0')}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground">Saldo total</div>
-              <div className="text-2xl font-bold tabular-nums">
-                {balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.total ?? '0')}
-              </div>
-            </div>
+          )}
+          <div className="ml-auto flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm tabular-nums">
+            <span className="text-muted-foreground">
+              Efectivo <b className="text-foreground">{balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.cash ?? '0')}</b>
+            </span>
+            <span className="text-muted-foreground">
+              Electrónico <b className="text-foreground">{balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.electronic ?? '0')}</b>
+            </span>
+            <span className="text-muted-foreground">
+              Saldo total <b className="text-base font-bold text-foreground">{balanceQ.isLoading ? '…' : formatCurrency(balanceQ.data?.total ?? '0')}</b>
+            </span>
           </div>
         </div>
-
-        {canManage && (
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setOpenDialog('income')} className="bg-success text-success-foreground hover:bg-success/90">
-              <PlusCircle className="h-4 w-4" />
-              Registrar Ingreso
-            </Button>
-            <Button variant="destructive" onClick={() => setOpenDialog('expense')}>
-              <MinusCircle className="h-4 w-4" />
-              Registrar Egreso
-            </Button>
-            <Button variant="outline" onClick={() => setAjusteOpen(true)}>
-              <Scale className="h-4 w-4" />
-              Ajustar efectivo / electrónico
-            </Button>
-          </div>
-        )}
 
         {ajusteOpen && (
           <AjustarDesgloseDialog
