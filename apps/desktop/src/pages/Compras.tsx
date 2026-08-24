@@ -211,7 +211,7 @@ export function Compras() {
         quantity: String(Number(p.quantity)),
         costPrice: p.unitPrice ?? art.costPrice,
         vatRate: art.vatRate,
-        newSalePrice: '',
+        newSalePrice: art.listPrice1,
       })
       supplierIds.add(art.supplierId ?? null)
     }
@@ -251,7 +251,9 @@ export function Compras() {
       }
       return [
         ...prev,
-        { article, quantity: '1', costPrice: article.costPrice, vatRate: article.vatRate, newSalePrice: '' },
+        // El campo de precio de venta arranca con el precio VIGENTE: se ve y
+        // se pisa ahí mismo. Si queda igual, al guardar no se toca (ver submit).
+        { article, quantity: '1', costPrice: article.costPrice, vatRate: article.vatRate, newSalePrice: article.listPrice1 },
       ]
     })
   }
@@ -330,7 +332,14 @@ export function Compras() {
           articleId: l.article.id,
           quantity: parseCurrencyInput(l.quantity),
           costPrice: parseCurrencyInput(l.costPrice),
-          salePrice: updatePrices && l.newSalePrice.trim() !== '' ? parseCurrencyInput(l.newSalePrice) : undefined,
+          // El precio de venta viaja SOLO si el usuario lo cambió: el campo
+          // muestra el vigente, y "igual al vigente" o vacío = no tocar.
+          salePrice:
+            updatePrices &&
+            l.newSalePrice.trim() !== '' &&
+            Number(parseCurrencyInput(l.newSalePrice)) !== Number(l.article.listPrice1)
+              ? parseCurrencyInput(l.newSalePrice)
+              : undefined,
           vatRate: l.vatRate,
         })),
       })
@@ -508,14 +517,8 @@ export function Compras() {
                     </td>
                     {updatePrices && (
                       <td className="px-2 py-1">
-                        <CurrencyInput className="h-8 text-right tabular-nums" placeholder="(sin cambio)" value={l.newSalePrice}
+                        <CurrencyInput className="h-8 text-right tabular-nums" value={l.newSalePrice}
                           onChange={(v) => setLine(i, 'newSalePrice', v)} />
-                        {/* El precio de venta VIGENTE, a la vista: para decidir
-                            el nuevo hay que saber cuál es el actual — sin esto
-                            el campo vacío parecía "no hay precio". */}
-                        <div className="mt-0.5 text-right text-[10px] tabular-nums text-muted-foreground">
-                          hoy {formatCurrency(l.article.listPrice1)}
-                        </div>
                       </td>
                     )}
                     <td className="px-2 py-1 text-right tabular-nums font-medium">
