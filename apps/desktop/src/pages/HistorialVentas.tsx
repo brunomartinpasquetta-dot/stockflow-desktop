@@ -378,7 +378,9 @@ function SaleDetailDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl">
+      {/* Igual que el detalle de compras: max-h + scroll interno para que los
+          botones no se caigan de la pantalla con ventas de muchos renglones. */}
+      <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col">
         <DialogHeader>
           <DialogTitle>
             {sale ? `${VOUCHER_LABELS[sale.type]} N° ${sale.number}` : 'Detalle de la venta'}
@@ -387,7 +389,7 @@ function SaleDetailDialog({
         {detailQuery.isLoading || !sale ? (
           <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="flex flex-col gap-3 text-sm">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 text-sm">
             <div className="grid grid-cols-2 gap-1 text-muted-foreground">
               <span>Fecha: {formatDateTime(sale.date)}</span>
               <span>Cliente: {customerName}</span>

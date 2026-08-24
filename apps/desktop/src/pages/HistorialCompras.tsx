@@ -87,7 +87,10 @@ function PurchaseDetailDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl">
+      {/* max-h + scroll INTERNO: con una compra de muchos renglones el diálogo
+          crecía más que la pantalla y los botones quedaban abajo, inalcanzables
+          (reporte de Peverelli). El cuerpo scrollea; encabezado y botones, fijos. */}
+      <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col">
         <DialogHeader>
           <DialogTitle>
             {purchase
@@ -98,7 +101,7 @@ function PurchaseDetailDialog({
         {detailQuery.isLoading || !purchase ? (
           <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="flex flex-col gap-3 text-sm">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 text-sm">
             <div className="grid grid-cols-2 gap-1 text-muted-foreground">
               <span>Fecha: {formatDateTime(purchase.date)}</span>
               <span>Proveedor: {supplierName}</span>
