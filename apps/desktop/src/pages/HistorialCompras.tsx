@@ -2,16 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Undo2, Loader2 } from 'lucide-react'
+import { Undo2, Loader2, FileDown, Printer } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
-import { useArticles, useSuppliers } from '@/lib/hooks'
+import { useArticles, useSuppliers, useCompany } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { ReturnPurchaseDialog } from '@/components/ReturnDialogs'
+import { exportPurchasePdf, printPurchasePdf, type PurchaseDocData } from '@/lib/purchaseDoc'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -54,6 +55,22 @@ function PurchaseDetailDialog({
   const [reason, setReason] = useState('')
 
   const purchase = detailQuery.data?.purchase
+  const companyQuery = useCompany()
+
+  function docData(): PurchaseDocData | null {
+    if (!purchase || !companyQuery.data) return null
+    return {
+      company: companyQuery.data,
+      purchase,
+      supplierName,
+      lines: (detailQuery.data?.lines ?? []).map((l) => ({
+        line: l,
+        description: descById.get(l.articleId) ?? '—',
+      })),
+      voucherLabel: VOUCHER_LABELS[purchase.type],
+    }
+  }
+
   const voidMutation = useMutation({
     mutationFn: () => api.purchases.void(purchaseId),
     onSuccess: () => {
@@ -164,6 +181,24 @@ function PurchaseDetailDialog({
           </div>
         )}
         <DialogFooter>
+          <Button
+            variant="outline"
+            disabled={!purchase || !companyQuery.data}
+            onClick={() => { const d = docData(); if (d) exportPurchasePdf(d) }}
+            title="Descargar la compra como PDF"
+          >
+            <FileDown className="h-4 w-4" />
+            Exportar PDF
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!purchase || !companyQuery.data}
+            onClick={() => { const d = docData(); if (d) printPurchasePdf(d) }}
+            title="Imprimir la compra"
+          >
+            <Printer className="h-4 w-4" />
+            Imprimir
+          </Button>
           <Button variant="outline" onClick={onClose}>Cerrar</Button>
         </DialogFooter>
       </DialogContent>
