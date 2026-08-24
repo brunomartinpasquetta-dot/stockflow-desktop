@@ -510,6 +510,12 @@ export function Compras() {
                       <td className="px-2 py-1">
                         <CurrencyInput className="h-8 text-right tabular-nums" placeholder="(sin cambio)" value={l.newSalePrice}
                           onChange={(v) => setLine(i, 'newSalePrice', v)} />
+                        {/* El precio de venta VIGENTE, a la vista: para decidir
+                            el nuevo hay que saber cuál es el actual — sin esto
+                            el campo vacío parecía "no hay precio". */}
+                        <div className="mt-0.5 text-right text-[10px] tabular-nums text-muted-foreground">
+                          hoy {formatCurrency(l.article.listPrice1)}
+                        </div>
                       </td>
                     )}
                     <td className="px-2 py-1 text-right tabular-nums font-medium">
