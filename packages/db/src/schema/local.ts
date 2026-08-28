@@ -166,6 +166,14 @@ export const articles = sqliteTable(
     wholesalePrice: text('wholesale_price').notNull().default('0.0000'),
     wholesaleMinQty: text('wholesale_min_qty').notNull().default('0.000'),
     vatRate: text('vat_rate').notNull().default('21.00'),
+    /**
+     * Utilidad % de cada lista sobre el COSTO (c/IVA, modo 'gross'). La usa
+     * Compras para recalcular las listas al cambiar el costo. NULL = sin
+     * margen conocido: esa lista no se toca. Se siembran en la 0022.
+     */
+    margin1: text('margin1'),
+    margin2: text('margin2'),
+    margin3: text('margin3'),
     stock: text('stock').notNull().default('0.000'),
     minStock: text('min_stock').notNull().default('0.000'),
     idealStock: text('ideal_stock').notNull().default('0.000'),

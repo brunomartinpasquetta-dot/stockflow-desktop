@@ -37,10 +37,13 @@ const viejo = join(tmp, 'migr-viejas');
 mkdirSync(viejo, { recursive: true });
 cpSync(MIGR, viejo, { recursive: true });
 
-// Journal recortado hasta la 0020 = el estado en el que están los clientes hoy.
+// Journal recortado a ANTES de la 0021 = el estado previo al rebuild. Hay que
+// cortar TODO lo posterior, no sólo la 0021: drizzle aplica por timestamp y si
+// la base "vieja" ya tiene una migración más nueva, la 0021 se saltea y el
+// test deja de probar lo que dice probar (pasó al agregar la 0022).
 const jPath = join(viejo, 'meta/_journal.json');
 const j = JSON.parse(readFileSync(jPath, 'utf8')) as { entries: { tag: string }[] };
-j.entries = j.entries.filter((e) => !e.tag.startsWith('0021'));
+j.entries = j.entries.filter((e) => e.tag < '0021');
 writeFileSync(jPath, JSON.stringify(j, null, 2));
 
 const dbPath = join(tmp, 'test.db');

@@ -148,6 +148,13 @@
       "when": 1786725681774,
       "tag": "0021_articulo_rapido",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1786725681775,
+      "tag": "0022_margen_utilidad",
+      "breakpoints": true
     }
   ]
 }

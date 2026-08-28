@@ -27,6 +27,15 @@ export const CreatePurchaseLineInputSchema = z.object({
   costPrice: moneySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
   salePrice: moneySchema,
   vatRate: vatRateSchema.default('21.00'),
+  /**
+   * Precios nuevos POR LISTA, ya calculados por el servicio (modo "por
+   * utilidad": costo nuevo × margen del artículo, redondeado a peso entero).
+   * Sólo se aplican si la compra actualiza precios; ausente = esa lista no se
+   * toca. En modo manual el servicio manda sólo `newListPrice1` (= salePrice).
+   */
+  newListPrice1: moneySchema.optional(),
+  newListPrice2: moneySchema.optional(),
+  newListPrice3: moneySchema.optional(),
 });
 
 export type PurchaseLineOutput = z.infer<typeof PurchaseLineSchema>;

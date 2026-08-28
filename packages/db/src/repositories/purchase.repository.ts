@@ -97,6 +97,9 @@ export class PurchaseRepository extends BaseRepository<
             quantity: line.quantity,
             costPrice: line.costPrice,
             salePrice: line.salePrice,
+            newListPrice1: line.newListPrice1,
+            newListPrice2: line.newListPrice2,
+            newListPrice3: line.newListPrice3,
             vatRate: line.vatRate ?? '21.00',
             lineTotal,
             vat,
@@ -151,7 +154,19 @@ export class PurchaseRepository extends BaseRepository<
             .update(articles)
             .set({
               stock: sql`printf('%.3f', CAST(${articles.stock} AS REAL) + CAST(${l.quantity} AS REAL))`,
-              ...(data.updatedPricesOnSave ? { costPrice: l.costPrice, listPrice1: l.salePrice } : {}),
+              // Con actualización de precios: costo siempre, y cada lista sólo
+              // si el servicio mandó su precio nuevo. El fallback a salePrice
+              // mantiene compatible a una terminal vieja que no manda listas.
+              ...(data.updatedPricesOnSave
+                ? {
+                    costPrice: l.costPrice,
+                    ...(l.newListPrice1 ?? l.salePrice
+                      ? { listPrice1: l.newListPrice1 ?? l.salePrice }
+                      : {}),
+                    ...(l.newListPrice2 ? { listPrice2: l.newListPrice2 } : {}),
+                    ...(l.newListPrice3 ? { listPrice3: l.newListPrice3 } : {}),
+                  }
+                : {}),
             })
             .where(eq(articles.id, l.articleId))
             .run();

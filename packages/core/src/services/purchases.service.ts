@@ -42,6 +42,16 @@ export interface CreatePurchaseInput {
   payments?: PurchasePaymentDraft[];
   /** Si true, al guardar actualiza costPrice y listPrice1 de cada artículo. */
   updatePrices?: boolean;
+  /**
+   * Cómo se actualizan los precios de venta al guardar:
+   *  - 'manual': el precio que el usuario puso en cada renglón (lista 1). Es
+   *    el comportamiento histórico de `updatePrices: true`.
+   *  - 'margin': recalcula TODAS las listas con margen cargado del artículo
+   *    (costo nuevo × (1 + margen/100)), redondeado a PESO ENTERO — decisión
+   *    de Bruno: en góndola no van centavos.
+   * Ausente: 'manual' si updatePrices, si no nada (compatibilidad LAN).
+   */
+  priceUpdateMode?: 'manual' | 'margin';
   discount?: string;
   notes?: string | null;
   /** Caja donde impacta el egreso (sólo si es contado). */
@@ -84,22 +94,51 @@ export class PurchasesService {
     const supplier = await repos.suppliers.findById(input.supplierId);
     if (!supplier) throw new NotFoundError('Proveedor', input.supplierId);
 
+    const modoPrecios = input.priceUpdateMode ?? (input.updatePrices ? 'manual' : undefined);
+    /** costo × (1 + margen%) redondeado a peso entero: $4.815,90 → $4.816. */
+    const precioPorMargen = (costo: string, margen: string | null): string | undefined => {
+      if (margen == null || margen.trim() === '') return undefined;
+      const m = Number(margen);
+      if (!Number.isFinite(m)) return undefined;
+      return `${Math.round(Number(costo) * (1 + m / 100))}.0000`;
+    };
+
     const resolvedLines: Array<{
       articleId: string;
       quantity: string;
       costPrice: string;
       salePrice: string;
       vatRate: string;
+      newListPrice1?: string;
+      newListPrice2?: string;
+      newListPrice3?: string;
     }> = [];
     for (const line of input.lines) {
       const article = await repos.articles.findById(line.articleId);
       if (!article) throw new NotFoundError('Artículo', line.articleId);
+      // Modo "por utilidad": las listas salen del margen guardado en el
+      // artículo. Una lista sin margen no se toca — mejor un precio viejo que
+      // uno inventado.
+      const porMargen =
+        modoPrecios === 'margin'
+          ? {
+              newListPrice1: precioPorMargen(line.costPrice, article.margin1),
+              newListPrice2: precioPorMargen(line.costPrice, article.margin2),
+              newListPrice3: precioPorMargen(line.costPrice, article.margin3),
+            }
+          : {};
+      const manual = line.salePrice && line.salePrice.trim() !== '' ? line.salePrice : undefined;
       resolvedLines.push({
         articleId: line.articleId,
         quantity: line.quantity,
         costPrice: line.costPrice,
-        salePrice: line.salePrice && line.salePrice.trim() !== '' ? line.salePrice : article.listPrice1,
+        // El precio de venta del RENGLÓN (queda en el historial de la compra):
+        // el que va a regir en lista 1 después de guardar.
+        salePrice:
+          (modoPrecios === 'margin' ? porMargen.newListPrice1 : manual) ?? article.listPrice1,
         vatRate: line.vatRate ?? article.vatRate,
+        ...(modoPrecios === 'manual' && manual ? { newListPrice1: manual } : {}),
+        ...porMargen,
       });
     }
 
@@ -169,6 +208,9 @@ export class PurchasesService {
         costPrice: l.costPrice,
         salePrice: l.salePrice,
         vatRate: l.vatRate,
+        newListPrice1: l.newListPrice1,
+        newListPrice2: l.newListPrice2,
+        newListPrice3: l.newListPrice3,
       })),
     });
 

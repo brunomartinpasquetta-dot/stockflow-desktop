@@ -432,6 +432,52 @@ async function main(): Promise<void> {
     JSON.stringify(rapidoSinDesc).slice(0, 160),
   );
 
+  // COMPRAS Y PRECIOS — tres garantías:
+  // 1) SIN actualizar precios, una compra con costo distinto NO toca nada
+  //    (reporte de Peverelli 27-ago-2026: no se reprodujo, y esto lo garantiza).
+  // 2) Modo 'margin' recalcula TODAS las listas con margen, redondeado a peso.
+  // 3) Una lista sin margen no se toca.
+  const artC = await invoke<{ id: string }>(handlers, 'articles:create', {
+    barcode: 'COMPRA-1', description: 'ARTICULO COMPRA', costPrice: '1000.0000',
+    listPrice1: '2000.0000', listPrice2: '2500.0000', listPrice3: '0.0000',
+    wholesalePrice: '0.0000', wholesaleMinQty: '0.000', vatRate: '21.00',
+    stock: '10.000', minStock: '0.000', idealStock: '0.000',
+    soldByWeight: false, unit: 'UN', active: true,
+    margin1: '35.00', margin2: '80.00', margin3: null,
+  });
+  const provC = await invoke<{ id: string }>(handlers, 'suppliers:create', { name: 'PROV COMPRA', code: 'PC1' });
+  check('setup compra ok', artC.ok && provC.ok, '');
+
+  if (artC.ok && provC.ok) {
+    // (1) sin actualizar precios
+    const c1 = await invoke(handlers, 'purchases:create', {
+      type: 'X', supplierId: provC.data.id, isAccountPurchase: false, fundingSource: 'daily',
+      updatePrices: false, payments: [{ paymentMethodId: 'pm-efectivo', amount: '1500.0000' }],
+      lines: [{ articleId: artC.data.id, quantity: '1.000', costPrice: '1500.0000' }],
+    });
+    const a1 = await invoke<{ costPrice: string; listPrice1: string; listPrice2: string }>(handlers, 'articles:get', { id: artC.data.id });
+    check(
+      'compra SIN actualizar precios no toca costo ni listas',
+      c1.ok && a1.ok && a1.data.costPrice === '1000.0000' && a1.data.listPrice1 === '2000.0000' && a1.data.listPrice2 === '2500.0000',
+      a1.ok ? `costo=${a1.data.costPrice} l1=${a1.data.listPrice1} l2=${a1.data.listPrice2}` : JSON.stringify(a1),
+    );
+
+    // (2)+(3) modo margin: costo 1234 → l1 = 1234×1.35 = 1665.9 → 1666;
+    // l2 = 1234×1.80 = 2221.2 → 2221; l3 sin margen → intacta en 0.
+    const c2 = await invoke(handlers, 'purchases:create', {
+      type: 'X', supplierId: provC.data.id, isAccountPurchase: false, fundingSource: 'daily',
+      updatePrices: true, priceUpdateMode: 'margin',
+      payments: [{ paymentMethodId: 'pm-efectivo', amount: '1234.0000' }],
+      lines: [{ articleId: artC.data.id, quantity: '1.000', costPrice: '1234.0000' }],
+    });
+    const a2 = await invoke<{ costPrice: string; listPrice1: string; listPrice2: string; listPrice3: string }>(handlers, 'articles:get', { id: artC.data.id });
+    check(
+      'modo utilidad: recalcula listas con margen, redondeo a peso, y no toca la lista sin margen',
+      c2.ok && a2.ok && a2.data.costPrice === '1234.0000' && a2.data.listPrice1 === '1666.0000' && a2.data.listPrice2 === '2221.0000' && a2.data.listPrice3 === '0.0000',
+      a2.ok ? `costo=${a2.data.costPrice} l1=${a2.data.listPrice1} l2=${a2.data.listPrice2} l3=${a2.data.listPrice3}` : JSON.stringify(c2),
+    );
+  }
+
   // sales:voidRange — anulación en lote del día. Va AL FINAL a propósito: anula
   // la venta que usaron todos los checks anteriores, así que mover esto para
   // arriba los rompe. Lo que importa verificar es que no sea un borrado suelto:

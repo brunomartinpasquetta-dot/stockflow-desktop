@@ -123,6 +123,10 @@ export interface ArticleDTO {
   wholesalePrice: string;
   wholesaleMinQty: string;
   vatRate: string;
+  /** Utilidad % por lista sobre el costo (null = sin margen, no se recalcula). */
+  margin1: string | null;
+  margin2: string | null;
+  margin3: string | null;
   stock: string;
   minStock: string;
   idealStock: string;
@@ -654,6 +658,8 @@ export interface CreatePurchaseInputDTO {
   /** Pagos de la compra (contado); obligatorio (≥1) si NO es a cuenta. */
   payments?: PaymentInputDTO[];
   updatePrices?: boolean;
+  /** 'manual' (histórico) o 'margin' (recalcula listas por % de utilidad). */
+  priceUpdateMode?: 'manual' | 'margin';
   discount?: string;
   notes?: string | null;
   cashRegisterId?: string | null;

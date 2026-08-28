@@ -94,10 +94,22 @@ export class DesktopWindowsManager {
   open(input: DesktopWindowOpenInput): { windowKey: string; created: boolean } {
     const windowKey = input.pageKey;
     const existing = this.windows.get(windowKey);
-    if (existing && !existing.isDestroyed()) {
+    // Reusar la ventana SOLO si su renderer está vivo. Si el proceso murió (o
+    // quedó colgado cargando), la ventana existe pero está en blanco u oculta:
+    // reusarla es exactamente el bug de "Contabilidad no abre hasta reiniciar"
+    // que reportó Leo Citzia — el clic hacía focus() sobre una ventana muerta.
+    if (existing && !existing.isDestroyed() && !existing.webContents.isCrashed()) {
       if (existing.isMinimized()) existing.restore();
+      // `ready-to-show` puede no haber llegado nunca (carga colgada): si quedó
+      // oculta, mostrarla acá es lo que la rescata.
+      if (!existing.isVisible()) existing.show();
       existing.focus();
       return { windowKey, created: false };
+    }
+    if (existing && !existing.isDestroyed()) {
+      // Zombie con renderer muerto: se destruye y se crea una nueva.
+      existing.destroy();
+      this.windows.delete(windowKey);
     }
 
     const win = new BrowserWindow({
@@ -124,6 +136,12 @@ export class DesktopWindowsManager {
     });
     win.on('closed', () => {
       this.windows.delete(windowKey);
+    });
+    // Renderer muerto → fuera del registro YA. Sin esto, la ventana rota queda
+    // "reutilizable" y el módulo no vuelve a abrir hasta reiniciar la app.
+    win.webContents.on('render-process-gone', () => {
+      this.windows.delete(windowKey);
+      if (!win.isDestroyed()) win.destroy();
     });
 
     const hash = buildEmbeddedHash(input.pageKey, input.params);

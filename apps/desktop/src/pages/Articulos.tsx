@@ -65,7 +65,7 @@ import {
   useSuppliers,
 } from '@/lib/hooks'
 import { api } from '@/lib/api'
-import { formatCurrency, formatQty } from '@/lib/format'
+import { formatCurrency, formatQty, parseCurrencyInput } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -100,6 +100,10 @@ interface FormState {
   listPrice3: string
   wholesalePrice: string
   wholesaleMinQty: string
+  /** Utilidad % editable por lista. Vacío = sin margen (Compras no recalcula esa lista). */
+  margin1: string
+  margin2: string
+  margin3: string
   vatRate: string
   stock: string
   minStock: string
@@ -121,6 +125,9 @@ const EMPTY_FORM: FormState = {
   listPrice3: '0',
   wholesalePrice: '0',
   wholesaleMinQty: '0',
+  margin1: '',
+  margin2: '',
+  margin3: '',
   vatRate: '21.00',
   stock: '0',
   minStock: '0',
@@ -141,6 +148,9 @@ function articleToForm(a: ArticleDTO): FormState {
     listPrice1: a.listPrice1,
     listPrice2: a.listPrice2,
     listPrice3: a.listPrice3,
+    margin1: a.margin1 ?? '',
+    margin2: a.margin2 ?? '',
+    margin3: a.margin3 ?? '',
     wholesalePrice: a.wholesalePrice,
     wholesaleMinQty: a.wholesaleMinQty,
     vatRate: a.vatRate,
@@ -366,6 +376,7 @@ export function Articulos() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+
   function validate(): string | null {
     if (!form.barcode.trim()) return 'El código es obligatorio'
     if (form.description.trim().length < 2)
@@ -395,6 +406,9 @@ export function Articulos() {
       listPrice1: form.listPrice1 || '0',
       listPrice2: form.listPrice2 || '0',
       listPrice3: form.listPrice3 || '0',
+      margin1: form.margin1.trim() === '' ? null : Number(form.margin1.replace(',', '.')).toFixed(2),
+      margin2: form.margin2.trim() === '' ? null : Number(form.margin2.replace(',', '.')).toFixed(2),
+      margin3: form.margin3.trim() === '' ? null : Number(form.margin3.replace(',', '.')).toFixed(2),
       wholesalePrice: form.wholesalePrice || '0',
       wholesaleMinQty: form.wholesaleMinQty || '0',
       vatRate: form.vatRate,
@@ -928,6 +942,39 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
     onQuickCreateFamily,
   } = props
 
+  /**
+   * Utilidad ↔ precio, bidireccionales: tocás el % y el precio se recalcula
+   * (redondeado a peso entero, sin centavos); tocás el precio y el % se
+   * recalcula. Tocar el costo actualiza los % para que sigan diciendo la
+   * verdad sobre los precios en pantalla.
+   */
+  function setMargen(n: 1 | 2 | 3, valor: string): void {
+    setField(`margin${n}` as keyof FormState, valor)
+    const costo = Number(parseCurrencyInput(form.costPrice))
+    const m = Number(valor.replace(',', '.'))
+    if (Number.isFinite(m) && valor.trim() !== '' && costo > 0) {
+      setField(`listPrice${n}` as keyof FormState, String(Math.round(costo * (1 + m / 100))))
+    }
+  }
+  function setPrecioLista(n: 1 | 2 | 3, valor: string): void {
+    setField(`listPrice${n}` as keyof FormState, valor)
+    const costo = Number(parseCurrencyInput(form.costPrice))
+    const precio = Number(parseCurrencyInput(valor))
+    if (costo > 0 && precio > 0) {
+      setField(`margin${n}` as keyof FormState, (((precio - costo) / costo) * 100).toFixed(2))
+    }
+  }
+  function setCosto(valor: string): void {
+    setField('costPrice', valor)
+    const costo = Number(parseCurrencyInput(valor))
+    if (costo <= 0) return
+    for (const n of [1, 2, 3] as const) {
+      const precio = Number(parseCurrencyInput(form[`listPrice${n}` as const] as string))
+      if (precio > 0) setField(`margin${n}` as keyof FormState, (((precio - costo) / costo) * 100).toFixed(2))
+    }
+  }
+
+
   return (
     <div className="flex h-full flex-col p-3">
       {/* Cabecera del panel */}
@@ -1016,19 +1063,25 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         <Field className="col-span-3" label="P. Costo">
           <CurrencyInput
             value={form.costPrice}
-            onChange={(v) => setField('costPrice', v)}
+            onChange={(v) => setCosto(v)}
             disabled={inputsDisabled}
           />
         </Field>
         <Field className="col-span-3" label="P. Venta (Lista 1)">
           <CurrencyInput
             value={form.listPrice1}
-            onChange={(v) => setField('listPrice1', v)}
+            onChange={(v) => setPrecioLista(1, v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Utilidad">
-          <ReadonlyValue>{utilPct(form.listPrice1, form.costPrice)}</ReadonlyValue>
+        <Field className="col-span-2" label="Utilidad %">
+          <Input
+            inputMode="decimal"
+            placeholder="—"
+            value={form.margin1}
+            onChange={(e) => setMargen(1, e.target.value)}
+            disabled={inputsDisabled}
+          />
         </Field>
         <div className="col-span-4" />
 
@@ -1036,22 +1089,34 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         <Field className="col-span-3" label="P. Lista 2">
           <CurrencyInput
             value={form.listPrice2}
-            onChange={(v) => setField('listPrice2', v)}
+            onChange={(v) => setPrecioLista(2, v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Utilidad">
-          <ReadonlyValue>{utilPct(form.listPrice2, form.costPrice)}</ReadonlyValue>
+        <Field className="col-span-2" label="Utilidad %">
+          <Input
+            inputMode="decimal"
+            placeholder="—"
+            value={form.margin2}
+            onChange={(e) => setMargen(2, e.target.value)}
+            disabled={inputsDisabled}
+          />
         </Field>
         <Field className="col-span-3" label="P. Lista 3">
           <CurrencyInput
             value={form.listPrice3}
-            onChange={(v) => setField('listPrice3', v)}
+            onChange={(v) => setPrecioLista(3, v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Utilidad">
-          <ReadonlyValue>{utilPct(form.listPrice3, form.costPrice)}</ReadonlyValue>
+        <Field className="col-span-2" label="Utilidad %">
+          <Input
+            inputMode="decimal"
+            placeholder="—"
+            value={form.margin3}
+            onChange={(e) => setMargen(3, e.target.value)}
+            disabled={inputsDisabled}
+          />
         </Field>
         <div className="col-span-2" />
 
