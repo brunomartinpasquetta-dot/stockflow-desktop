@@ -626,13 +626,13 @@ export function Compras() {
             value={priceMode2}
             onChange={(e) => setPriceMode2(e.target.value as 'none' | 'manual' | 'margin')}
           >
-            <option value="none">No actualizar</option>
-            <option value="manual">Manual (lo que cargue en cada renglón)</option>
-            <option value="margin">Respetando % de utilidad de cada artículo</option>
+            <option value="none">No actualizar precios</option>
+            <option value="manual">Actualización manual por renglón</option>
+            <option value="margin">Actualización automática por % de utilidad</option>
           </Select>
           {priceMode2 === 'margin' && (
             <span className="text-xs text-muted-foreground">
-              Recalcula TODAS las listas con margen cargado: costo nuevo × utilidad, sin centavos.
+              Recalcula todas las listas de precios con utilidad definida: costo nuevo × % de utilidad, redondeado sin centavos.
             </span>
           )}
         </div>
