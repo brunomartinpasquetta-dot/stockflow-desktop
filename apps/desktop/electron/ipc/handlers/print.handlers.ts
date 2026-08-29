@@ -59,6 +59,26 @@ export function buildPrintHandlers(deps: HandlerDeps): HandlerMap {
      * Enumera impresoras del SO con `webContents.getPrintersAsync()` — devuelve el
      * `name` EXACTO que la config de impresora necesita (para `kind:'system'`).
      */
+    /**
+     * Imprime la VENTANA ACTIVA en silencio, directo a la impresora indicada.
+     * Lo usa el camino A4 (facturas/reportes): la página ya está en modo
+     * impresión (#print-area + @media print), así que sale idéntica al diálogo
+     * pero sin diálogo. El precedente de "hoja en blanco" con print() era con
+     * TÉRMICAS; para A4 en impresora común funciona, y ante error el renderer
+     * cae solo al diálogo de siempre.
+     */
+    'print:silentCurrent': unguarded(deps, async (payload: { deviceName: string }) => {
+      const { webContents } = await import('electron');
+      const wc = webContents.getFocusedWebContents();
+      if (!wc) throw new Error('No hay una ventana activa para imprimir');
+      await new Promise<void>((resolve, reject) => {
+        wc.print(
+          { silent: true, deviceName: payload.deviceName, printBackground: true },
+          (ok, reason) => (ok ? resolve() : reject(new Error(reason || 'La impresora rechazó el trabajo'))),
+        );
+      });
+      return { printed: true };
+    }),
     'printer:listElectron': unguarded(
       deps,
       async (): Promise<{ name: string; isDefault: boolean }[]> => {

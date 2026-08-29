@@ -466,6 +466,13 @@ export class LanServer {
           'lan-impersonation',
           () => handler(parsed.payload) as Promise<IpcResponse<unknown>>,
         )) as IpcResponse<unknown>;
+      } else if (this.opts.sessionStore) {
+        // Canales sin JWT (auth:login/logout): también AISLADOS. Si corrieran
+        // fuera del ALS, el setSession/clearSession de esos handlers escribiría
+        // el singleton y pisaría la sesión del usuario del escritorio.
+        response = (await this.opts.sessionStore.runDetached(
+          () => handler(parsed.payload) as Promise<IpcResponse<unknown>>,
+        )) as IpcResponse<unknown>;
       } else {
         response = (await handler(parsed.payload)) as IpcResponse<unknown>;
       }

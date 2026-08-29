@@ -17,6 +17,8 @@
 import type { ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 
+import { api } from '@/lib/api'
+
 export type PrintWidth = '58' | '80' | 'a4'
 
 export interface PrintOptions {
@@ -111,12 +113,32 @@ export async function printNode(
             window.removeEventListener('afterprint', onAfter)
             finish()
           }, 10_000)
-          try {
-            window.print()
-          } catch (err) {
-            cleanup()
-            reject(err)
-          }
+          // A4 DIRECTO: si hay una impresora A4 configurada (Configuración →
+          // Hardware), el documento sale sin diálogo por `print:silentCurrent`
+          // (la ventana ya está en modo impresión, sale idéntico). Cualquier
+          // problema —navegador, canal ausente, impresora apagada— cae al
+          // diálogo de siempre: imprimir nunca se rompe por esta vía.
+          void (async () => {
+            if (width === 'a4') {
+              try {
+                const cfg = await api.hardware.printer.getConfig()
+                if (cfg?.a4PrinterName && cfg.silentPrint !== false) {
+                  await api.print.silentCurrent(cfg.a4PrinterName)
+                  window.removeEventListener('afterprint', onAfter)
+                  finish()
+                  return
+                }
+              } catch {
+                /* sigue al diálogo */
+              }
+            }
+            try {
+              window.print()
+            } catch (err) {
+              cleanup()
+              reject(err)
+            }
+          })()
         })
       })
     } catch (err) {

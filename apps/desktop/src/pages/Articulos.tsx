@@ -968,9 +968,15 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
     setField('costPrice', valor)
     const costo = Number(parseCurrencyInput(valor))
     if (costo <= 0) return
+    // LA UTILIDAD PREESTABLECIDA MANDA (regla de Bruno, 28-ago-2026): cambiar
+    // el costo recalcula los PRECIOS desde el margen guardado — el margen no
+    // se toca. Es la misma regla que aplica Compras en el modo automático,
+    // venga el costo nuevo de donde venga. Una lista sin margen no se toca.
     for (const n of [1, 2, 3] as const) {
-      const precio = Number(parseCurrencyInput(form[`listPrice${n}` as const] as string))
-      if (precio > 0) setField(`margin${n}` as keyof FormState, (((precio - costo) / costo) * 100).toFixed(2))
+      const margen = Number(String(form[`margin${n}` as const]).replace(',', '.'))
+      if (String(form[`margin${n}` as const]).trim() !== '' && Number.isFinite(margen)) {
+        setField(`listPrice${n}` as keyof FormState, String(Math.round(costo * (1 + margen / 100))))
+      }
     }
   }
 

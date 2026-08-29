@@ -1880,6 +1880,7 @@ export interface ApiSurface {
   };
   print: {
     /** Diagnóstico de impresión: reporte de texto (impresoras del SO + config). */
+    silentCurrent(payload: { deviceName: string }): Res<{ printed: boolean }>;
     diagnose(payload: { deviceName?: string }): Res<{ report: string }>;
     /**
      * Lista impresoras vía `webContents.getPrintersAsync()`. El `name` devuelto
@@ -2038,6 +2039,12 @@ export interface PrinterConfigDTO {
   paperFormat?: PaperFormatDTO;
   /** Impresión silenciosa (sin dialog del SO). Default false. */
   silentPrint?: boolean;
+  /**
+   * Impresora del SO para los documentos A4 (facturas, reportes). Si está
+   * definida, el A4 se imprime DIRECTO ahí, sin diálogo. Es un campo aparte de
+   * `interface` porque el A4 casi nunca sale por la térmica de tickets.
+   */
+  a4PrinterName?: string | null;
   /** Imprimir el ticket automáticamente al confirmar una venta. Default true. */
   autoPrintOnSale?: boolean;
 }

@@ -106,6 +106,8 @@ function PrinterSection() {
   // Override: mostrar el diálogo del SO en lugar de imprimir directo. Por
   // defecto OFF → con impresora térmica configurada se imprime directo.
   const [showDialog, setShowDialog] = useState(false)
+  /** Impresora del SO para documentos A4 (facturas/reportes). Vacío = diálogo. */
+  const [a4Printer, setA4Printer] = useState<string>('')
   const [seeded, setSeeded] = useState<PrinterConfigDTO | null | undefined>(undefined)
   const [testing, setTesting] = useState(false)
   const [diagnosing, setDiagnosing] = useState(false)
@@ -126,6 +128,7 @@ function PrinterSection() {
       // `?? ''`: si la config viniera incompleta, el `.trim()` de más abajo
       // reventaba la pantalla entera en vez de mostrarla vacía.
       if (cfgQuery.data.kind === 'system') setSystemName(cfgQuery.data.interface ?? '')
+      setA4Printer(cfgQuery.data.a4PrinterName ?? '')
     }
   }
 
@@ -229,6 +232,7 @@ function PrinterSection() {
       // override → se imprime directo (sin diálogo).
       silentPrint: !showDialog,
       autoPrintOnSale,
+      a4PrinterName: a4Printer.trim() === '' ? null : a4Printer.trim(),
     })
   }
 
@@ -285,6 +289,26 @@ function PrinterSection() {
             StockFlow imprime usando la cola del sistema operativo. Configurá la impresora desde
             Preferencias del sistema → Impresoras y luego seleccionala acá.
           </p>
+
+          <div className="flex flex-col gap-1 border-t pt-3">
+            <span className="text-sm font-medium">Impresora para documentos A4</span>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={a4Printer}
+              onChange={(e) => setA4Printer(e.target.value)}
+            >
+              <option value="">Mostrar diálogo de impresión (predeterminado)</option>
+              {systemPrinters.map((p) => (
+                <option key={`a4-${p.name}`} value={p.name}>
+                  {p.name}{p.isDefault ? ' (predeterminada)' : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Facturas, presupuestos y reportes en A4. Con una impresora seleccionada, la impresión
+              es directa, sin vista previa. Sin selección, se muestra el diálogo del sistema.
+            </p>
+          </div>
           {systemPrinters.length === 0 && (
             <p className="text-xs text-muted-foreground">
               No se detectaron impresoras instaladas en el sistema. Instalala primero desde el SO y

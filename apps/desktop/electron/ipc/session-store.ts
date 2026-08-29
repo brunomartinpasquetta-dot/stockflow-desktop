@@ -30,7 +30,7 @@ export interface Session {
  * que no se filtra a otra invocación ni al singleton.
  */
 interface InvocationState {
-  session: Session;
+  session: Session | null;
   cashRegister: CashRegister | null;
 }
 
@@ -41,6 +41,16 @@ export class SessionStore {
   private readonly als = new AsyncLocalStorage<InvocationState>();
 
   setSession(user: SafeUser, token: string): void {
+    // ALS-aware, IGUAL que los getters. Sin esto, un auth:login llegado por
+    // LAN escribía el singleton y PISABA la sesión del usuario del escritorio:
+    // el administrador del servidor pasaba a ser, para el main, el vendedor de
+    // la terminal — "acceso denegado" en módulos al azar hasta reiniciar
+    // (reporte de Leo Citzia, ago-2026).
+    const scoped = this.als.getStore();
+    if (scoped) {
+      scoped.session = { user, token };
+      return;
+    }
     this.session = { user, token };
   }
 
@@ -51,6 +61,14 @@ export class SessionStore {
   }
 
   clearSession(): void {
+    // Mismo criterio: un logout de una terminal no puede desloguear al
+    // escritorio ni hacerle perder la caja abierta.
+    const scoped = this.als.getStore();
+    if (scoped) {
+      scoped.session = null;
+      scoped.cashRegister = null;
+      return;
+    }
     this.session = null;
     this.cashRegister = null;
   }
@@ -79,6 +97,17 @@ export class SessionStore {
    */
   runWith<T>(user: SafeUser, token: string, fn: () => Promise<T>): Promise<T> {
     const state: InvocationState = { session: { user, token }, cashRegister: null };
+    return this.als.run(state, fn);
+  }
+
+  /**
+   * Ejecuta `fn` en un contexto SIN sesión, aislado del singleton. Es para los
+   * canales LAN que corren sin JWT (auth:login / auth:logout): lo que esos
+   * handlers escriban en la sesión muere con la invocación y el escritorio ni
+   * se entera.
+   */
+  runDetached<T>(fn: () => Promise<T>): Promise<T> {
+    const state: InvocationState = { session: null, cashRegister: null };
     return this.als.run(state, fn);
   }
 }

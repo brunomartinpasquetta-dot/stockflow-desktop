@@ -82,8 +82,39 @@ function setupAppMenu(): void {
       ]),
     );
   } else {
-    Menu.setApplicationMenu(null);
+    // NO va null: sin menú de aplicación, Windows/Linux se quedan sin los
+    // aceleradores de edición y "no se puede pegar" (reporte de clientes,
+    // ago-2026). Se deja SOLO el menú Editar con roles nativos —la barra sigue
+    // oculta por autoHideMenuBar, pero Ctrl+X/C/V/A quedan registrados.
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'editMenu' }]));
   }
+}
+
+/**
+ * Menú contextual (clic derecho) con Cortar/Copiar/Pegar en TODO el sistema.
+ * Electron no trae ninguno: sin esto, el clic derecho no muestra nada en
+ * ninguna ventana y el usuario no tiene forma visible de pegar (reporte de
+ * clientes, ago-2026). Enganchado por `web-contents-created`, cubre la ventana
+ * principal, las de módulos, el manual y el webview de WhatsApp de una vez.
+ */
+function instalarMenuContextual(): void {
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('context-menu', (_e, params) => {
+      const items: Electron.MenuItemConstructorOptions[] = [];
+      if (params.isEditable) {
+        items.push(
+          { role: 'cut', label: 'Cortar', enabled: params.editFlags.canCut },
+          { role: 'copy', label: 'Copiar', enabled: params.editFlags.canCopy },
+          { role: 'paste', label: 'Pegar', enabled: params.editFlags.canPaste },
+          { type: 'separator' },
+          { role: 'selectAll', label: 'Seleccionar todo' },
+        );
+      } else if (params.selectionText.trim()) {
+        items.push({ role: 'copy', label: 'Copiar' });
+      }
+      if (items.length > 0) Menu.buildFromTemplate(items).popup();
+    });
+  });
 }
 
 function createWindow(extraArgs: string[]): void {
@@ -97,6 +128,7 @@ function createWindow(extraArgs: string[]): void {
     return;
   }
   setupAppMenu();
+  instalarMenuContextual();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,

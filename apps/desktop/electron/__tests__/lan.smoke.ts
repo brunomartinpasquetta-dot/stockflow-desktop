@@ -113,6 +113,34 @@ async function main(): Promise<void> {
   const exp = Math.floor(Date.now() / 1000) + 60;
   const jwt = signJwt({ sub: 'user-1', exp }, secret);
   const verified = verifyJwt(jwt, secret);
+  // REGRESIÓN (Leo Citzia, ago-2026): un auth:login llegado por LAN pisaba la
+  // sesión del ESCRITORIO — el admin del servidor pasaba a ser el vendedor de
+  // la terminal y le negaba módulos hasta reiniciar. El fix: setters ALS-aware
+  // + rama sin-JWT del LanServer corriendo en runDetached.
+  {
+    const { SessionStore } = await import('../ipc/session-store');
+    const store = new SessionStore();
+    type U = Parameters<InstanceType<typeof SessionStore>['setSession']>[0];
+    const admin = { id: 'admin-1', username: 'admin', fullName: 'Admin', role: 'admin', active: true, createdAt: 0, updatedAt: 0 } as unknown as U;
+    const vendedor = { id: 'vend-1', username: 'vendedor', fullName: 'Vend', role: 'seller', active: true, createdAt: 0, updatedAt: 0 } as unknown as U;
+    store.setSession(admin, 'token-escritorio');
+
+    // login de terminal, como lo corre el LanServer (rama sin JWT → detached)
+    await store.runDetached(async () => {
+      store.setSession(vendedor, 'token-terminal');
+      check('dentro del RPC, la sesión es la del vendedor', store.getSession()?.user.id === 'vend-1');
+    });
+    check(
+      'un login LAN NO pisa la sesión del escritorio',
+      store.getSession()?.user.id === 'admin-1',
+      `quedó: ${store.getSession()?.user.username}`,
+    );
+
+    // logout de terminal: tampoco puede desloguear al escritorio
+    await store.runDetached(async () => { store.clearSession(); });
+    check('un logout LAN NO desloguea al escritorio', store.getSession()?.user.id === 'admin-1');
+  }
+
   check('signJwt + verifyJwt round-trip', verified?.sub === 'user-1', JSON.stringify(verified));
   const tampered = verifyJwt(jwt + 'x', secret);
   check('JWT con firma corrupta → null', tampered === null);

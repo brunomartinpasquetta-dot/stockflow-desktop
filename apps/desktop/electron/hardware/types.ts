@@ -28,6 +28,12 @@ export interface PrinterConfig {
    */
   silentPrint?: boolean;
   /**
+   * Impresora del SO para los documentos A4 (facturas, reportes). Si está
+   * definida, el A4 se imprime DIRECTO ahí, sin diálogo. Es un campo aparte de
+   * `interface` porque el A4 casi nunca sale por la térmica de tickets.
+   */
+  a4PrinterName?: string | null;
+  /**
    * Imprimir el ticket automáticamente al confirmar una venta. Si es false, la
    * venta NO imprime al confirmar (el operador puede usar "Imprimir último
    * ticket" en el PDV). Default true.

@@ -541,12 +541,18 @@ export function Compras() {
                             {(['margin1', 'margin2', 'margin3'] as const).map((k, idx) => {
                               const m = l.article[k]
                               const costo = Number(parseCurrencyInput(l.costPrice))
-                              const precio = m != null && m !== '' && Number.isFinite(Number(m))
+                              const nuevo = m != null && m !== '' && Number.isFinite(Number(m))
                                 ? Math.round(costo * (1 + Number(m) / 100))
                                 : null
+                              const actual = Number(l.article[`listPrice${idx + 1}` as 'listPrice1'])
+                              if (nuevo == null) return <div key={k}>L{idx + 1}: sin utilidad — no se modifica</div>
                               return (
                                 <div key={k}>
-                                  L{idx + 1}: {precio != null ? formatCurrency(String(precio)) : '—'}
+                                  L{idx + 1}: {formatCurrency(String(actual))}
+                                  {' → '}
+                                  <span className={nuevo !== actual ? 'font-semibold text-foreground' : undefined}>
+                                    {formatCurrency(String(nuevo))}
+                                  </span>
                                 </div>
                               )
                             })}

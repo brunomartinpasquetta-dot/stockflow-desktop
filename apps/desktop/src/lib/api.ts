@@ -447,6 +447,8 @@ export const api = {
       unwrap(sf().print.diagnose(payload)),
     listElectron: (): Promise<import('@/types/api').SystemPrinterDTO[]> =>
       unwrap(sf().print.listElectron()),
+    silentCurrent: (deviceName: string): Promise<{ printed: boolean }> =>
+      unwrap(sf().print.silentCurrent({ deviceName })),
   },
   desktopWindow: {
     open: (

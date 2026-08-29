@@ -42,6 +42,11 @@ export function useEmbeddedShortcuts(): void {
     function onKey(e: KeyboardEvent) {
       const k = e.key.toLowerCase()
 
+      // Escribiendo en un campo NO se disparan atajos de ventana: Ctrl+W acá
+      // cerraba la ventana mientras el usuario editaba (y en Windows, Ctrl+M
+      // la minimizaba a mitad de un campo).
+      if (isEditingTarget() && (e.metaKey || e.ctrlKey)) return
+
       // Cmd/Ctrl+W → cerrar esta ventana nativa.
       if ((e.metaKey || e.ctrlKey) && k === 'w') {
         e.preventDefault()

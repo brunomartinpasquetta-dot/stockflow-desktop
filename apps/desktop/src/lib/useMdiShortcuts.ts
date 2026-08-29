@@ -32,8 +32,9 @@ export function useMdiShortcuts(): void {
     function onKey(e: KeyboardEvent) {
       const k = e.key.toLowerCase()
 
-      // Ctrl+L → logout.
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && k === 'l') {
+      // Ctrl+L → logout. NUNCA mientras se escribe en un campo: desloguear al
+      // cajero a mitad de una carga es destructivo.
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && k === 'l' && !isEditingTarget()) {
         e.preventDefault()
         void logout()
         return
