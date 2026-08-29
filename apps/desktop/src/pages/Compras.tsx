@@ -40,11 +40,18 @@ interface CompraLine {
   costPrice: string
   vatRate: string
   /** Nuevo precio de venta (vacío = no cambia listPrice1). */
-  newSalePrice: string
-  /** true = el campo de venta se carga como % de utilidad sobre el costo. */
-  salePriceAsPct: boolean
-  /** El % tipeado (sólo en modo %). El precio resultante vive en newSalePrice. */
-  salePct: string
+  /**
+   * Precio nuevo POR LISTA, editable en pantalla. En modo manual arranca con
+   * el precio vigente; en modo utilidad, con costo × margen (redondeado). El
+   * usuario puede pisar cualquiera —por ejemplo si el redondeo no le sirve—
+   * y `editado` recuerda cuáles tocó para no recalcularle encima.
+   */
+  nl1: string
+  nl2: string
+  nl3: string
+  editado1: boolean
+  editado2: boolean
+  editado3: boolean
 }
 
 const VOUCHER_OPTIONS: { value: VoucherType; label: string }[] = [
@@ -224,9 +231,10 @@ export function Compras() {
         quantity: String(Number(p.quantity)),
         costPrice: p.unitPrice ?? art.costPrice,
         vatRate: art.vatRate,
-        newSalePrice: art.listPrice1,
-        salePriceAsPct: false,
-        salePct: '',
+        ...preciosIniciales(art, p.unitPrice ?? art.costPrice, priceMode2),
+        editado1: false,
+        editado2: false,
+        editado3: false,
       })
       supplierIds.add(art.supplierId ?? null)
     }
@@ -268,7 +276,11 @@ export function Compras() {
         ...prev,
         // El campo de precio de venta arranca con el precio VIGENTE: se ve y
         // se pisa ahí mismo. Si queda igual, al guardar no se toca (ver submit).
-        { article, quantity: '1', costPrice: article.costPrice, vatRate: article.vatRate, newSalePrice: article.listPrice1, salePriceAsPct: false, salePct: '' },
+        {
+          article, quantity: '1', costPrice: article.costPrice, vatRate: article.vatRate,
+          ...preciosIniciales(article, article.costPrice, priceMode2),
+          editado1: false, editado2: false, editado3: false,
+        },
       ]
     })
   }
@@ -278,10 +290,39 @@ export function Compras() {
   function setLine<K extends keyof CompraLine>(i: number, key: K, value: CompraLine[K]): void {
     setCart((prev) => {
       const next = [...prev]
-      next[i] = { ...next[i]!, [key]: value }
+      const linea = { ...next[i]!, [key]: value }
+      // En modo utilidad, un costo nuevo recalcula las listas que el usuario
+      // NO pisó a mano — lo editado a mano se respeta siempre.
+      if (key === 'costPrice' && priceMode2 === 'margin') {
+        if (!linea.editado1) linea.nl1 = precioPorUtilidad(String(value), linea.article.margin1)
+        if (!linea.editado2) linea.nl2 = precioPorUtilidad(String(value), linea.article.margin2)
+        if (!linea.editado3) linea.nl3 = precioPorUtilidad(String(value), linea.article.margin3)
+      }
+      next[i] = linea
       return next
     })
   }
+
+  /** costo × (1 + margen%) redondeado a peso entero; '' si no hay margen. */
+  function precioPorUtilidad(costo: string, margen: string | null | undefined): string {
+    if (margen == null || String(margen).trim() === '') return ''
+    const m = Number(String(margen).replace(',', '.'))
+    const c = Number(parseCurrencyInput(costo))
+    if (!Number.isFinite(m) || !(c > 0)) return ''
+    return String(Math.round(c * (1 + m / 100)))
+  }
+  /** Precios iniciales de las 3 listas para un artículo, según el modo. */
+  function preciosIniciales(a: ArticleDTO, costo: string, modo: 'none' | 'manual' | 'margin') {
+    if (modo === 'margin') {
+      return {
+        nl1: precioPorUtilidad(costo, a.margin1),
+        nl2: precioPorUtilidad(costo, a.margin2),
+        nl3: precioPorUtilidad(costo, a.margin3),
+      }
+    }
+    return { nl1: a.listPrice1, nl2: a.listPrice2, nl3: a.listPrice3 }
+  }
+
   function clearCompra(): void {
     setCart([])
     setGlobalDiscount('0')
@@ -344,20 +385,38 @@ export function Compras() {
         priceUpdateMode: priceMode2 === 'none' ? undefined : priceMode2,
         discount: parseCurrencyInput(globalDiscount),
         notes: null,
-        lines: cart.map((l) => ({
-          articleId: l.article.id,
-          quantity: parseCurrencyInput(l.quantity),
-          costPrice: parseCurrencyInput(l.costPrice),
-          // El precio de venta viaja SOLO si el usuario lo cambió: el campo
-          // muestra el vigente, y "igual al vigente" o vacío = no tocar.
-          salePrice:
-            updatePrices &&
-            l.newSalePrice.trim() !== '' &&
-            Number(parseCurrencyInput(l.newSalePrice)) !== Number(l.article.listPrice1)
-              ? parseCurrencyInput(l.newSalePrice)
-              : undefined,
-          vatRate: l.vatRate,
-        })),
+        lines: cart.map((l) => {
+          // Qué viaja por lista (hallazgos de la revisión multi-agente):
+          //  - $0 NUNCA es un precio nuevo: el campo de moneda emite '0' al
+          //    vaciarlo (no ''), y sin este guard "borrar para no tocar"
+          //    dejaba el precio de góndola en cero.
+          //  - Modo utilidad: se manda SIEMPRE lo que está en pantalla (y si
+          //    el campo quedó sin valor, el vigente). Si se omitiera, el
+          //    servidor rellenaría con el cálculo por margen y pisaría en
+          //    silencio un precio tipeado igual al vigente.
+          //  - Modo manual: viaja sólo lo que difiere del vigente.
+          const lista = (valor: string, vigente: string): string | undefined => {
+            if (!updatePrices) return undefined
+            const n = valor.trim() === '' ? 0 : Number(parseCurrencyInput(valor))
+            if (priceMode2 === 'margin') {
+              if (n > 0) return parseCurrencyInput(valor)
+              return Number(vigente) > 0 ? vigente : undefined
+            }
+            if (!(n > 0) || n === Number(vigente)) return undefined
+            return parseCurrencyInput(valor)
+          }
+          const n1 = lista(l.nl1, l.article.listPrice1)
+          return {
+            articleId: l.article.id,
+            quantity: parseCurrencyInput(l.quantity),
+            costPrice: parseCurrencyInput(l.costPrice),
+            salePrice: n1,
+            newListPrice1: n1,
+            newListPrice2: lista(l.nl2, l.article.listPrice2),
+            newListPrice3: lista(l.nl3, l.article.listPrice3),
+            vatRate: l.vatRate,
+          }
+        }),
       })
     },
     onSuccess: (result) => {
@@ -498,7 +557,13 @@ export function Compras() {
                 <th className="w-24 px-2 py-1.5 text-right">Cantidad</th>
                 <th className="w-28 px-2 py-1.5 text-right">{priceMode === 'gross' ? 'Costo (c/IVA)' : 'Costo (neto)'}</th>
                 <th className="w-20 px-2 py-1.5 text-right">IVA</th>
-                {updatePrices && <th className="w-28 px-2 py-1.5 text-right">Nuevo P. venta</th>}
+                {updatePrices && (
+                  <>
+                    <th className="w-28 px-2 py-1.5 text-right">P. Lista 1</th>
+                    <th className="w-28 px-2 py-1.5 text-right">P. Lista 2</th>
+                    <th className="w-28 px-2 py-1.5 text-right">P. Lista 3</th>
+                  </>
+                )}
                 <th className="w-28 px-2 py-1.5 text-right">Subtotal</th>
                 <th className="w-8 px-2 py-1.5" />
               </tr>
@@ -506,7 +571,7 @@ export function Compras() {
             <tbody>
               {cart.length === 0 ? (
                 <tr>
-                  <td colSpan={updatePrices ? 8 : 7} className="py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={updatePrices ? 10 : 7} className="py-10 text-center text-sm text-muted-foreground">
                     Sin líneas — escaneá o buscá un producto para empezar.
                   </td>
                 </tr>
@@ -531,80 +596,33 @@ export function Compras() {
                         {VAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </Select>
                     </td>
-                    {updatePrices && (
-                      <td className="px-2 py-1">
-                        {priceMode2 === 'margin' ? (
-                          // Vista previa de lo que va a quedar cada lista: nada
-                          // se actualiza a ciegas. "—" = esa lista no tiene
-                          // margen cargado y no se toca.
-                          <div className="text-right text-xs tabular-nums text-muted-foreground">
-                            {(['margin1', 'margin2', 'margin3'] as const).map((k, idx) => {
-                              const m = l.article[k]
-                              const costo = Number(parseCurrencyInput(l.costPrice))
-                              const nuevo = m != null && m !== '' && Number.isFinite(Number(m))
-                                ? Math.round(costo * (1 + Number(m) / 100))
-                                : null
-                              const actual = Number(l.article[`listPrice${idx + 1}` as 'listPrice1'])
-                              if (nuevo == null) return <div key={k}>L{idx + 1}: sin utilidad — no se modifica</div>
-                              return (
-                                <div key={k}>
-                                  L{idx + 1}: {formatCurrency(String(actual))}
-                                  {' → '}
-                                  <span className={nuevo !== actual ? 'font-semibold text-foreground' : undefined}>
-                                    {formatCurrency(String(nuevo))}
-                                  </span>
-                                </div>
-                              )
-                            })}
+                    {updatePrices && ([1, 2, 3] as const).map((n) => {
+                      const campo = `nl${n}` as 'nl1'
+                      const editado = `editado${n}` as 'editado1'
+                      const vigente = l.article[`listPrice${n}` as 'listPrice1']
+                      const cambia = l[campo].trim() !== '' && Number(parseCurrencyInput(l[campo])) !== Number(vigente)
+                      return (
+                        <td key={n} className="px-2 py-1">
+                          {/* Editable SIEMPRE, en los dos modos: si el redondeo
+                              automático no le sirve al comercio, lo pisa acá.
+                              Vacío = esa lista no se toca. */}
+                          <CurrencyInput
+                            className={cambia ? 'h-8 border-primary/60 text-right font-medium tabular-nums' : 'h-8 text-right tabular-nums'}
+                            value={l[campo]}
+                            onChange={(v) => {
+                              setCart((prev) => {
+                                const next = [...prev]
+                                next[i] = { ...next[i]!, [campo]: v, [editado]: true }
+                                return next
+                              })
+                            }}
+                          />
+                          <div className="mt-0.5 text-right text-[10px] tabular-nums text-muted-foreground">
+                            {Number(vigente) > 0 ? `hoy ${formatCurrency(vigente)}` : 'sin precio'}
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            {/* $ = precio directo · % = utilidad sobre el costo
-                                nuevo (opción A de Bruno), redondeado a peso. */}
-                            <button
-                              type="button"
-                              className="h-8 w-7 shrink-0 rounded border text-xs font-semibold hover:bg-accent"
-                              title={l.salePriceAsPct ? 'Cambiar a precio en pesos' : 'Cambiar a % de utilidad sobre el costo'}
-                              onClick={() => setLine(i, 'salePriceAsPct', !l.salePriceAsPct)}
-                            >
-                              {l.salePriceAsPct ? '%' : '$'}
-                            </button>
-                            {l.salePriceAsPct ? (
-                              <Input
-                                className="h-8 text-right tabular-nums"
-                                inputMode="decimal"
-                                placeholder="% util."
-                                value={l.salePct}
-                                onChange={(e) => {
-                                  const pct = e.target.value
-                                  const costo = Number(parseCurrencyInput(l.costPrice))
-                                  const n = Number(pct.replace(',', '.'))
-                                  setCart((prev) => {
-                                    const next = [...prev]
-                                    next[i] = {
-                                      ...next[i]!,
-                                      salePct: pct,
-                                      newSalePrice: Number.isFinite(n) && pct.trim() !== ''
-                                        ? `${Math.round(costo * (1 + n / 100))}.0000`
-                                        : next[i]!.newSalePrice,
-                                    }
-                                    return next
-                                  })
-                                }}
-                              />
-                            ) : (
-                              <CurrencyInput className="h-8 text-right tabular-nums" value={l.newSalePrice}
-                                onChange={(v) => setLine(i, 'newSalePrice', v)} />
-                            )}
-                            {l.salePriceAsPct && (
-                              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                = {formatCurrency(l.newSalePrice)}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    )}
+                        </td>
+                      )
+                    })}
                     <td className="px-2 py-1 text-right tabular-nums font-medium">
                       {formatCurrency(lineTotal({ quantity: l.quantity, unitPrice: l.costPrice }))}
                       {priceMode === 'net' && (
@@ -630,7 +648,22 @@ export function Compras() {
           <Select
             className="h-8 w-72"
             value={priceMode2}
-            onChange={(e) => setPriceMode2(e.target.value as 'none' | 'manual' | 'margin')}
+            onChange={(e) => {
+              const modo = e.target.value as 'none' | 'manual' | 'margin'
+              setPriceMode2(modo)
+              // Cambiar el modo re-precarga los precios de TODAS las líneas
+              // con la base del modo nuevo (vigentes o costo × utilidad) y
+              // olvida las ediciones a mano: eran del modo anterior.
+              setCart((prev) =>
+                prev.map((l) => ({
+                  ...l,
+                  ...preciosIniciales(l.article, l.costPrice, modo),
+                  editado1: false,
+                  editado2: false,
+                  editado3: false,
+                })),
+              )
+            }}
           >
             <option value="none">No actualizar precios</option>
             <option value="manual">Actualización manual por renglón</option>

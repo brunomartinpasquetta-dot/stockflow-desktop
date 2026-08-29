@@ -478,6 +478,47 @@ async function main(): Promise<void> {
     );
   }
 
+  // (4) En modo margin, un precio EDITADO EN PANTALLA le gana al cálculo:
+  // el usuario puede pisar el redondeo y eso es lo que se guarda.
+  if (artC.ok && provC.ok) {
+    const c3 = await invoke(handlers, 'purchases:create', {
+      type: 'X', supplierId: provC.data.id, isAccountPurchase: false, fundingSource: 'daily',
+      updatePrices: true, priceUpdateMode: 'margin',
+      payments: [{ paymentMethodId: 'pm-efectivo', amount: '1234.0000' }],
+      lines: [{
+        articleId: artC.data.id, quantity: '1.000', costPrice: '1234.0000',
+        newListPrice1: '1700.0000',
+      }],
+    });
+    const a3 = await invoke<{ listPrice1: string; listPrice2: string }>(handlers, 'articles:get', { id: artC.data.id });
+    check(
+      'modo utilidad: el precio pisado a mano le gana al cálculo (1700, no 1666)',
+      c3.ok && a3.ok && a3.data.listPrice1 === '1700.0000' && a3.data.listPrice2 === '2221.0000',
+      a3.ok ? `l1=${a3.data.listPrice1} l2=${a3.data.listPrice2}` : JSON.stringify(c3),
+    );
+  }
+
+  // (5) '$0' NUNCA pisa un precio: un campo vaciado en un cliente viejo llega
+  // como '0' y el servidor lo descarta (hallazgo de la revisión multi-agente:
+  // sin este guard, la góndola quedaba en $0).
+  if (artC.ok && provC.ok) {
+    const c4 = await invoke(handlers, 'purchases:create', {
+      type: 'X', supplierId: provC.data.id, isAccountPurchase: false, fundingSource: 'daily',
+      updatePrices: true, priceUpdateMode: 'manual',
+      payments: [{ paymentMethodId: 'pm-efectivo', amount: '500.0000' }],
+      lines: [{
+        articleId: artC.data.id, quantity: '1.000', costPrice: '500.0000',
+        newListPrice1: '0', newListPrice2: '0.0000',
+      }],
+    });
+    const a4 = await invoke<{ listPrice1: string; listPrice2: string }>(handlers, 'articles:get', { id: artC.data.id });
+    check(
+      "un precio '0' se descarta: la góndola no queda en cero",
+      c4.ok && a4.ok && Number(a4.data.listPrice1) > 0 && Number(a4.data.listPrice2) > 0,
+      a4.ok ? `l1=${a4.data.listPrice1} l2=${a4.data.listPrice2}` : JSON.stringify(c4),
+    );
+  }
+
   // sales:voidRange — anulación en lote del día. Va AL FINAL a propósito: anula
   // la venta que usaron todos los checks anteriores, así que mover esto para
   // arriba los rompe. Lo que importa verificar es que no sea un borrado suelto:

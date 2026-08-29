@@ -22,6 +22,10 @@ export interface PurchaseLineDraft {
   costPrice: string;
   /** Nuevo precio de venta sugerido (se aplica a listPrice1 si updatePrices=true). Vacío → listPrice1 actual. */
   salePrice?: string;
+  /** Precios nuevos por lista, editados en pantalla. Prioridad sobre el cálculo por margen. */
+  newListPrice1?: string;
+  newListPrice2?: string;
+  newListPrice3?: string;
   vatRate?: string;
 }
 
@@ -119,14 +123,28 @@ export class PurchasesService {
       // Modo "por utilidad": las listas salen del margen guardado en el
       // artículo. Una lista sin margen no se toca — mejor un precio viejo que
       // uno inventado.
+      // LO QUE MANDA LA PANTALLA ES LA VERDAD: los precios por lista vienen
+      // editables desde Compras (el usuario puede pisar el redondeo a mano) y
+      // tienen prioridad. El cálculo por margen es el FALLBACK, para
+      // terminales viejas que no mandan listas en modo 'margin'.
+      // Un precio nuevo tiene que ser > 0: '0' llega de campos vaciados en
+      // clientes viejos y dejaría la góndola en cero. Se descarta acá también
+      // — defensa en el servidor, no sólo en la pantalla.
+      const positivo = (v: string | undefined): string | undefined =>
+        v != null && Number(v) > 0 ? v : undefined;
+      const deLinea = {
+        newListPrice1: positivo(line.newListPrice1),
+        newListPrice2: positivo(line.newListPrice2),
+        newListPrice3: positivo(line.newListPrice3),
+      };
       const porMargen =
         modoPrecios === 'margin'
           ? {
-              newListPrice1: precioPorMargen(line.costPrice, article.margin1),
-              newListPrice2: precioPorMargen(line.costPrice, article.margin2),
-              newListPrice3: precioPorMargen(line.costPrice, article.margin3),
+              newListPrice1: deLinea.newListPrice1 ?? precioPorMargen(line.costPrice, article.margin1),
+              newListPrice2: deLinea.newListPrice2 ?? precioPorMargen(line.costPrice, article.margin2),
+              newListPrice3: deLinea.newListPrice3 ?? precioPorMargen(line.costPrice, article.margin3),
             }
-          : {};
+          : deLinea;
       const manual = line.salePrice && line.salePrice.trim() !== '' ? line.salePrice : undefined;
       resolvedLines.push({
         articleId: line.articleId,
@@ -134,10 +152,11 @@ export class PurchasesService {
         costPrice: line.costPrice,
         // El precio de venta del RENGLÓN (queda en el historial de la compra):
         // el que va a regir en lista 1 después de guardar.
-        salePrice:
-          (modoPrecios === 'margin' ? porMargen.newListPrice1 : manual) ?? article.listPrice1,
+        salePrice: porMargen.newListPrice1 ?? manual ?? article.listPrice1,
         vatRate: line.vatRate ?? article.vatRate,
-        ...(modoPrecios === 'manual' && manual ? { newListPrice1: manual } : {}),
+        ...(modoPrecios === 'manual' && manual && !porMargen.newListPrice1
+          ? { newListPrice1: manual }
+          : {}),
         ...porMargen,
       });
     }
