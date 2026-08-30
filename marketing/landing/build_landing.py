@@ -7,6 +7,7 @@ W = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(W, 'assets')
 os.makedirs(ASSETS, exist_ok=True)
 def b64(p): return base64.b64encode(open(p,'rb').read()).decode()
+IMG_WH = {}  # ruta emitida -> (w,h) reales, para width/height en los <img> (sin CLS)
 def img(n, maxw=1400, q=80, lossless=False):
     """Optimiza la imagen (resize + WebP) y la escribe como ARCHIVO en assets/
     en vez de embeberla en base64: el HTML queda liviano (carga instantánea en
@@ -24,11 +25,17 @@ def img(n, maxw=1400, q=80, lossless=False):
     slug = os.path.splitext(n)[0].replace('.', '-')
     fn = f"{slug}-{maxw}{'ll' if lossless else f'q{q}'}.webp"
     open(os.path.join(ASSETS, fn), 'wb').write(buf.getvalue())
+    IMG_WH[f"assets/{fn}"] = (im.width, im.height)
     return f"assets/{fn}"
+def wh(src):
+    w, h = IMG_WH[src]
+    return f"width='{w}' height='{h}'"
 def font(f): return base64.b64encode(open(os.path.join(W,'fonts',f),'rb').read()).decode()
 PDV=img('pdv.png'); ART=img('articulos.png'); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
 CAJA2=img('caja-abierta-resumen.png'); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
-LOGO=img('logo-full.png', maxw=760, lossless=True); CUBE=img('cube-hd.png', maxw=800, lossless=True)
+# El cubo es el LCP del hero: mitad de tamaño visual (CSS) + mitad de píxeles (maxw=400,
+# alcanza para 180px CSS a 2x DPR) + lossy q90 para quedar ~60 KB en vez de 172 KB.
+LOGO=img('logo-full.png', maxw=760, lossless=True); CUBE=img('cube-hd.png', maxw=400, q=90)
 # ────────────────────────────────────────────────────────────────────────────
 # TRACKING — completar ACÁ y regenerar (python3 build_landing.py).
 # Estos valores se inyectan en js/tracking.js y en el <noscript> del píxel.
@@ -51,16 +58,17 @@ GAL=[('panel-principal.png','Pantalla principal'),('pdv.png','Ventas — Punto d
  ('contabilidad-resumen.png','Contabilidad y Libro IVA'),('compras-principal.png','Compras'),
  ('clientes-listado.png','Clientes')]
 GAL_I=[(img(f),c) for f,c in GAL]
-GAL_SLIDES="".join(f"<figure class='cf-card' data-i='{k}'><div class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span><span class='gbt'>StockFlow — {c}</span><span class='gzoom'>⤢</span></div><img loading='lazy' src='{s}' alt='{c}'/></div></figure>" for k,(s,c) in enumerate(GAL_I))
+GAL_SLIDES="".join(f"<figure class='cf-card' data-i='{k}'><div class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span><span class='gbt'>StockFlow — {c}</span><span class='gzoom'>⤢</span></div><img loading='lazy' src='{s}' {wh(s)} alt='{c}'/></div></figure>" for k,(s,c) in enumerate(GAL_I))
 GAL_DOTS="".join(f"<button class='gdot' data-i='{k}' aria-label='Pantalla {k+1}'></button>" for k in range(len(GAL_I)))
 
 def face(w): return (f"@font-face{{font-family:'Jak';font-style:normal;font-weight:{w};font-display:swap;"
                      f"src:url(data:font/woff2;base64,{font(f'jakarta-{w}.woff2')}) format('woff2');}}")
 def face2(fam,fn,w): return (f"@font-face{{font-family:'{fam}';font-style:normal;font-weight:{w};font-display:swap;"
                      f"src:url(data:font/woff2;base64,{font(fn)}) format('woff2');}}")
-# Tipografía ÚNICA de la página = la del logo StockFlow: Plus Jakarta Sans
-# (logo-full.svg: 'Stock' en 800, 'Flow' en 600). Sin Montserrat.
-FONTS="".join(face(w) for w in (400,500,600,700,800))
+# Tipografía ÚNICA de la página = la del logo StockFlow: Plus Jakarta Sans.
+# Solo DOS caras embebidas (400 y 700): las 5 caras eran el 57% del HTML crítico.
+# El matching CSS resuelve el resto sin tocar cada declaración: 500→400, 600→700, 800→700.
+FONTS="".join(face(w) for w in (400,700))
 
 # iconos line (24) currentColor
 def sic(p): return f"<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'>{p}</svg>"
@@ -114,7 +122,9 @@ CSS=f"""
 html{{scroll-behavior:smooth;}}
 body{{margin:0;font-family:var(--jak);color:var(--body);background:var(--paper);font-size:17px;line-height:1.6;
  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}}
-img{{max-width:100%;display:block;}} a{{color:inherit;text-decoration:none;}}
+/* height:auto es clave: los <img> llevan width/height (anti-CLS) y el CSS los
+   escala por width; sin esto la altura del atributo queda fija y deforma. */
+img{{max-width:100%;height:auto;display:block;}} a{{color:inherit;text-decoration:none;}}
 h1,h2,h3,h4{{color:var(--ink);font-family:var(--disp);font-weight:800;line-height:1.1;letter-spacing:-.02em;margin:0;text-wrap:balance;}}
 .fitem h4,.why h3,.show li,.faq summary{{font-family:var(--disp);font-weight:700;}}
 p{{margin:0;}}
@@ -140,6 +150,8 @@ p{{margin:0;}}
 .nlinks{{display:flex;gap:26px;align-items:center;}}
 .nlinks a{{font-weight:600;font-size:15px;color:var(--body);}} .nlinks a:hover{{color:var(--blue);}}
 .nav .cta{{display:flex;gap:10px;align-items:center;}}
+/* WhatsApp de la nav reducido a ícono: el CTA verde protagonista es la mbar inferior. */
+.nav-wa{{padding:11px 13px;}} .nav-wa .wai{{width:21px;height:21px;}}
 @media(max-width:960px){{.nlinks{{display:none;}} .nav .cta .btn-ghost{{display:none;}} .brand-img{{transform:translateX(0);height:46px;}}}}
 
 /* HERO */
@@ -151,23 +163,27 @@ p{{margin:0;}}
 .badge .st{{color:#f5a623;}}
 h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:var(--blue);}}
 .hero-title{{grid-column:1 / -1;font-family:var(--disp);font-weight:800;color:var(--ink);
- font-size:clamp(40px,6.2vw,74px);line-height:1.0;letter-spacing:-.025em;margin:0 0 2px;text-wrap:balance;}}
+ font-size:clamp(30px,4.2vw,54px);line-height:1.06;letter-spacing:-.025em;margin:0 0 2px;text-wrap:balance;}}
 .hero-title b{{color:var(--blue);}}
-.hero-cube{{height:clamp(240px,30vw,360px);width:auto;display:block;margin:16px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
+/* Orden del hero: H1 → subtítulo → BOTONES → rubros (CTA arriba del pliegue). */
+.hero-sub{{grid-column:1 / -1;font-size:clamp(17px,2vw,20px);color:var(--body);margin:10px 0 0;max-width:62ch;}}
+.hero .hcta{{grid-column:1 / -1;}}
+.hero .dl-alt{{grid-column:1 / -1;}}
+.hero-cube{{height:clamp(120px,15vw,180px);width:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
 /* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
 .rubros-hero{{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
- gap:12px 14px;margin:-0.5cm 0 4px;}}
+ gap:12px 14px;margin:18px 0 4px;position:relative;z-index:120;}}
 .rh{{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;
  font-family:var(--disp);font-weight:700;font-size:15px;color:var(--ink);transition:color .15s;}}
 .rh:hover{{color:var(--blue);}}
 .rh i{{color:var(--blue);display:inline-flex;flex:none;}}
 .rh i svg{{width:31px;height:31px;stroke-width:2;}}
-@media(max-width:900px){{.rubros-hero{{justify-content:flex-start;gap:12px 22px;margin-top:-0.2cm;}} .rh{{font-size:14.5px;}} .rh i svg{{width:28px;height:28px;}}}}
+@media(max-width:900px){{.rubros-hero{{justify-content:flex-start;gap:12px 22px;margin-top:12px;}} .rh{{font-size:14.5px;}} .rh i svg{{width:28px;height:28px;}}}}
 @media(max-width:480px){{.rubros-hero{{margin-top:6px;}} .rh{{font-size:14px;}}}}
 .sr-only{{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}}
 .lead b{{color:var(--ink);font-weight:800;}}
 .hero .lead{{font-size:19px;margin-top:20px;max-width:40ch;}}
-.hcta{{display:flex;gap:16px;margin-top:30px;flex-wrap:wrap;align-items:center;}}
+.hcta{{display:flex;gap:16px;margin-top:22px;flex-wrap:wrap;align-items:center;}}
 .hcta .btn{{padding:11px 15px;font-size:14.5px;flex-shrink:0;}}
 .hcta .trust{{margin-top:0;flex:1;min-width:260px;}}
 .dl-alt{{margin-top:10px;font-size:13.5px;color:var(--body);}}
@@ -185,7 +201,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .trust .wa-c{{width:34px;height:34px;border-radius:50%;background:var(--wa);color:#053d1c;display:grid;place-items:center;}}
 .trust .wa-c svg{{width:19px;height:19px;}}
 .shot{{border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 60px rgba(20,40,80,.18);background:#fff;}}
-.hero .shotwrap{{position:relative;margin-top:-103px;}}
+.hero .shotwrap{{position:relative;margin-top:0;}}
 .hero .ftag{{position:absolute;left:-14px;bottom:-16px;background:#fff;border:1px solid var(--line);border-radius:12px;
  box-shadow:0 14px 30px rgba(20,40,80,.16);padding:12px 16px;display:flex;align-items:center;gap:11px;}}
 .hero .ftag .ic{{width:38px;height:38px;border-radius:10px;background:var(--green);color:#fff;display:grid;place-items:center;}}
@@ -321,7 +337,8 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .cfbox{{width:100%;}}
 .cfrow{{position:relative;height:480px;margin-top:14px;}}
 .cf{{position:relative;width:100%;height:100%;perspective:1700px;}}
-.cf-card{{position:absolute;top:50%;left:50%;width:min(90%,560px);
+/* margin:0 mata el margin UA de <figure> (40px) que corría la card del centro. */
+.cf-card{{position:absolute;top:50%;left:50%;width:min(90%,560px);margin:0;
  transform:translate(-50%,-50%);transform-origin:center center;backface-visibility:hidden;cursor:pointer;
  transition:none;will-change:transform,opacity;}}
 .cwin{{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 50px rgba(20,40,80,.30);background:#fff;}}
@@ -330,6 +347,8 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .cfrow .gnav.prev{{left:-6px;}} .cfrow .gnav.next{{right:-6px;}}
 .gzoom{{font-size:14px;color:#9fb3d8;}}
 @media(max-width:960px){{.cfrow{{height:380px;}} .cf-card{{width:min(88%,500px);}}}}
+/* ≤900px el JS pasa el carrusel a modo plano: UNA captura por vez, completa, sin superposición. */
+@media(max-width:900px){{.cfrow{{height:400px;}} .cf-card{{width:min(94%,520px);}}}}
 @media(max-width:560px){{.cfrow{{height:300px;}} .cf-card{{width:min(92%,380px);}} .cfrow .gnav{{width:38px;height:38px;font-size:20px;}}}}
 .gdots{{display:flex;gap:9px;justify-content:center;margin-top:18px;flex-wrap:wrap;}}
 .gdot{{width:9px;height:9px;border-radius:50%;border:0;background:#c8d3e6;cursor:pointer;padding:0;transition:background .2s,transform .2s;}}
@@ -356,15 +375,24 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .pain-sheet{{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 50px rgba(20,40,80,.18);background:#fff;text-align:left;}}
 @media(max-width:820px){{.pain-2col{{grid-template-columns:1fr;gap:26px;}} .pain-head p{{max-width:none;}}}}
 .pain-body{{padding:4px 26px 16px;}}
+/* Prueba social (contenido marcado TODO-PERMISO en el BODY) */
+.social-sec{{padding:36px 0 6px;}}
+.sp-cards{{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:880px;margin:0 auto;}}
+.sp-card{{background:#fff;border:1px solid var(--line);padding:20px 22px;}}
+.sp-name{{font-family:var(--disp);font-weight:700;color:var(--ink);font-size:16.5px;}}
+.sp-meta{{color:var(--body);font-size:14.5px;margin-top:4px;}}
+.sp-foot{{text-align:center;color:var(--body);font-size:15px;margin-top:16px;}}
+@media(max-width:700px){{.sp-cards{{grid-template-columns:1fr;}}}}
 /* CARACTERÍSTICAS PRINCIPALES — 2 columnas compactas */
-.feats-sec{{padding-top:0;margin-top:-42px;}}
+.feats-sec{{padding-top:24px;margin-top:0;}}
+.feats-rest{{padding-top:0;}}
 .feats-sec .sc-intro{{margin-bottom:16px;}}
 .feats-sec .sc-intro p{{margin-top:6px;}}
 .feats{{display:grid;grid-template-columns:1fr 1fr;gap:4px 44px;margin-top:12px;}}
 .feats ul{{list-style:none;margin:0;padding:0;}}
 .feats li{{position:relative;padding:6px 0 6px 24px;border-bottom:1px solid var(--line);font-size:14.5px;color:var(--ink);line-height:1.3;}}
 .feats li::before{{content:'✓';position:absolute;left:2px;top:5px;color:var(--blue);font-weight:800;}}
-@media(max-width:700px){{.feats{{grid-template-columns:1fr;gap:0 0;}} .feats-sec{{margin-top:-18px;}}}}
+@media(max-width:700px){{.feats{{grid-template-columns:1fr;gap:0 0;}}}}
 .pain-row{{display:flex;justify-content:space-between;gap:18px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line);font-size:15.5px;color:var(--ink);}}
 .pain-row>span:first-child{{flex:1;padding-right:14px;}}
 .pain-row .mny{{color:var(--coral);font-weight:600;font-size:19px;white-space:nowrap;}}
@@ -402,7 +430,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .incl2col li{{display:flex;gap:11px;align-items:center;font-size:16px;color:var(--ink);font-weight:500;}}
 .incl2col li svg{{width:20px;height:20px;color:var(--green);flex:none;}}
 @media(max-width:700px){{.mini3{{grid-template-columns:1fr;}} .incl2col{{grid-template-columns:1fr;}}}}
-.facturas{{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:880px;margin:0 auto;align-items:start;}}
+.facturas{{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:20px;max-width:1120px;margin:0 auto;align-items:start;}}
 .fac{{border-radius:16px;padding:26px;}}
 .fac-bad{{background:#fff;border:1.5px dashed #cdd6e6;}}
 .fac-good{{background:var(--blue);color:#fff;box-shadow:0 22px 46px rgba(43,111,214,.30);}}
@@ -410,13 +438,17 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .fac-bad .fac-h{{color:var(--body);}}
 .fr{{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);color:var(--ink);font-size:15px;font-weight:600;}}
 .fr:last-child{{border-bottom:0;}}
+.fac-intro{{font-size:14.5px;color:var(--body);margin:0 0 6px;}}
+.fac-qs{{list-style:none;margin:0;padding:0;}}
+.fac-qs li{{padding:12px 0;border-bottom:1px solid var(--line);color:var(--ink);font-size:15px;font-weight:600;line-height:1.45;}}
+.fac-qs li:last-child{{border-bottom:0;}}
 .fr span{{color:var(--coral);font-weight:700;font-size:13px;text-align:right;}}
 .fr2{{display:flex;gap:10px;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.18);font-size:15.5px;font-weight:600;}}
 .fr2 svg{{width:20px;height:20px;color:#9df0bb;flex:none;}}
 .fac-total{{display:flex;justify-content:space-between;align-items:baseline;margin-top:18px;padding-top:14px;border-top:1.5px solid rgba(255,255,255,.25);}}
 .fac-total>span:first-child{{font-weight:600;}} .fac-total .z{{font-family:var(--disp);font-weight:800;font-size:42px;line-height:1;}}
 .fac-foot{{text-align:center;color:var(--body);margin-top:24px;font-weight:600;font-size:16px;}}
-@media(max-width:700px){{.facturas{{grid-template-columns:1fr;}}}}
+@media(max-width:940px){{.facturas{{grid-template-columns:1fr;max-width:560px;}}}}
 .faq-grid{{display:grid;grid-template-columns:2fr 1fr;gap:30px;align-items:start;}}
 .faq-rail .rail-card{{position:sticky;top:88px;background:var(--blue-t2);border:1px solid var(--line);border-radius:16px;padding:24px;}}
 .rail-card h4{{font-family:var(--disp);font-size:18px;color:var(--ink);margin:0;}} .rail-card p{{color:var(--body);font-size:15px;margin:8px 0 16px;}}
@@ -442,7 +474,7 @@ def sc(sid,rev,klabel,title,body,solve,wtitle,src,notes):
             f"<span class='sc-solve'>{solve}</span>"
             f"<ul class='sc-notes'>{n}</ul></div>"
             f"<div class='si'><figure class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span>"
-            f"<span class='gbt'>StockFlow — {wtitle}</span></div><img loading='lazy' src='{src}' alt='StockFlow {wtitle}'/></figure></div></div>")
+            f"<span class='gbt'>StockFlow — {wtitle}</span></div><img loading='lazy' src='{src}' {wh(src)} alt='StockFlow {wtitle}'/></figure></div></div>")
 
 FEATURES=[('box','Gestión de artículos','Alta, baja y modificación completa.'),
  ('truck','Proveedores','Administrá compras y proveedores.'),
@@ -466,13 +498,19 @@ FEATURES=[('box','Gestión de artículos','Alta, baja y modificación completa.'
 
 BODY=f"""
 <nav class="nav"><div class="wrap">
- <a href="#top" aria-label="StockFlow"><img class="brand-img" src="{LOGO}" alt="StockFlow"/></a>
+ <a href="#top" aria-label="StockFlow"><img class="brand-img" src="{LOGO}" {wh(LOGO)} alt="StockFlow"/></a>
  <div class="nlinks"><a href="#why">Beneficios</a><a href="#func">Funciones</a><a href="#comp">Comparación</a><a href="#precio">Precio</a><a href="#faq">Preguntas</a></div>
- <div class="cta"><a class="btn btn-ghost" href="#precio">Probar gratis</a><a class="btn btn-wa" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}WhatsApp</a></div>
+ <div class="cta"><a class="btn btn-ghost" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">Consultar por WhatsApp</a><a class="btn btn-wa nav-wa" data-sf-cta="whatsapp" aria-label="Consultar por WhatsApp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}</a></div>
 </div></nav>
 
 <header class="hero" id="top"><div class="wrap">
- <h1 class="hero-title">Sistema de Gestión <b>Comercial</b></h1>
+ <h1 class="hero-title">Ventas, stock, caja y fiado de tu comercio en <b>una sola PC</b>.</h1>
+ <p class="hero-sub">Funciona aunque se corte internet y factura con CAE. Instalás, cargás tus productos y arrancás.</p>
+ <div class="hcta">
+  <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}Quiero probarlo en mi comercio</a>
+  <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
+ </div>
+ <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
  <div class="rubros-hero">
   <span class="rh"><i>{G['lu_wrench']}</i>Ferreterías</span>
   <span class="rh"><i>{G['lu_forklift']}</i>Corralones</span>
@@ -483,13 +521,7 @@ BODY=f"""
   <span class="rh"><i>{G['lu_gear']}</i>Repuestos</span>
  </div>
  <div>
-  <img class="hero-cube" src="{CUBE}" alt="StockFlow — Sistema de Gestión Comercial"/>
-  <p class="lead"><b>Controlá tu comercio de punta a punta.</b> Ventas, stock, caja, clientes y precios siempre al día, en una sola PC. Comprobantes en regla y todo funcionando aunque se corte internet.</p>
-  <div class="hcta">
-   <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}Quiero probarlo en mi comercio</a>
-   <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
-  </div>
-  <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
+  <img class="hero-cube" src="{CUBE}" {wh(CUBE)} fetchpriority="high" alt="StockFlow — Sistema de Gestión Comercial"/>
   <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
   <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> — se activa sola al instalar, sin tarjeta · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>
  </div>
@@ -503,6 +535,18 @@ BODY=f"""
  </div>
 </div></header>
 
+<!-- TODO-PERMISO: Coronda Express (Guillermo Peverelli) y Leo Citzia son clientes REALES.
+     Confirmar con ambos que aceptan figurar acá (y que se pase su contacto a interesados)
+     ANTES de mandar tráfico pago a esta página. -->
+<section class="sec social-sec" id="clientes"><div class="wrap">
+ <div class="sc-intro" style="margin-bottom:20px"><h2>Ya lo usan <b>todos los días</b></h2></div>
+ <div class="sp-cards rv">
+  <div class="sp-card"><div class="sp-name">Coronda Express — Guillermo Peverelli</div><div class="sp-meta">Coronda, Santa Fe</div></div>
+  <div class="sp-card"><div class="sp-name">Leo Citzia</div><div class="sp-meta">Factura electrónica con CAE, varias terminales en red</div></div>
+ </div>
+ <p class="sp-foot">Si querés hablar con alguno antes de decidir, te paso el contacto.</p>
+</div></section>
+
 <section class="sec feats-sec"><div class="wrap">
  <div class="sc-intro">
   <h2>Características <b>principales</b></h2>
@@ -511,29 +555,13 @@ BODY=f"""
  <div class="feats">
   <ul>
    <li>Funciona sin internet — seguís vendiendo aunque se corte</li>
-   <li>Asistente virtual Flowy: ayuda 24/7 dentro del sistema</li>
-   <li>Soporte técnico directo por WhatsApp</li>
    <li>Facturación electrónica ARCA (CAE)</li>
-   <li>Integración con Mercado Pago (QR) y WhatsApp</li>
    <li>Punto de venta rápido con ticket térmico</li>
-   <li>Control de stock con alertas de reposición</li>
-   <li>Compras, ventas y presupuestos</li>
-   <li>Cuentas corrientes de clientes y proveedores</li>
-   <li>3 listas de precios + precio mayorista</li>
-   <li>Actualización masiva de precios con vista previa</li>
   </ul>
   <ul>
-   <li>Descuentos por producto y sobre el total</li>
+   <li>Control de stock con alertas de reposición</li>
+   <li>Cuentas corrientes de clientes y proveedores</li>
    <li>Caja diaria con apertura, cierre y arqueo</li>
-   <li>Estadísticas, contabilidad y Libro IVA</li>
-   <li>Importación de productos desde Excel</li>
-   <li>Buscador total: código, marca, familia o proveedor</li>
-   <li>Multiusuario con roles y permisos</li>
-   <li>Varias cajas conectadas en red local</li>
-   <li>Escáner, balanza electrónica y cajón de dinero</li>
-   <li>Reportes exportables a Excel y PDF</li>
-   <li>Backups automáticos: tus datos en tu PC</li>
-   <li>Actualizaciones automáticas incluidas</li>
   </ul>
  </div>
 </div></section>
@@ -559,13 +587,40 @@ BODY=f"""
    <p>PDF A4 con tu encabezado, tu CUIT y la vigencia. El cliente lo aprueba y lo convertís en venta sin volver a cargar los productos.</p>
    <span class="sc-solve">Sin presupuestos armados en Word</span>
    <ul class="sc-notes"><li><b>Membrete y CUIT</b> — impresos automáticamente en el PDF</li><li><b>Vigencia 30 días</b> — quedás cubierto ante un reprecio</li><li><b>Un clic</b> — presupuesto aprobado → venta registrada</li></ul></div>
-  <div class="si"><figure class="a4sheet"><img loading="lazy" src="{PRES}" alt="Presupuesto A4 de StockFlow"/></figure></div>
+  <div class="si"><figure class="a4sheet"><img loading="lazy" src="{PRES}" {wh(PRES)} alt="Presupuesto A4 de StockFlow"/></figure></div>
  </div>
  {sc('sc-ganas',False,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('38,5% de margen',' — tu rentabilidad real'),('Ticket $&#8202;5.832',' — el promedio de compra por cliente'),('Por período y medio de pago',' — el análisis que necesites')])}
  </div>
 </div></section>
 
-
+<section class="sec feats-rest"><div class="wrap">
+ <div class="sc-intro">
+  <h2>Y todo lo demás, <b>incluido</b></h2>
+  <p>Sin módulos aparte ni costos extra: esto viene con el sistema.</p>
+ </div>
+ <div class="feats">
+  <ul>
+   <li>Asistente virtual Flowy: ayuda 24/7 dentro del sistema</li>
+   <li>Soporte técnico directo por WhatsApp</li>
+   <li>Integración con Mercado Pago (QR) y WhatsApp</li>
+   <li>Compras, ventas y presupuestos</li>
+   <li>3 listas de precios + precio mayorista</li>
+   <li>Actualización masiva de precios con vista previa</li>
+   <li>Descuentos por producto y sobre el total</li>
+   <li>Estadísticas, contabilidad y Libro IVA</li>
+  </ul>
+  <ul>
+   <li>Importación de productos desde Excel</li>
+   <li>Buscador total: código, marca, familia o proveedor</li>
+   <li>Multiusuario con roles y permisos</li>
+   <li>Varias cajas conectadas en red local</li>
+   <li>Escáner, balanza electrónica y cajón de dinero</li>
+   <li>Reportes exportables a Excel y PDF</li>
+   <li>Backups automáticos: tus datos en tu PC</li>
+   <li>Actualizaciones automáticas incluidas</li>
+  </ul>
+ </div>
+</div></section>
 
 <section class="sec" id="comp"><div class="wrap">
  <div class="sec-h"><h2>El pago único parece más económico… <span style="color:var(--coral)">hasta el próximo cambio de AFIP</span>.</h2><p>Se paga una vez, pero cada mejora, soporte o adecuación normativa se cobra por separado.</p></div>
@@ -577,12 +632,24 @@ BODY=f"""
    <div class="fr">Actualizaciones y mejoras<span>no incluidas</span></div>
    <div class="fr">Entre versiones<span>seguís con la anterior</span></div>
   </div>
+  <!-- Sin afirmaciones sobre competidores: solo preguntas que el visitante
+       puede hacerle a CUALQUIER sistema, y las respuestas de StockFlow. -->
+  <div class="fac fac-bad">
+   <div class="fac-h">Un mensual más económico</div>
+   <p class="fac-intro">Antes de decidir por precio, preguntale esto a cualquier sistema:</p>
+   <ul class="fac-qs">
+    <li>¿Quién te atiende cuando el sistema falla un sábado a la tarde?</li>
+    <li>¿La adecuación a los cambios de ARCA viene incluida o se cobra aparte?</li>
+    <li>¿Cuentas corrientes, 3 listas de precios y presupuestos están en el plan que te cotizaron, o son módulos extra?</li>
+    <li>¿Podés probarlo 30 días completos sin dejar la tarjeta?</li>
+   </ul>
+  </div>
   <div class="fac fac-good">
    <div class="fac-h">StockFlow · cuota fija</div>
-   <div class="fr2">{chk()}Actualizaciones incluidas</div>
-   <div class="fr2">{chk()}Adecuación a AFIP, incluida</div>
-   <div class="fr2">{chk()}Soporte por WhatsApp, incluido</div>
-   <div class="fac-total"><span>Costos extra</span><span class="z">$0</span></div>
+   <div class="fr2">{chk()}Te atiende quien programó el sistema, por WhatsApp.</div>
+   <div class="fr2">{chk()}Incluida. Costos extra: $0.</div>
+   <div class="fr2">{chk()}Todo incluido en los {money("70.000")}.</div>
+   <div class="fr2">{chk()}Sí. 30 días, sin tarjeta, sin vendedor.</div>
   </div>
  </div>
  <div class="price rv" id="precio" style="margin-top:40px">
@@ -594,8 +661,7 @@ BODY=f"""
     <li>{chk()}Cuentas corrientes, caja y presupuestos A4</li>
     <li>{chk()}Estadísticas, actualizaciones nuevas y AFIP al día</li>
     <li>{chk()}Soporte por WhatsApp, de una persona</li></ul>
-   <div class="anchor">Con recuperar una sola de las pérdidas anteriores —una cobranza pendiente, una lista atrasada— la cuota queda amortizada.</div>
-   <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Empezar la prueba gratis</a>
+   <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Consultar por WhatsApp</a>
    <a data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe" style="display:block;text-align:center;margin-top:10px;font-size:14px">O descargá directo para Windows</a></div>
  </div>
 </div></section>
@@ -604,15 +670,18 @@ BODY=f"""
  <div class="sec-h" style="text-align:left;max-width:none;margin:0 0 40px"><div class="eyebrow">Preguntas</div><h2>Preguntas frecuentes antes de empezar.</h2></div>
  <div class="faq-grid">
   <div class="faq rv">
-   <details open><summary>¿En cuánto tiempo recupero los $&#8202;70.000?<span class="faq-badge">la más consultada</span></summary><div class="a">Habitualmente en la primera semana: al actualizar la lista a tiempo y recuperar una cobranza pendiente, la cuota ya queda cubierta.</div></details>
+   <details open><summary>¿Qué me ahorra concretamente?</summary><div class="a">Repreciar una lista completa pasa de una tarde a un minuto. El fiado deja de estar en papeles sueltos. La caja cierra con el monto exacto. Cuánto vale eso en tu comercio lo sabés vos mejor que yo.</div></details>
    {"".join(f'<details><summary>{q}</summary><div class="a">{a}</div></details>' for q,a in [
     ("¿Necesito internet para usarlo?","No. StockFlow funciona en tu PC de forma 100% offline. La conexión solo se usa para actualizaciones o AFIP. Si se corta, seguís operando con normalidad."),
+    ("Ya lo llevo en Excel, ¿tengo que cargar todo de nuevo?","No. StockFlow importa tus productos desde Excel: códigos, descripciones, precios y stock. Traés tu planilla y el sistema arranca con tu catálogo cargado."),
+    ("¿Cuánto tardo en cargar mis productos?","Si los tenés en Excel, la importación los deja cargados en minutos. Si no, podés cargarlos a medida que vendés — y la instalación asistida incluye dejarte el sistema funcionando con tus productos."),
+    ("¿Puedo pasar los datos del sistema que tengo hoy?","En muchos casos, sí: ya migramos comercios que venían de otros sistemas con sus artículos, clientes y cuentas corrientes. Escribinos por WhatsApp contándonos qué sistema usás y lo vemos con tus datos."),
     ("¿Mis datos quedan en mi PC?","Sí. Tus datos son tuyos y residen en tu computadora. El sistema genera copias de seguridad que guardás donde prefieras."),
     ("¿Por qué suscripción y no pago único?","Porque incluye todo: actualizaciones, soporte y adecuación permanente a AFIP. El pago único deja el sistema en una versión fija y, ante cada cambio normativo, se vuelve a pagar."),
     ("¿Cómo funciona la prueba gratis?","Descargás el instalador, lo instalás y al abrir StockFlow completás tu nombre, comercio y WhatsApp: la prueba de 30 días se activa sola, sin tarjeta. Es el sistema completo. Al finalizar, tus datos quedan intactos y activás tu licencia por WhatsApp."),
     ("¿Incluye la instalación?","Sí. Si la necesitás, lo dejamos instalado y en funcionamiento con tus productos cargados. La prueba gratuita de 30 días incluye la instalación asistida."),
     ("¿Qué pasa si dejo de pagar?","El sistema pasa a modo solo lectura: seguís consultando tu información, pero no cargás nuevas operaciones. No se pierde ningún dato y, al renovar, vuelve a funcionar de forma completa."),
-    ("¿Para qué comercios es?","Para comercios con volumen de operación: ferreterías, corralones, autoservicios, mayoristas, distribuidoras y casas de repuestos."),
+    ("¿Para qué comercios es?","Para comercios con volumen de operación: ferreterías, corralones, autoservicios, indumentaria, mayoristas, distribuidoras y casas de repuestos."),
    ])}
   </div>
   <aside class="faq-rail rv"><div class="rail-card"><h4>¿Tenés otra consulta?</h4><p>Escribinos y te responde una persona, no un bot. Contestamos el mismo día.</p><a class="btn btn-wa" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Consultar por WhatsApp</a></div></aside>
@@ -645,18 +714,34 @@ BODY=f"""
  var lb=document.getElementById('lb'), lbimg=document.getElementById('lbimg');
  var rm=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
  var pos=0, target=0, speed=0.0062, li=0, raf;
+ var mq=window.matchMedia('(max-width:900px)');
  function wrap(d){{while(d>n/2)d-=n; while(d<-n/2)d+=n; return d;}}
  function place(){{
+  var flat=mq.matches;
   cards.forEach(function(c,k){{
-   var d=wrap(k-pos), ad=Math.abs(d);
-   var x=d*45, z=-ad*205, ry=-d*32, s=Math.max(.4,1-ad*0.17), op=Math.max(0,1-ad*0.42);
-   c.style.opacity=''+op; c.style.pointerEvents=(ad<2?'auto':'none'); c.style.zIndex=''+Math.round(100-ad*10);
+   var d=wrap(k-pos), ad=Math.abs(d), x, z, ry, s, op;
+   if(flat){{
+    /* Modo plano (angosto): una captura entera por vez, deslizando de costado. */
+    x=d*106; z=0; ry=0; s=1; op=Math.max(0,1-ad*1.5);
+   }} else {{
+    x=d*45; z=-ad*205; ry=-d*32; s=Math.max(.4,1-ad*0.17); op=Math.max(0,1-ad*0.42);
+   }}
+   c.style.opacity=''+op; c.style.pointerEvents=(ad<(flat?0.5:2)?'auto':'none'); c.style.zIndex=''+Math.round(100-ad*10);
    c.style.transform='translate(-50%,-50%) translateX('+x+'%) translateZ('+z+'px) rotateY('+ry+'deg) scale('+s+')';
   }});
   var ci=((Math.round(pos)%n)+n)%n;
   dots.forEach(function(dt,k){{dt.classList.toggle('on',k===ci);}});
  }}
- function frame(){{ if(!lb.classList.contains('open')) target+=speed; pos+=(target-pos)*0.09; place(); raf=requestAnimationFrame(frame); }}
+ var lastStep=0;
+ function frame(ts){{
+  if(!lb.classList.contains('open')){{
+   if(mq.matches){{
+    /* Plano: avance por pasos (captura quieta y completa entre paso y paso). */
+    if(!lastStep)lastStep=ts;
+    if(ts-lastStep>3800){{target=Math.round(target)+1;lastStep=ts;}}
+   }} else {{ target+=speed; }}
+  }}
+  pos+=(target-pos)*0.09; place(); raf=requestAnimationFrame(frame); }}
  function glideTo(k){{target=pos+wrap(k-pos);}}
  cards.forEach(function(c,k){{c.onclick=function(){{ if(Math.abs(wrap(k-pos))<0.6){{ li=((Math.round(pos)%n)+n)%n; lbimg.src=cards[li].querySelector('img').src; lb.classList.add('open'); }} else {{ glideTo(k); }} }};}});
  dots.forEach(function(dt,k){{dt.onclick=function(){{glideTo(k);}};}});
@@ -707,8 +792,10 @@ HEAD=("<meta name='viewport' content='width=device-width,initial-scale=1'>"
  "<meta property='og:locale' content='es_AR'>"
  "<meta name='twitter:card' content='summary_large_image'>"
  # Módulo único de tracking (Meta Pixel + GA4 + atribución + eventos). Va en el
- # <head> para que los stubs fbq/gtag existan antes de cualquier clic.
- "<script src='js/tracking.js'></script>")
+ # <head> con defer: no bloquea el parser y ejecuta antes de DOMContentLoaded,
+ # así los stubs fbq/gtag y el listener de clics existen antes de que el
+ # visitante pueda interactuar.
+ "<script src='js/tracking.js' defer></script>")
 
 # Medición mínima sin servicios externos: cada clic a WhatsApp manda un beacon a
 
