@@ -146,8 +146,8 @@ export const api = {
     onNavigate: (cb: (phone: string) => void): (() => void) => sf().whatsapp.onNavigate(cb),
   },
   assistant: {
-    ask: (messages: AssistantMessageDTO[], conversationId?: string): Promise<AssistantAskResultDTO> =>
-      unwrap(sf().assistant.ask({ messages, conversationId })),
+    ask: (messages: AssistantMessageDTO[], conversationId?: string, screen?: string): Promise<AssistantAskResultDTO> =>
+      unwrap(sf().assistant.ask({ messages, conversationId, screen })),
   },
   articles: {
     list: (): Promise<ArticleDTO[]> => unwrap(sf().articles.list()),

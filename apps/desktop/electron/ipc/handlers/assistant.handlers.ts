@@ -11,6 +11,7 @@ import { join } from 'node:path';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import { responderConDatos } from '../../assistant/consultas';
+import { resolveScreenArea } from '../../assistant/context';
 import { answerQuestion } from '../../assistant/engine';
 import { kbLoadError } from '../../assistant/kbLoader';
 
@@ -64,10 +65,12 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
     'assistant:ask': withSession(
       deps,
       async (
-        payload: { messages: AssistantMessage[]; conversationId?: string },
+        payload: { messages: AssistantMessage[]; conversationId?: string; screen?: string },
         ctx,
       ): Promise<AssistantAskResult> => {
         const question = lastUserMessage(payload?.messages ?? []);
+        // Contexto de pantalla (E1): pageKey de la ventana donde está el usuario.
+        const screenArea = resolveScreenArea(payload?.screen);
 
         // KB rota/ausente: el asistente se degrada con honestidad (la app ya
         // arrancó igual — ver kbLoader).
@@ -93,7 +96,7 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
           }
         }
 
-        const ans = answerQuestion(question, payload?.conversationId ?? 'default');
+        const ans = answerQuestion(question, payload?.conversationId ?? 'default', screenArea);
         if (ans.kind === 'fallback' && question.trim()) logMiss(deps.userDataDir, deps.appVersion, question.trim());
         return { reply: ans.reply, suggestions: ans.suggestions, image: ans.image };
       },

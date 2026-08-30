@@ -481,8 +481,15 @@ function metaReply(idx: Index, id: string, fallback: string): AssistantAnswer {
 const INTENT_THRESHOLD = 6;
 const MANUAL_THRESHOLD = 5;
 
-/** Responde manteniendo el hilo de la charla `convId`. */
-export function answerQuestion(question: string, convId = 'default'): AssistantAnswer {
+/**
+ * Responde manteniendo el hilo de la charla `convId`.
+ *
+ * `screenArea` (E1): área de KB de la pantalla donde está parado el usuario.
+ * La CONVERSACIÓN manda y la pantalla completa: el boost de contexto usa
+ * `lastArea ?? screenArea`, y en la zona de desambiguación la pantalla
+ * desempata sin preguntar.
+ */
+export function answerQuestion(question: string, convId = 'default', screenArea: string | null = null): AssistantAnswer {
   const idx = getIndex();
   const c = convo(convId);
   c.turn++;
@@ -594,7 +601,8 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   const qTokens = expand(correctTokens(content, idx), idx.aliasToTerm);
   const qNorm = norm;
   const referential = raw.every((t) => REFERENTIAL.has(t) || STOPWORDS.has(t));
-  const ctxArea = c.lastArea;
+  // La conversación manda; si todavía no hay hilo, prioriza la pantalla actual.
+  const ctxArea = c.lastArea ?? screenArea;
 
   const ranked = idx.intents
     .filter((d) => d.area !== 'meta')
@@ -619,6 +627,10 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
     const confident = exact || best.s >= 45 || gap >= 12 || !second;
     // Solo desambiguar en la "zona gris": nada confiado y el 2º pisa los talones.
     if (!confident && second && second.s >= INTENT_THRESHOLD && second.s >= best.s * 0.85 && second.d.gidx !== best.d.gidx) {
+      // El contexto desempata sin preguntar: si uno de los dos candidatos es
+      // del área de la charla/pantalla y el otro no, se responde ese.
+      if (ctxArea && best.d.area === ctxArea && second.d.area !== ctxArea) return answerIntentByIdx(idx, best.d.gidx, c);
+      if (ctxArea && second.d.area === ctxArea && best.d.area !== ctxArea) return answerIntentByIdx(idx, second.d.gidx, c);
       c.clarify = [best.d.gidx, second.d.gidx];
       c.lastArea = best.d.area;
       c.lastIntentIdx = null;
@@ -678,4 +690,12 @@ export function resolveIntentId(question: string, convId = 'default'): string {
 
 export function newConvId(): string {
   return 'test-' + Math.round(performance.now()) + '-' + INDEX!.intents.length;
+}
+
+/** Sólo para tests: área e id del último intent resuelto en la charla. */
+export function lastResolved(convId: string): { area: string; id: string } | null {
+  const c = SESSIONS.get(convId);
+  if (!c || c.lastIntentIdx == null || !INDEX) return null;
+  const d = INDEX.intents[c.lastIntentIdx];
+  return d ? { area: d.area, id: d.id } : null;
 }

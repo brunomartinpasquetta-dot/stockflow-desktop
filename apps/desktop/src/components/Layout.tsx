@@ -100,7 +100,7 @@ function LayoutInner() {
         <WelcomeScreen />
       </div>
       <Taskbar />
-      <AssistantPanel />
+      <AssistantPanel screen="principal" />
     </div>
   )
 }

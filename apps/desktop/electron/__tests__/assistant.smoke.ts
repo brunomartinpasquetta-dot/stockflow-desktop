@@ -6,7 +6,7 @@
  * (2) Conversación: diálogos multi-turno que ejercitan CONTEXTO, seguimientos
  *     referenciales, reexplicación, desambiguación y charla humana.
  */
-import { answerQuestion } from '../assistant/engine';
+import { answerQuestion, lastResolved } from '../assistant/engine';
 
 let convSeq = 0
 const freshId = (): string => `t${convSeq++}`
@@ -125,6 +125,38 @@ for (const d of DIALOGS) {
     if (!ok) fails++
     console.log(`    ${ok ? '✅' : '❌'} "${t.user}"  (${t.why})\n       → ${r.reply.replace(/\n/g, ' ⏎ ').slice(0, 90)}`)
   }
+}
+
+/* ---------- (4) contexto de PANTALLA (E1) ---------- */
+console.log('\n── Contexto de pantalla ──')
+const SCREEN_CASES: { q: string; screenArea: string; expectArea: string; why: string }[] = [
+  { q: 'como agrego productos', screenArea: 'ventas', expectArea: 'ventas', why: 'ambigua ×3 áreas: parado en Ventas responde Ventas' },
+  { q: 'como agrego productos', screenArea: 'presupuestos', expectArea: 'presupuestos', why: 'la misma pregunta en Presupuestos responde Presupuestos' },
+  { q: 'como aplico un descuento global', screenArea: 'compras', expectArea: 'compras', why: 'descuento-global ×3 áreas: gana la pantalla' },
+  { q: 'atajos de teclado', screenArea: 'articulos', expectArea: 'articulos', why: 'atajos ×3 áreas: gana la pantalla' },
+]
+for (const t of SCREEN_CASES) {
+  const id = freshId()
+  const r = answerQuestion(t.q, id, t.screenArea)
+  const res = lastResolved(id)
+  const ok = res?.area === t.expectArea && !r.reply.includes(FALLBACK)
+  if (!ok) fails++
+  console.log(`${ok ? '✅' : '❌'} "${t.q}" @${t.screenArea}  (${t.why})  → ${res ? `${res.area}/${res.id}` : 'sin intent (¿desambiguación?)'}`)
+}
+// La CONVERSACIÓN le gana a la pantalla: 'atajos de teclado' es pattern exacto
+// de intro Y de articulos; con el hilo en articulos (aunque el usuario esté
+// parado en Ventas) tiene que responder articulos. (Ojo: una frase que es
+// pattern exacto de UNA sola área se responde con esa área aunque el hilo
+// venga de otra — frase exacta = pedido explícito; ese caso no se testea acá.)
+{
+  const id = freshId()
+  answerQuestion('como cargo un articulo nuevo', id, 'ventas')
+  const before = lastResolved(id)
+  answerQuestion('atajos de teclado', id, 'ventas')
+  const after = lastResolved(id)
+  const ok = before?.area === 'articulos' && after?.area === 'articulos' && after?.id === 'atajos-teclado'
+  if (!ok) fails++
+  console.log(`${ok ? '✅' : '❌'} hilo en articulos + pantalla ventas → atajos responde articulos  → ${after ? `${after.area}/${after.id}` : 'null'}`)
 }
 
 console.log(fails === 0 ? '\n✅ TODO OK' : `\n❌ ${fails} FALLAS`)

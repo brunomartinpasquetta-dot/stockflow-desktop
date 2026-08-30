@@ -1647,7 +1647,8 @@ export interface ApiSurface {
     onNavigate(cb: (phone: string) => void): () => void;
   };
   assistant: {
-    ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string }): Res<AssistantAskResultDTO>;
+    /** `screen`: pageKey de la ventana donde está el usuario (contexto E1). */
+    ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string; screen?: string }): Res<AssistantAskResultDTO>;
   };
   fiscal: {
     getConfig(): Res<FiscalConfigDTO | null>;

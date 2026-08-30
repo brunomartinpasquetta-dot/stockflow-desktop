@@ -74,7 +74,7 @@ function saveRect(r: Rect): void {
   }
 }
 
-export function AssistantPanel() {
+export function AssistantPanel({ screen }: { screen?: string }) {
   const { state, hide } = useAssistant()
   const open = state === 'open'
   const [messages, setMessages] = useState<ChatMsg[]>([])
@@ -111,7 +111,7 @@ export function AssistantPanel() {
     setGreeted(true)
     void (async () => {
       try {
-        const res = await api.assistant.ask([], convIdRef.current)
+        const res = await api.assistant.ask([], convIdRef.current, screen)
         setMessages([{ role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image }])
       } catch {
         setMessages([{ role: 'assistant', content: '¡Hola! Soy Flowy, tu asistente de StockFlow. Escribime en qué te puedo ayudar.' }])
@@ -169,8 +169,10 @@ export function AssistantPanel() {
     setInput('')
     setBusy(true)
     try {
-      const payload: AssistantMessageDTO[] = next.map((m) => ({ role: m.role, content: m.content }))
-      const res = await api.assistant.ask(payload, convIdRef.current)
+      // Solo viaja la pregunta nueva: el hilo vive en el motor (por convId),
+      // mandar el transcript entero era desperdicio (peor en modo LAN).
+      const payload: AssistantMessageDTO[] = [{ role: 'user', content: q }]
+      const res = await api.assistant.ask(payload, convIdRef.current, screen)
       setMessages((prev) => [...prev, { role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image }])
     } catch {
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Uy, algo falló. Probá de nuevo.' }])

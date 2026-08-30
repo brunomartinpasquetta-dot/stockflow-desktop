@@ -20,6 +20,9 @@ import { type CSSProperties, Suspense, useEffect, useMemo } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { AssistantLauncher } from '@/components/AssistantLauncher'
+import { AssistantPanel } from '@/components/AssistantPanel'
+import { AssistantProvider } from '@/contexts/AssistantContext'
 import { PageSpinner } from '@/components/PageSpinner'
 import { WindowManagerProvider, WindowSelfProvider } from '@/contexts/WindowManagerContext'
 import { api } from '@/lib/api'
@@ -132,6 +135,9 @@ export function EmbeddedWindow() {
   const esMac = navigator.userAgent.includes('Mac')
 
   return (
+    /* Flowy también vive acá (E1): el usuario trabaja en las ventanas de módulo
+       y el asistente responde con el contexto EXACTO de esta pantalla. */
+    <AssistantProvider>
     <div className="flex h-screen flex-col bg-secondary/30">
       {/* En el navegador todo pasa en una sola pestaña: hace falta una forma
           clara de volver al menú principal, porque no hay ventanas que cerrar. */}
@@ -194,6 +200,9 @@ export function EmbeddedWindow() {
       </WindowManagerProvider>
         </div>
       </div>
+      <AssistantLauncher />
+      <AssistantPanel screen={pageKey} />
     </div>
+    </AssistantProvider>
   )
 }
