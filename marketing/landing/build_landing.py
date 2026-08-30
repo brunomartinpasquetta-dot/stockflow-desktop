@@ -32,7 +32,8 @@ def wh(src):
     return f"width='{w}' height='{h}'"
 def font(f): return base64.b64encode(open(os.path.join(W,'fonts',f),'rb').read()).decode()
 PDV=img('pdv.png'); ART=img('articulos.png'); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
-CAJA2=img('caja-abierta-resumen.png'); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
+# caja: la captura nueva es más densa; q=72 la deja <55 KB con los montos legibles
+CAJA2=img('caja-abierta-resumen.png', q=72); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
 # El cubo es el LCP del hero: mitad de tamaño visual (CSS) + mitad de píxeles (maxw=400,
 # alcanza para 180px CSS a 2x DPR) + lossy q90 para quedar ~60 KB en vez de 172 KB.
 LOGO=img('logo-full.png', maxw=760, lossless=True); CUBE=img('cube-hd.png', maxw=400, q=90)
@@ -52,14 +53,23 @@ CUBE_HTML=("<div class='cube3d' aria-hidden='true'><div class='c-halo'></div>"
  + "".join(f"<div class='c-face {c}'><img class='c-lg' src='{CUBE}' alt=''/></div>" for c in ['cf-fr','cf-bk','cf-ri','cf-le','cf-tp','cf-bo'])
  + "</div></div><div class='c-sh'></div></div>")
 
-GAL=[('panel-principal.png','Pantalla principal'),('pdv.png','Ventas — Punto de venta'),('articulos.png','Artículos y precios'),
- ('ctacte.png','Cuentas corrientes'),('presupuestos-crear.png','Presupuestos'),
- ('estadisticas.png','Estadísticas'),('caja-abierta-resumen.png','Caja diaria'),
- ('contabilidad-resumen.png','Contabilidad y Libro IVA'),('compras-principal.png','Compras'),
- ('clientes-listado.png','Clientes')]
-GAL_I=[(img(f),c) for f,c in GAL]
-GAL_SLIDES="".join(f"<figure class='cf-card' data-i='{k}'><div class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span><span class='gbt'>StockFlow — {c}</span><span class='gzoom'>⤢</span></div><img loading='lazy' src='{s}' {wh(s)} alt='{c}'/></div></figure>" for k,(s,c) in enumerate(GAL_I))
+# (archivo fuente en img/, título visible en la barra de ventana, alt descriptivo)
+GAL=[('panel-principal.png','Pantalla principal','Pantalla principal de StockFlow con todos los módulos del sistema'),
+ ('pdv.png','Ventas — Punto de venta','Punto de venta de StockFlow cobrando artículos de ferretería'),
+ ('articulos.png','Artículos y precios','Listado de artículos de ferretería con stock, familias y tres listas de precios'),
+ ('ctacte.png','Cuentas corrientes','Cuentas corrientes con los saldos de cada cliente al día'),
+ ('presupuestos-crear.png','Presupuestos','Pantalla de presupuestos de StockFlow listos para convertir en venta'),
+ ('estadisticas.png','Estadísticas','Estadísticas de ventas con margen bruto y ticket promedio'),
+ ('caja-abierta-resumen.png','Caja diaria','Caja diaria con el efectivo esperado y la comisión de tarjeta descontada'),
+ ('contabilidad-resumen.png','Contabilidad y Libro IVA','Resumen contable y Libro IVA generados por StockFlow'),
+ ('compras-principal.png','Compras','Pantalla de compras con órdenes a proveedores'),
+ ('clientes-listado.png','Clientes','Listado de clientes del comercio en StockFlow')]
+GAL_I=[(img(f),c,a) for f,c,a in GAL]
+GAL_SLIDES="".join(f"<figure class='cf-card' data-i='{k}'><div class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span><span class='gbt'>StockFlow — {c}</span><span class='gzoom'>⤢</span></div><img loading='lazy' src='{s}' {wh(s)} alt='{a}'/></div></figure>" for k,(s,c,a) in enumerate(GAL_I))
 GAL_DOTS="".join(f"<button class='gdot' data-i='{k}' aria-label='Pantalla {k+1}'></button>" for k in range(len(GAL_I)))
+# Vista previa de actualización de precios (actual / nuevo / diferencia): va en el
+# showcase de precios; el listado de artículos queda solo en el carrusel.
+PRECIOS=img('precios-preview.png')
 
 def face(w): return (f"@font-face{{font-family:'Jak';font-style:normal;font-weight:{w};font-display:swap;"
                      f"src:url(data:font/woff2;base64,{font(f'jakarta-{w}.woff2')}) format('woff2');}}")
@@ -466,15 +476,16 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 
 def chk(): return "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12l4.5 4.5L19 7'/></svg>"
 def shot(t,s,a): return (f"<figure class='shot'><img loading='lazy' src='{s}' alt='{a}'/></figure>")
-def sc(sid,rev,klabel,title,body,solve,wtitle,src,notes):
+def sc(sid,rev,klabel,title,body,solve,wtitle,src,notes,alt=None):
     n="".join(f"<li><b>{a}</b>{b}</li>" for a,b in notes)
     r=" rev" if rev else ""
+    alt=alt or f"StockFlow {wtitle}"
     return (f"<div class='show sc{r} rv' id='{sid}'>"
             f"<div class='st'><span class='sc-k'>{klabel}</span><h3>{title}</h3><p>{body}</p>"
             f"<span class='sc-solve'>{solve}</span>"
             f"<ul class='sc-notes'>{n}</ul></div>"
             f"<div class='si'><figure class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span>"
-            f"<span class='gbt'>StockFlow — {wtitle}</span></div><img loading='lazy' src='{src}' {wh(src)} alt='StockFlow {wtitle}'/></figure></div></div>")
+            f"<span class='gbt'>StockFlow — {wtitle}</span></div><img loading='lazy' src='{src}' {wh(src)} alt='{alt}'/></figure></div></div>")
 
 FEATURES=[('box','Gestión de artículos','Alta, baja y modificación completa.'),
  ('truck','Proveedores','Administrá compras y proveedores.'),
@@ -578,10 +589,10 @@ BODY=f"""
   <nav class="anchors"><a href="#sc-ventas">Ventas</a><a href="#sc-precios">Precios</a><a href="#sc-cuentas">Cuentas</a><a href="#sc-caja">Caja</a><a href="#sc-presu">Presupuestos</a><a href="#sc-ganas">Rentabilidad</a></nav>
  </div>
  <div class="sc-wrap">
- {sc('sc-ventas',False,'Punto de venta','Cobrá en segundos, con el IVA ya calculado.','Escaneás el código o escribís el nombre y el producto entra con su precio. Confirmás con F2 y el comprobante queda listo. Si se corta internet, seguís cobrando sin interrupciones.','Sin demoras en el mostrador','Ventas',PDV,[('$&#8202;763,64',' — IVA calculado automáticamente, sin cuentas manuales'),('$&#8202;4.400,00',' — total y vuelto en el momento'),('Pago mixto',' — efectivo y tarjeta en una misma operación')])}
- {sc('sc-precios',False,'Actualización de precios','Actualizá toda la lista en un clic.','Seleccionás la lista, ingresás el porcentaje y se actualiza completa. Sin modificar producto por producto ni planillas manuales.','Sin repreciar artículo por artículo','Artículos',ART,[('+18% a toda la lista',' aplicado en segundos'),('Verde / ámbar',' — identificás qué reponer de un vistazo'),('Hasta 3 listas',' — mostrador, mayorista y especial')])}
- {sc('sc-cuentas',False,'Cuentas corrientes','Sabés quién te debe, cuánto y desde cuándo.','Cada cliente con su saldo actualizado. Registrás la cobranza y la cuenta se ajusta automáticamente, sin deudas anotadas en papeles sueltos.','Sin cuadernos de deuda','Cuentas Corrientes',CTA_,[('$&#8202;7.500',' — el saldo de cada cliente, siempre a la vista'),('Pago parcial',' — registra abonos y lleva el saldo pendiente'),('Saldo corrido',' — cada venta y cada cobranza, en orden')])}
- {sc('sc-caja',False,'Caja y arqueo','Al cierre sabés exactamente cuánto debe haber en caja.','Cada medio de pago discriminado, con la comisión de tarjeta ya descontada y el efectivo esperado calculado. Cerrás la caja con el monto exacto, sin estimaciones.','Sin descuadres al cierre','Caja diaria',CAJA2,[('Efectivo esperado',' — el monto que debe haber para el arqueo'),('Comisión descontada',' — el neto real de cada acreditación'),('Caja general',' — consolidás varias cajas en una')])}
+ {sc('sc-ventas',False,'Punto de venta','Cobrá en segundos, con el IVA ya calculado.','Escaneás el código o escribís el nombre y el producto entra con su precio. Confirmás con F2 y el comprobante queda listo. Si se corta internet, seguís cobrando sin interrupciones.','Sin demoras en el mostrador','Ventas',PDV,[('Escaneá o escribí y Enter',' — el producto entra con su precio de lista'),('F2 confirma, F12 pago mixto',' — efectivo y tarjeta en una misma venta'),('Precios con IVA incluido',' — sin cuentas manuales en el mostrador')],alt='Punto de venta de StockFlow listo para cobrar, con búsqueda por código y pago mixto')}
+ {sc('sc-precios',False,'Actualización de precios','Actualizá toda la lista en un clic.','Seleccionás la lista, ingresás el porcentaje y ves cada cambio antes de confirmarlo: precio actual, nuevo y diferencia, artículo por artículo.','Sin repreciar artículo por artículo','Actualización de precios',PRECIOS,[('+18% con vista previa',' — actual, nuevo y diferencia de cada artículo'),('44 cambios en un clic',' — revisás y confirmás antes de aplicar'),('Hasta 3 listas',' — mostrador, mayorista y especial')],alt='Vista previa de actualización de precios en StockFlow: precio actual, nuevo y diferencia por artículo')}
+ {sc('sc-cuentas',False,'Cuentas corrientes','Sabés quién te debe, cuánto y desde cuándo.','Cada cliente con su saldo actualizado. Registrás la cobranza y la cuenta se ajusta automáticamente, sin deudas anotadas en papeles sueltos.','Sin cuadernos de deuda','Cuentas Corrientes',CTA_,[('$&#8202;13.400',' — el saldo de cada cliente, siempre a la vista'),('Último pago y comprobantes',' — cada cuenta con su historia completa'),('5 con saldo',' — sabés a quién cobrarle de un vistazo')],alt='Cuentas corrientes de StockFlow con cinco clientes con saldo y su último pago')}
+ {sc('sc-caja',False,'Caja y arqueo','Al cierre sabés exactamente cuánto debe haber en caja.','Cada medio de pago discriminado, con la comisión de tarjeta ya descontada y el efectivo esperado calculado. Cerrás la caja con el monto exacto, sin estimaciones.','Sin descuadres al cierre','Caja diaria',CAJA2,[('$&#8202;170.000 esperados en el cajón',' — el monto exacto para el arqueo'),('Comisión descontada',' — el neto real de cada medio de pago'),('Cada movimiento con su hora',' — ventas, señas y retiros del día')],alt='Caja diaria de StockFlow con efectivo esperado, desglose por medio de pago y comisión descontada')}
  <div class="show sc rv" id="sc-presu">
   <div class="st"><span class="sc-k">Presupuestos</span><h3>Presupuestás formal y lo convertís en venta con un clic.</h3>
    <p>PDF A4 con tu encabezado, tu CUIT y la vigencia. El cliente lo aprueba y lo convertís en venta sin volver a cargar los productos.</p>
@@ -589,7 +600,7 @@ BODY=f"""
    <ul class="sc-notes"><li><b>Membrete y CUIT</b> — impresos automáticamente en el PDF</li><li><b>Vigencia 30 días</b> — quedás cubierto ante un reprecio</li><li><b>Un clic</b> — presupuesto aprobado → venta registrada</li></ul></div>
   <div class="si"><figure class="a4sheet"><img loading="lazy" src="{PRES}" {wh(PRES)} alt="Presupuesto A4 de StockFlow"/></figure></div>
  </div>
- {sc('sc-ganas',False,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('38,5% de margen',' — tu rentabilidad real'),('Ticket $&#8202;5.832',' — el promedio de compra por cliente'),('Por período y medio de pago',' — el análisis que necesites')])}
+ {sc('sc-ganas',False,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('38,3% de margen bruto',' — tu rentabilidad real del período'),('Ticket $&#8202;81.459',' — el promedio de compra por cliente'),('Por período y medio de pago',' — el análisis que necesites')],alt='Estadísticas de StockFlow con ventas del mes, ticket promedio y margen bruto')}
  </div>
 </div></section>
 
