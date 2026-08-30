@@ -1,6 +1,6 @@
 /* StockFlow landing — tracking (generado por build_landing.py; completar IDs ahí). */
 var SF_CONFIG = {
-  META_PIXEL_ID: "",
+  META_PIXEL_ID: "1363051382693261",
   GA4_MEASUREMENT_ID: "",
   WA_NUMBER: "543425847340",
   WA_TEXT: "Hola! Quiero probar StockFlow en mi comercio."

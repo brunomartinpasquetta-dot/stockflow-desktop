@@ -33,7 +33,7 @@ LOGO=img('logo-full.png', maxw=760, lossless=True); CUBE=img('cube-hd.png', maxw
 # TRACKING — completar ACÁ y regenerar (python3 build_landing.py).
 # Estos valores se inyectan en js/tracking.js y en el <noscript> del píxel.
 # NO inventar IDs: vacíos = los snippets quedan inertes (stubs sin red).
-META_PIXEL_ID = ""        # ← ID numérico del Píxel de Meta (Administrador de eventos)
+META_PIXEL_ID = "1363051382693261"  # ← ID numérico del Píxel de Meta (Administrador de eventos)
 GA4_MEASUREMENT_ID = ""   # ← "G-XXXXXXXXXX" de la propiedad GA4
 WA_NUM = "543425847340"   # único lugar donde vive el número de WhatsApp
 WA_TEXT = "Hola! Quiero probar StockFlow en mi comercio."

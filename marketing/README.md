@@ -15,7 +15,11 @@ Landing de una sola página, **self-contained** (HTML/CSS/JS inline, imágenes y
 
 **Deploy (additive, VPS Hostinger 187.127.20.131):**
 ```bash
-scp marketing/landing/index.html root@187.127.20.131:/var/www/stockflow-landing/index.html
+./scripts/deploy-landing.sh
+# (regenera con build_landing.py y sube index3.html→index.html + js/ + assets/
+#  + og.jpg + favicon.png, con backup fechado del index anterior. OJO: el scp
+#  de index.html suelto que documentaba este README subía la versión VIEJA
+#  self-contained sin tracking — no volver a ese método.)
 ```
 La raíz de `bpsgsistemas.com` apunta a `/var/www/stockflow-landing/` (vhost `bpsg`; el sitio de agencia quedó preservado en `/var/www/bpsg`). NO toca la API `stockflow.bpsgsistemas.com`.
 
