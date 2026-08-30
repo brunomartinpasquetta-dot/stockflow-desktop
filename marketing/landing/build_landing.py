@@ -31,7 +31,7 @@ def wh(src):
     w, h = IMG_WH[src]
     return f"width='{w}' height='{h}'"
 def font(f): return base64.b64encode(open(os.path.join(W,'fonts',f),'rb').read()).decode()
-PDV=img('pdv.png'); ART=img('articulos.png'); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
+PDV=img('pdv.png'); ART=img('articulos.png', maxw=1200, q=67); CTA_=img('ctacte.png'); PRES=img('presupuesto.png'); EST=img('estadisticas.png')
 # caja: la captura nueva es más densa; q=72 la deja <55 KB con los montos legibles
 CAJA2=img('caja-abierta-resumen.png', q=72); CONTA=img('contabilidad-resumen.png'); COMPRAS=img('compras-principal.png'); CLIENTES=img('clientes-listado.png')
 # El cubo es el LCP del hero: mitad de tamaño visual (CSS) + mitad de píxeles (maxw=400,
@@ -69,7 +69,8 @@ GAL_SLIDES="".join(f"<figure class='cf-card' data-i='{k}'><div class='cwin'><div
 GAL_DOTS="".join(f"<button class='gdot' data-i='{k}' aria-label='Pantalla {k+1}'></button>" for k in range(len(GAL_I)))
 # Vista previa de actualización de precios (actual / nuevo / diferencia): va en el
 # showcase de precios; el listado de artículos queda solo en el carrusel.
-PRECIOS=img('precios-preview.png')
+# Tablas de texto densas: 1200px (sobra para ~600px CSS a 2x) + q agresiva = <55 KB.
+PRECIOS=img('precios-preview.png', maxw=1200, q=64)
 
 def face(w): return (f"@font-face{{font-family:'Jak';font-style:normal;font-weight:{w};font-display:swap;"
                      f"src:url(data:font/woff2;base64,{font(f'jakarta-{w}.woff2')}) format('woff2');}}")
@@ -600,7 +601,7 @@ BODY=f"""
    <ul class="sc-notes"><li><b>Membrete y CUIT</b> — impresos automáticamente en el PDF</li><li><b>Vigencia 30 días</b> — quedás cubierto ante un reprecio</li><li><b>Un clic</b> — presupuesto aprobado → venta registrada</li></ul></div>
   <div class="si"><figure class="a4sheet"><img loading="lazy" src="{PRES}" {wh(PRES)} alt="Presupuesto A4 de StockFlow"/></figure></div>
  </div>
- {sc('sc-ganas',False,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('38,3% de margen bruto',' — tu rentabilidad real del período'),('Ticket $&#8202;81.459',' — el promedio de compra por cliente'),('Por período y medio de pago',' — el análisis que necesites')],alt='Estadísticas de StockFlow con ventas del mes, ticket promedio y margen bruto')}
+ {sc('sc-ganas',False,'Rentabilidad','No es cuánto vendés. Es cuánto te queda.','Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.','Sin vender a ciegas','Estadísticas',EST,[('Margen bruto',' — cuánto te queda, no solo cuánto vendés'),('Ticket promedio',' — cuánto compra cada cliente, en promedio'),('Por período y medio de pago',' — el análisis que necesites')],alt='Estadísticas de StockFlow con ventas del mes, ticket promedio y margen bruto')}
  </div>
 </div></section>
 
