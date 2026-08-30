@@ -2042,7 +2042,7 @@
       "En la pantalla de Artículos (F1) además tenés un filtro desplegable de marcas: arriba de la lista, donde dice 'Todas las marcas', elegí una y la lista muestra solo esa marca.",
       "En los resultados, cada artículo muestra su marca en un chip azul, junto al precio y el stock — así distinguís el mismo producto entre distintos fabricantes."
      ],
-     "image": "articulos-listado"
+     "image": "articulos-listado.png"
     },
     {
      "id": "crear-promocion",
@@ -6355,7 +6355,7 @@
       "Después, en Ventas (F5), cuando cargues ese cliente, mirá el selector 'Lista de precios' (arriba): se cambia solo a la lista asignada y los productos salen con esos precios.",
       "Si para una venta puntual querés otra lista, cambiala a mano en ese selector — vale solo para esa venta."
      ],
-     "image": "pdv-principal"
+     "image": "pdv-principal.png"
     },
     {
      "id": "devolucion-venta",
@@ -9189,7 +9189,7 @@
       "La lista muestra solo los movimientos de ese rango, y al lado ves los totales: 'Ventas del período', las cobranzas y el 'Total del período' (lo que quedó sin pagar de ese rango).",
       "Para volver a ver todos los movimientos, borrá las dos fechas."
      ],
-     "image": "cuentas-corrientes-detalle-cliente"
+     "image": "cuentas-corrientes-detalle-cliente.png"
     },
     {
      "id": "cc-cobrar-periodo",
@@ -9216,7 +9216,7 @@
       "Elegí el medio de pago y confirmá.",
       "Al confirmar se imprime solo el ticket con el detalle del período (cada venta y cobranza del rango, con los totales). El dinero se asigna a las ventas más viejas primero, como siempre."
      ],
-     "image": "cuentas-corrientes-dialogo-cobranza-fifo"
+     "image": "cuentas-corrientes-dialogo-cobranza-fifo.png"
     },
     {
      "id": "cc-exportar-recibo-pdf",

@@ -43,6 +43,11 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # La KB de Flowy y su motor se validan ANTES de compilar: un intents.json
+      # roto brickearía el asistente en todos los clientes con auto-update.
+      - run: pnpm --filter @stockflow/desktop run test:kb
+      - run: pnpm --filter @stockflow/desktop run test:assistant
+      - run: pnpm --filter @stockflow/desktop run test:consultas
       - run: pnpm --filter @stockflow/desktop run build:web
       - run: pnpm --filter @stockflow/desktop run build:electron
       - name: Publish (macOS)

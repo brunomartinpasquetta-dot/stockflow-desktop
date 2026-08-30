@@ -181,6 +181,13 @@ const REFERENTIAL = new Set([
 interface IntentDoc {
   kind: 'intent';
   area: string;
+  /**
+   * Índice GLOBAL del intent en `Index.intents`. Toda referencia interna
+   * (desambiguación, ofertas, respuesta elegida) usa este índice y no el `id`:
+   * hay ids repetidos entre áreas (p.ej. `descuento-global` en ventas y en
+   * presupuestos) y resolver por id devolvía el intent de OTRA área.
+   */
+  gidx: number;
   id: string;
   canonical: string;
   answer: string;
@@ -261,6 +268,7 @@ function buildIndex(): Index {
       const doc: IntentDoc = {
         kind: 'intent',
         area: area.area,
+        gidx: intents.length,
         id: it.id,
         canonical: it.canonical,
         answer: it.answer,
@@ -418,7 +426,7 @@ interface Convo {
   lastIntentIdx: number | null;
   lastSteps: string[];
   offeredIdx: number[]; // relacionados ofrecidos ("¿querés ver X?")
-  clarify: string[]; // dos ids en desambiguación
+  clarify: number[]; // dos ÍNDICES globales en desambiguación
   walkIdx: number; // índice del último paso entregado en modo "paso a paso" (-1 = no arrancó)
   turn: number;
 }
@@ -510,8 +518,8 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   if (c.clarify.length === 2) {
     const opts = c.clarify;
     c.clarify = [];
-    if (phraseHas(low, ORDINAL_SECOND)) return answerIntent(idx, opts[1]!, c);
-    if (has(raw, AFFIRM) || phraseHas(low, ORDINAL_FIRST)) return answerIntent(idx, opts[0]!, c);
+    if (phraseHas(low, ORDINAL_SECOND)) return answerIntentByIdx(idx, opts[1]!, c);
+    if (has(raw, AFFIRM) || phraseHas(low, ORDINAL_FIRST)) return answerIntentByIdx(idx, opts[0]!, c);
     // Si no eligió, seguimos con el flujo normal (quizá reformuló).
   }
 
@@ -579,7 +587,7 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
 
   // ── 4) "sí/dale" → tomar el tema relacionado ofrecido ──
   if (raw.length <= 2 && has(raw, AFFIRM) && c.offeredIdx.length) {
-    return answerIntent(idx, idx.intents[c.offeredIdx[0]!]!.id, c);
+    return answerIntentByIdx(idx, c.offeredIdx[0]!, c);
   }
 
   // ── 5) Búsqueda de intent (con typos y contexto) ──
@@ -610,8 +618,8 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
     const gap = second ? best.s - second.s : 999;
     const confident = exact || best.s >= 45 || gap >= 12 || !second;
     // Solo desambiguar en la "zona gris": nada confiado y el 2º pisa los talones.
-    if (!confident && second && second.s >= INTENT_THRESHOLD && second.s >= best.s * 0.85 && second.d.id !== best.d.id) {
-      c.clarify = [best.d.id, second.d.id];
+    if (!confident && second && second.s >= INTENT_THRESHOLD && second.s >= best.s * 0.85 && second.d.gidx !== best.d.gidx) {
+      c.clarify = [best.d.gidx, second.d.gidx];
       c.lastArea = best.d.area;
       c.lastIntentIdx = null;
       return {
@@ -620,7 +628,7 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
         kind: 'meta',
       };
     }
-    return answerIntent(idx, best.d.id, c);
+    return answerIntentByIdx(idx, best.d.gidx, c);
   }
 
   // ── 6) Red de contención: manual ──
@@ -639,10 +647,10 @@ export function answerQuestion(question: string, convId = 'default'): AssistantA
   };
 }
 
-function answerIntent(idx: Index, id: string, c: Convo): AssistantAnswer {
-  const j = idx.intents.findIndex((d) => d.id === id && d.area !== 'meta');
+function answerIntentByIdx(idx: Index, j: number, c: Convo): AssistantAnswer {
   const d = idx.intents[j];
-  if (!d) return { reply: 'Perdón, no encontré eso. ¿Lo reformulás?', suggestions: idx.topSuggestions, kind: 'fallback' };
+  if (!d || d.area === 'meta')
+    return { reply: 'Perdón, no encontré eso. ¿Lo reformulás?', suggestions: idx.topSuggestions, kind: 'fallback' };
   c.lastArea = d.area;
   c.lastIntentIdx = j;
   c.lastSteps = d.steps;

@@ -9,12 +9,28 @@
  * consulta reconoce una forma de preguntar y ejecuta una lectura concreta de
  * la base. Si no está seguro, no responde y deja que siga el motor de siempre
  * — es preferible explicar dónde mirar que inventar un número.
+ *
+ * PERMISOS: cada consulta declara qué PermissionAction requiere y se valida
+ * contra el rol del usuario en sesión. Flowy responde con los MISMOS límites
+ * que la UI: un rol sin Reportes no obtiene las ventas del día por el chat.
  */
+import { effectivePermissionsFor, type PermissionAction } from '@stockflow/core';
 import type { Repositories } from '@stockflow/db';
+import type { UserRole } from '@stockflow/shared';
 
 export interface ConsultaCtx {
   repos: Repositories;
+  user: { role: UserRole };
 }
+
+/** Mismo criterio que la UI: la lista efectiva de permisos del rol. */
+function puede(user: { role: UserRole }, permiso: PermissionAction): boolean {
+  return effectivePermissionsFor(user.role).includes(permiso);
+}
+
+const SIN_PERMISO =
+  'Esa información está limitada por los permisos de tu usuario, así que no te la puedo mostrar. ' +
+  'Si la necesitás, pedísela a quien administra StockFlow en tu comercio.';
 
 /** Sin acentos y en minúsculas, para comparar como la gente escribe. */
 function norm(s: string): string {
@@ -43,12 +59,15 @@ interface Consulta {
   id: string;
   /** Frases que disparan la consulta (ya normalizadas). */
   frases: string[];
+  /** Permiso necesario para ver este dato — el mismo que exige la UI. */
+  permiso: PermissionAction;
   responder: (ctx: ConsultaCtx, pregunta: string) => Promise<string | null>;
 }
 
 const CONSULTAS: Consulta[] = [
   {
     id: 'ventas-de-hoy',
+    permiso: 'view_reports',
     frases: [
       'cuanto vendi hoy', 'cuanto vendimos hoy', 'ventas de hoy', 'venta del dia',
       'cuanto se vendio hoy', 'total vendido hoy', 'cuanto facture hoy',
@@ -68,6 +87,7 @@ const CONSULTAS: Consulta[] = [
   },
   {
     id: 'efectivo-en-caja',
+    permiso: 'open_cash',
     frases: [
       'cuanto hay en caja', 'cuanto tengo en caja', 'efectivo en caja',
       'cuanta plata hay en caja', 'saldo de caja', 'cuanto hay en el cajon',
@@ -91,6 +111,7 @@ const CONSULTAS: Consulta[] = [
   },
   {
     id: 'saldo-caja-general',
+    permiso: 'view_cash_general',
     frases: [
       'cuanto hay en caja general', 'saldo de caja general', 'cuanto tengo en la caja fuerte',
       'cuanto hay en la caja general', 'plata en caja general',
@@ -105,6 +126,7 @@ const CONSULTAS: Consulta[] = [
   },
   {
     id: 'quien-me-debe',
+    permiso: 'receive_payment',
     frases: [
       'quien me debe', 'quienes me deben', 'cuanto me deben', 'deudores',
       'clientes que me deben', 'cuentas corrientes pendientes', 'total por cobrar',
@@ -132,6 +154,7 @@ const CONSULTAS: Consulta[] = [
   },
   {
     id: 'stock-bajo',
+    permiso: 'view_articles',
     frases: [
       'que articulos tengo que reponer', 'stock bajo', 'articulos con poco stock',
       'que me falta comprar', 'que tengo que pedir', 'articulos sin stock',
@@ -150,24 +173,37 @@ const CONSULTAS: Consulta[] = [
   },
 ];
 
-/** Consultas de un artículo puntual: precio y stock. */
-const PATRON_ARTICULO = [
-  /(?:tengo|hay|queda|quedan)\s+stock\s+de\s+(.+)/,
-  /(?:cuanto|cuantos|cuantas)\s+(?:stock\s+)?(?:tengo|hay|quedan?)\s+de\s+(.+)/,
-  /stock\s+de\s+(.+)/,
-  /(?:cuanto|a cuanto)\s+(?:cuesta|sale|esta|vale)\s+(?:el|la|los|las)?\s*(.+)/,
-  /precio\s+de\s+(?:la|el|los|las)?\s*(.+)/,
+/**
+ * Consultas de un artículo puntual: precio y stock.
+ *
+ * `estricto`: los patrones con "stock de X" / "precio de X" son inequívocamente
+ * sobre artículos → si no hay resultados se responde "no lo encontré" (útil).
+ * El patrón amplio de precio ("cuánto cuesta/sale/está X") matchea CUALQUIER
+ * cosa ("¿a cuánto está el dólar?"): si no encuentra el artículo devuelve null
+ * para que la pregunta siga al motor de conocimiento y quede en el log de
+ * misses — antes secuestraba la pregunta y moría acá.
+ */
+const PATRON_ARTICULO: { rx: RegExp; estricto: boolean }[] = [
+  { rx: /(?:tengo|hay|queda|quedan)\s+stock\s+de\s+(.+)/, estricto: true },
+  { rx: /(?:cuanto|cuantos|cuantas)\s+(?:stock\s+)?(?:tengo|hay|quedan?)\s+de\s+(.+)/, estricto: true },
+  { rx: /stock\s+de\s+(.+)/, estricto: true },
+  { rx: /(?:cuanto|a cuanto)\s+(?:cuesta|sale|esta|vale)\s+(?:el|la|los|las)?\s*(.+)/, estricto: false },
+  { rx: /precio\s+de\s+(?:la|el|los|las)?\s*(.+)/, estricto: true },
 ];
 
 async function consultarArticulo(ctx: ConsultaCtx, pregunta: string): Promise<string | null> {
+  // Consultar artículos por chat exige el mismo permiso que verlos en la UI.
+  if (!puede(ctx.user, 'view_articles')) return null;
   const n = norm(pregunta);
   let termino: string | null = null;
   let quierePrecio = false;
-  for (const rx of PATRON_ARTICULO) {
+  let estricto = false;
+  for (const { rx, estricto: e } of PATRON_ARTICULO) {
     const m = n.match(rx);
     if (m?.[1]) {
       termino = m[1].trim();
       quierePrecio = /cuesta|sale|vale|precio|esta/.test(rx.source);
+      estricto = e;
       break;
     }
   }
@@ -175,6 +211,7 @@ async function consultarArticulo(ctx: ConsultaCtx, pregunta: string): Promise<st
 
   const encontrados = await ctx.repos.articles.searchByText(termino);
   if (!encontrados.length) {
+    if (!estricto) return null; // pregunta ambigua sin match → sigue el motor
     return `No encontré ningún artículo que se llame "${termino}". Probá con otra palabra.`;
   }
   if (encontrados.length === 1) {
@@ -201,15 +238,26 @@ export async function responderConDatos(
   const n = norm(pregunta);
   if (!n) return null;
 
+  // Gana la frase MÁS ESPECÍFICA (más larga) entre todas las consultas, no la
+  // primera en orden de lista: "cuánto hay en caja general" contiene también
+  // "cuanto hay en caja" y respondía el efectivo de la caja diaria.
+  let mejor: { c: Consulta; len: number } | null = null;
   for (const c of CONSULTAS) {
-    if (c.frases.some((f) => n.includes(f))) {
-      try {
-        return await c.responder(ctx, pregunta);
-      } catch {
-        // Si la consulta falla, mejor que conteste el motor de siempre que
-        // devolver un error al usuario.
-        return null;
-      }
+    for (const f of c.frases) {
+      if (n.includes(f) && (!mejor || f.length > mejor.len)) mejor = { c, len: f.length };
+    }
+  }
+  if (mejor) {
+    // El dato existe pero el rol no puede verlo: se dice honesto y claro,
+    // en vez de dejar caer la pregunta al motor (que explicaría dónde
+    // mirarlo en una pantalla que el usuario tampoco puede abrir).
+    if (!puede(ctx.user, mejor.c.permiso)) return SIN_PERMISO;
+    try {
+      return await mejor.c.responder(ctx, pregunta);
+    } catch {
+      // Si la consulta falla, mejor que conteste el motor de siempre que
+      // devolver un error al usuario.
+      return null;
     }
   }
 

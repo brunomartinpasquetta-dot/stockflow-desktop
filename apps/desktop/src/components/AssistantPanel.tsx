@@ -9,7 +9,7 @@
  * (localStorage) y se re-encuadran si la ventana se achica.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GripHorizontal, Loader2, Minus, Send, X } from 'lucide-react'
+import { GripHorizontal, Loader2, Send, X } from 'lucide-react'
 
 import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
@@ -75,7 +75,7 @@ function saveRect(r: Rect): void {
 }
 
 export function AssistantPanel() {
-  const { state, pending, hide, minimize, clearPending } = useAssistant()
+  const { state, hide } = useAssistant()
   const open = state === 'open'
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
@@ -104,17 +104,9 @@ export function AssistantPanel() {
     }
   }, [messages, busy])
 
-  // Al abrir: si viene una pregunta desde el buscador, la mandamos directo;
-  // si no, saludo inicial (viene del motor, con sugerencias reales).
+  // Al abrir por primera vez: saludo inicial (viene del motor, con sugerencias reales).
   useEffect(() => {
     if (!open) return
-    if (pending) {
-      const q = pending
-      clearPending()
-      setGreeted(true)
-      void send(q)
-      return
-    }
     if (greeted) return
     setGreeted(true)
     void (async () => {
@@ -127,7 +119,7 @@ export function AssistantPanel() {
       setTimeout(() => inputRef.current?.focus(), 100)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, pending, greeted])
+  }, [open, greeted])
 
   // Si el usuario achica la ventana, el panel se re-encuadra solo.
   useEffect(() => {
@@ -213,15 +205,6 @@ export function AssistantPanel() {
         <GripHorizontal className="h-4 w-4 opacity-50" />
         <button
           type="button"
-          onClick={minimize}
-          className="rounded-md p-1 transition-colors hover:bg-primary-foreground/15"
-          aria-label="Minimizar asistente"
-          title="Minimizar"
-        >
-          <Minus className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
           onClick={hide}
           className="rounded-md p-1 transition-colors hover:bg-primary-foreground/15"
           aria-label="Cerrar asistente"
@@ -266,6 +249,25 @@ export function AssistantPanel() {
               })()}
           </div>
         ))}
+        {/* Chips de sugerencias del último mensaje del bot — clic = preguntar eso */}
+        {!busy &&
+          lastIdx >= 0 &&
+          messages[lastIdx]?.role === 'assistant' &&
+          (messages[lastIdx]?.suggestions?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap gap-1.5 pl-1">
+              {messages[lastIdx]!.suggestions!.slice(0, 3).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => void send(s)}
+                  className="rounded-full border bg-background px-3 py-1 text-left text-xs transition-colors hover:border-primary hover:text-primary"
+                  title="Preguntar esto"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         {busy && (
           <div className="flex justify-start">
             <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm border bg-background px-3 py-2 text-sm text-muted-foreground">

@@ -28,7 +28,9 @@
     "publish:mac": "node scripts/package.mjs --mac --publish=always",
     "package:dry": "node scripts/package.mjs --mac --dir",
     "preview": "vite preview",
-    "test:assistant": "tsx electron/__tests__/assistant.smoke.ts"
+    "test:assistant": "tsx electron/__tests__/assistant.smoke.ts",
+    "test:consultas": "tsx electron/__tests__/consultas.smoke.ts",
+    "test:kb": "node scripts/validate-kb.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

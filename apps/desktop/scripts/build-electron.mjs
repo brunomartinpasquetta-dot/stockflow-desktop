@@ -14,6 +14,7 @@
  * - Copia las migraciones de @stockflow/db a `dist-electron/migrations/`.
  */
 import { build } from 'esbuild';
+import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,10 @@ const appRoot = join(here, '..');
 const outDir = join(appRoot, 'dist-electron');
 const repoRoot = resolve(appRoot, '..', '..');
 const dbMigrations = join(repoRoot, 'packages', 'db', 'migrations');
+
+// La KB de Flowy se valida ANTES de compilar: un intents.json roto o con
+// imágenes inexistentes no debe llegar a un release (falla acá, no en el cliente).
+execFileSync(process.execPath, [join(here, 'validate-kb.mjs')], { stdio: 'inherit' });
 
 const pkg = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'));
 const runtimeDeps = Object.keys(pkg.dependencies ?? {});
@@ -82,6 +87,24 @@ if (existsSync(dbMigrations)) {
 // inlinearse como literales — V8 crasheaba (SIGTRAP) compilando main.mjs empaquetado.
 cpSync(join(appRoot, 'electron', 'assistant', 'intents.json'), join(outDir, 'assistant-intents.json'));
 cpSync(join(appRoot, 'manual-src', 'sections.json'), join(outDir, 'manual-sections.json'));
+
+// GUARDIA MECÁNICA anti-SIGTRAP: si algún refactor vuelve a importar la KB
+// estáticamente (resolveJsonModule lo permite sin error), esbuild la inlinea y
+// V8 crashea SOLO en la app empaquetada — invisible para tsx/type-check/CI.
+// Se toma un texto centinela de la KB real y se verifica que NO esté en main.mjs.
+{
+  const mainSrc = readFileSync(join(outDir, 'main.mjs'), 'utf8');
+  const kbRaw = JSON.parse(readFileSync(join(appRoot, 'electron', 'assistant', 'intents.json'), 'utf8'));
+  const sentinel = kbRaw.areas?.[0]?.intents?.[0]?.answer?.slice(0, 60);
+  if (sentinel && mainSrc.includes(sentinel)) {
+    console.error(
+      '[build-electron] ❌ main.mjs contiene texto de intents.json: la KB quedó INLINEADA en el bundle.\n' +
+        'Eso revive el crash SIGTRAP de V8 en la app empaquetada. Los JSON grandes se cargan en runtime vía kbLoader —\n' +
+        'buscá y eliminá el import estático de intents.json/sections.json.',
+    );
+    process.exit(1);
+  }
+}
 
 console.log(`[build-electron] externals: ${external.join(', ')}`);
 console.log('[build-electron] dist-electron/{main.mjs,preload.cjs,migrations,kb} listo');

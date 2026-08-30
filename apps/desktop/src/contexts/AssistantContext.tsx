@@ -1,27 +1,18 @@
 /**
- * Estado del panel del Asistente virtual. Tres estados, igual que el panel de
- * WhatsApp: 'closed' (nada), 'open' (visible) y 'min' (minimizado a un chip en la
- * barra superior). Lo monta `Layout` una sola vez; el panel se mantiene montado
- * (aunque esté cerrado/minimizado) para no perder la conversación.
- *
- * `openWith(pregunta)` abre el panel y le manda esa pregunta directo — lo usa el
- * botón "Flowy" de la barra superior (StatusBar) para abrir el asistente.
+ * Estado del panel del Asistente virtual "Flowy". Dos estados: 'closed' y
+ * 'open'. Lo monta `Layout` una sola vez; el panel se mantiene montado aunque
+ * esté cerrado para no perder la conversación. Se abre desde el botón "Flowy"
+ * de la barra superior (StatusBar).
  */
 import { createContext, useContext, useState, type ReactNode } from 'react'
 
-export type AssistantState = 'closed' | 'open' | 'min'
+export type AssistantState = 'closed' | 'open'
 
 interface AssistantCtx {
   state: AssistantState
-  /** Pregunta pendiente para enviar al abrir (desde el buscador). */
-  pending: string | null
   show: () => void
   hide: () => void
-  minimize: () => void
-  /** Abre el asistente y le envía la pregunta directamente. */
-  openWith: (question: string) => void
-  clearPending: () => void
-  /** Abre si está cerrado/minimizado; cierra si está abierto. */
+  /** Abre si está cerrado; cierra si está abierto. */
   toggle: () => void
 }
 
@@ -29,18 +20,10 @@ const Ctx = createContext<AssistantCtx | null>(null)
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AssistantState>('closed')
-  const [pending, setPending] = useState<string | null>(null)
   const value: AssistantCtx = {
     state,
-    pending,
     show: () => setState('open'),
     hide: () => setState('closed'),
-    minimize: () => setState('min'),
-    openWith: (question: string) => {
-      setPending(question)
-      setState('open')
-    },
-    clearPending: () => setPending(null),
     toggle: () => setState((s) => (s === 'open' ? 'closed' : 'open')),
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
