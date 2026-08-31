@@ -17,8 +17,7 @@ const PAGE_TO_AREA: Record<string, string> = {
   ventas: 'ventas',
   'historial-ventas': 'ventas',
   'ventas-vendedor': 'ventas',
-  // Hasta que exista un área ARCA propia (E3), la KB de facturación vive en ventas.
-  'facturacion-electronica': 'ventas',
+  'facturacion-electronica': 'facturacion-arca',
 
   articulos: 'articulos',
   familias: 'articulos',

@@ -5826,15 +5826,17 @@
       "no puedo hacer factura",
       "factura sin afip",
       "por que solo remito x",
-      "cae",
       "necesito afip para facturar",
       "facturas requieren afip",
-      "emitir factura electronica",
       "factura no valida",
       "que significa requiere afip"
      ],
-     "answer": "Las opciones Factura A, B y C dicen '(requiere AFIP)' porque una factura de verdad necesita la conexión con AFIP/ARCA para que sea válida. Mientras no tengas esa conexión, usá 'Remito X (no fiscal)', que es la opción que ya viene puesta y sirve para registrar todas tus ventas.",
-     "steps": []
+     "answer": "StockFlow SÍ factura de verdad: las opciones 'Factura A/B/C (con CAE)' emiten comprobantes electrónicos autorizados por ARCA. Solo necesitan la facturación electrónica configurada — si no lo está, las ventas salen como 'Remito X (no fiscal)', que es un comprobante interno.",
+     "steps": [
+      "Configurá ARCA una vez en 'Facturación Electrónica' (en Contabilidad): certificado, CUIT y punto de venta.",
+      "En Ventas, elegí la letra en 'Comprobante': 'Factura A (con CAE)', 'Factura B (con CAE)' o 'Factura C (con CAE)'.",
+      "Al confirmar, el sistema espera el CAE de ARCA y la factura sale con su número oficial."
+     ]
     },
     {
      "id": "formas-de-pago",
@@ -12252,6 +12254,378 @@
      ],
      "answer": "Escribime \"qué artículos tengo que reponer\" y te listo los que están por debajo del stock mínimo que configuraste, con las unidades que quedan de cada uno.",
      "steps": []
+    }
+   ]
+  },
+  {
+   "area": "facturacion-arca",
+   "synonyms": [
+    {
+     "term": "arca",
+     "aliases": [
+      "afip",
+      "fisco",
+      "agencia"
+     ]
+    },
+    {
+     "term": "factura",
+     "aliases": [
+      "facturacion",
+      "facturar",
+      "comprobante",
+      "fatura",
+      "factira"
+     ]
+    },
+    {
+     "term": "cae",
+     "aliases": [
+      "autorizacion",
+      "codigo"
+     ]
+    },
+    {
+     "term": "certificado",
+     "aliases": [
+      "crt",
+      "pem",
+      "clave",
+      "credencial"
+     ]
+    },
+    {
+     "term": "punto",
+     "aliases": [
+      "pv",
+      "puntoventa"
+     ]
+    },
+    {
+     "term": "electronica",
+     "aliases": [
+      "electronico",
+      "digital"
+     ]
+    },
+    {
+     "term": "monotributo",
+     "aliases": [
+      "monotributista",
+      "responsable",
+      "inscripto"
+     ]
+    }
+   ],
+   "intents": [
+    {
+     "id": "arca-que-es-facturacion-electronica",
+     "canonical": "¿Qué es la facturación electrónica y cómo funciona en StockFlow?",
+     "patterns": [
+      "que es la facturacion electronica",
+      "stockflow factura con arca",
+      "puedo facturar con afip",
+      "el sistema hace facturas de verdad",
+      "facturas legales con el sistema",
+      "sirve para facturar en arca",
+      "emite facturas electronicas",
+      "factura electronica como funciona",
+      "puedo hacer facturas oficiales",
+      "facturacion arca"
+     ],
+     "answer": "Sí: StockFlow emite facturas electrónicas de verdad. Cuando cobrás una venta, el sistema le pide a ARCA el CAE (el código que hace válida la factura) y recién ahí la imprime. Solo hay que configurarlo una vez, con tu certificado y tu punto de venta.",
+     "steps": [
+      "Configurá ARCA una sola vez en la pantalla 'Facturación Electrónica' (certificado, CUIT y punto de venta).",
+      "Después, en Ventas, elegí 'Factura A (con CAE)', 'Factura B (con CAE)' o 'Factura C (con CAE)' al cobrar.",
+      "El sistema espera el CAE de ARCA y la factura sale con su número oficial, por ejemplo 'Factura B 00005-00000012 — CAE …'."
+     ],
+     "image": null,
+     "action": {
+      "label": "Abrir Facturación Electrónica",
+      "screen": "facturacion-electronica"
+     }
+    },
+    {
+     "id": "arca-configurar-desde-cero",
+     "canonical": "¿Cómo configuro la facturación electrónica de ARCA desde cero?",
+     "patterns": [
+      "como configuro la facturacion electronica",
+      "configurar arca",
+      "configurar afip en el sistema",
+      "activar la facturacion electronica",
+      "poner en marcha las facturas",
+      "conectar stockflow con arca",
+      "alta de facturacion electronica",
+      "como activo arca",
+      "empezar a facturar con cae",
+      "configurar factura electronica"
+     ],
+     "answer": "Se configura una sola vez, en la pantalla 'Facturación Electrónica'. Necesitás tres cosas: el certificado de ARCA (con su clave privada), tu CUIT y un punto de venta habilitado para web services.",
+     "steps": [
+      "Abrí 'Facturación Electrónica' (está en Contabilidad).",
+      "Cargá la ruta del certificado (.crt) y de la clave privada, y tu CUIT tal como figura en ARCA.",
+      "Elegí el ambiente: 'Homologación' para probar sin valor fiscal, 'Producción' para facturar de verdad.",
+      "Tocá 'Guardar' — vas a ver 'Configuración fiscal guardada'.",
+      "Probá la conexión: si está todo bien dice 'Conexión con ARCA OK'.",
+      "Traé tus puntos de venta desde ARCA y elegí el que vas a usar."
+     ],
+     "image": null,
+     "action": {
+      "label": "Abrir Facturación Electrónica",
+      "screen": "facturacion-electronica"
+     }
+    },
+    {
+     "id": "arca-conseguir-certificado",
+     "canonical": "¿De dónde saco el certificado de ARCA?",
+     "patterns": [
+      "de donde saco el certificado",
+      "como consigo el certificado de arca",
+      "certificado digital afip",
+      "no tengo el certificado",
+      "tramitar certificado arca",
+      "donde se pide el certificado",
+      "generar certificado para facturar",
+      "certificado y clave privada de arca"
+     ],
+     "answer": "El certificado se tramita en el sitio de ARCA con tu clave fiscal (o lo hace tu contador). Del trámite salen dos archivos: el certificado (.crt) y la clave privada. Guardalos en una carpeta propia de tu PC y cargá esas rutas en StockFlow.",
+     "steps": [
+      "Entrá al sitio de ARCA con tu clave fiscal (o pedíselo a tu contador, es un trámite habitual).",
+      "Del trámite obtenés el certificado (.crt) y la clave privada: son un par, van juntos.",
+      "Guardalos en una carpeta FUERA de la instalación de StockFlow (por ejemplo C:\\StockFlow\\arca\\) para que nada los toque.",
+      "En 'Facturación Electrónica', cargá la ruta de los dos archivos y tocá 'Guardar'."
+     ],
+     "image": null
+    },
+    {
+     "id": "arca-certificado-sobrevive-updates",
+     "canonical": "¿El certificado de ARCA se pierde cuando actualizo StockFlow?",
+     "patterns": [
+      "el certificado se pierde cuando actualizo",
+      "la actualizacion borra el certificado",
+      "actualice y no factura mas",
+      "se borro el certificado",
+      "donde guardo el certificado para no perderlo",
+      "el update me saco la facturacion",
+      "sobrevive el certificado a la actualizacion"
+     ],
+     "answer": "No. StockFlow guarda la RUTA de tu certificado, no una copia: mientras los archivos sigan en su carpeta, las actualizaciones no los tocan. Por eso conviene tenerlos en una carpeta propia, fuera de la instalación (por ejemplo C:\\StockFlow\\arca\\).",
+     "steps": [
+      "Guardá el certificado y la clave privada en una carpeta que no dependa de la instalación (ej.: C:\\StockFlow\\arca\\).",
+      "Si un día no factura después de mover archivos, revisá en 'Facturación Electrónica' que las rutas sigan apuntando a los archivos."
+     ],
+     "image": null
+    },
+    {
+     "id": "arca-puntos-de-venta",
+     "canonical": "¿Qué es el punto de venta de ARCA y cómo lo cargo?",
+     "patterns": [
+      "que es el punto de venta",
+      "cargar punto de venta",
+      "punto de venta arca",
+      "pv de afip",
+      "traer puntos de venta",
+      "no me aparece el punto de venta",
+      "alta de punto de venta",
+      "punto de venta habilitado",
+      "como agrego un punto de venta"
+     ],
+     "answer": "El punto de venta es el número que ARCA le asigna a tu facturación (el 00005 de 'Factura B 00005-00000012'). En StockFlow los traés directo desde ARCA con un botón. Importante: tiene que estar dado de alta para el sistema 'RECE para aplicativo y web services'.",
+     "steps": [
+      "Abrí 'Facturación Electrónica' con la conexión ya configurada.",
+      "Usá el botón que consulta tus puntos de venta a ARCA.",
+      "Si dice 'ARCA no devolvió puntos de venta habilitados', el punto de venta no está dado de alta para web services: se crea en el sitio de ARCA con clave fiscal, eligiendo 'RECE para aplicativo y web services'.",
+      "Guardalo con un nombre que te sirva (ej.: 'Terminal 1 — Mostrador')."
+     ],
+     "image": null,
+     "action": {
+      "label": "Abrir Facturación Electrónica",
+      "screen": "facturacion-electronica"
+     }
+    },
+    {
+     "id": "arca-error-10005",
+     "canonical": "¿Qué significa el error 10005 de ARCA?",
+     "patterns": [
+      "error 10005",
+      "me da error 10005",
+      "que es el 10005",
+      "error de punto de venta al facturar",
+      "arca rechaza el punto de venta",
+      "10005 punto de venta invalido",
+      "error diez mil cinco",
+      "rechazo 10005 de arca"
+     ],
+     "answer": "El 10005 es ARCA diciendo que el punto de venta no sirve para facturar por sistema: está dado de alta para otro método (talonario, controlador o facturador en línea). Hace falta un punto de venta del sistema 'RECE para aplicativo y web services'.",
+     "steps": [
+      "Entrá al sitio de ARCA con clave fiscal (o pedíselo a tu contador).",
+      "Dá de alta un punto de venta NUEVO eligiendo el sistema 'RECE para aplicativo y web services'.",
+      "En StockFlow, volvé a traer los puntos de venta desde 'Facturación Electrónica' y elegí el nuevo."
+     ],
+     "image": null
+    },
+    {
+     "id": "arca-emitir-factura-cae",
+     "canonical": "¿Cómo emito una factura con CAE en una venta?",
+     "patterns": [
+      "como emito una factura con cae",
+      "hacer una factura a",
+      "hacer una factura b",
+      "facturar una venta",
+      "como facturo con arca",
+      "sacar factura con cae",
+      "factura de verdad en la venta",
+      "emitir comprobante fiscal",
+      "facturarle a un cliente",
+      "hacer factura electronica en ventas"
+     ],
+     "answer": "Directo desde Ventas: en 'Comprobante' elegí 'Factura A (con CAE)', 'Factura B (con CAE)' o 'Factura C (con CAE)' y cobrá normal. El sistema le pide el CAE a ARCA, espera la respuesta y recién ahí imprime — la factura sale con su número oficial y el CAE.",
+     "steps": [
+      "En Ventas, cargá los productos como siempre.",
+      "En 'Comprobante', elegí la letra: 'Factura A (con CAE)', 'Factura B (con CAE)' o 'Factura C (con CAE)'.",
+      "Confirmá la venta (F2): el sistema espera el CAE de ARCA antes de imprimir.",
+      "Vas a ver el resultado como 'Factura B 00005-00000012 — CAE …'. Si ARCA no responde, la venta queda registrada igual y el sistema te avisa que salió sin CAE."
+     ],
+     "image": null,
+     "action": {
+      "label": "Abrir Ventas",
+      "screen": "ventas"
+     }
+    },
+    {
+     "id": "arca-que-es-cae",
+     "canonical": "¿Qué es el CAE?",
+     "patterns": [
+      "que es el cae",
+      "para que sirve el cae",
+      "que significa cae",
+      "cae de la factura",
+      "codigo de autorizacion electronico",
+      "factura sin cae vale",
+      "cae que es eso",
+      "me piden el cae"
+     ],
+     "answer": "CAE = Código de Autorización Electrónico. Es el número con el que ARCA autoriza cada factura: sin CAE, una 'Factura A/B/C' no es un comprobante fiscal válido. StockFlow lo pide y lo espera ANTES de imprimir, así nunca entregás una factura inválida.",
+     "steps": [],
+     "image": null
+    },
+    {
+     "id": "arca-letras-abc",
+     "canonical": "¿Qué letra de factura tengo que hacer: A, B o C?",
+     "patterns": [
+      "que letra de factura hago",
+      "factura a o b",
+      "cuando factura a y cuando b",
+      "que es factura c",
+      "a quien le hago factura a",
+      "diferencia entre factura a b y c",
+      "letra de comprobante"
+     ],
+     "answer": "Depende de tu condición y la del cliente: un Responsable Inscripto emite A a otros RI y B a consumidores finales; un Monotributista emite C a todos. StockFlow te ofrece las tres letras con CAE; ante la duda de qué corresponde en un caso puntual, confirmalo con tu contador.",
+     "steps": [],
+     "image": null
+    },
+    {
+     "id": "arca-conexion-ok-no-factura",
+     "canonical": "La prueba de conexión dio OK pero no puedo facturar, ¿por qué?",
+     "patterns": [
+      "la conexion da ok pero no factura",
+      "probar conexion ok y no puedo facturar",
+      "conecta pero no emite",
+      "dice conexion con arca ok pero falla la factura",
+      "anda la conexion pero no sale el cae",
+      "la prueba anda pero la factura no",
+      "test de conexion bien pero sin factura"
+     ],
+     "answer": "'Conexión con ARCA OK' confirma que el certificado y la clave funcionan — pero facturar además necesita un punto de venta válido para web services. Si la conexión da OK y la factura falla, el problema casi siempre es el punto de venta (mirá el error 10005).",
+     "steps": [
+      "Verificá en 'Facturación Electrónica' que haya un punto de venta cargado y seleccionado.",
+      "Si al facturar aparece el error 10005, el punto de venta no es de 'RECE para aplicativo y web services': dá de alta uno nuevo en ARCA con ese sistema.",
+      "Revisá también el ambiente: en 'Homologación' se factura de prueba, sin valor fiscal."
+     ],
+     "image": null
+    },
+    {
+     "id": "arca-sin-internet",
+     "canonical": "¿Qué pasa si se corta internet cuando estoy facturando?",
+     "patterns": [
+      "se corto internet y estaba facturando",
+      "sin internet puedo facturar",
+      "no hay conexion y tengo que facturar",
+      "arca no responde",
+      "se cayo internet la factura salio",
+      "facturar sin conexion"
+     ],
+     "answer": "La venta NO se pierde: queda registrada igual. Lo que necesita internet es el CAE — si ARCA no responde, el sistema te avisa que la venta quedó sin CAE. Podés seguir vendiendo (con Remito X mientras tanto) y facturar cuando vuelva la conexión.",
+     "steps": [
+      "Si se corta a mitad de una factura, la venta queda registrada y el sistema avisa que salió sin CAE.",
+      "Mientras no haya internet, seguí operando con 'Remito X (no fiscal)': la caja y el stock se mueven normal.",
+      "Con la conexión de vuelta, facturá normalmente con la letra que corresponda."
+     ],
+     "image": null
+    },
+    {
+     "id": "arca-monotributo-a-ri",
+     "canonical": "Pasé de Monotributo a Responsable Inscripto, ¿tengo que cambiar algo?",
+     "patterns": [
+      "pase de monotributo a responsable inscripto",
+      "cambie de condicion fiscal",
+      "ahora soy responsable inscripto",
+      "deje el monotributo",
+      "cambio de monotributo a ri",
+      "cambie la condicion en afip y no factura"
+     ],
+     "answer": "Sí: al cambiar de condición, el punto de venta viejo queda inválido para facturar — hay que dar de alta uno nuevo en ARCA y actualizar la configuración. También cambiá tu condición de IVA en StockFlow para que ofrezca las letras correctas (A/B en vez de C).",
+     "steps": [
+      "En el sitio de ARCA, dá de alta un punto de venta nuevo ('RECE para aplicativo y web services') para tu nueva condición.",
+      "En 'Facturación Electrónica', actualizá tu condición de IVA, volvé a traer los puntos de venta y elegí el nuevo.",
+      "Si algo no cierra, probá la conexión y mirá el mensaje: los errores de ARCA aparecen ahí."
+     ],
+     "image": null
+    },
+    {
+     "id": "arca-notas-credito-debito",
+     "canonical": "¿Cómo hago una nota de crédito o de débito de una factura emitida?",
+     "patterns": [
+      "nota de credito",
+      "como anulo una factura con cae",
+      "nota de debito",
+      "me equivoque en una factura emitida",
+      "anular factura electronica",
+      "devolver una factura con cae",
+      "corregir una factura ya emitida"
+     ],
+     "answer": "Una factura con CAE ya está informada a ARCA: anular la venta en StockFlow no la da de baja allá. Lo correcto es emitir una nota de crédito (o de débito) asociada a ese comprobante — el sistema las emite con su propio CAE, ligadas a la factura original.",
+     "steps": [
+      "Ubicá la venta facturada (por ejemplo desde el historial de ventas).",
+      "Emití la nota de crédito asociada al comprobante: sale con su propio CAE y referencia a la factura original.",
+      "Si es un ajuste a favor tuyo, el mismo mecanismo emite nota de débito."
+     ],
+     "image": null
+    },
+    {
+     "id": "arca-donde-quedan-pdf",
+     "canonical": "¿Dónde quedan guardadas las facturas emitidas?",
+     "patterns": [
+      "donde quedan las facturas",
+      "pdf de las facturas",
+      "archivo de comprobantes emitidos",
+      "quiero ver una factura vieja",
+      "carpeta de facturas",
+      "descargar factura emitida",
+      "reimprimir una factura con cae"
+     ],
+     "answer": "Cada comprobante autorizado se guarda en PDF, ordenado por año y mes, en una carpeta de tu PC. Desde 'Facturación Electrónica' podés abrir esa carpeta y también generar el PDF de facturas ya emitidas que todavía no estén archivadas.",
+     "steps": [
+      "Abrí 'Facturación Electrónica'.",
+      "Usá la opción de abrir la carpeta de facturas: están en PDF por año y mes.",
+      "Si falta alguna, el botón de archivar genera el PDF de las emitidas pendientes."
+     ],
+     "image": null,
+     "action": {
+      "label": "Abrir Facturación Electrónica",
+      "screen": "facturacion-electronica"
+     }
     }
    ]
   }

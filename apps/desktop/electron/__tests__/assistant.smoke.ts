@@ -180,5 +180,31 @@ for (const t of ACTION_CASES) {
   console.log(`${ok ? '✅' : '❌'} intent sin action → sin botones`)
 }
 
+/* ---------- (6) facturación ARCA ---------- */
+console.log('\n── Facturación ARCA ──')
+const ARCA_CASES = [
+  'como facturo con arca',
+  'que es el cae',
+  'error 10005 punto de venta',
+  'el certificado se pierde cuando actualizo?',
+  'como configuro la facturacion electronica',
+  'pase de monotributo a responsable inscripto',
+]
+for (const q of ARCA_CASES) {
+  const id = freshId()
+  const r = answerQuestion(q, id)
+  const res = lastResolved(id)
+  const ok = res?.area === 'facturacion-arca' && !r.reply.includes(FALLBACK)
+  if (!ok) fails++
+  console.log(`${ok ? '✅' : '❌'} "${q}"  → ${res ? `${res.area}/${res.id}` : 'sin intent'}`)
+}
+// El intent viejo ya no desinforma: nada de "usá Remito X" como respuesta.
+{
+  const r = answerQuestion('por que las facturas dicen requiere afip', freshId())
+  const ok = !/us[aá] remito x/i.test(r.reply)
+  if (!ok) fails++
+  console.log(`${ok ? '✅' : '❌'} facturas-afip corregido (no recomienda Remito X)  → ${r.reply.slice(0, 70).replace(/\n/g, ' ')}`)
+}
+
 console.log(fails === 0 ? '\n✅ TODO OK' : `\n❌ ${fails} FALLAS`)
 process.exit(fails === 0 ? 0 : 1)
