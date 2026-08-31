@@ -13,6 +13,7 @@ import { type HandlerDeps, type HandlerMap, withSession } from '../handler-conte
 import { responderConDatos } from '../../assistant/consultas';
 import { resolveScreenArea } from '../../assistant/context';
 import { answerQuestion } from '../../assistant/engine';
+import { detectFlow, handleFlowAnswer, startFlow, type FlowChecks } from '../../assistant/flows';
 import { kbLoadError } from '../../assistant/kbLoader';
 
 export interface AssistantMessage {
@@ -86,7 +87,26 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
           };
         }
 
-        // Primero: ¿es una pregunta por datos del negocio? ("cuánto vendí hoy",
+        // Flujos de diagnóstico (E3). Los checks automáticos leen el estado
+        // REAL del sistema: no se le pregunta al usuario lo que el main ya sabe.
+        const convId = payload?.conversationId ?? 'default';
+        const checks: FlowChecks = {
+          'printer-configured': async () => Boolean(deps.hardware.getConfig().printer),
+          'scale-configured': async () => Boolean(deps.hardware.getConfig().scale),
+        };
+        if (question.trim()) {
+          // ¿Hay un flujo activo esperando esta respuesta?
+          const enCurso = await handleFlowAnswer(convId, question, checks);
+          if (enCurso) return { reply: enCurso.reply, suggestions: enCurso.suggestions, image: null, actions: enCurso.actions };
+          // ¿La pregunta dispara un diagnóstico guiado?
+          const flowId = detectFlow(question);
+          if (flowId) {
+            const inicio = await startFlow(convId, flowId, checks);
+            if (inicio) return { reply: inicio.reply, suggestions: inicio.suggestions, image: null, actions: inicio.actions };
+          }
+        }
+
+        // Después: ¿es una pregunta por datos del negocio? ("cuánto vendí hoy",
         // "tengo stock de X"). Se contesta con el número real en vez de
         // explicar dónde mirarlo — respetando los permisos del rol.
         if (question.trim()) {
@@ -98,7 +118,7 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
           }
         }
 
-        const ans = answerQuestion(question, payload?.conversationId ?? 'default', screenArea);
+        const ans = answerQuestion(question, convId, screenArea);
         if (ans.kind === 'fallback' && question.trim()) logMiss(deps.userDataDir, deps.appVersion, question.trim());
         return { reply: ans.reply, suggestions: ans.suggestions, image: ans.image, actions: ans.actions ?? [] };
       },

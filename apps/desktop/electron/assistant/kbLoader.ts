@@ -22,7 +22,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  */
 export let kbLoadError: string | null = null;
 
-function loadJson(candidates: string[], what: string, fallback: unknown): unknown {
+function loadJson(candidates: string[], what: string, fallback: unknown, fatal = true): unknown {
   const intentos: string[] = [];
   for (const rel of candidates) {
     try {
@@ -31,8 +31,14 @@ function loadJson(candidates: string[], what: string, fallback: unknown): unknow
       intentos.push(`${rel}: ${(e as Error).message}`);
     }
   }
-  kbLoadError = `[assistant] no pude cargar ${what} — ${intentos.join(' | ')}`;
-  console.error(`${kbLoadError}\n[assistant] el asistente queda deshabilitado; StockFlow sigue funcionando.`);
+  const msg = `[assistant] no pude cargar ${what} — ${intentos.join(' | ')}`;
+  if (fatal) {
+    kbLoadError = msg;
+    console.error(`${msg}\n[assistant] el asistente queda deshabilitado; StockFlow sigue funcionando.`);
+  } else {
+    // No-fatal (p.ej. flujos): el asistente sigue, solo sin esa capacidad.
+    console.error(`${msg} — el asistente sigue sin esta capacidad.`);
+  }
   return fallback;
 }
 
@@ -42,3 +48,5 @@ export const manualData: unknown = loadJson(
   'manual',
   { sections: [] },
 );
+// Flujos de diagnóstico (E3). Si faltan, el asistente sigue sin flujos (no es fatal).
+export const flowsData: unknown = loadJson(['assistant-flows.json', 'flows.json'], 'flows', { flows: [] }, false);

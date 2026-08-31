@@ -1,0 +1,135 @@
+{
+ "flows": [
+  {
+   "id": "impresora-no-imprime",
+   "title": "La impresora no imprime",
+   "triggers": [
+    "no imprime", "no me imprime", "impresora no funciona", "no sale el ticket",
+    "ticket no sale", "la impresora no anda", "no anda la impresora",
+    "problema con la impresora", "impresora no responde", "no imprime nada",
+    "no me sale el ticket", "no quiere imprimir"
+   ],
+   "start": "check-config",
+   "nodes": {
+    "check-config": { "kind": "check", "check": "printer-configured", "yes": "ask-fisico", "no": "sol-configurar" },
+    "sol-configurar": {
+     "kind": "solution",
+     "text": "Encontré el motivo: StockFlow no tiene ninguna impresora configurada todavía.\n\n1. Abrí Configuración.\n2. En la parte de impresora, elegí la tuya de la lista.\n3. Tocá 'Probar impresión': si sale el ticket de prueba, ya quedó.\n\nSi después de configurarla sigue sin imprimir, escribime 'no imprime' de nuevo y seguimos revisando juntos.",
+     "action": { "label": "Abrir Configuración", "screen": "configuracion" }
+    },
+    "ask-fisico": {
+     "kind": "ask",
+     "text": "StockFlow tiene una impresora configurada, así que vamos a revisar por qué no sale nada. Arranquemos por lo básico: ¿la impresora está encendida, con papel, y con el cable bien conectado?",
+     "options": [
+      { "label": "Sí, está todo bien", "next": "ask-prueba" },
+      { "label": "Encontré algo apagado o suelto", "next": "sol-fisico" }
+     ]
+    },
+    "sol-fisico": {
+     "kind": "solution",
+     "text": "¡Buenísimo, ese suele ser el motivo! Encendela / conectala / ponele papel y probá así:\n\n1. Abrí Configuración.\n2. Tocá 'Probar impresión'.\n\nSi el ticket de prueba sale, ya está solucionado. Si sigue igual, escribime 'no imprime' y seguimos con lo que falta.",
+     "action": { "label": "Abrir Configuración", "screen": "configuracion" }
+    },
+    "ask-prueba": {
+     "kind": "ask",
+     "text": "Perfecto. Ahora probemos la impresora directo desde StockFlow: en Configuración hay un botón 'Probar impresión'. ¿Sale el ticket de prueba?",
+     "options": [
+      { "label": "Sí, la prueba imprime", "next": "sol-ticket-venta" },
+      { "label": "No, la prueba tampoco imprime", "next": "ask-windows" },
+      { "label": "No sé cómo probarla", "next": "sol-como-probar" }
+     ]
+    },
+    "sol-como-probar": {
+     "kind": "solution",
+     "text": "Es un minuto:\n\n1. Abrí Configuración.\n2. Buscá el botón 'Probar impresión' y tocalo.\n3. Si sale un ticket de prueba, la impresora está bien conectada a StockFlow.\n\nDespués contame qué pasó: escribime 'no imprime' si la prueba no salió, y seguimos desde ahí.",
+     "action": { "label": "Abrir Configuración", "screen": "configuracion" }
+    },
+    "sol-ticket-venta": {
+     "kind": "solution",
+     "text": "Entonces la impresora funciona — lo que falla es la impresión del ticket en la venta, no la impresora.\n\n1. En Ventas, fijate el casillero 'Imprimir ticket automáticamente': si está destildado, el ticket no sale solo al confirmar.\n2. En Configuración, revisá que el formato de papel (58 u 80 mm) coincida con tu rollo.\n\nCon eso el ticket de la venta tiene que salir igual que la prueba.",
+     "action": { "label": "Abrir Ventas", "screen": "ventas" }
+    },
+    "ask-windows": {
+     "kind": "ask",
+     "text": "Entonces el problema está entre la PC y la impresora. ¿La computadora la reconoce? En Windows: Configuración del sistema → Bluetooth y dispositivos → Impresoras. ¿Tu impresora aparece en esa lista?",
+     "options": [
+      { "label": "Sí, aparece", "next": "escalate-driver" },
+      { "label": "No aparece", "next": "sol-usb" }
+     ]
+    },
+    "sol-usb": {
+     "kind": "solution",
+     "text": "Si la PC no la ve, StockFlow tampoco puede verla. Casi siempre es una de estas tres:\n\n1. Probá el cable en OTRO puerto USB de la PC.\n2. Probá con otro cable USB si tenés a mano.\n3. Reinstalá el driver de la impresora (el programita del fabricante que vino con ella o se descarga de su página).\n\nCuando aparezca en la lista de impresoras de Windows, volvé a 'Probar impresión' en StockFlow. Si no aparece con nada de esto, escribime 'quiero hablar con soporte'.",
+     "action": null
+    },
+    "escalate-driver": {
+     "kind": "escalate",
+     "text": "Hicimos todo lo que se puede revisar desde acá: la PC ve la impresora pero la prueba de StockFlow no sale — eso suele ser un tema del driver o del modo de impresión del ticket, y conviene que lo mire soporte.\n\nEscribile a soporte por WhatsApp con estos datos (ya los verificamos juntos):\n• Modelo de la impresora.\n• 'Windows la reconoce, pero la prueba de impresión de StockFlow no imprime'.\n• Si es de ticket (térmica) o común (A4)."
+    }
+   }
+  },
+  {
+   "id": "conectar-balanza",
+   "title": "Conectar y configurar la balanza",
+   "triggers": [
+    "conectar una balanza", "conectar la balanza", "configurar la balanza",
+    "quiero conectar la balanza", "instalar la balanza", "balanza no funciona",
+    "la balanza no pesa", "no anda la balanza", "conectar balanza",
+    "poner la balanza", "enchufar la balanza", "la balanza no responde"
+   ],
+   "start": "check-config",
+   "nodes": {
+    "check-config": { "kind": "check", "check": "scale-configured", "yes": "ask-pesa", "no": "ask-conexion" },
+    "ask-conexion": {
+     "kind": "ask",
+     "text": "Vamos a dejar la balanza andando. Primero necesito saber cómo está conectada a la PC: ¿por USB o por puerto serie (el conector ancho, con tornillos a los costados)?",
+     "options": [
+      { "label": "Por USB", "next": "sol-configurar" },
+      { "label": "Por puerto serie", "next": "sol-configurar" },
+      { "label": "Todavía no la conecté", "next": "sol-conectar" }
+     ]
+    },
+    "sol-conectar": {
+     "kind": "solution",
+     "text": "Empecemos por ahí:\n\n1. Conectá la balanza a la PC (USB o puerto serie) y encendela.\n2. Después escribime 'configurar la balanza' y seguimos con la configuración en StockFlow.",
+     "action": null
+    },
+    "sol-configurar": {
+     "kind": "solution",
+     "text": "Perfecto. Ahora se lo indicamos a StockFlow:\n\n1. Abrí Configuración.\n2. En la parte de balanza, tenés que indicar el puerto serial por el que está conectada (si es USB, la PC le asigna un puerto igual — aparece en la lista).\n3. Guardá y apoyá algo en la balanza para ver si toma el peso.\n\nSi el peso no aparece, escribime 'la balanza no pesa' y lo revisamos juntos.",
+     "action": { "label": "Abrir Configuración", "screen": "configuracion" }
+    },
+    "ask-pesa": {
+     "kind": "ask",
+     "text": "Veo que ya hay una balanza configurada en StockFlow. ¿El peso aparece al apoyar algo en la balanza?",
+     "options": [
+      { "label": "Sí, pesa bien", "next": "sol-funciona" },
+      { "label": "No, no toma el peso", "next": "ask-puerto" }
+     ]
+    },
+    "sol-funciona": {
+     "kind": "solution",
+     "text": "¡Entonces la balanza está funcionando! Si lo que querés es vender por peso, preguntame '¿puedo usar una balanza para pesar en la venta?' y te explico cómo se usa en el mostrador.",
+     "action": null
+    },
+    "ask-puerto": {
+     "kind": "ask",
+     "text": "Casi siempre es el puerto: la balanza quedó configurada en un puerto serial que no es el que está usando ahora. ¿Sabés cuál es el puerto correcto?",
+     "options": [
+      { "label": "Lo revisé y el puerto está bien", "next": "escalate-balanza" },
+      { "label": "No sé cuál es el puerto", "next": "sol-identificar-puerto" }
+     ]
+    },
+    "sol-identificar-puerto": {
+     "kind": "solution",
+     "text": "Truco simple para encontrarlo:\n\n1. Abrí Configuración, en la parte de balanza, y mirá la lista de puertos disponibles.\n2. Desenchufá el cable de la balanza y volvé a mirar la lista: el puerto que DESAPARECIÓ es el de la balanza.\n3. Enchufala de nuevo, elegí ese puerto, guardá y probá apoyando algo.\n\nSi con el puerto correcto sigue sin pesar, escribime 'la balanza no pesa' y lo derivamos con los datos ya juntados.",
+     "action": { "label": "Abrir Configuración", "screen": "configuracion" }
+    },
+    "escalate-balanza": {
+     "kind": "escalate",
+     "text": "Si el puerto es el correcto y aun así no toma el peso, lo que queda es específico del modelo (velocidad del puerto o protocolo de la balanza) y conviene que lo vea soporte.\n\nEscribile a soporte por WhatsApp con estos datos:\n• Marca y modelo de la balanza.\n• Cómo está conectada (USB o puerto serie) y qué puerto elegiste en Configuración.\n• 'El puerto está bien pero StockFlow no toma el peso'."
+    }
+   }
+  }
+ ]
+}

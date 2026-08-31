@@ -100,6 +100,54 @@ if (kb) {
   }
 }
 
+/* ── flows.json (diagnósticos guiados, E3) ── */
+const flowsDoc = parse('electron/assistant/flows.json', 'flows.json');
+let totalFlows = 0;
+if (flowsDoc) {
+  if (!Array.isArray(flowsDoc.flows)) {
+    errors.push('flows.json: falta el array raíz `flows`');
+  } else {
+    for (const f of flowsDoc.flows) {
+      totalFlows++;
+      const fr = `flow:${f?.id ?? '?'}`;
+      if (!f?.id || !f?.title || !Array.isArray(f?.triggers) || f.triggers.length < 3 || !f?.start || !f?.nodes) {
+        errors.push(`${fr}: faltan campos (id/title/triggers≥3/start/nodes)`);
+        continue;
+      }
+      const ids = Object.keys(f.nodes);
+      if (!f.nodes[f.start]) errors.push(`${fr}: start "${f.start}" no existe en nodes`);
+      const referenced = new Set([f.start]);
+      for (const [nid, n] of Object.entries(f.nodes)) {
+        const nr = `${fr}/${nid}`;
+        if (n.kind === 'check') {
+          for (const dest of [n.yes, n.no]) {
+            if (!f.nodes[dest]) errors.push(`${nr}: rama "${dest}" no existe`);
+            else referenced.add(dest);
+          }
+        } else if (n.kind === 'ask') {
+          if (!n.text || !Array.isArray(n.options) || n.options.length < 2) errors.push(`${nr}: ask necesita text y ≥2 options`);
+          for (const o of n.options ?? []) {
+            if (!o.label || !f.nodes[o.next]) errors.push(`${nr}: opción "${o.label}" apunta a nodo inexistente "${o.next}"`);
+            else referenced.add(o.next);
+          }
+        } else if (n.kind === 'solution') {
+          if (!n.text) errors.push(`${nr}: solution sin text`);
+          if (n.action != null && n.action !== null) {
+            if (!n.action.label || !n.action.screen) errors.push(`${nr}: action inválida`);
+            else if (PAGE_KEYS.size && !PAGE_KEYS.has(n.action.screen)) errors.push(`${nr}: action.screen "${n.action.screen}" no existe en el registry`);
+          }
+        } else if (n.kind === 'escalate') {
+          if (!n.text) errors.push(`${nr}: escalate sin text`);
+        } else {
+          errors.push(`${nr}: kind desconocido "${n?.kind}"`);
+        }
+      }
+      const orphans = ids.filter((i) => !referenced.has(i));
+      if (orphans.length) warns.push(`${fr}: nodos inalcanzables: ${orphans.join(', ')}`);
+    }
+  }
+}
+
 /* ── sections.json (manual) ── */
 const manual = parse('manual-src/sections.json', 'sections.json');
 let totalSubs = 0;
@@ -120,5 +168,5 @@ if (manual) {
 /* ── resultado ── */
 for (const w of warns) console.log(`⚠️  ${w}`);
 for (const e of errors) console.error(`❌ ${e}`);
-console.log(`\nKB: ${totalIntents} intents · ${totalSubs} subsecciones de manual · ${errors.length} errores · ${warns.length} advertencias`);
+console.log(`\nKB: ${totalIntents} intents · ${totalFlows} flujos · ${totalSubs} subsecciones de manual · ${errors.length} errores · ${warns.length} advertencias`);
 process.exit(errors.length ? 1 : 0);
