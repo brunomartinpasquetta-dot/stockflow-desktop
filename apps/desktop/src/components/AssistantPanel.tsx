@@ -14,14 +14,23 @@ import { GripHorizontal, Loader2, Send, X } from 'lucide-react'
 import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
 import { shotUrl } from '@/lib/sofiaShots'
 import { Button } from '@/components/ui/button'
 import { useAssistant } from '@/contexts/AssistantContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useWindowManager } from '@/contexts/WindowManagerContext'
+import { WINDOWS } from '@/windows/registry'
 import type { AssistantMessageDTO } from '@/types/api'
 
+interface ChatAction {
+  label: string
+  screen: string
+}
 interface ChatMsg extends AssistantMessageDTO {
   suggestions?: string[]
   image?: string | null
+  actions?: ChatAction[]
 }
 
 interface Rect {
@@ -76,7 +85,23 @@ function saveRect(r: Rect): void {
 
 export function AssistantPanel({ screen }: { screen?: string }) {
   const { state, hide } = useAssistant()
+  const { currentUser } = useAuth()
+  const { openWindow } = useWindowManager()
   const open = state === 'open'
+
+  /**
+   * REGLA (E2): un botón de acción se muestra SOLO si el rol puede abrir esa
+   * pantalla (mismo gate que el registry: roles + requires). Sin permiso no
+   * aparece — ni deshabilitado ni fallando al clic. Y es SOLO navegación.
+   */
+  const visibleActions = (m: ChatMsg): ChatAction[] =>
+    (m.actions ?? []).filter((a) => {
+      const def = WINDOWS[a.screen]
+      if (!def || !currentUser) return false
+      const roleOk = !def.roles || (currentUser.role && def.roles.includes(currentUser.role))
+      const permOk = !def.requires || hasPermissionFor(currentUser.permissions, def.requires as PermissionAction)
+      return Boolean(roleOk && permOk)
+    })
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -112,7 +137,7 @@ export function AssistantPanel({ screen }: { screen?: string }) {
     void (async () => {
       try {
         const res = await api.assistant.ask([], convIdRef.current, screen)
-        setMessages([{ role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image }])
+        setMessages([{ role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image, actions: res.actions }])
       } catch {
         setMessages([{ role: 'assistant', content: '¡Hola! Soy Flowy, tu asistente de StockFlow. Escribime en qué te puedo ayudar.' }])
       }
@@ -173,7 +198,7 @@ export function AssistantPanel({ screen }: { screen?: string }) {
       // mandar el transcript entero era desperdicio (peor en modo LAN).
       const payload: AssistantMessageDTO[] = [{ role: 'user', content: q }]
       const res = await api.assistant.ask(payload, convIdRef.current, screen)
-      setMessages((prev) => [...prev, { role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image }])
+      setMessages((prev) => [...prev, { role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image, actions: res.actions }])
     } catch {
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Uy, algo falló. Probá de nuevo.' }])
     } finally {
@@ -251,6 +276,25 @@ export function AssistantPanel({ screen }: { screen?: string }) {
               })()}
           </div>
         ))}
+        {/* Botones de acción (E2, solo navegación) — visibles SOLO con permiso */}
+        {!busy &&
+          lastIdx >= 0 &&
+          messages[lastIdx]?.role === 'assistant' &&
+          visibleActions(messages[lastIdx]!).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pl-1">
+              {visibleActions(messages[lastIdx]!).map((a) => (
+                <button
+                  key={a.screen}
+                  type="button"
+                  onClick={() => openWindow({ pageKey: a.screen })}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+                  title={`Abrir ${WINDOWS[a.screen]?.title ?? a.screen}`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          )}
         {/* Chips de sugerencias del último mensaje del bot — clic = preguntar eso */}
         {!busy &&
           lastIdx >= 0 &&

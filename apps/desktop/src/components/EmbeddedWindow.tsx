@@ -136,7 +136,10 @@ export function EmbeddedWindow() {
 
   return (
     /* Flowy también vive acá (E1): el usuario trabaja en las ventanas de módulo
-       y el asistente responde con el contexto EXACTO de esta pantalla. */
+       y el asistente responde con el contexto EXACTO de esta pantalla.
+       WindowManagerProvider arriba de todo: lo usan las páginas (useWindowNav)
+       Y el panel de Flowy (botones de acción que abren pantallas, E2). */
+    <WindowManagerProvider>
     <AssistantProvider>
     <div className="flex h-screen flex-col bg-secondary/30">
       {/* En el navegador todo pasa en una sola pestaña: hace falta una forma
@@ -177,12 +180,6 @@ export function EmbeddedWindow() {
           sale del `minWidth` declarado en el registry (1000 si no declara). */}
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="h-full" style={{ minWidth: (def.minWidth ?? 1000) - 32 }}>
-      {/*
-        WindowManagerProvider también acá: páginas como Compras usan `useWindowNav`
-        (→ useWindowManager) para abrir OTRAS ventanas nativas desde adentro. En el
-        modo embedded el proxy IPC sigue siendo válido.
-      */}
-      <WindowManagerProvider>
         <WindowSelfProvider
           value={{
             windowId: pageKey,
@@ -197,12 +194,12 @@ export function EmbeddedWindow() {
             <Component />
           </Suspense>
         </WindowSelfProvider>
-      </WindowManagerProvider>
         </div>
       </div>
       <AssistantLauncher />
       <AssistantPanel screen={pageKey} />
     </div>
     </AssistantProvider>
+    </WindowManagerProvider>
   )
 }

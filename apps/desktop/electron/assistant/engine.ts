@@ -29,6 +29,12 @@ interface Section {
   overview?: string;
   subsections?: Subsection[];
 }
+/** Acción de NAVEGACIÓN (E2): abrir una pantalla. No ejecuta operaciones. */
+export interface AssistantAction {
+  label: string;
+  /** pageKey del registry de ventanas (src/windows/registry.ts). */
+  screen: string;
+}
 interface Intent {
   id: string;
   canonical: string;
@@ -36,6 +42,7 @@ interface Intent {
   answer: string;
   steps: string[];
   image?: string | null;
+  action?: AssistantAction | null;
 }
 interface Synonym {
   term: string;
@@ -51,6 +58,12 @@ export interface AssistantAnswer {
   reply: string;
   suggestions: string[];
   image?: string | null;
+  /**
+   * Botones de navegación ("Abrir Configuración"). El RENDERER los muestra
+   * SOLO si el rol tiene permiso para esa pantalla (registry.requires) — sin
+   * permiso, el botón no aparece.
+   */
+  actions?: AssistantAction[];
   /** Clasificación interna para logging (no se manda al renderer). */
   kind?: 'intent' | 'manual' | 'meta' | 'fallback' | 'walk';
 }
@@ -193,6 +206,7 @@ interface IntentDoc {
   answer: string;
   steps: string[];
   image: string | null;
+  action: AssistantAction | null;
   patternTokens: Set<string>;
   canonicalTokens: Set<string>;
   answerTokens: Set<string>;
@@ -274,6 +288,7 @@ function buildIndex(): Index {
         answer: it.answer,
         steps: it.steps ?? [],
         image: it.image ?? null,
+        action: it.action ?? null,
         patternTokens,
         canonicalTokens,
         answerTokens,
@@ -667,7 +682,13 @@ function answerIntentByIdx(idx: Index, j: number, c: Convo): AssistantAnswer {
   c.lastIntentIdx = j;
   c.lastSteps = d.steps;
   c.walkIdx = -1; // reinicia el modo paso a paso
-  return { reply: renderIntent(idx, d, c), suggestions: suggestionsFor(idx, d), image: d.image, kind: 'intent' };
+  return {
+    reply: renderIntent(idx, d, c),
+    suggestions: suggestionsFor(idx, d),
+    image: d.image,
+    actions: d.action ? [d.action] : [],
+    kind: 'intent',
+  };
 }
 
 /* --------------------------- utilidades test --------------------------- */

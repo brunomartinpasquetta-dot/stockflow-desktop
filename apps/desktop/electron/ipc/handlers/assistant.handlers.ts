@@ -23,6 +23,8 @@ export interface AssistantAskResult {
   reply: string;
   suggestions: string[];
   image?: string | null;
+  /** Botones de navegación; el renderer los oculta si el rol no tiene permiso. */
+  actions?: { label: string; screen: string }[];
 }
 
 function lastUserMessage(messages: AssistantMessage[]): string {
@@ -98,7 +100,7 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
 
         const ans = answerQuestion(question, payload?.conversationId ?? 'default', screenArea);
         if (ans.kind === 'fallback' && question.trim()) logMiss(deps.userDataDir, deps.appVersion, question.trim());
-        return { reply: ans.reply, suggestions: ans.suggestions, image: ans.image };
+        return { reply: ans.reply, suggestions: ans.suggestions, image: ans.image, actions: ans.actions ?? [] };
       },
     ),
   };

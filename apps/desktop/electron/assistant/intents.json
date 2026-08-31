@@ -1212,7 +1212,11 @@
       "Si en cambio salta un cartel rojo tipo 'Código ya existe' o 'El costo no puede ser negativo', el artículo NO se guardó: corregí ese dato (el código no se puede repetir con otro producto y los precios no pueden ser negativos) y volvé a tocar 'Guardar'.",
       "Si sale un cartel rojo que dice 'El código es obligatorio' o 'La descripción debe tener al menos 2 caracteres', completá ese dato y volvé a tocar 'Guardar'."
      ],
-     "image": "articulos-listado.png"
+     "image": "articulos-listado.png",
+     "action": {
+      "label": "Abrir Artículos",
+      "screen": "articulos"
+     }
     },
     {
      "id": "editar-articulo",
@@ -1845,7 +1849,11 @@
       "Tené en cuenta que la importación solo da de alta productos NUEVOS: si un código de barras ya existía en tu base, esa fila se marca con error 'Código ya existe en la base' y se saltea (no se actualiza ni se pisa lo que ya tenías).",
       "Si sale un cartel rojo tipo 'Tenés que mapear el campo \"Descripción\"', te faltó elegir la columna de un dato obligatorio: elegila y tocá 'Validar' de nuevo."
      ],
-     "image": "articulos-listado.png"
+     "image": "articulos-listado.png",
+     "action": {
+      "label": "Abrir Importar desde Excel",
+      "screen": "importar-stock"
+     }
     },
     {
      "id": "inventario-valuado",
@@ -2427,7 +2435,11 @@
       "Hacé clic en el botón 'Guardar presupuesto' (abajo a la derecha). Vas a ver un cartelito verde que dice 'Presupuesto P-0001 guardado' y volvés al listado.",
       "Si te aparece un cartel rojo que dice 'Agregá al menos un producto' o 'Elegí un cliente', es que te faltó ese dato: completalo y volvé a tocar 'Guardar presupuesto'."
      ],
-     "image": "presupuestos-crear.png"
+     "image": "presupuestos-crear.png",
+     "action": {
+      "label": "Abrir Presupuestos",
+      "screen": "presupuestos"
+     }
     },
     {
      "id": "alta-rapida-cliente",
@@ -4395,7 +4407,11 @@
       "Elegí con qué pagás: en el panel de abajo al medio, en la listita 'Forma de pago', seleccioná el medio (Efectivo, Transferencia, etc.). Si repartís el pago entre dos medios, hacé clic en 'Pago mixto (F12)' y cargá cuánto va en cada uno hasta cubrir el total.",
       "Abajo a la derecha, presioná el botón verde grande que dice 'Pagar (F2)' (o directamente la tecla F2). Va a aparecer un cartelito verde que dice 'Compra … registrada' con el número y el total, y la pantalla queda limpia para la próxima."
      ],
-     "image": "compras-principal.png"
+     "image": "compras-principal.png",
+     "action": {
+      "label": "Abrir Compras",
+      "screen": "compras"
+     }
     },
     {
      "id": "elegir-proveedor",
@@ -5410,7 +5426,11 @@
       "Abajo a la derecha está el botón verde grande que dice 'Confirmar venta (F2)' con el total. Presioná F2 o hacé clic ahí.",
       "Va a aparecer un cartelito verde arriba a la derecha que dice 'Venta ... registrada' con el número y el total. La pantalla queda limpia para la próxima venta, y si tenés impresora el ticket sale solo."
      ],
-     "image": "pdv-principal.png"
+     "image": "pdv-principal.png",
+     "action": {
+      "label": "Abrir Ventas",
+      "screen": "ventas"
+     }
     },
     {
      "id": "abrir-caja-para-vender",
@@ -5980,7 +6000,11 @@
       "Si el cliente cancela o el QR vence, cerrá la ventana y cobrale con otra forma de pago.",
       "¿No ves el botón celeste? Falta configurar MercadoPago (en Configuración) o vincular el dispositivo QR a la caja que tenés abierta."
      ],
-     "image": "pdv-principal.png"
+     "image": "pdv-principal.png",
+     "action": {
+      "label": "Abrir Configuración de MercadoPago",
+      "screen": "configuracion-mp"
+     }
     },
     {
      "id": "confirmar-venta",
@@ -6653,7 +6677,11 @@
       "Va a aparecer un cartelito que dice 'Caja abierta' y la pantalla cambia al resumen del día. Listo, ya podés vender.",
       "Si el botón 'Abrir caja' está gris y no te deja tocarlo, pasá el mouse por encima: si dice 'Suscripción suspendida — sólo lectura', hablá con el dueño del negocio para regularizar la suscripción."
      ],
-     "image": "caja-abierta-resumen.png"
+     "image": "caja-abierta-resumen.png",
+     "action": {
+      "label": "Abrir Caja",
+      "screen": "caja"
+     }
     },
     {
      "id": "caja-obligatoria-ventas",
@@ -9644,7 +9672,11 @@
       "Hacé clic en 'Probar impresión'. Tiene que salir un ticket de prueba que termina diciendo '¡Funciona!'.",
       "Si no sale nada, tildá el cuadradito 'Imprimir con diálogo del sistema', guardá de nuevo y probá otra vez: ahora se abre la ventana de imprimir de la computadora, que es la opción más segura."
      ],
-     "image": "config-hardware-printer.png"
+     "image": "config-hardware-printer.png",
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
     },
     {
      "id": "desactivar-ticket-automatico",
@@ -9747,7 +9779,11 @@
       "Hacé clic en 'Guardar configuración'. Vas a ver el cartelito 'Configuración de balanza guardada'. Si te sale un cartel rojo 'Tenés que indicar el puerto serial', es que falta elegir el puerto en el paso 3.",
       "Poné algo arriba de la balanza y hacé clic en 'Probar lectura (5 s)'. Durante 5 segundos, al lado del botón va apareciendo el peso, por ejemplo: '1.5 kg (estable)'. Si dice '(no estable)', esperá a que la aguja se quede quieta."
      ],
-     "image": "config-hardware-printer.png"
+     "image": "config-hardware-printer.png",
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
     },
     {
      "id": "backup-automatico",
@@ -9774,7 +9810,11 @@
       "En 'Carpeta de destino' escribí la carpeta donde se guardan las copias. Lo mejor es una carpeta que se suba sola a internet, como Dropbox, Google Drive o OneDrive: así, si se rompe la computadora, la copia está a salvo.",
       "Hacé clic en el botón 'Guardar'. Vas a ver el cartelito 'Configuración de backup guardada'.",
       "Si querés una copia ya mismo, hacé clic en 'Crear backup ahora'. Vas a ver el cartelito 'Backup creado' y el archivo aparece abajo, en la lista 'Backups existentes', con su nombre, tamaño y fecha."
-     ]
+     ],
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
     },
     {
      "id": "restaurar-backup",
@@ -10023,7 +10063,11 @@
       "Dejá tildado el cuadradito 'Usuario activo' para que pueda entrar enseguida.",
       "Guardá. Vas a ver el cartelito 'Usuario creado' y la persona ya aparece en la lista. Ya puede entrar con su usuario y contraseña.",
       "Si más adelante querés que esa persona deje de entrar sin borrarla, hacé clic en el botoncito de la columna 'Estado' de su fila: cambia de 'Activo' a 'Inactivo' y ya no puede iniciar sesión. Ojo: el sistema no te deja desactivar al único Administrador (sale 'No se puede desactivar al único administrador')."
-     ]
+     ],
+     "action": {
+      "label": "Abrir Usuarios",
+      "screen": "usuarios"
+     }
     },
     {
      "id": "cambiar-contrasena-usuario",
@@ -10255,7 +10299,11 @@
       "Revisá la vista previa antes de confirmar: así te asegurás de que cada columna quedó en su lugar.",
       "Confirmá la importación. Los artículos quedan cargados y ya los ves en la pantalla de Artículos.",
       "Si esta opción se ve gris, es porque tu usuario no es Administrador: pedile a la persona administradora que la haga."
-     ]
+     ],
+     "action": {
+      "label": "Abrir Importar desde Excel",
+      "screen": "importar-stock"
+     }
     },
     {
      "id": "efectivo-fisico-medio-pago",
@@ -11053,7 +11101,11 @@
       "Si querés llevarte todo a una planilla, hacé clic en el botón 'Exportar Excel', arriba a la derecha.",
       "Si la pantalla no te aparece, tu usuario no tiene permiso para ver reportes: pedile al dueño o administrador que te lo habilite."
      ],
-     "image": "estadisticas-resumen.png"
+     "image": "estadisticas-resumen.png",
+     "action": {
+      "label": "Abrir Estadísticas",
+      "screen": "estadisticas"
+     }
     },
     {
      "id": "productos-mas-vendidos",

@@ -32,6 +32,18 @@ function parse(path, label) {
   }
 }
 
+/* ── pageKeys válidos, parseados del registry real (sin lista que driftee) ── */
+function registryPageKeys() {
+  try {
+    const src = readFileSync(join(ROOT, 'src/windows/registry.ts'), 'utf8');
+    return new Set([...src.matchAll(/pageKey:\s*'([^']+)'/g)].map((m) => m[1]));
+  } catch {
+    errors.push('no pude leer src/windows/registry.ts para validar actions');
+    return new Set();
+  }
+}
+const PAGE_KEYS = registryPageKeys();
+
 /* ── intents.json ── */
 const kb = parse('electron/assistant/intents.json', 'intents.json');
 let totalIntents = 0;
@@ -69,6 +81,13 @@ if (kb) {
         if (it.image != null) {
           if (!String(it.image).endsWith('.png')) errors.push(`${ref}: image "${it.image}" sin extensión .png`);
           else if (!shots.has(it.image)) errors.push(`${ref}: image "${it.image}" no existe en sofia-shots/`);
+        }
+        // Acción de navegación (E2): label no vacío + pantalla existente en el registry.
+        if (it.action != null) {
+          if (typeof it.action.label !== 'string' || !it.action.label.trim() || typeof it.action.screen !== 'string')
+            errors.push(`${ref}: action inválida (se espera {label, screen})`);
+          else if (PAGE_KEYS.size && !PAGE_KEYS.has(it.action.screen))
+            errors.push(`${ref}: action.screen "${it.action.screen}" no existe en el registry de ventanas`);
         }
       }
     }

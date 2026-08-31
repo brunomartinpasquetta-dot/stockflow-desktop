@@ -159,5 +159,26 @@ for (const t of SCREEN_CASES) {
   console.log(`${ok ? '✅' : '❌'} hilo en articulos + pantalla ventas → atajos responde articulos  → ${after ? `${after.area}/${after.id}` : 'null'}`)
 }
 
+/* ---------- (5) acciones de navegación (E2) ---------- */
+console.log('\n── Acciones de navegación ──')
+const ACTION_CASES: { q: string; expectScreen: string }[] = [
+  { q: 'como hago una venta', expectScreen: 'ventas' },
+  { q: 'como configuro la impresora', expectScreen: 'configuracion' },
+  { q: 'como importo mis articulos desde un excel', expectScreen: 'importar-stock' },
+]
+for (const t of ACTION_CASES) {
+  const r = answerQuestion(t.q, freshId())
+  const ok = (r.actions ?? []).some((a) => a.screen === t.expectScreen && a.label.length > 0)
+  if (!ok) fails++
+  console.log(`${ok ? '✅' : '❌'} "${t.q}" → botón a «${t.expectScreen}»  (${JSON.stringify(r.actions ?? [])})`)
+}
+// Una respuesta sin action en la KB no inventa botones.
+{
+  const r = answerQuestion('que es el stock minimo', freshId())
+  const ok = (r.actions ?? []).length === 0
+  if (!ok) fails++
+  console.log(`${ok ? '✅' : '❌'} intent sin action → sin botones`)
+}
+
 console.log(fails === 0 ? '\n✅ TODO OK' : `\n❌ ${fails} FALLAS`)
 process.exit(fails === 0 ? 0 : 1)

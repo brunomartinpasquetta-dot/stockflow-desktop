@@ -1504,6 +1504,12 @@ export interface AssistantMessageDTO {
   role: 'user' | 'assistant';
   content: string;
 }
+/** Asistente virtual: botón de navegación ("Abrir Configuración"). */
+export interface AssistantActionDTO {
+  label: string;
+  /** pageKey del registry de ventanas. */
+  screen: string;
+}
 /** Asistente virtual: respuesta a una consulta. */
 export interface AssistantAskResultDTO {
   reply: string;
@@ -1511,6 +1517,11 @@ export interface AssistantAskResultDTO {
   suggestions: string[];
   /** Nombre de archivo de la captura de pantalla a mostrar (si aplica). */
   image?: string | null;
+  /**
+   * Botones que ABREN una pantalla (solo navegación). El renderer los muestra
+   * únicamente si el rol tiene permiso para esa ventana (registry.requires).
+   */
+  actions?: AssistantActionDTO[];
 }
 
 /* ----------------------------------------------------------------------- */
