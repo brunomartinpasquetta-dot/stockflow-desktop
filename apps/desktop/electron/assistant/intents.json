@@ -4180,6 +4180,29 @@
       "label": "Abrir Configuración",
       "screen": "configuracion"
      }
+    },
+    {
+     "id": "primeros-pasos",
+     "canonical": "¿Por dónde empiezo? ¿Cuáles son los primeros pasos?",
+     "patterns": [
+      "por donde empiezo",
+      "primeros pasos",
+      "que hago primero",
+      "recien instale el sistema",
+      "acabo de instalar stockflow",
+      "como arranco",
+      "que tengo que configurar primero",
+      "guia de inicio",
+      "como empiezo a usar el sistema",
+      "soy nuevo en el sistema"
+     ],
+     "answer": "En la pantalla principal tenés la lista de «Primeros pasos»: cargar los datos de tu comercio, tu primer artículo (o importar tu Excel), tu primera venta, la impresora y el backup. Cada paso te lleva a la pantalla justa, y se tilda solo cuando lo hacés. Si preferís practicar antes, preguntame por los datos de ejemplo.",
+     "steps": [
+      "Mirá la tarjeta «Primeros pasos» abajo a la izquierda de la pantalla principal.",
+      "Tocá un paso pendiente y se abre la pantalla donde se hace.",
+      "Los tildes aparecen solos: el sistema detecta lo que ya está hecho."
+     ],
+     "image": null
     }
    ]
   },

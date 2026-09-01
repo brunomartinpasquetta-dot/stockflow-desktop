@@ -50,6 +50,7 @@ jobs:
       - run: pnpm --filter @stockflow/desktop run test:consultas
       - run: pnpm --filter @stockflow/desktop run test:flows
       - run: pnpm --filter @stockflow/desktop run test:demo
+      - run: pnpm --filter @stockflow/desktop run test:onboarding
       - run: pnpm --filter @stockflow/desktop run build:web
       - run: pnpm --filter @stockflow/desktop run build:electron
       - name: Publish (macOS)

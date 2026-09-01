@@ -1504,6 +1504,21 @@ export interface AssistantMessageDTO {
   role: 'user' | 'assistant';
   content: string;
 }
+/** Primeros pasos (E5): un paso de la checklist de onboarding. */
+export interface OnboardingStepDTO {
+  id: 'empresa' | 'articulos' | 'venta' | 'impresora' | 'backup';
+  label: string;
+  /** pageKey del registry a abrir al tocar el paso. */
+  screen: string;
+  done: boolean;
+}
+/** Primeros pasos (E5): checklist computada contra la base real. */
+export interface OnboardingStatusDTO {
+  hidden: boolean;
+  steps: OnboardingStepDTO[];
+  pending: number;
+}
+
 /** Modo demo (E5): estado de los datos de ejemplo. */
 export interface DemoStatusDTO {
   active: boolean;
@@ -1669,6 +1684,10 @@ export interface ApiSurface {
   assistant: {
     /** `screen`: pageKey de la ventana donde está el usuario (contexto E1). */
     ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string; screen?: string }): Res<AssistantAskResultDTO>;
+  };
+  onboarding: {
+    status(): Res<OnboardingStatusDTO>;
+    dismiss(): Res<{ ok: true }>;
   };
   demo: {
     status(): Res<DemoStatusDTO>;

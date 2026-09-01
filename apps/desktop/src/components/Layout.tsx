@@ -16,6 +16,7 @@ import { WindowManagerProvider } from '@/contexts/WindowManagerContext'
 import { WhatsAppPanelProvider } from '@/contexts/WhatsAppPanelContext'
 import { AssistantProvider } from '@/contexts/AssistantContext'
 import { AssistantPanel } from '@/components/AssistantPanel'
+import { OnboardingCard } from '@/components/OnboardingCard'
 import { useGlobalShortcuts } from '@/lib/useGlobalShortcuts'
 import { useMdiShortcuts } from '@/lib/useMdiShortcuts'
 import { useDeepLinkRouter } from '@/lib/useDeepLinkRouter'
@@ -96,8 +97,9 @@ function LayoutInner() {
       <MenuBar />
       <QuickAccessToolbar />
       <StatusBar />
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         <WelcomeScreen />
+        <OnboardingCard />
       </div>
       <Taskbar />
       <AssistantPanel screen="principal" />
