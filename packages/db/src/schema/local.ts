@@ -297,6 +297,14 @@ export const cashRegisters = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
+    /**
+     * Caja por terminal (migración 0017): cada puesto abre/cierra la suya.
+     * NULL = "caja del sistema" (compartida, comportamiento de una sola PC).
+     * Estas columnas existían en la DB pero faltaban acá: drizzle no las
+     * seleccionaba y el filtro por terminal no discriminaba de verdad.
+     */
+    terminalId: text('terminal_id'),
+    terminalName: text('terminal_name'),
     /** Observaciones del cierre (ej. diferencia de arqueo). */
     notes: text('notes'),
     createdAt: createdAtCol(),
@@ -869,6 +877,8 @@ export const supplierPayments = sqliteTable(
     amount: text('amount').notNull(),
     date: integer('date').notNull(),
     reference: text('reference'),
+    /** Nota del pago (espejo de payments.notes de clientes; migración 0023). */
+    notes: text('notes'),
     createdAt: createdAtCol(),
   },
   (t) => ({

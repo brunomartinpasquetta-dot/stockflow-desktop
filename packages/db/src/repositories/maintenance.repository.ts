@@ -27,6 +27,7 @@
  * Todo en UNA transacción: si algo falla, no queda a medias.
  */
 import { sql } from 'drizzle-orm';
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 
 import { rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
@@ -99,7 +100,7 @@ export class MaintenanceRepository {
         const articlesStockReset = scalar(tx.select({ n: sql<number>`count(*)` }).from(articles));
 
         // Helper: filtro SQL "id NOT IN (...conservados)". Con Set vacío → borra todo.
-        const notKept = (ids: Set<string>, col: typeof sales.id): ReturnType<typeof sql> | undefined => {
+        const notKept = (ids: Set<string>, col: AnySQLiteColumn): ReturnType<typeof sql> | undefined => {
           if (ids.size === 0) return undefined;
           const list = [...ids];
           return sql`${col} NOT IN (${sql.join(list.map((x) => sql`${x}`), sql`, `)})`;

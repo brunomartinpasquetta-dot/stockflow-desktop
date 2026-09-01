@@ -120,6 +120,19 @@ export class SalesService {
     const customer = await repos.customers.findById(draft.customerId);
     if (!customer) throw new NotFoundError('Cliente', draft.customerId);
 
+    // Espejo del bloqueo del front (Ventas.tsx isCfCustomer): el CONSUMIDOR
+    // FINAL no lleva cuenta corriente — sin ficha real no hay a quién cobrarle.
+    // El front ya lo impide; esto cierra la puerta por IPC directo/LAN/tests.
+    if (
+      isAccountSale &&
+      (customer.lastName.trim().toUpperCase() === 'CONSUMIDOR FINAL' || customer.docType === 'CF')
+    ) {
+      throw new BusinessRuleError(
+        'account_sale_consumer_final',
+        'El CONSUMIDOR FINAL no puede comprar a cuenta corriente. Elegí un cliente con ficha.',
+      );
+    }
+
     if (!isAccountSale && payments.length === 0) {
       throw new BusinessRuleError('no_payments', 'La venta debe registrar al menos un pago');
     }

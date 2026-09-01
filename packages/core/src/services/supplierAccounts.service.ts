@@ -5,6 +5,7 @@ import type { Purchase, Supplier, SupplierAccountPayable, SupplierPayment } from
 import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
+import { assertPhysicalCashAvailable } from './cash.service';
 import type { ServiceContext } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 
@@ -170,7 +171,7 @@ export class SupplierAccountsService {
     }
 
     const fundingSource: 'daily' | 'general' = input.fundingSource === 'general' ? 'general' : 'daily';
-    const cashRegisterId = await this.resolveFunding(fundingSource, input.cashRegisterId, totalPaid);
+    const cashRegisterId = await this.resolveFunding(fundingSource, input.cashRegisterId, totalPaid, input.payments);
 
     const payments = await repos.supplierPayments.createPayment({
       accountId: input.accountId,
@@ -223,7 +224,7 @@ export class SupplierAccountsService {
     }
 
     const fundingSource: 'daily' | 'general' = input.fundingSource === 'general' ? 'general' : 'daily';
-    const cashRegisterId = await this.resolveFunding(fundingSource, input.cashRegisterId, totalPaid);
+    const cashRegisterId = await this.resolveFunding(fundingSource, input.cashRegisterId, totalPaid, input.payments);
 
     const result = await repos.supplierPayments.createAccountPayment({
       supplierId: input.supplierId,
@@ -250,6 +251,7 @@ export class SupplierAccountsService {
     fundingSource: 'daily' | 'general',
     inputCashRegisterId: string | undefined,
     totalPaid: string,
+    payments: SupplierPaymentDraft[] = [],
   ): Promise<string | null> {
     const { repos } = this.ctx;
     if (fundingSource === 'general') {
@@ -269,6 +271,14 @@ export class SupplierAccountsService {
         : (await repos.cashRegisters.getCurrentOpen())?.id);
     if (!cashRegisterId) {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el egreso');
+    }
+    // La parte en EFECTIVO del pago no puede superar lo que hay en el cajón.
+    if (payments.length > 0) {
+      const pmById = await repos.paymentMethods.byId();
+      const fisico = sumDecimals(
+        payments.filter((p) => pmById.get(p.paymentMethodId)?.isPhysicalCash === true).map((p) => p.amount),
+      );
+      await assertPhysicalCashAvailable(repos, cashRegisterId, fisico);
     }
     return cashRegisterId;
   }

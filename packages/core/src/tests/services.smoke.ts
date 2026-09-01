@@ -313,6 +313,12 @@ async function main(): Promise<void> {
   // ------------------------------------------------------------------ caja
   console.log('\n[cash]');
   const mov = await admin.cash.addMovement({ type: 'income', description: 'Aporte de socio', amount: '500.0000', paymentMethodId: PM_CASH });
+
+  await expectThrows(
+    'egreso en efectivo mayor al disponible → BusinessRuleError (insufficient_cash_daily)',
+    () => admin.cash.addMovement({ type: 'expense', description: 'Egreso imposible', amount: '9999999.0000', paymentMethodId: PM_CASH }),
+    (e) => e instanceof BusinessRuleError && /efectivo suficiente/.test((e as Error).message),
+  );
   check('addMovement (admin, efectivo)', mov.type === 'income' && mov.amount === '500.0000' && mov.paymentMethodId === PM_CASH);
   await expectThrows(
     'addMovement como seller → PermissionDeniedError',
@@ -341,7 +347,9 @@ async function main(): Promise<void> {
 
   // ---------------------------------------------- compras + cuentas proveedores
   console.log('\n[compras / cuentas proveedores]');
-  const reg2 = await admin.cash.openCashRegister('1000.0000');
+  // Apertura holgada: desde la validación de fondos (insufficient_cash_daily)
+  // los egresos en efectivo de esta sección necesitan cajón real que los cubra.
+  const reg2 = await admin.cash.openCashRegister('3000.0000');
   check('reabrir caja para compras', reg2.status === 'open');
   const prov = await repos.suppliers.create({ code: 'P001', name: 'Distribuidora Test' });
 
@@ -868,6 +876,26 @@ async function main(): Promise<void> {
     );
     const b3 = await admin.cashGeneral.getBalanceBreakdown();
     check('el rechazo no movió Caja General', Number(b3.total) === 700, `total=${b3.total}`);
+
+    // Anular una compra contado pagada desde Caja General DEVUELVE la plata
+    // (antes el reverso solo existía para caja diaria y el saldo quedaba
+    // descontado para siempre), con el desglose restaurado.
+    const compraCG = await admin.purchases.createPurchase({
+      type: 'X',
+      supplierId: prov.id,
+      isAccountPurchase: false,
+      fundingSource: 'general',
+      payments: [
+        { paymentMethodId: PM_CASH, amount: '150.0000' },
+        { paymentMethodId: PM_TRANSFER, amount: '50.0000' },
+      ],
+      lines: [{ articleId: art.id, quantity: '1.000', costPrice: '200.0000', vatRate: '0.00' }],
+    });
+    const bAntesVoid = await admin.cashGeneral.getBalanceBreakdown();
+    check('compra contado desde CG bajó 200 (150 efectivo + 50 electrónico)', Number(bAntesVoid.total) === 500 && Number(bAntesVoid.cash) === 100 && Number(bAntesVoid.electronic) === 400, `total=${bAntesVoid.total} cash=${bAntesVoid.cash} elec=${bAntesVoid.electronic}`);
+    await admin.purchases.voidPurchase(compraCG.purchase.id);
+    const bTrasVoid = await admin.cashGeneral.getBalanceBreakdown();
+    check('voidPurchase devuelve el dinero a Caja General con el desglose original', Number(bTrasVoid.total) === 700 && Number(bTrasVoid.cash) === 250 && Number(bTrasVoid.electronic) === 450, `total=${bTrasVoid.total} cash=${bTrasVoid.cash} elec=${bTrasVoid.electronic}`);
   }
 
   // ----------------------------------------------------- analytics

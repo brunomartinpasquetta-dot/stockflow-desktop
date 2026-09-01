@@ -2,7 +2,7 @@
  * Servicio de caja: apertura/cierre, movimientos manuales y reportes de arqueo.
  */
 import type { CashMovement, CashRegister, PaymentMethod, PaymentMethodType } from '@stockflow/shared';
-import { addDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
+import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { hasPermission, requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -104,6 +104,43 @@ export interface CashReport {
   /** Desglose por medio de pago (efectivo, transferencia, tarjetas, ...). */
   byPaymentMethod: PaymentMethodBreakdown[];
   movements: CashMovementWithStatus[];
+}
+
+/**
+ * Efectivo FÍSICO disponible en una caja: apertura + ingresos en efectivo −
+ * egresos en efectivo (misma regla que el arqueo: paymentMethodId null o
+ * isPhysicalCash). Compartido por los flujos que egresan efectivo del cajón.
+ */
+export async function availablePhysicalCash(
+  repos: ServiceContext['repos'],
+  registerId: string,
+): Promise<string> {
+  const register = await repos.cashRegisters.findById(registerId);
+  if (!register) throw new NotFoundError('Caja', registerId);
+  const [movs, pmById] = await Promise.all([
+    repos.cashMovements.findByRegister(registerId),
+    repos.paymentMethods.byId(),
+  ]);
+  const fisico = (pmId: string | null): boolean => pmId == null || pmById.get(pmId)?.isPhysicalCash === true;
+  const inc = movs.filter((m) => m.type === 'income' && fisico(m.paymentMethodId)).map((m) => m.amount);
+  const exp = movs.filter((m) => m.type === 'expense' && fisico(m.paymentMethodId)).map((m) => m.amount);
+  return subDecimal(sumDecimals([register.openingAmount, ...inc]), sumDecimals(exp), 4);
+}
+
+/** Valida que la caja tenga efectivo físico suficiente para un egreso. */
+export async function assertPhysicalCashAvailable(
+  repos: ServiceContext['repos'],
+  registerId: string,
+  amount: string,
+): Promise<void> {
+  if (cmpDecimal(amount, '0') <= 0) return;
+  const disponible = await availablePhysicalCash(repos, registerId);
+  if (cmpDecimal(amount, disponible) > 0) {
+    throw new BusinessRuleError(
+      'insufficient_cash_daily',
+      `No hay efectivo suficiente en la caja (disponible ${disponible}, egreso en efectivo ${amount})`,
+    );
+  }
 }
 
 export class CashService {
@@ -305,6 +342,10 @@ export class CashService {
     const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'add_cash_movement');
 
+    if (cmpDecimal(input.amount, '0') <= 0) {
+      throw new BusinessRuleError('invalid_amount', 'El monto debe ser mayor a cero');
+    }
+
     const registerId =
       input.cashRegisterId ??
       (this.ctx.currentCashRegister?.status === 'open'
@@ -312,6 +353,15 @@ export class CashService {
         : (await repos.cashRegisters.getCurrentOpen())?.id);
     if (!registerId) {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta');
+    }
+
+    // Un egreso en EFECTIVO no puede sacar del cajón más de lo que hay.
+    // (Los medios electrónicos no tienen esta restricción física; los reversos
+    // de anulaciones tampoco pasan por acá — van directo al repositorio.)
+    if (input.type === 'expense') {
+      const pmById = await repos.paymentMethods.byId();
+      const fisico = input.paymentMethodId == null || pmById.get(input.paymentMethodId)?.isPhysicalCash === true;
+      if (fisico) await assertPhysicalCashAvailable(repos, registerId, input.amount);
     }
 
     return repos.cashMovements.create({

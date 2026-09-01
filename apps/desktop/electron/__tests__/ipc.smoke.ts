@@ -450,6 +450,10 @@ async function main(): Promise<void> {
 
   if (artC.ok && provC.ok) {
     // (1) sin actualizar precios
+  // Fondeo del cajón: la validación de fondos (insufficient_cash_daily) exige
+  // efectivo real para los egresos en efectivo de las compras que siguen.
+  await invoke(handlers, 'cash:addMovement', { type: 'income', description: 'Fondeo para compras del guión', amount: '9000.0000', paymentMethodId: 'pm-efectivo' });
+
     const c1 = await invoke(handlers, 'purchases:create', {
       type: 'X', supplierId: provC.data.id, isAccountPurchase: false, fundingSource: 'daily',
       updatePrices: false, payments: [{ paymentMethodId: 'pm-efectivo', amount: '1500.0000' }],

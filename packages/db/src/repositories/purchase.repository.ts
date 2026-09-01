@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, like, lte, max, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, lt, lte, max, or, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   CreatePurchaseWithLinesSchema,
@@ -443,6 +443,67 @@ export class PurchaseRepository extends BaseRepository<
               })
               .run();
           }
+        }
+
+        // Reverso de CAJA GENERAL (compras contado con fundingSource='general'):
+        // esas compras NO generan cash_movements — su egreso vive en
+        // cash_general_movements con referenceId = compra. Antes la anulación
+        // lo ignoraba y la plata quedaba descontada de la caja fuerte para
+        // siempre. El TOTAL del reverso es exacto (invariante de la casa);
+        // el desglose efectivo/electrónico se deriva contra la fila anterior
+        // (ids uuidv7 = orden temporal) y, si un 'Ajustar desglose' manual en
+        // el medio hace que la derivación no cierre, cae a la etiqueta isCash
+        // — corregible con la misma herramienta de ajuste.
+        const cgExpenses = tx
+          .select()
+          .from(cashGeneralMovements)
+          .where(and(eq(cashGeneralMovements.referenceId, id), eq(cashGeneralMovements.type, 'expense')))
+          .all();
+        for (const m of cgExpenses) {
+          const prev = tx
+            .select()
+            .from(cashGeneralMovements)
+            .where(lt(cashGeneralMovements.id, m.id))
+            .orderBy(desc(cashGeneralMovements.id))
+            .limit(1)
+            .get();
+          const prevCash = prev?.balanceAfterCash ?? '0';
+          let cashPart = subDecimal(prevCash, m.balanceAfterCash ?? '0', 2);
+          if (cmpDecimal(cashPart, '0') < 0 || cmpDecimal(cashPart, m.amount) > 0) {
+            cashPart = m.isCash ? m.amount : '0';
+          }
+          const elecPart = subDecimal(m.amount, cashPart, 2);
+          const cgCur = tx.select().from(cashGeneral).where(eq(cashGeneral.id, 'singleton')).get();
+          if (!cgCur) continue; // sin singleton no hay de dónde revertir (no debería pasar)
+          const now = Date.now();
+          const balanceAfter = addDecimal(cgCur.currentBalance, m.amount, 2);
+          const balanceAfterCash = addDecimal(cgCur.cashBalance, cashPart, 2);
+          const balanceAfterElec = addDecimal(cgCur.electronicBalance, elecPart, 2);
+          tx.insert(cashGeneralMovements)
+            .values({
+              id: uuidv7(),
+              type: 'income',
+              amount: m.amount,
+              description: `Anulación compra ${purchase.type} #${purchase.number}`,
+              category: 'other',
+              createdBy: m.createdBy,
+              referenceId: purchase.id,
+              balanceAfter,
+              isCash: cmpDecimal(cashPart, elecPart) >= 0,
+              balanceAfterCash,
+              balanceAfterElectronic: balanceAfterElec,
+              createdAt: now,
+            })
+            .run();
+          tx.update(cashGeneral)
+            .set({
+              currentBalance: balanceAfter,
+              cashBalance: balanceAfterCash,
+              electronicBalance: balanceAfterElec,
+              lastUpdate: now,
+            })
+            .where(eq(cashGeneral.id, 'singleton'))
+            .run();
         }
 
         const updated = tx

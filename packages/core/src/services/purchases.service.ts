@@ -12,6 +12,7 @@ import type {
 import { cmpDecimal, sumDecimals } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
+import { assertPhysicalCashAvailable } from './cash.service';
 import type { ServiceContext } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 import { type PriceMode, calculateSaleTotals } from '../pricing';
@@ -190,6 +191,17 @@ export class PurchasesService {
             : (await repos.cashRegisters.getCurrentOpen())?.id) ??
           null)
         : null;
+
+    // La parte en EFECTIVO de una compra contado no puede superar el cajón.
+    if (!isAccountPurchase && fundingSource === 'daily' && cashRegisterId && (input.payments ?? []).length > 0) {
+      const pmById = await repos.paymentMethods.byId();
+      const fisico = sumDecimals(
+        (input.payments ?? [])
+          .filter((p) => pmById.get(p.paymentMethodId)?.isPhysicalCash === true)
+          .map((p) => p.amount),
+      );
+      await assertPhysicalCashAvailable(repos, cashRegisterId, fisico);
+    }
 
     // Validación de fondos: si sale de Caja General, tiene que haber saldo.
     if (fundingSource === 'general') {

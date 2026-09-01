@@ -157,6 +157,7 @@ function ArticlePicker({
   articles,
   families,
   suppliers,
+  activeList,
   onClose,
   onPick,
 }: {
@@ -164,6 +165,8 @@ function ArticlePicker({
   articles: ArticleDTO[]
   families: { id: string; name: string }[]
   suppliers: { id: string; name: string; code: string }[]
+  /** Lista de precios activa de la venta: su columna se resalta. */
+  activeList: 1 | 2 | 3
   onClose: () => void
   onPick: (a: ArticleDTO) => void
 }) {
@@ -304,13 +307,17 @@ function ArticlePicker({
                 <th className="px-2 py-1.5">Marca</th>
                 <th className="px-2 py-1.5">Familia</th>
                 <th className="px-2 py-1.5 text-right">Stock</th>
-                <th className="px-2 py-1.5 text-right">Precio</th>
+                {/* Todos los precios; la lista ACTIVA de la venta va resaltada. */}
+                <th className={cn('px-2 py-1.5 text-right', activeList === 1 && 'text-primary')}>Lista 1</th>
+                <th className={cn('px-2 py-1.5 text-right', activeList === 2 && 'text-primary')}>Lista 2</th>
+                <th className={cn('px-2 py-1.5 text-right', activeList === 3 && 'text-primary')}>Lista 3</th>
+                <th className="px-2 py-1.5 text-right">Mayorista</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
                     Sin resultados
                   </td>
                 </tr>
@@ -331,8 +338,20 @@ function ArticlePicker({
                     <td className="px-2 py-1 text-right tabular-nums">
                       {formatQty(a.stock)}
                     </td>
-                    <td className="px-2 py-1 text-right tabular-nums">
+                    <td className={cn('px-2 py-1 text-right tabular-nums', activeList === 1 && 'font-semibold text-primary')}>
                       {formatCurrency(a.listPrice1)}
+                    </td>
+                    <td className={cn('px-2 py-1 text-right tabular-nums', activeList === 2 && 'font-semibold text-primary')}>
+                      {formatCurrency(a.listPrice2)}
+                    </td>
+                    <td className={cn('px-2 py-1 text-right tabular-nums', activeList === 3 && 'font-semibold text-primary')}>
+                      {formatCurrency(a.listPrice3)}
+                    </td>
+                    <td
+                      className="px-2 py-1 text-right tabular-nums text-muted-foreground"
+                      title={Number(a.wholesalePrice) > 0 ? `A partir de ${formatQty(a.wholesaleMinQty)} unidades` : undefined}
+                    >
+                      {Number(a.wholesalePrice) > 0 ? formatCurrency(a.wholesalePrice) : '—'}
                     </td>
                   </tr>
                 ))
@@ -1867,6 +1886,7 @@ function PDV() {
         articles={allArticles}
         families={familiesQuery.data ?? []}
         suppliers={suppliersQuery.data ?? []}
+        activeList={selectedPriceList}
         onClose={() => {
           setArticlePickerOpen(false)
           barcodeRef.current?.focus()

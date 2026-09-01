@@ -203,6 +203,7 @@ export class SupplierPaymentRepository extends BaseRepository<
               amount: p.amount,
               date: now,
               reference: p.reference ?? null,
+              notes: data.notes ?? null,
             })
             .returning()
             .all()[0];
@@ -368,6 +369,7 @@ export class SupplierPaymentRepository extends BaseRepository<
                 amount: take,
                 date: now,
                 reference: m.reference,
+                notes: data.notes ?? null,
               })
               .returning()
               .all()[0];
