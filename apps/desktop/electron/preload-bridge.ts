@@ -16,6 +16,7 @@
 import type {
   ApiSurface,
   AssistantAskResultDTO,
+  DemoStatusDTO,
   DesktopWindowInfoDTO,
   DesktopWindowOpenDTO,
   IpcResponse,
@@ -92,6 +93,8 @@ export const LAN_ROUTED_GROUPS = new Set([
   // respuestas con datos del negocio ("¿cuánto vendí hoy?") necesitan LA BASE,
   // que sólo tiene el servidor. En los puestos quedaba sin contestar nada.
   'assistant',
+  // Modo demo (E5): la base del negocio vive en el puesto servidor.
+  'demo',
 ]);
 
 export const LOCAL_GROUPS = new Set([
@@ -257,6 +260,12 @@ export function createApiBridge(
     },
     assistant: {
       ask: (p) => c<AssistantAskResultDTO>('assistant:ask', p),
+    },
+    demo: {
+      status: () => c<DemoStatusDTO>('demo:status'),
+      load: () => c<{ ok: true; ventas: number; compras: number }>('demo:load'),
+      remove: (p) => c<{ ok: true; needsRestart: true }>('demo:remove', p),
+      restart: () => c<{ ok: true }>('demo:restart'),
     },
     articles: {
       list: () => c<never>('articles:list'),

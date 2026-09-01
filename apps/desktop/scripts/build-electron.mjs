@@ -88,6 +88,11 @@ if (existsSync(dbMigrations)) {
 cpSync(join(appRoot, 'electron', 'assistant', 'intents.json'), join(outDir, 'assistant-intents.json'));
 cpSync(join(appRoot, 'manual-src', 'sections.json'), join(outDir, 'manual-sections.json'));
 cpSync(join(appRoot, 'electron', 'assistant', 'flows.json'), join(outDir, 'assistant-flows.json'));
+// Datos de ejemplo del modo demo (E5): el xlsx viaja junto al bundle.
+cpSync(
+  join(repoRoot, 'marketing', 'demo-data', 'StockFlow-demo-articulos.xlsx'),
+  join(outDir, 'demo-articulos.xlsx'),
+);
 
 // GUARDIA MECÁNICA anti-SIGTRAP: si algún refactor vuelve a importar la KB
 // estáticamente (resolveJsonModule lo permite sin error), esbuild la inlinea y

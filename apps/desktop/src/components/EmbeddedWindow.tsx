@@ -27,6 +27,7 @@ import { PageSpinner } from '@/components/PageSpinner'
 import { WindowManagerProvider, WindowSelfProvider } from '@/contexts/WindowManagerContext'
 import { api } from '@/lib/api'
 import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
+import { useDemoActive } from '@/lib/useDemoActive'
 import { useEmbeddedShortcuts } from '@/lib/useEmbeddedShortcuts'
 import { WINDOWS } from '@/windows/registry'
 
@@ -46,6 +47,7 @@ export function EmbeddedWindow() {
   const { pageKey } = useParams<{ pageKey: string }>()
   const [searchParams] = useSearchParams()
   const { currentUser, loading } = useAuth()
+  const demoActive = useDemoActive()
   useEmbeddedShortcuts()
 
   const def = pageKey ? WINDOWS[pageKey] : undefined
@@ -158,6 +160,7 @@ export function EmbeddedWindow() {
             style={esMac ? { left: 0, right: 0 } : { left: 0, right: 140 }}
           >
             {def.title} — StockFlow
+            {demoActive && <span className="ml-2 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">DEMO</span>}
           </span>
         </div>
       )}

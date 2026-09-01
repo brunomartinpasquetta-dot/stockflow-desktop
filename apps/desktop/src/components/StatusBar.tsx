@@ -14,11 +14,13 @@ import { LanStatusIndicator } from '@/components/LanStatusIndicator'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAssistant } from '@/contexts/AssistantContext'
 import { useLicense } from '@/contexts/LicenseContext'
+import { useDemoActive } from '@/lib/useDemoActive'
 
 export function StatusBar() {
   const { currentUser } = useAuth()
   const assistant = useAssistant()
   const { state: license } = useLicense()
+  const demoActive = useDemoActive()
   const [now, setNow] = useState(() => new Date())
 
   // Prueba gratis: días que le quedan (mínimo 0). null si no es trial.
@@ -59,6 +61,15 @@ export function StatusBar() {
           <img src={BRANDING.iconSvg} alt="" className="h-5 w-5" draggable={false} />
           <span className="hidden md:inline">Flowy</span>
         </button>
+        {/* MODO DEMO: distintivo permanente mientras los datos de ejemplo estén cargados */}
+        {demoActive && (
+          <span
+            className="inline-flex shrink-0 items-center rounded-md border border-amber-500/60 bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800"
+            title="Datos de ejemplo cargados. Todo lo que cargues acá se descarta al quitar la demo (Configuración → Datos de ejemplo)."
+          >
+            MODO DEMO
+          </span>
+        )}
       </div>
       {/* Prueba gratis: días restantes, siempre a la vista */}
       {trialDaysLeft !== null && (

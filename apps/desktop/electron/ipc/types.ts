@@ -1504,6 +1504,15 @@ export interface AssistantMessageDTO {
   role: 'user' | 'assistant';
   content: string;
 }
+/** Modo demo (E5): estado de los datos de ejemplo. */
+export interface DemoStatusDTO {
+  active: boolean;
+  loadedAt?: number;
+  /** true solo con la base virgen y los datos de ejemplo disponibles. */
+  canLoad: boolean;
+  reason?: string;
+}
+
 /** Asistente virtual: botón de navegación ("Abrir Configuración"). */
 export interface AssistantActionDTO {
   label: string;
@@ -1660,6 +1669,12 @@ export interface ApiSurface {
   assistant: {
     /** `screen`: pageKey de la ventana donde está el usuario (contexto E1). */
     ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string; screen?: string }): Res<AssistantAskResultDTO>;
+  };
+  demo: {
+    status(): Res<DemoStatusDTO>;
+    load(): Res<{ ok: true; ventas: number; compras: number }>;
+    remove(payload: { password: string }): Res<{ ok: true; needsRestart: true }>;
+    restart(): Res<{ ok: true }>;
   };
   fiscal: {
     getConfig(): Res<FiscalConfigDTO | null>;

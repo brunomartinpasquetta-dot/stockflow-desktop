@@ -4152,6 +4152,34 @@
      ],
      "answer": "En el servidor: Configuración → Red → \"Terminales conectadas\". Ahí ves cada puesto con su dirección, si entró por la app o por el navegador, qué usuario está trabajando y hace cuánto se lo vio, con un punto verde o rojo. Si no aparece ninguna, tocá \"Revisar\" y fijate el firewall.",
      "steps": []
+    },
+    {
+     "id": "datos-de-ejemplo",
+     "canonical": "¿Puedo probar el sistema con datos de ejemplo?",
+     "patterns": [
+      "puedo probar con datos de ejemplo",
+      "cargar datos de ejemplo",
+      "datos de prueba",
+      "cargar la demo",
+      "modo demo",
+      "quiero practicar sin cargar mis productos",
+      "probar sin miedo a romper algo",
+      "datos de muestra para aprender",
+      "como quito los datos de ejemplo",
+      "sacar la demo",
+      "borrar los datos de prueba"
+     ],
+     "answer": "¡Sí! Podés cargar el comercio de ejemplo «Ferretería del Litoral» (artículos, clientes, ventas y caja) para practicar sin miedo. Solo se carga con la base vacía y es 100% reversible: al quitarla, todo vuelve exactamente a como estaba. Mientras esté activa, vas a ver el distintivo MODO DEMO en pantalla.",
+     "steps": [
+      "Abrí Configuración, pestaña de mantenimiento (necesitás ser administrador).",
+      "En 'Datos de ejemplo', tocá 'Cargar datos de ejemplo' y confirmá.",
+      "Para quitarla: mismo lugar, 'Quitar datos de ejemplo…' con tu contraseña — la base vuelve al estado anterior al reiniciar."
+     ],
+     "image": null,
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
     }
    ]
   },

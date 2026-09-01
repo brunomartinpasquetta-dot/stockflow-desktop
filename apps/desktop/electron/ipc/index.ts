@@ -19,6 +19,7 @@ import { buildHardwareHandlers } from './handlers/hardware.handlers';
 import { buildImportHandlers } from './handlers/import.handlers';
 import { buildCompanyHandlers } from './handlers/company.handlers';
 import { buildCustomersHandlers } from './handlers/customers.handlers';
+import { buildDemoHandlers } from './handlers/demo.handlers';
 import { buildFamiliesHandlers } from './handlers/families.handlers';
 import { buildInventoryHandlers } from './handlers/inventory.handlers';
 import { buildLanHandlers } from './handlers/lan.handlers';
@@ -100,6 +101,12 @@ export function buildAllHandlers(deps: HandlerDeps): HandlerMap {
       }
       map[channel] = isAuditable(channel) ? withAudit(channel, handler, deps) : handler;
     }
+  }
+  // Modo demo (E5): se arma al FINAL porque siembra llamando a los canales del
+  // propio mapa (mismas reglas de negocio que la app).
+  for (const [channel, handler] of Object.entries(buildDemoHandlers(deps, map))) {
+    if (channel in map) throw new Error(`Canal IPC duplicado: ${channel}`);
+    map[channel] = handler;
   }
   return map;
 }

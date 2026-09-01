@@ -149,6 +149,12 @@ export const api = {
     ask: (messages: AssistantMessageDTO[], conversationId?: string, screen?: string): Promise<AssistantAskResultDTO> =>
       unwrap(sf().assistant.ask({ messages, conversationId, screen })),
   },
+  demo: {
+    status: (): Promise<DemoStatusDTO> => unwrap(sf().demo.status()),
+    load: (): Promise<{ ok: true; ventas: number; compras: number }> => unwrap(sf().demo.load()),
+    remove: (password: string): Promise<{ ok: true; needsRestart: true }> => unwrap(sf().demo.remove({ password })),
+    restart: (): Promise<{ ok: true }> => unwrap(sf().demo.restart()),
+  },
   articles: {
     list: (): Promise<ArticleDTO[]> => unwrap(sf().articles.list()),
     get: (id: string): Promise<ArticleDTO | null> => unwrap(sf().articles.get({ id })),

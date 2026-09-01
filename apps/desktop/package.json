@@ -31,7 +31,8 @@
     "test:assistant": "tsx electron/__tests__/assistant.smoke.ts",
     "test:consultas": "tsx electron/__tests__/consultas.smoke.ts",
     "test:kb": "node scripts/validate-kb.mjs",
-    "test:flows": "tsx electron/__tests__/flows.smoke.ts"
+    "test:flows": "tsx electron/__tests__/flows.smoke.ts",
+    "test:demo": "tsx electron/__tests__/demo.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

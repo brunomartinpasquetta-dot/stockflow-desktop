@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { closeLocalDb, createRepositories, initLocalDb, roleAreaAccess, type LocalDatabase, type Repositories } from '@stockflow/db';
 import { applyAreaConfig } from '@stockflow/core';
 
+import { applyPendingDemoDiscard } from '../demo/DemoManager';
+
 export interface DbHandle {
   db: LocalDatabase;
   repos: Repositories;
@@ -33,6 +35,9 @@ let closed = false;
 
 export function initialize(dbPath: string): DbHandle {
   closed = false;
+  // Modo demo (E5): si quedó un descarte pendiente, restaurar el snapshot
+  // pre-demo ANTES de abrir la base (la demo descartada se conserva renombrada).
+  applyPendingDemoDiscard(path.dirname(dbPath), dbPath);
   const { db } = initLocalDb(dbPath, { migrationsFolder: MIGRATIONS_FOLDER });
   const repos = createRepositories(db);
 

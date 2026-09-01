@@ -1330,11 +1330,170 @@ export function Configuracion() {
           <GeneralSection />
         </TabsContent>
         {isAdmin && (
-          <TabsContent value="mantenimiento">
+          <TabsContent value="mantenimiento" className="flex flex-col gap-4">
             <MantenimientoSection />
+            <DemoSection />
           </TabsContent>
         )}
       </Tabs>
     </div>
+  )
+}
+
+/* ─────────────────────────── Datos de ejemplo (E5) ─────────────────────────── */
+
+/**
+ * MODO DEMO: carga los datos de ejemplo "Ferretería del Litoral" para conocer
+ * el sistema sin miedo. Reglas duras: solo con la base VACÍA (jamás se mezcla
+ * con datos reales) y 100% reversible — antes de cargar se guarda una copia
+ * exacta de la base, y al quitar la demo esa copia se restaura tal cual.
+ */
+function DemoSection() {
+  const qc = useQueryClient()
+  const status = useQuery({ queryKey: ['demo', 'status'], queryFn: api.demo.status })
+  const [confirmLoadOpen, setConfirmLoadOpen] = useState(false)
+  const [removeOpen, setRemoveOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [waitRestart, setWaitRestart] = useState(false)
+
+  const load = useMutation({
+    mutationFn: api.demo.load,
+    onSuccess: (r) => {
+      toast.success(`Datos de ejemplo cargados: ${r.ventas} ventas y ${r.compras} compras de muestra.`)
+      setConfirmLoadOpen(false)
+      void qc.invalidateQueries()
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudieron cargar los datos de ejemplo'),
+  })
+  const remove = useMutation({
+    mutationFn: () => api.demo.remove(password),
+    onSuccess: () => {
+      setRemoveOpen(false)
+      setPassword('')
+      setWaitRestart(true)
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo quitar la demo'),
+  })
+
+  const st = status.data
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <HardDrive className="h-4 w-4" />
+          Datos de ejemplo
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        {waitRestart ? (
+          <>
+            <p className="font-medium">La demo se quita al reiniciar StockFlow.</p>
+            <p className="text-muted-foreground">
+              Al volver a abrir, la base queda exactamente como estaba antes de cargar la demo.
+            </p>
+            <div>
+              <Button onClick={() => void api.demo.restart().catch(() => toast.error('Cerrá y volvé a abrir StockFlow a mano'))}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reiniciar StockFlow ahora
+              </Button>
+            </div>
+          </>
+        ) : st?.active ? (
+          <>
+            <p>
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 font-bold text-amber-800">MODO DEMO</span>{' '}
+              Los datos de ejemplo están cargados{st.loadedAt ? ` desde el ${new Date(st.loadedAt).toLocaleDateString('es-AR')}` : ''}.
+            </p>
+            <p className="text-muted-foreground">
+              Todo lo que se cargue mientras la demo esté activa se descarta al quitarla. Al quitar la demo, la base
+              vuelve exactamente al estado anterior a la carga (la copia se guarda sola).
+            </p>
+            <div>
+              <Button variant="outline" onClick={() => setRemoveOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Quitar datos de ejemplo…
+              </Button>
+            </div>
+          </>
+        ) : st?.canLoad ? (
+          <>
+            <p className="text-muted-foreground">
+              Cargá el comercio de ejemplo «Ferretería del Litoral» (44 artículos, clientes con cuenta corriente,
+              ventas de 15 días y la caja del día abierta) para recorrer el sistema con datos reales de práctica.
+            </p>
+            <p className="text-muted-foreground">
+              Es reversible: antes de cargar se guarda una copia exacta de la base, y «Quitar datos de ejemplo» la
+              restaura tal cual.
+            </p>
+            <div>
+              <Button onClick={() => setConfirmLoadOpen(true)} disabled={load.isPending}>
+                {load.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HardDrive className="mr-2 h-4 w-4" />}
+                Cargar datos de ejemplo
+              </Button>
+            </div>
+          </>
+        ) : (
+          <p className="text-muted-foreground">
+            {st?.reason ?? 'Consultando el estado de los datos de ejemplo…'}
+          </p>
+        )}
+      </CardContent>
+
+      {/* Confirmación de carga */}
+      <AlertDialog open={confirmLoadOpen} onOpenChange={setConfirmLoadOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cargar los datos de ejemplo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se carga el comercio de práctica «Ferretería del Litoral». Mientras la demo esté activa, toda la
+              pantalla muestra el distintivo MODO DEMO. Antes de cargar se guarda una copia exacta de la base actual:
+              al quitar la demo, esa copia se restaura tal cual. La carga demora unos segundos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={load.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={load.isPending} onClick={(e) => { e.preventDefault(); load.mutate() }}>
+              {load.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {load.isPending ? 'Cargando…' : 'Cargar demo'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmación de quita, con contraseña del administrador */}
+      <AlertDialog open={removeOpen} onOpenChange={(o) => { setRemoveOpen(o); if (!o) setPassword('') }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Quitar los datos de ejemplo</AlertDialogTitle>
+            <AlertDialogDescription>
+              La base vuelve exactamente al estado anterior a cargar la demo. Todo lo cargado durante el modo demo se
+              descarta (queda una copia de seguridad por si hiciera falta recuperar algo con soporte). Confirmá con la
+              contraseña de administrador.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-1">
+            <Label htmlFor="demo-pass">Contraseña del administrador</Label>
+            <Input
+              id="demo-pass"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={remove.isPending || !password}
+              onClick={(e) => { e.preventDefault(); remove.mutate() }}
+            >
+              {remove.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Quitar demo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   )
 }
