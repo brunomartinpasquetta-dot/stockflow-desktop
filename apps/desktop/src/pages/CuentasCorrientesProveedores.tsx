@@ -1,11 +1,11 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, ChevronDown, ChevronRight, FileDown, Loader2, ReceiptText, Search, Truck, Undo2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useSupplierBalances } from '@/lib/hooks'
-import { useCompany, usePaymentMethods } from '@/lib/hooks'
+import { useCashGeneralBalance, useCompany, usePaymentMethods } from '@/lib/hooks'
 import { exportReceiptPdf } from '@/lib/receiptDoc'
 import { printPaymentReceiptSilent } from '@/lib/printPaymentReceipt'
 import type { PaymentReceiptData } from '@/print/PaymentReceipt'
@@ -21,10 +21,51 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select } from '@/components/ui/select'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { ReturnPurchaseDialog } from '@/components/ReturnDialogs'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import type { SupplierAccountPayableDTO } from '@/types/api'
+
+/**
+ * Selector de origen del dinero para pagos a proveedor (E: paridad con Compras):
+ * caja diaria (default) o Caja General. Con Caja General no hace falta caja
+ * diaria abierta y el egreso baja el saldo consolidado (con su desglose
+ * efectivo/electrónico según los medios elegidos).
+ */
+function FundingSourceField({
+  value,
+  onChange,
+  noCash,
+}: {
+  value: 'daily' | 'general'
+  onChange: (v: 'daily' | 'general') => void
+  noCash: boolean
+}) {
+  const cashGeneralBalance = useCashGeneralBalance()
+  return (
+    <div className="flex flex-col gap-1">
+      <Label className="text-xs uppercase tracking-wide text-muted-foreground">El dinero sale de</Label>
+      <Select value={value} onChange={(e) => onChange(e.target.value as 'daily' | 'general')}>
+        <option value="daily">Caja diaria{noCash ? ' (sin caja abierta)' : ''}</option>
+        <option value="general">
+          Caja General{cashGeneralBalance.data ? ` (saldo ${formatCurrency(cashGeneralBalance.data.balance)})` : ''}
+        </option>
+      </Select>
+      {value === 'general' ? (
+        <p className="text-xs text-muted-foreground">El egreso baja el saldo de Caja General, no la caja diaria.</p>
+      ) : noCash ? (
+        <p className="text-xs text-destructive">No hay caja diaria abierta. Abrí la caja (F7) o pagá desde Caja General.</p>
+      ) : null}
+    </div>
+  )
+}
+
+/** Query compartida: ¿hay caja diaria abierta? (misma queryKey que el resto de la app) */
+function useNoCashOpen(): boolean {
+  const q = useQuery({ queryKey: ['cash', 'current'], queryFn: api.cash.getCurrent })
+  return !q.isLoading && !q.data
+}
 
 function PagoDialog({
   account,
@@ -42,9 +83,16 @@ function PagoDialog({
   const montoNum = monto ? Number(parseCurrencyInput(monto)) : 0
   const balanceNum = Number(account.balance)
   const split = usePaymentSplit(activeMethods, montoNum)
+  const noCash = useNoCashOpen()
+  const [fundingSource, setFundingSource] = useState<'daily' | 'general'>('daily')
+  // Sin caja diaria abierta, el único origen posible es Caja General.
+  useEffect(() => {
+    if (noCash) setFundingSource('general')
+  }, [noCash])
 
   const overBalance = montoNum > balanceNum + 0.005
-  const canConfirm = montoNum > 0 && !overBalance && split.isComplete && activeMethods.length > 0
+  const canConfirm =
+    montoNum > 0 && !overBalance && split.isComplete && activeMethods.length > 0 && (fundingSource === 'general' || !noCash)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -52,12 +100,14 @@ function PagoDialog({
         accountId: account.id,
         payments: split.payments,
         expectedAmount: montoNum.toFixed(4),
+        fundingSource,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['supplierBalances'] })
       void qc.invalidateQueries({ queryKey: ['supplierStatement', supplierId] })
       void qc.invalidateQueries({ queryKey: ['supplierOpen', supplierId] })
       void qc.invalidateQueries({ queryKey: ['cash'] })
+      void qc.invalidateQueries({ queryKey: ['cashGeneral'] })
       toast.success(`Pago registrado — ${formatCurrency(montoNum)}`)
       onClose()
     },
@@ -84,6 +134,7 @@ function PagoDialog({
             />
             {overBalance && <span className="text-xs text-destructive">No puede superar el saldo del comprobante.</span>}
           </div>
+          <FundingSourceField value={fundingSource} onChange={setFundingSource} noCash={noCash} />
           <div className="border-t pt-2">
             <p className="mb-1 text-xs font-medium text-muted-foreground">Composición del pago</p>
             <PaymentSplitInput methods={activeMethods} split={split} />
@@ -133,9 +184,16 @@ function PagoCuentaDialog({
   const montoNum = monto ? Number(parseCurrencyInput(monto)) : 0
   const balanceNum = Number(totalBalance)
   const split = usePaymentSplit(activeMethods, montoNum)
+  const noCash = useNoCashOpen()
+  const [fundingSource, setFundingSource] = useState<'daily' | 'general'>('daily')
+  // Sin caja diaria abierta, el único origen posible es Caja General.
+  useEffect(() => {
+    if (noCash) setFundingSource('general')
+  }, [noCash])
 
   const overBalance = montoNum > balanceNum + 0.005
-  const canConfirm = montoNum > 0 && !overBalance && split.isComplete && activeMethods.length > 0
+  const canConfirm =
+    montoNum > 0 && !overBalance && split.isComplete && activeMethods.length > 0 && (fundingSource === 'general' || !noCash)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -143,6 +201,7 @@ function PagoCuentaDialog({
         supplierId,
         payments: split.payments,
         expectedAmount: montoNum.toFixed(4),
+        fundingSource,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['supplierBalances'] })
@@ -150,6 +209,7 @@ function PagoCuentaDialog({
       void qc.invalidateQueries({ queryKey: ['supplierOpen', supplierId] })
       void qc.invalidateQueries({ queryKey: ['supplierAccountDetail'] })
       void qc.invalidateQueries({ queryKey: ['cash'] })
+      void qc.invalidateQueries({ queryKey: ['cashGeneral'] })
       toast.success(`Pago registrado — ${formatCurrency(montoNum)}`)
       onPaid?.({ amount: montoNum, payments: split.payments })
       onClose()
@@ -183,6 +243,7 @@ function PagoCuentaDialog({
             />
             {overBalance && <span className="text-xs text-destructive">No puede superar el saldo total del proveedor.</span>}
           </div>
+          <FundingSourceField value={fundingSource} onChange={setFundingSource} noCash={noCash} />
           <div className="border-t pt-2">
             <p className="mb-1 text-xs font-medium text-muted-foreground">Composición del pago</p>
             <PaymentSplitInput methods={activeMethods} split={split} />

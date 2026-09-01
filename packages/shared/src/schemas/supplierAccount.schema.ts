@@ -44,8 +44,13 @@ export const CreateSupplierPaymentSchema = z.object({
   payments: z.array(PaymentInputSchema).min(1, 'Debe registrarse al menos un pago'),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),
-  /** Caja donde impacta el egreso de la parte en efectivo. */
-  cashRegisterId: idSchema,
+  /**
+   * Caja diaria donde impacta el egreso. Con fundingSource='general' va null:
+   * el dinero sale de Caja General y no hace falta caja abierta.
+   */
+  cashRegisterId: idSchema.nullish(),
+  /** De dónde sale el dinero (mismo patrón que las compras contado). */
+  fundingSource: z.enum(['daily', 'general']).default('daily'),
   /** Usuario que registra el pago. */
   userId: idSchema,
 });
@@ -60,8 +65,10 @@ export const CreateSupplierAccountPaymentSchema = z.object({
   payments: z.array(PaymentInputSchema).min(1, 'Debe registrarse al menos un pago'),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),
-  /** Caja donde impacta el egreso. */
-  cashRegisterId: idSchema,
+  /** Caja diaria del egreso; null con fundingSource='general' (Caja General). */
+  cashRegisterId: idSchema.nullish(),
+  /** De dónde sale el dinero (mismo patrón que las compras contado). */
+  fundingSource: z.enum(['daily', 'general']).default('daily'),
   /** Usuario que registra el pago. */
   userId: idSchema,
 });

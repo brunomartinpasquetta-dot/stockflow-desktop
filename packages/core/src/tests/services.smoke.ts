@@ -789,6 +789,87 @@ async function main(): Promise<void> {
     check('cashGeneral.listMovements devuelve 2 movimientos', movs.length === 2, `len=${movs.length}`);
   }
 
+  // ------------------------------- pagos a proveedor desde Caja General
+  // (corre DESPUÉS de [cash general] a propósito: hereda su estado
+  //  determinístico — total 70, todo efectivo — y no rompe sus absolutos)
+  console.log('\n[pagos a proveedor: fundingSource]');
+  {
+    // El pago 'daily' mixto de más arriba (200 efectivo + 100 transferencia)
+    // tiene que haber dejado UN egreso de caja POR MEDIO, con su paymentMethodId.
+    const provMoves = (await repos.cashMovements.findByRegister(reg2.id)).filter(
+      (m) => m.type === 'expense' && m.description.startsWith('Pago a proveedor'),
+    );
+    check(
+      'payInvoice daily mixto → un egreso de caja por medio, con su paymentMethodId',
+      provMoves.length === 2 &&
+        provMoves.some((m) => m.paymentMethodId === PM_CASH && m.amount === '200.0000') &&
+        provMoves.some((m) => m.paymentMethodId === PM_TRANSFER && m.amount === '100.0000'),
+      `moves=${provMoves.map((m) => `${m.paymentMethodId}:${m.amount}`).join(',')}`,
+    );
+
+    // Fondos: CG queda 500 efectivo + 500 electrónico (desde el 70 heredado).
+    await admin.cashGeneral.addIncome({ amount: '430', description: 'Fondos para pagos (efectivo)' });
+    await admin.cashGeneral.addIncome({ amount: '500', description: 'Fondos para pagos (banco)', isCash: false });
+    const b0 = await admin.cashGeneral.getBalanceBreakdown();
+    check('breakdown inicial: 1000 = 500 efectivo + 500 electrónico', Number(b0.total) === 1000 && Number(b0.cash) === 500 && Number(b0.electronic) === 500, `total=${b0.total} cash=${b0.cash} elec=${b0.electronic}`);
+
+    // payInvoice desde CAJA GENERAL, mixto: 150 efectivo + 50 transferencia.
+    const movesBefore = (await repos.cashMovements.findByRegister(reg2.id)).length;
+    const pagoCG = await admin.supplierAccounts.payInvoice({
+      accountId: compraAcuenta.accountPayable!.id,
+      payments: [
+        { paymentMethodId: PM_CASH, amount: '150.0000' },
+        { paymentMethodId: PM_TRANSFER, amount: '50.0000' },
+      ],
+      expectedAmount: '200.0000',
+      fundingSource: 'general',
+    });
+    check('payInvoice desde Caja General → balance 200 (400−200), sigue partial', pagoCG.account.balance === '200.0000' && pagoCG.account.status === 'partial', `balance=${pagoCG.account.balance}`);
+    const b1 = await admin.cashGeneral.getBalanceBreakdown();
+    check(
+      'Caja General tras el pago: total 800, efectivo 350 (−150), electrónico 450 (−50)',
+      Number(b1.total) === 800 && Number(b1.cash) === 350 && Number(b1.electronic) === 450,
+      `total=${b1.total} cash=${b1.cash} elec=${b1.electronic}`,
+    );
+    check('el pago desde Caja General NO toca la caja diaria', (await repos.cashMovements.findByRegister(reg2.id)).length === movesBefore);
+    const cgMovs = await admin.cashGeneral.listMovements({});
+    check(
+      "el egreso queda con categoría 'supplier_payment' por el total del pago",
+      cgMovs.some((m) => m.category === 'supplier_payment' && m.type === 'expense' && Number(m.amount) === 200),
+    );
+
+    // payToSupplier (FIFO a nivel cuenta) también desde Caja General.
+    const fifoCG = await admin.supplierAccounts.payToSupplier({
+      supplierId: prov.id,
+      payments: [{ paymentMethodId: PM_CASH, amount: '100.0000' }],
+      expectedAmount: '100.0000',
+      fundingSource: 'general',
+    });
+    check('payToSupplier desde Caja General → aplica 100 FIFO', fifoCG.totalApplied === '100.0000' && fifoCG.accounts.some((a) => a.balance === '100.0000'));
+    const b2 = await admin.cashGeneral.getBalanceBreakdown();
+    check('breakdown tras FIFO: total 700, efectivo 250', Number(b2.total) === 700 && Number(b2.cash) === 250, `total=${b2.total} cash=${b2.cash}`);
+
+    // Sin saldo suficiente en Caja General → se rechaza ANTES de tocar nada.
+    const compraGrande = await admin.purchases.createPurchase({
+      type: 'A',
+      supplierId: prov.id,
+      isAccountPurchase: true,
+      lines: [{ articleId: art.id, quantity: '1.000', costPrice: '900000.0000', vatRate: '21.00' }],
+    });
+    await expectThrows(
+      'pago desde Caja General sin saldo suficiente → BusinessRuleError',
+      () =>
+        admin.supplierAccounts.payInvoice({
+          accountId: compraGrande.accountPayable!.id,
+          payments: [{ paymentMethodId: PM_CASH, amount: '800000.0000' }],
+          fundingSource: 'general',
+        }),
+      (e) => e instanceof BusinessRuleError && /Caja General/.test((e as Error).message),
+    );
+    const b3 = await admin.cashGeneral.getBalanceBreakdown();
+    check('el rechazo no movió Caja General', Number(b3.total) === 700, `total=${b3.total}`);
+  }
+
   // ----------------------------------------------------- analytics
   console.log('\n[analytics]');
   {

@@ -1,9 +1,11 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
+import { v7 as uuidv7 } from 'uuid';
 import {
   CreateSupplierAccountPaymentSchema,
   CreateSupplierPaymentSchema,
   type CreateSupplierAccountPaymentInput,
   type CreateSupplierPaymentInput,
+  addDecimal,
   cmpDecimal,
   subDecimal,
   sumDecimals,
@@ -12,16 +14,104 @@ import {
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import {
+  cashGeneral,
+  cashGeneralMovements,
   cashMovements,
   paymentMethods,
   suppliers,
   supplierAccountsPayable,
   supplierPayments,
   type NewSupplierPayment,
+  type PaymentMethod,
   type SupplierAccountPayable,
   type SupplierPayment,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
+
+/** Tipo del `tx` dentro de `db.transaction((tx) => …)`. */
+type Tx = Parameters<Parameters<LocalDatabase['transaction']>[0]>[0];
+
+/**
+ * Egreso de CAJA GENERAL por un pago a proveedor (fundingSource='general'),
+ * DENTRO de la transacción del pago. Mismo patrón que las compras contado
+ * desde Caja General (purchase.repository): un solo movimiento por el total,
+ * desglose efectivo/electrónico según isPhysicalCash de los medios usados,
+ * el TOTAL se deriva del saldo previo y el reparto se mueve por deltas.
+ * Categoría propia 'supplier_payment' para poder distinguirlo en el listado.
+ */
+function cashGeneralExpenseInTx(
+  tx: Tx,
+  opts: {
+    total: string;
+    parts: { paymentMethodId: string; amount: string }[];
+    pmMap: Map<string, PaymentMethod>;
+    description: string;
+    referenceId: string;
+    userId: string;
+    now: number;
+  },
+): void {
+  const cgCur = tx.select().from(cashGeneral).where(eq(cashGeneral.id, 'singleton')).get();
+  const prevBalance = cgCur?.currentBalance ?? '0';
+  const prevCash = cgCur?.cashBalance ?? '0';
+  const prevElec = cgCur?.electronicBalance ?? '0';
+  // Defensa doble (el service ya validó): sin saldo no hay pago.
+  if (cmpDecimal(prevBalance, opts.total) < 0) {
+    throw new ConstraintError(
+      'INSUFFICIENT_CASH_GENERAL',
+      `Caja General no tiene saldo suficiente (disponible ${prevBalance}, pago ${opts.total})`,
+    );
+  }
+  let cashPart = '0';
+  let elecPart = '0';
+  for (const p of opts.parts) {
+    const pm = opts.pmMap.get(p.paymentMethodId);
+    if (!pm) throw new NotFoundError('Medio de pago', p.paymentMethodId);
+    if (pm.isPhysicalCash) cashPart = addDecimal(cashPart, p.amount, 2);
+    else elecPart = addDecimal(elecPart, p.amount, 2);
+  }
+  const balanceAfter = subDecimal(prevBalance, opts.total, 2);
+  const balanceAfterCash = subDecimal(prevCash, cashPart, 2);
+  const balanceAfterElec = subDecimal(prevElec, elecPart, 2);
+  tx.insert(cashGeneralMovements)
+    .values({
+      id: uuidv7(),
+      type: 'expense',
+      amount: opts.total,
+      description: opts.description,
+      category: 'supplier_payment',
+      createdBy: opts.userId,
+      referenceId: opts.referenceId,
+      balanceAfter,
+      isCash: Number(cashPart) >= Number(elecPart),
+      balanceAfterCash,
+      balanceAfterElectronic: balanceAfterElec,
+      createdAt: opts.now,
+    })
+    .run();
+  if (cgCur) {
+    tx.update(cashGeneral)
+      .set({
+        currentBalance: balanceAfter,
+        cashBalance: balanceAfterCash,
+        electronicBalance: balanceAfterElec,
+        lastUpdate: opts.now,
+      })
+      .where(eq(cashGeneral.id, 'singleton'))
+      .run();
+  } else {
+    tx.insert(cashGeneral)
+      .values({
+        id: 'singleton',
+        currentBalance: balanceAfter,
+        cashBalance: balanceAfterCash,
+        electronicBalance: balanceAfterElec,
+        lastUpdate: opts.now,
+        createdAt: opts.now,
+      })
+      .run();
+  }
+}
 
 /** Resultado de un pago a nivel cuenta de proveedor (distribuido FIFO). */
 export interface SupplierAccountPaymentResult {
@@ -89,6 +179,14 @@ export class SupplierPaymentRepository extends BaseRepository<
           );
         }
 
+        const fromGeneral = data.fundingSource === 'general';
+        if (!fromGeneral && !data.cashRegisterId) {
+          throw new ConstraintError(
+            'SUPPLIER_PAYMENT_NO_REGISTER',
+            'Falta la caja diaria para registrar el egreso del pago',
+          );
+        }
+
         const pmIds = [...new Set(data.payments.map((p) => p.paymentMethodId))];
         const pmRows = tx.select().from(paymentMethods).where(inArray(paymentMethods.id, pmIds)).all();
         const pmMap = new Map(pmRows.map((r) => [r.id, r]));
@@ -110,13 +208,14 @@ export class SupplierPaymentRepository extends BaseRepository<
             .all()[0];
           if (!row) throw new ConstraintError('SUPPLIER_PAYMENT_INSERT', 'No se pudo registrar el pago');
           inserted.push(row);
+          if (fromGeneral) continue; // el egreso va a Caja General, un solo movimiento al final
           const desc = pm.isPhysicalCash
             ? 'Pago a proveedor'
             : `Pago a proveedor — ${pm.name}`;
           tx
             .insert(cashMovements)
             .values({
-              cashRegisterId: data.cashRegisterId,
+              cashRegisterId: data.cashRegisterId!,
               type: 'expense',
               description: desc,
               amount: p.amount,
@@ -125,6 +224,23 @@ export class SupplierPaymentRepository extends BaseRepository<
               paymentMethodId: pm.id,
             })
             .run();
+        }
+
+        if (fromGeneral) {
+          const supplierRow = tx
+            .select({ name: suppliers.name })
+            .from(suppliers)
+            .where(eq(suppliers.id, account.supplierId))
+            .get();
+          cashGeneralExpenseInTx(tx, {
+            total: totalPaid,
+            parts: data.payments.map((p) => ({ paymentMethodId: p.paymentMethodId, amount: p.amount })),
+            pmMap,
+            description: `Pago a proveedor — ${supplierRow?.name ?? 'proveedor'}`,
+            referenceId: data.accountId,
+            userId: data.userId,
+            now,
+          });
         }
 
         const newBalance = subDecimal(account.balance, totalPaid, 4);
@@ -213,6 +329,14 @@ export class SupplierPaymentRepository extends BaseRepository<
           }
         }
 
+        const fromGeneral = data.fundingSource === 'general';
+        if (!fromGeneral && !data.cashRegisterId) {
+          throw new ConstraintError(
+            'SUPPLIER_PAYMENT_NO_REGISTER',
+            'Falta la caja diaria para registrar el egreso del pago',
+          );
+        }
+
         const remaining = data.payments.map((p) => ({
           methodId: p.paymentMethodId,
           amount: p.amount,
@@ -252,21 +376,23 @@ export class SupplierPaymentRepository extends BaseRepository<
             }
             inserted.push(row);
 
-            const desc = pm.isPhysicalCash
-              ? `Pago a proveedor — ${supplierName}`
-              : `Pago a proveedor — ${supplierName} — ${pm.name}`;
-            tx
-              .insert(cashMovements)
-              .values({
-                cashRegisterId: data.cashRegisterId,
-                type: 'expense',
-                description: desc,
-                amount: take,
-                date: now,
-                userId: data.userId,
-                paymentMethodId: pm.id,
-              })
-              .run();
+            if (!fromGeneral) {
+              const desc = pm.isPhysicalCash
+                ? `Pago a proveedor — ${supplierName}`
+                : `Pago a proveedor — ${supplierName} — ${pm.name}`;
+              tx
+                .insert(cashMovements)
+                .values({
+                  cashRegisterId: data.cashRegisterId!,
+                  type: 'expense',
+                  description: desc,
+                  amount: take,
+                  date: now,
+                  userId: data.userId,
+                  paymentMethodId: pm.id,
+                })
+                .run();
+            }
 
             m.amount = subDecimal(m.amount, take, 4);
             toFill = subDecimal(toFill, take, 4);
@@ -288,6 +414,18 @@ export class SupplierPaymentRepository extends BaseRepository<
           if (updated) updatedAccounts.push(updated);
 
           totalRestante = subDecimal(totalRestante, sapPortion, 4);
+        }
+
+        if (fromGeneral) {
+          cashGeneralExpenseInTx(tx, {
+            total,
+            parts: data.payments.map((p) => ({ paymentMethodId: p.paymentMethodId, amount: p.amount })),
+            pmMap,
+            description: `Pago a proveedor — ${supplierName}`,
+            referenceId: data.supplierId,
+            userId: data.userId,
+            now,
+          });
         }
 
         return { payments: inserted, accounts: updatedAccounts, totalApplied: total };

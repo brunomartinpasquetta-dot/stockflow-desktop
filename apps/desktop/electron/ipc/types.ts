@@ -688,6 +688,8 @@ export interface PaySupplierInvoiceInputDTO {
   expectedAmount?: string;
   notes?: string | null;
   cashRegisterId?: string;
+  /** De dónde sale el dinero: caja diaria (default) o Caja General. */
+  fundingSource?: 'daily' | 'general';
 }
 
 export interface PaySupplierInvoiceResultDTO {
@@ -702,6 +704,8 @@ export interface PayToSupplierInputDTO {
   expectedAmount?: string;
   notes?: string | null;
   cashRegisterId?: string;
+  /** De dónde sale el dinero: caja diaria (default) o Caja General. */
+  fundingSource?: 'daily' | 'general';
 }
 
 export interface PayToSupplierResultDTO {

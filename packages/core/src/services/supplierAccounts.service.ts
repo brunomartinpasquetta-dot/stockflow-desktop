@@ -23,6 +23,12 @@ export interface PaySupplierInvoiceInput {
   notes?: string | null;
   /** Caja donde impacta el egreso (default: caja activa / caja abierta). */
   cashRegisterId?: string;
+  /**
+   * De dónde sale el dinero: 'daily' (caja diaria, default, exige caja
+   * abierta) o 'general' (Caja General — no exige caja diaria y valida saldo).
+   * Mismo patrón que las compras contado.
+   */
+  fundingSource?: 'daily' | 'general';
 }
 
 export interface PaySupplierInvoiceResult {
@@ -38,6 +44,8 @@ export interface PayToSupplierInput {
   expectedAmount?: string;
   notes?: string | null;
   cashRegisterId?: string;
+  /** De dónde sale el dinero ('daily' default | 'general'). Ver PaySupplierInvoiceInput. */
+  fundingSource?: 'daily' | 'general';
 }
 
 export interface PayToSupplierResult {
@@ -161,14 +169,8 @@ export class SupplierAccountsService {
       );
     }
 
-    const cashRegisterId =
-      input.cashRegisterId ??
-      (this.ctx.currentCashRegister?.status === 'open'
-        ? this.ctx.currentCashRegister.id
-        : (await repos.cashRegisters.getCurrentOpen())?.id);
-    if (!cashRegisterId) {
-      throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el egreso');
-    }
+    const fundingSource: 'daily' | 'general' = input.fundingSource === 'general' ? 'general' : 'daily';
+    const cashRegisterId = await this.resolveFunding(fundingSource, input.cashRegisterId, totalPaid);
 
     const payments = await repos.supplierPayments.createPayment({
       accountId: input.accountId,
@@ -179,6 +181,7 @@ export class SupplierAccountsService {
       })),
       notes: input.notes ?? null,
       cashRegisterId,
+      fundingSource,
       userId: currentUser.id,
     });
     const updatedAccount = await repos.supplierAccountsPayable.findById(input.accountId);
@@ -219,14 +222,8 @@ export class SupplierAccountsService {
       );
     }
 
-    const cashRegisterId =
-      input.cashRegisterId ??
-      (this.ctx.currentCashRegister?.status === 'open'
-        ? this.ctx.currentCashRegister.id
-        : (await repos.cashRegisters.getCurrentOpen())?.id);
-    if (!cashRegisterId) {
-      throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el egreso');
-    }
+    const fundingSource: 'daily' | 'general' = input.fundingSource === 'general' ? 'general' : 'daily';
+    const cashRegisterId = await this.resolveFunding(fundingSource, input.cashRegisterId, totalPaid);
 
     const result = await repos.supplierPayments.createAccountPayment({
       supplierId: input.supplierId,
@@ -237,9 +234,43 @@ export class SupplierAccountsService {
       })),
       notes: input.notes ?? null,
       cashRegisterId,
+      fundingSource,
       userId: currentUser.id,
     });
     return result;
+  }
+
+  /**
+   * Resuelve el origen del dinero de un pago a proveedor (mismo criterio que
+   * las compras contado): con 'daily' exige una caja diaria abierta y devuelve
+   * su id; con 'general' no hace falta caja (devuelve null) pero Caja General
+   * tiene que tener saldo suficiente para el total del pago.
+   */
+  private async resolveFunding(
+    fundingSource: 'daily' | 'general',
+    inputCashRegisterId: string | undefined,
+    totalPaid: string,
+  ): Promise<string | null> {
+    const { repos } = this.ctx;
+    if (fundingSource === 'general') {
+      const cgBalance = await repos.cashGeneral.getBalance();
+      if (cmpDecimal(cgBalance, totalPaid) < 0) {
+        throw new BusinessRuleError(
+          'insufficient_cash_general',
+          `Caja General no tiene saldo suficiente (disponible ${cgBalance}, pago ${totalPaid})`,
+        );
+      }
+      return null;
+    }
+    const cashRegisterId =
+      inputCashRegisterId ??
+      (this.ctx.currentCashRegister?.status === 'open'
+        ? this.ctx.currentCashRegister.id
+        : (await repos.cashRegisters.getCurrentOpen())?.id);
+    if (!cashRegisterId) {
+      throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el egreso');
+    }
+    return cashRegisterId;
   }
 
   /**

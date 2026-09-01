@@ -23,7 +23,14 @@ import {
 const SINGLETON_ID = 'singleton';
 
 export type CashGeneralMovementType = 'income' | 'expense' | 'transfer_from_daily';
-export type CashGeneralCategory = 'deposit' | 'close_deposit' | 'withdrawal' | 'service' | 'salary' | 'other';
+export type CashGeneralCategory =
+  | 'deposit'
+  | 'close_deposit'
+  | 'withdrawal'
+  | 'service'
+  | 'salary'
+  | 'supplier_payment'
+  | 'other';
 
 export interface AddCashGeneralMovementInput {
   type: CashGeneralMovementType;
