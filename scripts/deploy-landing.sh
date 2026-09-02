@@ -42,16 +42,15 @@ RES="--resolve bpsgsistemas.com:443:187.127.20.131"
 LM=$(curl -sI $RES https://bpsgsistemas.com/ | grep -i '^last-modified' || true)
 HTML=$(curl -s $RES https://bpsgsistemas.com/)
 PIXEL=$(printf '%s' "$HTML" | grep -c '1363051382693261' || true)
-# CTAs trackeados esperados: 13 = whatsapp×8 (nav ghost + nav ícono + hero×2 +
-# precio + rail FAQ + cierre + mbar) + download-win×3 (hero×2 + precio) +
-# download-mac×2 (hero×2). El hero repite los botones arriba y bajo el título.
+# CTAs trackeados esperados: 10 = whatsapp×7 (nav ghost + nav ícono + hero +
+# precio + rail FAQ + cierre + mbar) + download-win×2 (hero + precio) + download-mac×1.
 CTAS=$(printf '%s' "$HTML" | grep -o 'data-sf-cta' | wc -l | tr -d ' ')
 JS=$(curl -s $RES -o /dev/null -w '%{http_code}' https://bpsgsistemas.com/js/tracking.js)
 echo "   $LM"
 echo "   píxel en el HTML servido: $PIXEL aparición(es)"
-echo "   data-sf-cta en el HTML servido: $CTAS (esperados: 13)"
+echo "   data-sf-cta en el HTML servido: $CTAS (esperados: 10)"
 echo "   js/tracking.js → HTTP $JS"
-if [ "$PIXEL" -ge 1 ] && [ "$JS" = "200" ] && [ "$CTAS" = "13" ]; then
+if [ "$PIXEL" -ge 1 ] && [ "$JS" = "200" ] && [ "$CTAS" = "10" ]; then
   echo "✅ Landing publicada con tracking."
 else
   echo "✗ VERIFICACIÓN FALLÓ — revisar antes de dar por bueno el deploy." >&2

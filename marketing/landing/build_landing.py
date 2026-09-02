@@ -510,13 +510,8 @@ BODY=f"""
 </div></nav>
 
 <header class="hero" id="top"><div class="wrap">
- <!-- ORDEN DEL HERO (pedido de Bruno, sep-2026): botones ARRIBA DE TODO,
-      después rubros + cubo + carrusel, y el bloque del título DEBAJO. -->
- <div class="hcta">
-  <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}Quiero probarlo en mi comercio</a>
-  <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
- </div>
- <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
+ <!-- ORDEN DEL HERO (pedido de Bruno, sep-2026): rubros + cubo + carrusel
+      arriba, y el bloque del título con los botones DEBAJO (sin duplicados). -->
  <div class="rubros-hero">
   <span class="rh"><i>{G['lu_wrench']}</i>Ferreterías</span>
   <span class="rh"><i>{G['lu_forklift']}</i>Corralones</span>
