@@ -156,7 +156,8 @@ p{{margin:0;}}
 .wai{{width:19px;height:19px;}}
 
 /* NAV */
-.nav{{position:sticky;top:0;z-index:60;background:rgba(255,255,255,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);}}
+/* Fondo SÓLIDO: el contenido no debe traslucirse debajo de la nav al scrollear. */
+.nav{{position:sticky;top:0;z-index:60;background:#fff;border-bottom:1px solid var(--line);}}
 .nav .wrap{{display:flex;align-items:center;justify-content:space-between;height:70px;gap:20px;}}
 .brand-img{{height:60px;width:auto;display:block;transform:translateX(-2cm);}}
 .foot-logo{{height:26px;width:auto;filter:brightness(0) invert(1);opacity:.94;}}
@@ -172,7 +173,7 @@ p{{margin:0;}}
 /* Grid ASIMÉTRICO (captura de referencia de Bruno, sep-2026): la sección del
    logo+texto ocupa ~1/3 y el carrusel ~2/3. La fila de abajo hereda el mismo
    reparto: botones angostos a la izquierda, características anchas a la derecha. */
-.hero .wrap{{display:grid;grid-template-columns:1fr 2fr;gap:50px;align-items:start;padding:44px 24px 48px;}}
+.hero .wrap{{display:grid;grid-template-columns:1fr 2fr;gap:50px;align-items:start;padding:15px 24px 48px;}}
 .hero .wrap>div{{min-width:0;}}
 .badge{{display:inline-flex;align-items:center;gap:8px;background:var(--blue-t);color:var(--blue-d);font-weight:700;
  font-size:13.5px;padding:7px 14px;border-radius:999px;}}
@@ -185,9 +186,10 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero-sub{{grid-column:1 / -1;font-size:clamp(17px,2vw,20px);color:var(--body);margin:10px 0 0;max-width:62ch;}}
 .hero .hcta{{grid-column:1 / -1;}}
 .hero .dl-alt{{grid-column:1 / -1;}}
-/* Logo al 70% del ancho de su sección (Bruno pidió reducirlo un 30%). */
-.hero-cube{{width:70%;max-width:294px;height:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
-@media(max-width:960px){{.hero-cube{{max-width:210px;}}}}
+/* Logo al 49% del ancho de su sección (dos reducciones del 30% pedidas por
+   Bruno) para que logo+texto ocupen el mismo alto que las cards del carrusel. */
+.hero-cube{{width:49%;max-width:206px;height:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
+@media(max-width:960px){{.hero-cube{{max-width:147px;}}}}
 /* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
 .hero-title-low{{margin-top:0;}}
 /* Sección del logo: logo y texto ALINEADOS en un mismo bloque (captura de
@@ -202,12 +204,13 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 }}
 /* Bajo el título: botones apilados a la IZQUIERDA (ocupan el recuadro) y
    "Características principales" en PARALELO a la derecha. */
-/* Botones al 75% de ancho, centrados, y arrancando ARRIBA — a la altura del
-   título "Características principales" de la columna de al lado. */
-.hero-acciones{{display:flex;flex-direction:column;gap:16px;margin-top:26px;}}
-.hero-acciones .btn{{font-size:18px;padding:18px 32px;justify-content:center;width:75%;align-self:center;}}
+/* Botón centrado, en UNA línea, arrancando a la altura del título
+   "Características principales". El margin negativo compensa el row-gap de
+   50px del grid: separación título→fila de abajo reducida un 50% (38px). */
+.hero-acciones{{display:flex;flex-direction:column;gap:16px;margin-top:-12px;}}
+.hero-acciones .btn{{font-size:18px;padding:18px 32px;justify-content:center;width:auto;max-width:100%;white-space:nowrap;align-self:center;}}
 .hero-acciones .dl-alt{{text-align:center;margin-top:2px;}}
-.hero-feats{{margin-top:26px;min-width:0;}}
+.hero-feats{{margin-top:-12px;min-width:0;}}
 .hero-feats h2{{font-family:var(--disp);font-size:25px;letter-spacing:-.015em;margin:0;text-align:center;}}
 .hero-feats h2 b{{color:var(--blue);}}
 .hero-feats .feats{{gap:2px 26px;margin-top:12px;}}
@@ -217,7 +220,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 @media(min-width:1360px){{.hero-feats{{margin-right:-56px;}}}}
 /* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
 .rubros-hero{{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
- gap:12px 14px;margin:18px 0 4px;position:relative;z-index:120;}}
+ gap:12px 14px;margin:7px 0 4px;position:relative;z-index:120;}}
 .rh{{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;
  font-family:var(--disp);font-weight:700;font-size:15px;color:var(--ink);transition:color .15s;}}
 .rh:hover{{color:var(--blue);}}
@@ -386,7 +389,9 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 /* clip horizontal: las cards laterales del 3D no invaden la sección del logo
    (overflow-y visible para que respiren las sombras). */
 .cfbox{{width:100%;overflow:clip visible;}}
-.cfrow{{position:relative;height:480px;margin-top:8px;}}
+/* 405px = alto natural de la card MÁS ALTA (medido con CDP): la fila del
+   logo+texto y el carrusel terminan juntos, sin aire fantasma abajo. */
+.cfrow{{position:relative;height:405px;margin-top:8px;}}
 .cf{{position:relative;width:100%;height:100%;perspective:1700px;}}
 /* margin:0 mata el margin UA de <figure> (40px) que corría la card del centro. */
 .cf-card{{position:absolute;top:50%;left:50%;width:min(90%,560px);margin:0;
@@ -584,7 +589,6 @@ BODY=f"""
       PARALELO a la derecha con las 22 completas (antes vivían repartidas en
       dos secciones más abajo — se movieron acá, no duplicar). -->
  <div class="hero-acciones">
-  <a class="btn btn-wa" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}Quiero probarlo en mi comercio</a>
   <a class="btn btn-blue" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
   <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
  </div>
