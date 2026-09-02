@@ -86,11 +86,22 @@ function CobranzaDialog({
               value={monto}
               onChange={setMonto}
             />
-            {overBalance && <span className="text-xs text-destructive">No puede superar el saldo del comprobante.</span>}
+            {overBalance ? (
+              <span className="text-xs text-destructive">No puede superar el saldo del comprobante.</span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Podés cobrar una parte: el resto queda pendiente en la cuenta.</span>
+            )}
           </div>
           <div className="border-t pt-2">
             <p className="mb-1 text-xs font-medium text-muted-foreground">Composición del pago</p>
             <PaymentSplitInput methods={activeMethods} split={split} />
+            {montoNum > 0 && !split.isComplete && (
+              <p className="mt-1 text-xs text-amber-600">
+                {split.isExcess
+                  ? 'Los medios de pago suman más que el monto a cobrar.'
+                  : `Repartí el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -185,11 +196,22 @@ function CobranzaCuentaDialog({
               value={monto}
               onChange={setMonto}
             />
-            {overBalance && <span className="text-xs text-destructive">No puede superar el saldo total del cliente.</span>}
+            {overBalance ? (
+              <span className="text-xs text-destructive">No puede superar el saldo total del cliente.</span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Podés cobrar una parte: se aplica a los comprobantes más viejos y el resto queda pendiente.</span>
+            )}
           </div>
           <div className="border-t pt-2">
             <p className="mb-1 text-xs font-medium text-muted-foreground">Composición del pago</p>
             <PaymentSplitInput methods={activeMethods} split={split} />
+            {montoNum > 0 && !split.isComplete && (
+              <p className="mt-1 text-xs text-amber-600">
+                {split.isExcess
+                  ? 'Los medios de pago suman más que el monto a cobrar.'
+                  : `Repartí el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
