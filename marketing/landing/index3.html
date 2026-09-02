@@ -60,11 +60,23 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 .hero-cube{height:clamp(120px,15vw,180px);width:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}
 /* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
 .hero-title-low{margin-top:0;}
-/* Columna del logo: el texto se ENCUADRA bajo el cubo, en bloque compacto,
-   sin desparramarse por debajo del carrusel (pedido de Bruno, sep-2026). */
-.hero-left{max-width:440px;}
-.hero-left .trust{margin-top:22px;}
-.hero-left .hprice{margin-top:14px;}
+/* Columna del logo: el texto se ENCUADRA bajo el cubo y se ESTIRA hasta el
+   final del cuadrado (pedido de Bruno, sep-2026): letra +1.5px y márgenes
+   auto que reparten el alto sobrante (con padding de respaldo para móvil,
+   donde la columna no se estira y el margin:auto colapsa a 0). */
+.hero-left{max-width:440px;align-self:stretch;display:flex;flex-direction:column;}
+.hero-left .trust{margin-top:auto;padding-top:20px;font-size:15.5px;}
+.hero-left .hprice{margin-top:auto;padding-top:14px;margin-bottom:4px;font-size:16px;}
+/* Bajo el título: botones apilados a la IZQUIERDA (ocupan el recuadro) y
+   "Características principales" en PARALELO a la derecha. */
+.hero-acciones{display:flex;flex-direction:column;justify-content:center;gap:16px;margin-top:26px;align-self:stretch;}
+.hero-acciones .btn{font-size:18px;padding:18px 32px;justify-content:center;}
+.hero-acciones .dl-alt{text-align:center;margin-top:2px;}
+.hero-feats{margin-top:26px;min-width:0;}
+.hero-feats h2{font-family:var(--disp);font-size:24px;letter-spacing:-.015em;margin:0;}
+.hero-feats h2 b{color:var(--blue);}
+.hero-feats .feats{gap:2px 26px;margin-top:12px;}
+.hero-feats .feats li{font-size:13.5px;padding:4.5px 0 4.5px 22px;}
 /* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
 .rubros-hero{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
  gap:12px 14px;margin:18px 0 4px;position:relative;z-index:120;}
@@ -271,10 +283,6 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 @media(max-width:820px){.pain-2col{grid-template-columns:1fr;gap:26px;} .pain-head p{max-width:none;}}
 .pain-body{padding:4px 26px 16px;}
 /* CARACTERÍSTICAS PRINCIPALES — 2 columnas compactas */
-.feats-sec{padding-top:24px;margin-top:0;}
-.feats-rest{padding-top:0;}
-.feats-sec .sc-intro{margin-bottom:16px;}
-.feats-sec .sc-intro p{margin-top:6px;}
 .feats{display:grid;grid-template-columns:1fr 1fr;gap:4px 44px;margin-top:12px;}
 .feats ul{list-style:none;margin:0;padding:0;}
 .feats li{position:relative;padding:6px 0 6px 24px;border-bottom:1px solid var(--line);font-size:14.5px;color:var(--ink);line-height:1.3;}
@@ -384,36 +392,54 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
       ocupa esa franja. El JS tolera la ausencia de #gdots y el carrusel
       sigue rotando solo (y con swipe en el teléfono). -->
  <h1 class="hero-title hero-title-low">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
- <p class="hero-sub">Funciona aunque se corte internet y factura con CAE. Instalás, cargás tus productos y arrancás.</p>
- <div class="hcta">
+ <!-- Bajo el título, DOS columnas (pedido de Bruno, sep-2026): botones a la
+      izquierda ocupando el recuadro, y "Características principales" en
+      PARALELO a la derecha con las 22 completas (antes vivían repartidas en
+      dos secciones más abajo — se movieron acá, no duplicar). -->
+ <div class="hero-acciones">
   <a class="btn btn-blue" data-sf-cta="whatsapp" href="https://wa.me/543425847340?text=Hola%21%20Quiero%20probar%20StockFlow%20en%20mi%20comercio." target="_blank" rel="noopener"><svg class='wai' viewBox='0 0 24 24' fill='currentColor'><path d='M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm5.8 14.1c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.5-1.2-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.5-.3.3c-.2.2-.4.4-.2.7.2.4.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.7 1.6.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.2.6-.1l2 .9c.2.1.4.2.4.3.1.2.1.6-.1 1.1Z'/></svg>Quiero probarlo en mi comercio</a>
   <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
+  <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
  </div>
- <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
+ <div class="hero-feats" id="func">
+  <h2>Características <b>principales</b></h2>
+  <div class="feats">
+   <ul>
+    <li>Funciona sin internet — seguís vendiendo aunque se corte</li>
+    <li>Facturación electrónica ARCA (CAE)</li>
+    <li>Punto de venta rápido con ticket térmico</li>
+    <li>Control de stock con alertas de reposición</li>
+    <li>Cuentas corrientes de clientes y proveedores</li>
+    <li>Caja diaria con apertura, cierre y arqueo</li>
+    <li>Asistente virtual Flowy: ayuda 24/7 dentro del sistema</li>
+    <li>Soporte técnico directo por WhatsApp</li>
+    <li>Integración con Mercado Pago (QR) y WhatsApp</li>
+    <li>Compras, ventas y presupuestos</li>
+    <li>3 listas de precios + precio mayorista</li>
+   </ul>
+   <ul>
+    <li>Actualización masiva de precios con vista previa</li>
+    <li>Descuentos por producto y sobre el total</li>
+    <li>Estadísticas, contabilidad y Libro IVA</li>
+    <li>Importación de productos desde Excel</li>
+    <li>Buscador total: código, marca, familia o proveedor</li>
+    <li>Multiusuario con roles y permisos</li>
+    <li>Varias cajas conectadas en red local</li>
+    <li>Escáner, balanza electrónica y cajón de dinero</li>
+    <li>Reportes exportables a Excel y PDF</li>
+    <li>Backups automáticos: tus datos en tu PC</li>
+    <li>Actualizaciones automáticas incluidas</li>
+   </ul>
+  </div>
+ </div>
 </div></header>
 
 <!-- DECISIÓN DEFINITIVA (Bruno, sep-2026): SIN bloque de prueba social.
      Primero se anonimizó y después se eliminó entero por decisión de Bruno:
      no se publican clientes (ni con nombre ni anónimos). No reintroducir. -->
-<section class="sec feats-sec"><div class="wrap">
- <div class="sc-intro">
-  <h2>Características <b>principales</b></h2>
-  <p>Todo lo que necesitás para manejar tu comercio, en un solo sistema.</p>
- </div>
- <div class="feats">
-  <ul>
-   <li>Funciona sin internet — seguís vendiendo aunque se corte</li>
-   <li>Facturación electrónica ARCA (CAE)</li>
-   <li>Punto de venta rápido con ticket térmico</li>
-  </ul>
-  <ul>
-   <li>Control de stock con alertas de reposición</li>
-   <li>Cuentas corrientes de clientes y proveedores</li>
-   <li>Caja diaria con apertura, cierre y arqueo</li>
-  </ul>
- </div>
-</div></section>
-
+<!-- Las "Características principales" (las 22) viven ahora en el HERO, en
+     paralelo a los botones (pedido de Bruno, sep-2026). Acá había dos
+     secciones (6 principales + 16 "incluido") — NO reintroducirlas. -->
 <section class="proof"><div class="wrap">
  <span class="pdot"></span>
  <span>En producción desde 2026: ventas, caja y cuentas corrientes <b>reales, registradas todos los días</b> — con soporte directo de quien lo desarrolla.</span>
@@ -438,35 +464,6 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
   <div class="si"><figure class="a4sheet"><img loading="lazy" src="assets/presupuesto-1400q80.webp" width='1400' height='1215' alt="Presupuesto A4 de StockFlow"/></figure></div>
  </div>
  <div class='show sc rv' id='sc-ganas'><div class='st'><span class='sc-k'>Rentabilidad</span><h3>No es cuánto vendés. Es cuánto te queda.</h3><p>Margen bruto, ticket promedio y tendencia, filtrados por fecha y medio de pago. Identificás qué productos son rentables y cuáles no.</p><span class='sc-solve'>Sin vender a ciegas</span><ul class='sc-notes'><li><b>Margen bruto</b> — cuánto te queda, no solo cuánto vendés</li><li><b>Ticket promedio</b> — cuánto compra cada cliente, en promedio</li><li><b>Por período y medio de pago</b> — el análisis que necesites</li></ul></div><div class='si'><figure class='cwin'><div class='gbar'><span class='gdz'><i></i><i></i><i></i></span><span class='gbt'>StockFlow — Estadísticas</span></div><img loading='lazy' src='assets/estadisticas-1400q80.webp' width='1400' height='916' alt='Estadísticas de StockFlow con ventas del mes, ticket promedio y margen bruto'/></figure></div></div>
- </div>
-</div></section>
-
-<section class="sec feats-rest"><div class="wrap">
- <div class="sc-intro">
-  <h2>Y todo lo demás, <b>incluido</b></h2>
-  <p>Sin módulos aparte ni costos extra: esto viene con el sistema.</p>
- </div>
- <div class="feats">
-  <ul>
-   <li>Asistente virtual Flowy: ayuda 24/7 dentro del sistema</li>
-   <li>Soporte técnico directo por WhatsApp</li>
-   <li>Integración con Mercado Pago (QR) y WhatsApp</li>
-   <li>Compras, ventas y presupuestos</li>
-   <li>3 listas de precios + precio mayorista</li>
-   <li>Actualización masiva de precios con vista previa</li>
-   <li>Descuentos por producto y sobre el total</li>
-   <li>Estadísticas, contabilidad y Libro IVA</li>
-  </ul>
-  <ul>
-   <li>Importación de productos desde Excel</li>
-   <li>Buscador total: código, marca, familia o proveedor</li>
-   <li>Multiusuario con roles y permisos</li>
-   <li>Varias cajas conectadas en red local</li>
-   <li>Escáner, balanza electrónica y cajón de dinero</li>
-   <li>Reportes exportables a Excel y PDF</li>
-   <li>Backups automáticos: tus datos en tu PC</li>
-   <li>Actualizaciones automáticas incluidas</li>
-  </ul>
  </div>
 </div></section>
 
