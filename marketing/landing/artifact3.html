@@ -60,9 +60,9 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 .hero-sub{grid-column:1 / -1;font-size:clamp(17px,2vw,20px);color:var(--body);margin:10px 0 0;max-width:62ch;}
 .hero .hcta{grid-column:1 / -1;}
 .hero .dl-alt{grid-column:1 / -1;}
-/* El logo llena el ancho de su sección (grande, como en la captura de referencia). */
-.hero-cube{width:100%;max-width:420px;height:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}
-@media(max-width:960px){.hero-cube{max-width:300px;}}
+/* Logo al 70% del ancho de su sección (Bruno pidió reducirlo un 30%). */
+.hero-cube{width:70%;max-width:294px;height:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}
+@media(max-width:960px){.hero-cube{max-width:210px;}}
 /* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
 .hero-title-low{margin-top:0;}
 /* Sección del logo: logo y texto ALINEADOS en un mismo bloque (captura de
@@ -255,10 +255,10 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 /* clip horizontal: las cards laterales del 3D no invaden la sección del logo
    (overflow-y visible para que respiren las sombras). */
 .cfbox{width:100%;overflow:clip visible;}
-.cfrow{position:relative;height:560px;margin-top:14px;}
+.cfrow{position:relative;height:480px;margin-top:8px;}
 .cf{position:relative;width:100%;height:100%;perspective:1700px;}
 /* margin:0 mata el margin UA de <figure> (40px) que corría la card del centro. */
-.cf-card{position:absolute;top:50%;left:50%;width:min(90%,700px);margin:0;
+.cf-card{position:absolute;top:50%;left:50%;width:min(90%,560px);margin:0;
  transform:translate(-50%,-50%);transform-origin:center center;backface-visibility:hidden;cursor:pointer;
  transition:none;will-change:transform,opacity;}
 .cwin{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 50px rgba(20,40,80,.30);background:#fff;}
