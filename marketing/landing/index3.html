@@ -67,8 +67,11 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
    Bruno) para que logo+texto ocupen el mismo alto que las cards del carrusel. */
 .hero-cube{width:49%;max-width:206px;height:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}
 @media(max-width:960px){.hero-cube{max-width:147px;}}
-/* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
+/* Título 'Características principales' DEBAJO del carrusel; el h1 va ARRIBA
+   de los rubros (pedido de Bruno, sep-2026). Ambos centrados. */
 .hero-title-low{margin-top:0;}
+.hero-title-c{text-align:center;}
+.hero-title-top{margin:4px 0 6px;}
 /* Sección del logo: logo y texto ALINEADOS en un mismo bloque (captura de
    referencia de Bruno): en desktop el texto se reparte hasta el final de la
    sección; en móvil (1 columna) queda compacto — ahí el reparto quedaba mal. */
@@ -88,8 +91,6 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 .hero-acciones .btn{font-size:18px;padding:18px 32px;justify-content:center;width:auto;max-width:100%;white-space:nowrap;align-self:center;}
 .hero-acciones .dl-alt{text-align:center;margin-top:2px;}
 .hero-feats{margin-top:-12px;min-width:0;}
-.hero-feats h2{font-family:var(--disp);font-size:25px;letter-spacing:-.015em;margin:0;text-align:center;}
-.hero-feats h2 b{color:var(--blue);}
 .hero-feats .feats{gap:2px 26px;margin-top:12px;}
 .hero-feats .feats li{font-size:15.5px;padding:4.5px 0 4.5px 22px;}
 /* En pantallas anchas el bloque invade el margen derecho del wrap para que
@@ -414,6 +415,7 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 <header class="hero" id="top"><div class="wrap">
  <!-- ORDEN DEL HERO (pedido de Bruno, sep-2026): rubros + cubo + carrusel
       arriba, y el bloque del título con los botones DEBAJO (sin duplicados). -->
+ <h1 class="hero-title hero-title-c hero-title-top">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
  <div class="rubros-hero">
   <span class="rh"><i><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'/></svg></i>Ferreterías</span>
   <span class="rh"><i><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M12 12H5a2 2 0 0 0-2 2v5'/><circle cx='13' cy='19' r='2'/><circle cx='5' cy='19' r='2'/><path d='M8 19h3m5-17v17h6M6 12V7c0-1.1.9-2 2-2h3l5 5'/></svg></i>Corralones</span>
@@ -438,7 +440,7 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
  <!-- Los puntitos del carrusel se eliminaron (pedido de Bruno): el título
       ocupa esa franja. El JS tolera la ausencia de #gdots y el carrusel
       sigue rotando solo (y con swipe en el teléfono). -->
- <h1 class="hero-title hero-title-low">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
+ <h2 class="hero-title hero-title-low hero-title-c" id="func">Características <b>principales</b></h2>
  <!-- Bajo el título, DOS columnas (pedido de Bruno, sep-2026): botones a la
       izquierda ocupando el recuadro, y "Características principales" en
       PARALELO a la derecha con las 22 completas (antes vivían repartidas en
@@ -454,8 +456,7 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
    <img class="hl-uala" src="assets/logo-uala-150q85.webp" width='150' height='77' alt="Ualá" loading="lazy"/>
   </div>
  </div>
- <div class="hero-feats" id="func">
-  <h2>Características <b>principales</b></h2>
+ <div class="hero-feats">
   <div class="feats">
    <ul>
     <li>Funciona sin internet — seguís vendiendo aunque se corte</li>

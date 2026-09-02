@@ -195,8 +195,11 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
    Bruno) para que logo+texto ocupen el mismo alto que las cards del carrusel. */
 .hero-cube{{width:49%;max-width:206px;height:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
 @media(max-width:960px){{.hero-cube{{max-width:147px;}}}}
-/* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
+/* Título 'Características principales' DEBAJO del carrusel; el h1 va ARRIBA
+   de los rubros (pedido de Bruno, sep-2026). Ambos centrados. */
 .hero-title-low{{margin-top:0;}}
+.hero-title-c{{text-align:center;}}
+.hero-title-top{{margin:4px 0 6px;}}
 /* Sección del logo: logo y texto ALINEADOS en un mismo bloque (captura de
    referencia de Bruno): en desktop el texto se reparte hasta el final de la
    sección; en móvil (1 columna) queda compacto — ahí el reparto quedaba mal. */
@@ -216,8 +219,6 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero-acciones .btn{{font-size:18px;padding:18px 32px;justify-content:center;width:auto;max-width:100%;white-space:nowrap;align-self:center;}}
 .hero-acciones .dl-alt{{text-align:center;margin-top:2px;}}
 .hero-feats{{margin-top:-12px;min-width:0;}}
-.hero-feats h2{{font-family:var(--disp);font-size:25px;letter-spacing:-.015em;margin:0;text-align:center;}}
-.hero-feats h2 b{{color:var(--blue);}}
 .hero-feats .feats{{gap:2px 26px;margin-top:12px;}}
 .hero-feats .feats li{{font-size:15.5px;padding:4.5px 0 4.5px 22px;}}
 /* En pantallas anchas el bloque invade el margen derecho del wrap para que
@@ -577,6 +578,7 @@ BODY=f"""
 <header class="hero" id="top"><div class="wrap">
  <!-- ORDEN DEL HERO (pedido de Bruno, sep-2026): rubros + cubo + carrusel
       arriba, y el bloque del título con los botones DEBAJO (sin duplicados). -->
+ <h1 class="hero-title hero-title-c hero-title-top">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
  <div class="rubros-hero">
   <span class="rh"><i>{G['lu_wrench']}</i>Ferreterías</span>
   <span class="rh"><i>{G['lu_forklift']}</i>Corralones</span>
@@ -601,7 +603,7 @@ BODY=f"""
  <!-- Los puntitos del carrusel se eliminaron (pedido de Bruno): el título
       ocupa esa franja. El JS tolera la ausencia de #gdots y el carrusel
       sigue rotando solo (y con swipe en el teléfono). -->
- <h1 class="hero-title hero-title-low">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
+ <h2 class="hero-title hero-title-low hero-title-c" id="func">Características <b>principales</b></h2>
  <!-- Bajo el título, DOS columnas (pedido de Bruno, sep-2026): botones a la
       izquierda ocupando el recuadro, y "Características principales" en
       PARALELO a la derecha con las 22 completas (antes vivían repartidas en
@@ -617,8 +619,7 @@ BODY=f"""
    <img class="hl-uala" src="{L_UALA}" {wh(L_UALA)} alt="Ualá" loading="lazy"/>
   </div>
  </div>
- <div class="hero-feats" id="func">
-  <h2>Características <b>principales</b></h2>
+ <div class="hero-feats">
   <div class="feats">
    <ul>
     <li>Funciona sin internet — seguís vendiendo aunque se corte</li>
