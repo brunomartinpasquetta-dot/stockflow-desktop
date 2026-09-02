@@ -20,21 +20,13 @@ Regenera, respalda el index remoto, sube todo al docroot `/var/www/stockflow-lan
 del VPS (root@187.127.20.131) y verifica contra el sitio publicado. No toca `/dl/`
 (instaladores) ni nada fuera del docroot.
 
-## ⚠️ Estado del DNS (ago-2026) — PENDIENTE DE ARREGLAR
+## ✅ DNS — RESUELTO (2-sep-2026)
 
-- `bpsgsistemas.com` (apex) devuelve **dos IPs**: `46.202.145.28` (Hostinger,
-  NO sirve la landing: el puerto 80 da 403 y el 443 no tiene este sitio) y
-  `187.127.20.131` (el VPS con la landing).
-- `www.bpsgsistemas.com` devuelve solo `187.127.20.131` (correcto).
-
-Con el apex a dos IPs, cada visita al apex tiene ~50% de probabilidad de caer
-en Hostinger y fallar (en pruebas: 3 de 5 navegaciones fallidas). **Hay que
-sacar del apex el registro A `46.202.145.28`** en el panel DNS y dejar solo
-`187.127.20.131`. Mientras tanto, la verificación del deploy usa
-`curl --resolve` para fijar la IP del VPS y no dar falsos negativos.
-
-El redirect http→https ya existe en el nginx del VPS; el "403 en http" que se
-ve a veces también es la IP de Hostinger, no el VPS.
+Bruno eliminó del apex el registro A `46.202.145.28` y el AAAA de Hostinger.
+Verificado: `bpsgsistemas.com` y `www` resuelven solo a `187.127.20.131`,
+AAAA vacío, apex y www responden 200. La verificación del deploy conserva
+`curl --resolve` como blindaje determinístico (inmune a caches DNS viejos),
+ya no como workaround.
 
 ## nginx del VPS
 
@@ -43,9 +35,10 @@ Sirve apex + www con SSL de certbot. Ahí viven http/2, `gzip_types` para JS,
 y los `Cache-Control` (HTML: `no-cache, must-revalidate`; `js/`: `max-age=3600`).
 Antes de tocarlo: respaldar con fecha, `nginx -t`, y si falla restaurar.
 
-## Prueba social (TODO-PERMISO)
+## Prueba social — ANÓNIMA, decisión definitiva (sep-2026)
 
-El bloque "Ya están facturando con StockFlow" nombra a Coronda Express
-(Guillermo Peverelli) y Leo Citzia, clientes reales. Está marcado con
-`TODO-PERMISO` en `build_landing.py`: **confirmar con ambos antes de mandar
-tráfico pago** (y antes de pasar contactos a interesados).
+Bruno decidió **no pedir permiso** a los clientes para publicar sus nombres:
+el bloque "Ya lo usan todos los días" queda en versión anónima de forma
+definitiva ("un autoservicio de Coronda", "una imprenta con terminales en
+red" — datos descriptivos verdaderos, sin nombres). **No restaurar los
+nombres reales**: es una decisión de privacidad, no un placeholder.
