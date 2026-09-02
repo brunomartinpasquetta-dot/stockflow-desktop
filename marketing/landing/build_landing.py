@@ -183,6 +183,11 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero-cube{{height:clamp(120px,15vw,180px);width:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
 /* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
 .hero-title-low{{margin-top:46px;}}
+/* Columna del logo: el texto se ENCUADRA bajo el cubo, en bloque compacto,
+   sin desparramarse por debajo del carrusel (pedido de Bruno, sep-2026). */
+.hero-left{{max-width:440px;}}
+.hero-left .trust{{margin-top:22px;}}
+.hero-left .hprice{{margin-top:14px;}}
 /* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
 .rubros-hero{{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
  gap:12px 14px;margin:18px 0 4px;position:relative;z-index:120;}}
@@ -521,7 +526,7 @@ BODY=f"""
   <span class="rh"><i>{G['lu_truck']}</i>Distribuidoras</span>
   <span class="rh"><i>{G['lu_gear']}</i>Repuestos</span>
  </div>
- <div>
+ <div class="hero-left">
   <img class="hero-cube" src="{CUBE}" {wh(CUBE)} fetchpriority="high" alt="StockFlow — Sistema de Gestión Comercial"/>
   <div class="trust"><span class="wa-c">{WA_SVG}</span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
   <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> — se activa sola al instalar, sin tarjeta · después <b>{money("70.000")}/mes</b> todo incluido, sin costos ocultos.</div>

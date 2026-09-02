@@ -60,6 +60,11 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 .hero-cube{height:clamp(120px,15vw,180px);width:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}
 /* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
 .hero-title-low{margin-top:46px;}
+/* Columna del logo: el texto se ENCUADRA bajo el cubo, en bloque compacto,
+   sin desparramarse por debajo del carrusel (pedido de Bruno, sep-2026). */
+.hero-left{max-width:440px;}
+.hero-left .trust{margin-top:22px;}
+.hero-left .hprice{margin-top:14px;}
 /* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
 .rubros-hero{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
  gap:12px 14px;margin:18px 0 4px;position:relative;z-index:120;}
@@ -363,7 +368,7 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
   <span class="rh"><i><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2'/><path d='M15 18H9'/><path d='M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14'/><circle cx='7' cy='18' r='2'/><circle cx='17' cy='18' r='2'/></svg></i>Distribuidoras</span>
   <span class="rh"><i><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/><circle cx='12' cy='12' r='3'/></svg></i>Repuestos</span>
  </div>
- <div>
+ <div class="hero-left">
   <img class="hero-cube" src="assets/cube-hd-400q90.webp" width='400' height='410' fetchpriority="high" alt="StockFlow — Sistema de Gestión Comercial"/>
   <div class="trust"><span class="wa-c"><svg class='wai' viewBox='0 0 24 24' fill='currentColor'><path d='M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm5.8 14.1c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.5-1.2-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.5-.3.3c-.2.2-.4.4-.2.7.2.4.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.7 1.6.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.2.6-.1l2 .9c.2.1.4.2.4.3.1.2.1.6-.1 1.1Z'/></svg></span><span>Instalación asistida y <b>soporte real</b> por WhatsApp. Probalo 30 días gratis en tu comercio.</span></div>
   <div class="hprice">Prueba gratis por <b>30 días, sin costo</b> — se activa sola al instalar, sin tarjeta · después <b><span class='mny'>$&#8202;70.000</span>/mes</b> todo incluido, sin costos ocultos.</div>
