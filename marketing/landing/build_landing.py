@@ -204,7 +204,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero-acciones .btn{{font-size:18px;padding:18px 32px;justify-content:center;}}
 .hero-acciones .dl-alt{{text-align:center;margin-top:2px;}}
 .hero-feats{{margin-top:26px;min-width:0;}}
-.hero-feats h2{{font-family:var(--disp);font-size:24px;letter-spacing:-.015em;margin:0;}}
+.hero-feats h2{{font-family:var(--disp);font-size:25px;letter-spacing:-.015em;margin:0;text-align:center;}}
 .hero-feats h2 b{{color:var(--blue);}}
 .hero-feats .feats{{gap:2px 26px;margin-top:12px;}}
 .hero-feats .feats li{{font-size:14.5px;padding:4.5px 0 4.5px 22px;}}
