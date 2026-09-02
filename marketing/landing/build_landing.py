@@ -181,6 +181,8 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero .hcta{{grid-column:1 / -1;}}
 .hero .dl-alt{{grid-column:1 / -1;}}
 .hero-cube{{height:clamp(120px,15vw,180px);width:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
+/* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
+.hero-title-low{{margin-top:46px;}}
 /* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
 .rubros-hero{{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
  gap:12px 14px;margin:18px 0 4px;position:relative;z-index:120;}}
@@ -508,8 +510,8 @@ BODY=f"""
 </div></nav>
 
 <header class="hero" id="top"><div class="wrap">
- <h1 class="hero-title">Ventas, stock, caja y fiado de tu comercio en <b>una sola PC</b>.</h1>
- <p class="hero-sub">Funciona aunque se corte internet y factura con CAE. Instalás, cargás tus productos y arrancás.</p>
+ <!-- ORDEN DEL HERO (pedido de Bruno, sep-2026): botones ARRIBA DE TODO,
+      después rubros + cubo + carrusel, y el bloque del título DEBAJO. -->
  <div class="hcta">
   <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}Quiero probarlo en mi comercio</a>
   <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
@@ -537,6 +539,13 @@ BODY=f"""
    <div class="gdots" id="gdots">{GAL_DOTS}</div>
   </div>
  </div>
+ <h1 class="hero-title hero-title-low">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
+ <p class="hero-sub">Funciona aunque se corte internet y factura con CAE. Instalás, cargás tus productos y arrancás.</p>
+ <div class="hcta">
+  <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener">{WA_SVG}Quiero probarlo en mi comercio</a>
+  <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
+ </div>
+ <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
 </div></header>
 
 <!-- DECISIÓN DEFINITIVA (Bruno, sep-2026): SIN bloque de prueba social.

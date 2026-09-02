@@ -43,5 +43,6 @@ versión anónima: la sección de prueba social se eliminó por completo.
 
 ## Pendientes
 
-- **Acomodar el encabezado y la primera sección** (pedido de Bruno, sep-2026;
-  alcance a definir con él antes de tocar).
+(sin pendientes — el reordenamiento del hero pedido por Bruno se aplicó el
+2-sep-2026: botones arriba de todo, título "Todo tu comercio en un solo
+sistema integral." debajo del carrusel)

@@ -58,6 +58,8 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 .hero .hcta{grid-column:1 / -1;}
 .hero .dl-alt{grid-column:1 / -1;}
 .hero-cube{height:clamp(120px,15vw,180px);width:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}
+/* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
+.hero-title-low{margin-top:46px;}
 /* Rubros en el hero: solo ícono + label, estilo Lucide (como el sistema) */
 .rubros-hero{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
  gap:12px 14px;margin:18px 0 4px;position:relative;z-index:120;}
@@ -350,8 +352,8 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 </div></nav>
 
 <header class="hero" id="top"><div class="wrap">
- <h1 class="hero-title">Ventas, stock, caja y fiado de tu comercio en <b>una sola PC</b>.</h1>
- <p class="hero-sub">Funciona aunque se corte internet y factura con CAE. Instalás, cargás tus productos y arrancás.</p>
+ <!-- ORDEN DEL HERO (pedido de Bruno, sep-2026): botones ARRIBA DE TODO,
+      después rubros + cubo + carrusel, y el bloque del título DEBAJO. -->
  <div class="hcta">
   <a class="btn btn-blue" data-sf-cta="whatsapp" href="https://wa.me/543425847340?text=Hola%21%20Quiero%20probar%20StockFlow%20en%20mi%20comercio." target="_blank" rel="noopener"><svg class='wai' viewBox='0 0 24 24' fill='currentColor'><path d='M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm5.8 14.1c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.5-1.2-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.5-.3.3c-.2.2-.4.4-.2.7.2.4.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.7 1.6.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.2.6-.1l2 .9c.2.1.4.2.4.3.1.2.1.6-.1 1.1Z'/></svg>Quiero probarlo en mi comercio</a>
   <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
@@ -379,6 +381,13 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
    <div class="gdots" id="gdots"><button class='gdot' data-i='0' aria-label='Pantalla 1'></button><button class='gdot' data-i='1' aria-label='Pantalla 2'></button><button class='gdot' data-i='2' aria-label='Pantalla 3'></button><button class='gdot' data-i='3' aria-label='Pantalla 4'></button><button class='gdot' data-i='4' aria-label='Pantalla 5'></button><button class='gdot' data-i='5' aria-label='Pantalla 6'></button><button class='gdot' data-i='6' aria-label='Pantalla 7'></button><button class='gdot' data-i='7' aria-label='Pantalla 8'></button><button class='gdot' data-i='8' aria-label='Pantalla 9'></button><button class='gdot' data-i='9' aria-label='Pantalla 10'></button></div>
   </div>
  </div>
+ <h1 class="hero-title hero-title-low">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
+ <p class="hero-sub">Funciona aunque se corte internet y factura con CAE. Instalás, cargás tus productos y arrancás.</p>
+ <div class="hcta">
+  <a class="btn btn-blue" data-sf-cta="whatsapp" href="https://wa.me/543425847340?text=Hola%21%20Quiero%20probar%20StockFlow%20en%20mi%20comercio." target="_blank" rel="noopener"><svg class='wai' viewBox='0 0 24 24' fill='currentColor'><path d='M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm5.8 14.1c-.2.7-1.4 1.3-2 1.4-.5.1-1.2.1-1.9-.1-.4-.1-1-.3-1.7-.6-3-1.3-4.9-4.3-5.1-4.5-.1-.2-1.2-1.5-1.2-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.5-.3.3c-.2.2-.4.4-.2.7.2.4.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.7 1.6.3.1.5.1.7-.1l.9-1.1c.2-.2.4-.2.6-.1l2 .9c.2.1.4.2.4.3.1.2.1.6-.1 1.1Z'/></svg>Quiero probarlo en mi comercio</a>
+  <a class="btn btn-ghost" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
+ </div>
+ <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
 </div></header>
 
 <!-- DECISIÓN DEFINITIVA (Bruno, sep-2026): SIN bloque de prueba social.
