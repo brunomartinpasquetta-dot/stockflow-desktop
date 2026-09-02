@@ -182,7 +182,7 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .hero .dl-alt{{grid-column:1 / -1;}}
 .hero-cube{{height:clamp(120px,15vw,180px);width:auto;display:block;margin:8px 0 10px;filter:drop-shadow(0 22px 38px rgba(43,111,214,.30));image-rendering:auto;}}
 /* El bloque del título va DEBAJO del carrusel: aire arriba para separarlo. */
-.hero-title-low{{margin-top:46px;}}
+.hero-title-low{{margin-top:0;}}
 /* Columna del logo: el texto se ENCUADRA bajo el cubo, en bloque compacto,
    sin desparramarse por debajo del carrusel (pedido de Bruno, sep-2026). */
 .hero-left{{max-width:440px;}}
@@ -536,9 +536,11 @@ BODY=f"""
    <div class="cfrow">
     <div class="cf" id="cf">{GAL_SLIDES}</div>
    </div>
-   <div class="gdots" id="gdots">{GAL_DOTS}</div>
   </div>
  </div>
+ <!-- Los puntitos del carrusel se eliminaron (pedido de Bruno): el título
+      ocupa esa franja. El JS tolera la ausencia de #gdots y el carrusel
+      sigue rotando solo (y con swipe en el teléfono). -->
  <h1 class="hero-title hero-title-low">Todo tu comercio en <b>un solo sistema integral</b>.</h1>
  <p class="hero-sub">Funciona aunque se corte internet y factura con CAE. Instalás, cargás tus productos y arrancás.</p>
  <div class="hcta">
