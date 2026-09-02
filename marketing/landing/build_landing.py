@@ -634,6 +634,7 @@ BODY=f"""
     <li>Reportes exportables a Excel y PDF</li>
     <li>Backups automáticos: tus datos en tu PC</li>
     <li>Actualizaciones automáticas incluidas</li>
+    <li>Catálogo web incorporado, conectado con tu sistema</li>
    </ul>
   </div>
  </div>
@@ -674,11 +675,11 @@ BODY=f"""
 </div></section>
 
 <section class="sec" id="comp"><div class="wrap">
- <div class="sec-h"><h2>El pago único parece más económico… <span style="color:var(--coral)">hasta el próximo cambio de AFIP</span>.</h2><p>Se paga una vez, pero cada mejora, soporte o adecuación normativa se cobra por separado.</p></div>
+ <div class="sec-h"><h2>El pago único parece más económico… <span style="color:var(--coral)">hasta el próximo cambio de ARCA</span>.</h2><p>Se paga una vez, pero cada mejora, soporte o adecuación normativa se cobra por separado.</p></div>
  <div class="facturas rv">
   <div class="fac fac-bad">
    <div class="fac-h">Sistema de pago único</div>
-   <div class="fr">Versión nueva por AFIP<span>se cobra aparte</span></div>
+   <div class="fr">Versión nueva por ARCA<span>se cobra aparte</span></div>
    <div class="fr">Soporte<span>limitado o con costo</span></div>
    <div class="fr">Actualizaciones y mejoras<span>no incluidas</span></div>
    <div class="fr">Entre versiones<span>seguís con la anterior</span></div>
@@ -710,7 +711,7 @@ BODY=f"""
   <div><ul>
     <li>{chk()}Todo lo de arriba: ventas y actualización masiva de precios</li>
     <li>{chk()}Cuentas corrientes, caja y presupuestos A4</li>
-    <li>{chk()}Estadísticas, actualizaciones nuevas y AFIP al día</li>
+    <li>{chk()}Estadísticas, actualizaciones nuevas y ARCA al día</li>
     <li>{chk()}Soporte por WhatsApp, de una persona</li></ul>
    <a class="btn btn-blue" data-sf-cta="whatsapp" href="{WA}" target="_blank" rel="noopener" style="width:100%;justify-content:center">{WA_SVG}Consultar por WhatsApp</a>
    <a data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe" style="display:block;text-align:center;margin-top:10px;font-size:14px">O descargá directo para Windows</a></div>
@@ -723,12 +724,12 @@ BODY=f"""
   <div class="faq rv">
    <details open><summary>¿Qué me ahorra concretamente?</summary><div class="a">Repreciar una lista completa pasa de una tarde a un minuto. El fiado deja de estar en papeles sueltos. La caja cierra con el monto exacto. Cuánto vale eso en tu comercio lo sabés vos mejor que yo.</div></details>
    {"".join(f'<details><summary>{q}</summary><div class="a">{a}</div></details>' for q,a in [
-    ("¿Necesito internet para usarlo?","No. StockFlow funciona en tu PC de forma 100% offline. La conexión solo se usa para actualizaciones o AFIP. Si se corta, seguís operando con normalidad."),
+    ("¿Necesito internet para usarlo?","No. StockFlow funciona en tu PC de forma 100% offline. La conexión solo se usa para actualizaciones o ARCA. Si se corta, seguís operando con normalidad."),
     ("Ya lo llevo en Excel, ¿tengo que cargar todo de nuevo?","No. StockFlow importa tus productos desde Excel: códigos, descripciones, precios y stock. Traés tu planilla y el sistema arranca con tu catálogo cargado."),
     ("¿Cuánto tardo en cargar mis productos?","Si los tenés en Excel, la importación los deja cargados en minutos. Si no, podés cargarlos a medida que vendés — y la instalación asistida incluye dejarte el sistema funcionando con tus productos."),
     ("¿Puedo pasar los datos del sistema que tengo hoy?","En muchos casos, sí: ya migramos comercios que venían de otros sistemas con sus artículos, clientes y cuentas corrientes. Escribinos por WhatsApp contándonos qué sistema usás y lo vemos con tus datos."),
     ("¿Mis datos quedan en mi PC?","Sí. Tus datos son tuyos y residen en tu computadora. El sistema genera copias de seguridad que guardás donde prefieras."),
-    ("¿Por qué suscripción y no pago único?","Porque incluye todo: actualizaciones, soporte y adecuación permanente a AFIP. El pago único deja el sistema en una versión fija y, ante cada cambio normativo, se vuelve a pagar."),
+    ("¿Por qué suscripción y no pago único?","Porque incluye todo: actualizaciones, soporte y adecuación permanente a ARCA. El pago único deja el sistema en una versión fija y, ante cada cambio normativo, se vuelve a pagar."),
     ("¿Cómo funciona la prueba gratis?","Descargás el instalador, lo instalás y al abrir StockFlow completás tu nombre, comercio y WhatsApp: la prueba de 30 días se activa sola, sin tarjeta. Es el sistema completo. Al finalizar, tus datos quedan intactos y activás tu licencia por WhatsApp."),
     ("¿Incluye la instalación?","Sí. Si la necesitás, lo dejamos instalado y en funcionamiento con tus productos cargados. La prueba gratuita de 30 días incluye la instalación asistida."),
     ("¿Qué pasa si dejo de pagar?","El sistema pasa a modo solo lectura: seguís consultando tu información, pero no cargás nuevas operaciones. No se pierde ningún dato y, al renovar, vuelve a funcionar de forma completa."),
