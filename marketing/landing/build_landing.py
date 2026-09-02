@@ -489,6 +489,12 @@ h1.big{{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;}} h1.big .hl{{color:va
 .incl2col li{{display:flex;gap:11px;align-items:center;font-size:16px;color:var(--ink);font-weight:500;}}
 .incl2col li svg{{width:20px;height:20px;color:var(--green);flex:none;}}
 @media(max-width:700px){{.mini3{{grid-template-columns:1fr;}} .incl2col{{grid-template-columns:1fr;}}}}
+/* #comp compactada (pedido de Bruno, sep-2026): texto arriba de todo, título
+   y subtítulo en UNA fila cada uno (ancho libre + tamaño fijo), sin aire. */
+#comp{{padding-top:16px;}}
+#comp .sec-h{{max-width:none;margin-bottom:18px;}}
+#comp .sec-h h2{{font-size:clamp(24px,2.35vw,33px);margin-top:0;}}
+#comp .sec-h p{{margin-top:8px;}}
 .facturas{{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:20px;max-width:1120px;margin:0 auto;align-items:start;}}
 .fac{{border-radius:16px;padding:26px;}}
 .fac-bad{{background:#fff;border:1.5px dashed #cdd6e6;}}
