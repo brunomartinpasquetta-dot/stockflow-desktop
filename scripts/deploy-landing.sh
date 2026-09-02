@@ -49,7 +49,7 @@ CTAS=$(printf '%s' "$HTML" | grep -o 'data-sf-cta' | wc -l | tr -d ' ')
 JS=$(curl -s $RES -o /dev/null -w '%{http_code}' https://bpsgsistemas.com/js/tracking.js)
 echo "   $LM"
 echo "   píxel en el HTML servido: $PIXEL aparición(es)"
-echo "   data-sf-cta en el HTML servido: $CTAS (esperados: 10)"
+echo "   data-sf-cta en el HTML servido: $CTAS (esperados: 13)"
 echo "   js/tracking.js → HTTP $JS"
 if [ "$PIXEL" -ge 1 ] && [ "$JS" = "200" ] && [ "$CTAS" = "13" ]; then
   echo "✅ Landing publicada con tracking."
