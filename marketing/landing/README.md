@@ -35,10 +35,13 @@ Sirve apex + www con SSL de certbot. Ahí viven http/2, `gzip_types` para JS,
 y los `Cache-Control` (HTML: `no-cache, must-revalidate`; `js/`: `max-age=3600`).
 Antes de tocarlo: respaldar con fecha, `nginx -t`, y si falla restaurar.
 
-## Prueba social — ANÓNIMA, decisión definitiva (sep-2026)
+## Prueba social — ELIMINADA, decisión definitiva (sep-2026)
 
-Bruno decidió **no pedir permiso** a los clientes para publicar sus nombres:
-el bloque "Ya lo usan todos los días" queda en versión anónima de forma
-definitiva ("un autoservicio de Coronda", "una imprenta con terminales en
-red" — datos descriptivos verdaderos, sin nombres). **No restaurar los
-nombres reales**: es una decisión de privacidad, no un placeholder.
+Bruno decidió **no publicar clientes en la landing**, ni con nombre ni en
+versión anónima: la sección de prueba social se eliminó por completo.
+**No reintroducirla** — es una decisión de privacidad, no un hueco de diseño.
+
+## Pendientes
+
+- **Acomodar el encabezado y la primera sección** (pedido de Bruno, sep-2026;
+  alcance a definir con él antes de tocar).
