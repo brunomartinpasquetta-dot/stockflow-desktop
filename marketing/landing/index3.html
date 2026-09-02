@@ -259,7 +259,15 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
 .cf{position:relative;width:100%;height:100%;perspective:1700px;}
 /* margin:0 mata el margin UA de <figure> (40px) que corría la card del centro. */
 .cf-card{position:absolute;top:50%;left:50%;width:min(90%,560px);margin:0;
- transform:translate(-50%,-50%);transform-origin:center center;backface-visibility:hidden;cursor:pointer;
+ transform:translate(-50%,-50%);transform-origin:center center;backface-visibility:hidden;cursor:pointer;}
+/* Desktop (modo 3D): cards ALINEADAS ARRIBA con el tope del logo (pedido de
+   Bruno) — top 0 + origin/fuga arriba para que scale y perspectiva no las
+   bajen; el translateY(0) correspondiente vive en el JS (rama no-flat). */
+@media(min-width:901px){
+ .cf-card{top:0;transform-origin:50% 0;}
+ .cf{perspective-origin:50% 0;}
+}
+.cf-card{
  transition:none;will-change:transform,opacity;}
 .cwin{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 50px rgba(20,40,80,.30);background:#fff;}
 .cf-card img{width:100%;display:block;}
@@ -574,7 +582,9 @@ h1.big{font-size:clamp(36px,4.6vw,54px);margin:20px 0 0;} h1.big .hl{color:var(-
     x=d*45; z=-ad*205; ry=-d*32; s=Math.max(.4,1-ad*0.17); op=Math.max(0,1-ad*0.42);
    }
    c.style.opacity=''+op; c.style.pointerEvents=(ad<(flat?0.5:2)?'auto':'none'); c.style.zIndex=''+Math.round(100-ad*10);
-   c.style.transform='translate(-50%,-50%) translateX('+x+'%) translateZ('+z+'px) rotateY('+ry+'deg) scale('+s+')';
+   /* 3D (desktop): translateY 0 — las cards se alinean al TOPE del row (a la
+      altura del logo). Plano (angosto): centradas como siempre. */
+   c.style.transform='translate(-50%,'+(flat?'-50%':'0')+') translateX('+x+'%) translateZ('+z+'px) rotateY('+ry+'deg) scale('+s+')';
   });
   var ci=((Math.round(pos)%n)+n)%n;
   dots.forEach(function(dt,k){dt.classList.toggle('on',k===ci);});
