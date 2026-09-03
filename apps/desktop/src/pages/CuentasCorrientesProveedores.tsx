@@ -427,8 +427,15 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
   }, [statementQuery.data, fromMs, toMs, rangeActive])
   const periodCharges = useMemo(() => filteredEntries.reduce((n, e) => n + Number(e.debit || 0), 0), [filteredEntries])
   const periodPayments = useMemo(() => filteredEntries.reduce((n, e) => n + Number(e.credit || 0), 0), [filteredEntries])
-  const periodNet = Math.max(0, periodCharges - periodPayments)
-  const periodPagable = Math.min(periodNet, Number(balance))
+  // Lo pagable del período = saldo PENDIENTE de los comprobantes cuya fecha cae
+  // en el rango (espejo del criterio de CC clientes: el neto compras−pagos se
+  // anulaba si en el rango hubo pagos FIFO a deuda vieja). El pago sigue FIFO.
+  const periodPagable = useMemo(() => {
+    if (!rangeActive) return 0
+    return (openQuery.data ?? [])
+      .filter((a) => (fromMs == null || a.createdAt >= fromMs) && (toMs == null || a.createdAt <= toMs))
+      .reduce((n, a) => n + Number(a.balance || 0), 0)
+  }, [openQuery.data, fromMs, toMs, rangeActive])
 
   /** Comprobante del período: se imprime tras registrar el pago del rango. */
   function printPeriodReceipt(info: { amount: number; payments: { paymentMethodId: string; amount: string }[] }): void {
@@ -629,23 +636,30 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
               <div className="flex flex-wrap gap-x-5 gap-y-1 tabular-nums">
                 <span>Compras del período: <b>{formatCurrency(periodCharges)}</b></span>
                 <span>Pagos: <b className="text-success">{formatCurrency(periodPayments)}</b></span>
-                <span>Total del período: <b>{formatCurrency(periodNet)}</b></span>
+                <span>Pendiente del período: <b>{formatCurrency(periodPagable)}</b></span>
               </div>
-              <Button
-                size="sm"
-                disabled={!canPagar || periodPagable <= 0.005 || filteredEntries.length === 0}
-                title={
-                  !canPagar
-                    ? 'Requiere permiso para pagar'
-                    : periodPagable <= 0.005
-                      ? 'No hay importe pendiente en el período'
-                      : `Registrar un pago por ${formatCurrency(periodPagable)} y emitir el comprobante con el detalle`
-                }
-                onClick={() => setPagandoPeriodo(true)}
-              >
-                <ReceiptText className="h-4 w-4" />
-                Pagar período
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* Motivo VISIBLE: el tooltip no se muestra en botones
+                    deshabilitados (disabled:pointer-events-none). */}
+                {(!canPagar || periodPagable <= 0.005) && (
+                  <span className="text-xs text-muted-foreground">
+                    {!canPagar ? 'Requiere permiso para pagar' : 'Sin comprobantes con saldo en este período'}
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  disabled={!canPagar || periodPagable <= 0.005 || filteredEntries.length === 0}
+                  title={
+                    canPagar && periodPagable > 0.005
+                      ? `Registrar un pago por ${formatCurrency(periodPagable)} y emitir el comprobante con el detalle`
+                      : undefined
+                  }
+                  onClick={() => setPagandoPeriodo(true)}
+                >
+                  <ReceiptText className="h-4 w-4" />
+                  Pagar período
+                </Button>
+              </div>
             </div>
           )}
           <Table>

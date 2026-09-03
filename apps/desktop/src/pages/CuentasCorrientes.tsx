@@ -376,9 +376,17 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
     () => filteredEntries.reduce((n, e) => n + Number(e.credit || 0), 0),
     [filteredEntries],
   )
-  const periodNet = Math.max(0, periodCharges - periodPayments)
-  // Lo cobrable del período no puede superar el saldo actual de la cuenta.
-  const periodCobrable = Math.min(periodNet, Number(balance))
+  // Lo cobrable del período = saldo PENDIENTE de los comprobantes cuya fecha
+  // cae en el rango — lo que el comerciante espera al "cobrar agosto". El neto
+  // ventas−cobranzas del rango se anulaba cuando en el período hubo pagos
+  // aplicados (FIFO) a deuda vieja, con comprobantes del rango aún impagos
+  // (caso Coronda Express, sep-2026). El cobro en sí sigue siendo FIFO.
+  const periodCobrable = useMemo(() => {
+    if (!rangeActive) return 0
+    return (openQuery.data ?? [])
+      .filter((a) => (fromMs == null || a.createdAt >= fromMs) && (toMs == null || a.createdAt <= toMs))
+      .reduce((n, a) => n + Number(a.balance || 0), 0)
+  }, [openQuery.data, fromMs, toMs, rangeActive])
 
   /** Recibo del período: se imprime tras registrar la cobranza del rango. */
   function printPeriodReceipt(info: { amount: number; payments: { paymentMethodId: string; amount: string }[] }): void {
@@ -649,23 +657,31 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
               <div className="flex flex-wrap gap-x-5 gap-y-1 tabular-nums">
                 <span>Ventas del período: <b>{formatCurrency(periodCharges)}</b></span>
                 <span>Cobranzas: <b className="text-success">{formatCurrency(periodPayments)}</b></span>
-                <span>Total del período: <b>{formatCurrency(periodNet)}</b></span>
+                <span>Pendiente del período: <b>{formatCurrency(periodCobrable)}</b></span>
               </div>
-              <Button
-                size="sm"
-                disabled={!canCobrar || periodCobrable <= 0.005 || filteredEntries.length === 0}
-                title={
-                  !canCobrar
-                    ? 'Requiere permiso para cobrar'
-                    : periodCobrable <= 0.005
-                      ? 'No hay importe pendiente en el período'
-                      : `Registrar una cobranza por ${formatCurrency(periodCobrable)} y emitir el ticket con el detalle`
-                }
-                onClick={() => setCobrandoPeriodo(true)}
-              >
-                <ReceiptText className="h-4 w-4" />
-                Cobrar período
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* El motivo va como TEXTO visible: un botón deshabilitado no
+                    recibe hover (disabled:pointer-events-none) y el tooltip
+                    jamás se veía — el usuario quedaba sin explicación. */}
+                {(!canCobrar || periodCobrable <= 0.005) && (
+                  <span className="text-xs text-muted-foreground">
+                    {!canCobrar ? 'Requiere permiso para cobrar' : 'Sin comprobantes con saldo en este período'}
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  disabled={!canCobrar || periodCobrable <= 0.005 || filteredEntries.length === 0}
+                  title={
+                    canCobrar && periodCobrable > 0.005
+                      ? `Registrar una cobranza por ${formatCurrency(periodCobrable)} y emitir el ticket con el detalle`
+                      : undefined
+                  }
+                  onClick={() => setCobrandoPeriodo(true)}
+                >
+                  <ReceiptText className="h-4 w-4" />
+                  Cobrar período
+                </Button>
+              </div>
             </div>
           )}
           <Table>
