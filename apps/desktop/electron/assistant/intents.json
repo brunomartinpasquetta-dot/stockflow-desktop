@@ -9260,14 +9260,15 @@
       "estado de cuenta por fechas",
       "total del periodo",
       "ver lo del mes pasado cliente",
-      "filtrar movimientos proveedor por fecha"
+      "filtrar movimientos proveedor por fecha",
+      "pendiente del periodo"
      ],
-     "answer": "Podés filtrar los movimientos de la cuenta de un cliente (o proveedor) entre dos fechas y ver cuánto suma ese período: las ventas, las cobranzas y el total que quedó pendiente del rango.",
+     "answer": "Podés filtrar los movimientos de la cuenta de un cliente (o proveedor) entre dos fechas y ver cuánto suma ese período: las ventas, las cobranzas y el 'Pendiente del período' (lo que quedó sin pagar de los comprobantes de ese rango).",
      "steps": [
       "Presioná F9, o hacé clic en el menú 'Cobros y Pagos' y elegí 'Cuentas Corrientes'. Arriba tenés las pestañas 'Clientes' y 'Proveedores' — elegí la que necesites.",
       "Hacé clic en el cliente (o proveedor) de la lista para abrir su cuenta.",
       "En la parte de 'Movimientos' hay dos casilleros de fecha: 'Desde' y 'Hasta'. Elegí el rango que quieras (por ejemplo, del 1 al 30 del mes pasado).",
-      "La lista muestra solo los movimientos de ese rango, y al lado ves los totales: 'Ventas del período', las cobranzas y el 'Total del período' (lo que quedó sin pagar de ese rango).",
+      "La lista muestra solo los movimientos de ese rango, y al lado ves los totales: 'Ventas del período', 'Cobranzas' y 'Pendiente del período' (lo que quedó sin pagar de los comprobantes de ese rango). Desde ahí también podés tocar 'Cobrar período' para cobrarlo.",
       "Para volver a ver todos los movimientos, borrá las dos fechas."
      ],
      "image": "cuentas-corrientes-detalle-cliente.png"
@@ -9286,16 +9287,24 @@
       "pagar el periodo al proveedor",
       "pagar el mes al proveedor",
       "cobrar todo lo pendiente del mes",
-      "recibo del periodo"
+      "recibo del periodo",
+      "cobrar un rango de fechas en cuentas corrientes",
+      "cobrar un periodo de tiempo de una cuenta corriente",
+      "como cobro por periodo en cuenta corriente",
+      "cobrar entre dos fechas",
+      "cobrarle un periodo al cliente",
+      "cobrar las ventas de un mes",
+      "cobrar lo pendiente de un rango de fechas",
+      "cobrar desde hasta"
      ],
-     "answer": "Podés cobrarle a un cliente todo lo pendiente de un período (por ejemplo, el mes pasado) de una sola vez, y entregarle un ticket con el detalle de los movimientos de ese rango. Con proveedores es igual, pero el botón dice 'Pagar período'.",
+     "answer": "Podés cobrarle a un cliente lo que quedó pendiente de un período (por ejemplo, el mes pasado) de una sola vez, y entregarle un ticket con el detalle de los movimientos de ese rango. El monto que se cobra es la suma de los comprobantes de ese rango que todavía tienen saldo — lo mismo que muestra 'Pendiente del período'. Con proveedores es igual, pero el botón dice 'Pagar período'.",
      "steps": [
       "Presioná F9, o hacé clic en el menú 'Cobros y Pagos' y elegí 'Cuentas Corrientes'. Elegí la pestaña 'Clientes' (o 'Proveedores').",
       "Hacé clic en el cliente para abrir su cuenta.",
       "En 'Movimientos', completá las fechas 'Desde' y 'Hasta' del período que le querés cobrar.",
-      "Tocá el botón 'Cobrar período'. Se abre el diálogo de cobranza con el monto ya cargado: el total del período (si ese total es más que el saldo actual de la cuenta, se carga el saldo).",
+      "Tocá el botón 'Cobrar período'. Se abre el diálogo de cobranza con el monto ya cargado: la suma de lo que quedó sin pagar de los comprobantes de ese rango (el 'Pendiente del período'). Podés cambiarlo si querés cobrar otra cifra.",
       "Elegí el medio de pago y confirmá.",
-      "Al confirmar se imprime solo el ticket con el detalle del período (cada venta y cobranza del rango, con los totales). El dinero se asigna a las ventas más viejas primero, como siempre."
+      "Al confirmar se imprime solo el ticket con el detalle del período (cada venta y cobranza del rango, con los totales). El dinero se asigna a los comprobantes más viejos primero, como siempre."
      ],
      "image": "cuentas-corrientes-dialogo-cobranza-fifo.png"
     },
@@ -9328,6 +9337,27 @@
       "estado de cuenta pdf"
      ],
      "answer": "Sí: el «Resumen PDF» abre cada venta en sus artículos (cantidad, descripción, precio e importe). Las entregas de dinero van sumadas en una sola línea y abajo está el SALDO ADEUDADO, que es el saldo real de la cuenta (0 si no debe). Se genera desde Cuentas Corrientes → detalle del cliente → Resumen PDF."
+    },
+    {
+     "id": "cc-boton-cobrar-periodo-bloqueado",
+     "canonical": "¿Por qué el botón 'Cobrar período' está gris o no se habilita?",
+     "patterns": [
+      "no se habilita cobrar periodo",
+      "boton cobrar periodo bloqueado",
+      "cobrar periodo gris",
+      "no me deja cobrar el periodo",
+      "no anda cobrar periodo",
+      "cobrar periodo deshabilitado",
+      "no puedo cobrar el periodo",
+      "pagar periodo bloqueado",
+      "no se habilita el boton de cobrar periodo",
+      "el periodo me da cero",
+      "pendiente del periodo en cero",
+      "total del periodo cero"
+     ],
+     "answer": "El botón 'Cobrar período' aparece solo cuando cargaste fechas en 'Desde' y 'Hasta'. Si está gris, al lado te aparece el motivo escrito: 'Sin comprobantes con saldo en este período' significa que las ventas de ese rango ya están pagas (o no hubo ventas a cuenta en esas fechas) — no hay nada de ese período por cobrar. Si el cliente igual te debe, la deuda es de otras fechas: ampliá el rango, o usá 'Registrar cobranza' para cobrar contra el saldo total. Si dice 'Requiere permiso para cobrar', tu usuario no tiene la cobranza habilitada: un administrador puede dársela en Usuarios, pestaña Roles.",
+     "steps": null,
+     "image": null
     }
    ]
   },
