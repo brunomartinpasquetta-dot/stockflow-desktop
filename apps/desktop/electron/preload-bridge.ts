@@ -17,6 +17,7 @@ import type {
   ApiSurface,
   AssistantAskResultDTO,
   DemoStatusDTO,
+  NovedadesPendientesDTO,
   OnboardingStatusDTO,
   DesktopWindowInfoDTO,
   DesktopWindowOpenDTO,
@@ -107,6 +108,9 @@ export const LOCAL_GROUPS = new Set([
   'license',
   'print',
   'desktopWindow',
+  // Novedades post-update: la versión instalada y el "ya lo vi" son de CADA
+  // puesto (cada máquina se actualiza por separado), no del servidor.
+  'novedades',
 ]);
 
 interface LanState {
@@ -266,6 +270,10 @@ export function createApiBridge(
     onboarding: {
       status: () => c<OnboardingStatusDTO>('onboarding:status'),
       dismiss: () => c<{ ok: true }>('onboarding:dismiss'),
+    },
+    novedades: {
+      pendientes: () => c<NovedadesPendientesDTO>('novedades:pendientes'),
+      vistas: () => c<{ ok: true }>('novedades:vistas'),
     },
     demo: {
       status: () => c<DemoStatusDTO>('demo:status'),

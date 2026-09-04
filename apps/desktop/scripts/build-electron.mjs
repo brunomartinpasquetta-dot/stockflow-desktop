@@ -88,6 +88,8 @@ if (existsSync(dbMigrations)) {
 cpSync(join(appRoot, 'electron', 'assistant', 'intents.json'), join(outDir, 'assistant-intents.json'));
 cpSync(join(appRoot, 'manual-src', 'sections.json'), join(outDir, 'manual-sections.json'));
 cpSync(join(appRoot, 'electron', 'assistant', 'flows.json'), join(outDir, 'assistant-flows.json'));
+// Novedades post-update: mismo esquema runtime que la KB (nada inlineado).
+cpSync(join(appRoot, 'electron', 'novedades', 'release-notes.json'), join(outDir, 'novedades-release-notes.json'));
 // Datos de ejemplo del modo demo (E5): el xlsx viaja junto al bundle.
 cpSync(
   join(repoRoot, 'marketing', 'demo-data', 'StockFlow-demo-articulos.xlsx'),

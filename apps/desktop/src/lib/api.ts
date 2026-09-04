@@ -24,6 +24,7 @@ import type {
   ImportMappingDTO,
   ImportOptionsDTO,
   ImportValidationResultDTO,
+  NovedadesPendientesDTO,
   OnboardingStatusDTO,
   PaymentReceiptDataDTO,
   PrinterConfigDTO,
@@ -150,6 +151,10 @@ export const api = {
   assistant: {
     ask: (messages: AssistantMessageDTO[], conversationId?: string, screen?: string): Promise<AssistantAskResultDTO> =>
       unwrap(sf().assistant.ask({ messages, conversationId, screen })),
+  },
+  novedades: {
+    pendientes: (): Promise<NovedadesPendientesDTO> => unwrap(sf().novedades.pendientes()),
+    vistas: (): Promise<{ ok: true }> => unwrap(sf().novedades.vistas()),
   },
   onboarding: {
     status: (): Promise<OnboardingStatusDTO> => unwrap(sf().onboarding.status()),

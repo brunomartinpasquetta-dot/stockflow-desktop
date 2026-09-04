@@ -1,0 +1,29 @@
+{
+  "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
+  "versiones": [
+    {
+      "version": "1.4.2",
+      "novedades": [
+        "El asistente Flowy ahora responde consultas sobre cómo cobrar o pagar un período de fechas en Cuentas Corrientes."
+      ],
+      "internas": false
+    },
+    {
+      "version": "1.4.1",
+      "novedades": [
+        "En Cuentas Corrientes, al filtrar los movimientos por fechas ahora se muestra el importe pendiente de los comprobantes de ese período, y los botones 'Cobrar período' y 'Pagar período' cobran exactamente ese pendiente.",
+        "Cuando un botón de cobro no está disponible, el motivo se muestra escrito al lado del botón."
+      ],
+      "internas": true
+    },
+    {
+      "version": "1.4.0",
+      "novedades": [
+        "Cuentas Corrientes de Proveedores: los pagos permiten elegir la caja de origen (Caja diaria o Caja General) y combinar distintas formas de pago, igual que en clientes.",
+        "Pagos parciales a proveedores, con el saldo restante de cada comprobante siempre a la vista.",
+        "En Ventas, el buscador 'Ver todos' muestra todos los precios de lista de cada artículo."
+      ],
+      "internas": true
+    }
+  ]
+}

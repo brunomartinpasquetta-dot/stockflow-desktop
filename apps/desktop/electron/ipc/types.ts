@@ -1523,6 +1523,20 @@ export interface OnboardingStatusDTO {
   pending: number;
 }
 
+/** Novedades post-actualización: una versión con sus cambios visibles. */
+export interface NovedadesVersionDTO {
+  version: string;
+  novedades: string[];
+  internas: boolean;
+}
+/** Novedades pendientes de mostrar tras un update (por máquina). */
+export interface NovedadesPendientesDTO {
+  hidden: boolean;
+  versionActual: string;
+  items: NovedadesVersionDTO[];
+  internas: boolean;
+}
+
 /** Modo demo (E5): estado de los datos de ejemplo. */
 export interface DemoStatusDTO {
   active: boolean;
@@ -1692,6 +1706,10 @@ export interface ApiSurface {
   onboarding: {
     status(): Res<OnboardingStatusDTO>;
     dismiss(): Res<{ ok: true }>;
+  };
+  novedades: {
+    pendientes(): Res<NovedadesPendientesDTO>;
+    vistas(): Res<{ ok: true }>;
   };
   demo: {
     status(): Res<DemoStatusDTO>;
