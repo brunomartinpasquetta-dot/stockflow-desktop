@@ -193,10 +193,10 @@ export function AsistenteInicial({ visible, onClose }: { visible: boolean; onClo
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-6 backdrop-blur-md">
-      {/* +40% en AMBAS direcciones (pedido de Bruno): 1254px de ancho y alto
-          FIJO generoso — el objetivo es que las capturas se vean grandes y
-          legibles, no una tarjeta chata que crece con el texto. */}
-      <div className="flex h-[780px] max-h-[92vh] w-full max-w-[1254px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
+      {/* Ancho 1254px con panel de captura al 48% (las capturas se ven grandes
+          y legibles); alto justo para la captura sin aire de más — 780px le
+          sobraba, dijo Bruno. El contenido largo scrollea adentro. */}
+      <div className="flex h-[620px] max-h-[92vh] w-full max-w-[1254px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
         {/* Encabezado: progreso + saltar */}
         <div className="flex items-center justify-between border-b px-5 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold">
