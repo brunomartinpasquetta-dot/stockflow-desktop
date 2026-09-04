@@ -1537,6 +1537,12 @@ export interface NovedadesPendientesDTO {
   internas: boolean;
 }
 
+/** Guía de primeros pasos: estado one-shot por máquina. */
+export interface GuiaEstadoDTO {
+  vista: boolean;
+  paso: number;
+}
+
 /** Modo demo (E5): estado de los datos de ejemplo. */
 export interface DemoStatusDTO {
   active: boolean;
@@ -1710,6 +1716,11 @@ export interface ApiSurface {
   novedades: {
     pendientes(): Res<NovedadesPendientesDTO>;
     vistas(): Res<{ ok: true }>;
+  };
+  guia: {
+    estado(): Res<GuiaEstadoDTO>;
+    progreso(payload: { paso: number }): Res<{ ok: true }>;
+    vista(): Res<{ ok: true }>;
   };
   demo: {
     status(): Res<DemoStatusDTO>;

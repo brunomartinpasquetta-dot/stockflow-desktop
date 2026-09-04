@@ -16,7 +16,7 @@ import { WindowManagerProvider } from '@/contexts/WindowManagerContext'
 import { WhatsAppPanelProvider } from '@/contexts/WhatsAppPanelContext'
 import { AssistantProvider } from '@/contexts/AssistantContext'
 import { AssistantPanel } from '@/components/AssistantPanel'
-import { NovedadesDialog } from '@/components/NovedadesDialog'
+import { OverlaysInicio } from '@/components/guia/OverlaysInicio'
 import { OnboardingCard } from '@/components/OnboardingCard'
 import { useGlobalShortcuts } from '@/lib/useGlobalShortcuts'
 import { useMdiShortcuts } from '@/lib/useMdiShortcuts'
@@ -102,7 +102,7 @@ function LayoutInner() {
         <WelcomeScreen />
         <OnboardingCard />
       </div>
-      <NovedadesDialog />
+      <OverlaysInicio />
       <Taskbar />
       <AssistantPanel screen="principal" />
     </div>

@@ -20,6 +20,7 @@ import { buildImportHandlers } from './handlers/import.handlers';
 import { buildCompanyHandlers } from './handlers/company.handlers';
 import { buildCustomersHandlers } from './handlers/customers.handlers';
 import { buildDemoHandlers } from './handlers/demo.handlers';
+import { buildGuiaHandlers } from './handlers/guia.handlers';
 import { buildNovedadesHandlers } from './handlers/novedades.handlers';
 import { buildOnboardingHandlers } from './handlers/onboarding.handlers';
 import { buildFamiliesHandlers } from './handlers/families.handlers';
@@ -56,6 +57,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildAuthHandlers,
   buildOnboardingHandlers,
   buildNovedadesHandlers,
+  buildGuiaHandlers,
   buildArticlesHandlers,
   buildCustomersHandlers,
   buildSuppliersHandlers,

@@ -45,6 +45,7 @@ import {
   Truck,
   Users,
   Wallet,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -72,7 +73,7 @@ interface MenuItem {
   requires?: PermissionAction
   roles?: Role[]
   separator?: boolean
-  action?: 'logout' | 'exit' | 'manual'
+  action?: 'logout' | 'exit' | 'manual' | 'guia'
   /** Tab inicial cuando la página soporte tabs (ej. Configuración). */
   initialTab?: string
 }
@@ -167,6 +168,7 @@ const GROUPS: MenuGroup[] = [
     items: [
       { pageKey: 'acerca-de', label: 'Acerca de', icon: Info },
       { action: 'manual', label: 'Manual de usuario', icon: BookOpen },
+      { action: 'guia', label: 'Guía de primeros pasos', icon: Sparkles },
     ],
   },
 ]
@@ -211,6 +213,11 @@ export function MenuBar() {
     }
     if (item.action === 'manual') {
       void api.desktopWindow.openManual()
+      return
+    }
+    if (item.action === 'guia') {
+      // La guía vive montada en OverlaysInicio (Layout); se abre por evento.
+      window.dispatchEvent(new CustomEvent('sf:abrir-guia'))
       return
     }
     if (item.pageKey) {

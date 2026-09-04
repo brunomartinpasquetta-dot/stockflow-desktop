@@ -24,6 +24,7 @@ import type {
   ImportMappingDTO,
   ImportOptionsDTO,
   ImportValidationResultDTO,
+  GuiaEstadoDTO,
   NovedadesPendientesDTO,
   OnboardingStatusDTO,
   PaymentReceiptDataDTO,
@@ -155,6 +156,11 @@ export const api = {
   novedades: {
     pendientes: (): Promise<NovedadesPendientesDTO> => unwrap(sf().novedades.pendientes()),
     vistas: (): Promise<{ ok: true }> => unwrap(sf().novedades.vistas()),
+  },
+  guia: {
+    estado: (): Promise<GuiaEstadoDTO> => unwrap(sf().guia.estado()),
+    progreso: (paso: number): Promise<{ ok: true }> => unwrap(sf().guia.progreso({ paso })),
+    vista: (): Promise<{ ok: true }> => unwrap(sf().guia.vista()),
   },
   onboarding: {
     status: (): Promise<OnboardingStatusDTO> => unwrap(sf().onboarding.status()),
