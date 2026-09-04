@@ -480,7 +480,7 @@ export function Estadisticas() {
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Tendencia de ventas</h3>
-              <div className="h-64">
+              <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trend.data ?? []}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -496,7 +496,7 @@ export function Estadisticas() {
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Ventas por día de la semana</h3>
-              <div className="h-64">
+              <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(dow.data ?? []).map((d) => ({ ...d, name: DOW_NAMES[d.dayOfWeek] ?? d.dayOfWeek, totalN: Number(d.total) }))}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -519,7 +519,7 @@ export function Estadisticas() {
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Margen por familia</h3>
-              <div className="h-64">
+              <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -571,7 +571,7 @@ export function Estadisticas() {
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Top 10 Clientes</h3>
-              <div className="h-64">
+              <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(topC.data ?? []).map((r) => ({ name: r.fullName, value: Number(r.totalAmount) }))} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
@@ -608,7 +608,7 @@ export function Estadisticas() {
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Top 10 Proveedores</h3>
-              <div className="h-64">
+              <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(topS.data ?? []).map((r) => ({ name: r.supplierName, value: Number(r.totalAmount) }))} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
@@ -670,7 +670,7 @@ export function Estadisticas() {
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Distribución por forma de pago</h3>
-              <div className="h-64">
+              <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -741,7 +741,7 @@ export function Estadisticas() {
           <Card>
             <CardContent className="pt-4">
               <h3 className="mb-2 text-sm font-medium">Evolución por forma de pago</h3>
-              <div className="h-64">
+              <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={vfpTiempoPivot}>
                     <CartesianGrid strokeDasharray="3 3" />
