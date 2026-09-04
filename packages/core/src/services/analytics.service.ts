@@ -112,6 +112,85 @@ export interface StockRotationRow {
   rotation: string;
 }
 
+
+export interface ResumenDiaSegmento {
+  total: string;
+  count: number;
+}
+export interface ResumenDelDiaResult {
+  hoy: ResumenDiaSegmento;
+  ayer: ResumenDiaSegmento;
+  mismoDiaSemanaAnterior: ResumenDiaSegmento;
+}
+
+export interface AvanceDelMesInput {
+  mesActual: DateRange;
+  mesAnteriorParcial: DateRange;
+  mesAnteriorCompleto: DateRange;
+  diasTranscurridos: number;
+  diasDelMes: number;
+}
+export interface AvanceDelMesResult {
+  mesActual: string;
+  mesAnteriorParcial: string;
+  mesAnteriorCompleto: string;
+  /** Cierre estimado al ritmo actual: mesActual / díasTranscurridos × díasDelMes. */
+  proyeccionCierre: string;
+  /** Variación % contra el mes anterior a la misma altura (null sin base). */
+  variacionPct: string | null;
+}
+
+export interface ResultadoNetoResult {
+  ventasNetas: string;
+  /** Costo de mercadería vendida (costo congelado al vender; devoluciones no descontadas). */
+  cmv: string;
+  comisiones: string;
+  resultado: string;
+  margenPct: string | null;
+}
+
+export interface AntiguedadDeudaBucket {
+  rango: string;
+  monto: string;
+  comprobantes: number;
+}
+export interface AntiguedadDeudaResult {
+  total: string;
+  clientesConDeuda: number;
+  buckets: AntiguedadDeudaBucket[];
+}
+
+export interface ConversionPresupuestosResult {
+  total: number;
+  convertidos: number;
+  aceptados: number;
+  rechazados: number;
+  pendientes: number;
+  tasaConversionPct: string | null;
+  montoConvertido: string;
+}
+
+export interface StockSinMovimientoRow {
+  articleId: string;
+  description: string;
+  stock: string;
+  capitalInmovilizado: string;
+  ultimaVenta: number | null;
+}
+export interface StockSinMovimientoResult {
+  capitalTotal: string;
+  articulos: number;
+  top: StockSinMovimientoRow[];
+}
+
+export interface ReposicionPrioritariaRow {
+  articleId: string;
+  description: string;
+  stock: string;
+  minStock: string;
+  vendidoEnRango: string;
+}
+
 function fmt(n: unknown): string {
   if (n == null) return '0.00';
   const v = typeof n === 'number' ? n : Number(n);
@@ -639,5 +718,222 @@ export class AnalyticsService {
         rotation: fmt(rotation),
       };
     });
+  }
+  /** Total NETO (ventas − devoluciones) y operaciones de un rango. */
+  private netoDeRango(range: DateRange): { total: number; count: number } {
+    const v = this.ctx.db.$client
+      .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t, COUNT(*) AS c FROM sales WHERE status != 'voided' AND date BETWEEN ? AND ?`)
+      .get(range.from, range.to) as { t: number; c: number };
+    const d = this.ctx.db.$client
+      .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t FROM returns WHERE date BETWEEN ? AND ?`)
+      .get(range.from, range.to) as { t: number };
+    return { total: (v.t || 0) - (d.t || 0), count: v.c || 0 };
+  }
+
+  /** Resumen del día: hoy, ayer y el mismo día de la semana anterior (rangos armados por el llamador en hora local). */
+  async getResumenDelDia(input: { hoy: DateRange; ayer: DateRange; mismoDiaSemanaAnterior: DateRange }): Promise<ResumenDelDiaResult> {
+    this.requireRead();
+    const seg = (r: DateRange): ResumenDiaSegmento => {
+      const n = this.netoDeRango(r);
+      return { total: fmt(n.total), count: n.count };
+    };
+    return {
+      hoy: seg(input.hoy),
+      ayer: seg(input.ayer),
+      mismoDiaSemanaAnterior: seg(input.mismoDiaSemanaAnterior),
+    };
+  }
+
+  /** Avance del mes con proyección de cierre al ritmo de venta actual. */
+  async getAvanceDelMes(input: AvanceDelMesInput): Promise<AvanceDelMesResult> {
+    this.requireRead();
+    const actual = this.netoDeRango(input.mesActual).total;
+    const anteriorParcial = this.netoDeRango(input.mesAnteriorParcial).total;
+    const anteriorCompleto = this.netoDeRango(input.mesAnteriorCompleto).total;
+    const dias = Math.max(1, input.diasTranscurridos);
+    const proyeccion = (actual / dias) * Math.max(dias, input.diasDelMes);
+    const variacion = anteriorParcial > 0 ? ((actual - anteriorParcial) / anteriorParcial) * 100 : null;
+    return {
+      mesActual: fmt(actual),
+      mesAnteriorParcial: fmt(anteriorParcial),
+      mesAnteriorCompleto: fmt(anteriorCompleto),
+      proyeccionCierre: fmt(proyeccion),
+      variacionPct: variacion == null ? null : fmt(variacion),
+    };
+  }
+
+  /**
+   * Resultado neto del período: ventas netas − CMV − comisiones de medios.
+   * CMV con costo congelado al vender (COALESCE al costo actual para ventas
+   * previas a la migración 0024). Las devoluciones restan de las ventas pero
+   * no del CMV (no registran costo): resultado levemente conservador.
+   */
+  async getResultadoNeto(input: DateRange): Promise<ResultadoNetoResult> {
+    this.requireRead();
+    const ventasNetas = this.netoDeRango(input).total;
+    const cmvRow = this.ctx.db.$client
+      .prepare(`
+        SELECT COALESCE(SUM(CAST(sl.quantity AS REAL) * CAST(COALESCE(sl.cost_at_sale, a.cost_price) AS REAL)), 0) AS cmv
+        FROM sale_lines sl
+        JOIN sales s ON s.id = sl.sale_id
+        LEFT JOIN articles a ON a.id = sl.article_id
+        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+      `)
+      .get(input.from, input.to) as { cmv: number };
+    const comRow = this.ctx.db.$client
+      .prepare(`
+        SELECT COALESCE(SUM(CAST(sp.commission_amount AS REAL)), 0) AS com
+        FROM sale_payments sp
+        JOIN sales s ON s.id = sp.sale_id
+        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+      `)
+      .get(input.from, input.to) as { com: number };
+    const resultado = ventasNetas - (cmvRow.cmv || 0) - (comRow.com || 0);
+    return {
+      ventasNetas: fmt(ventasNetas),
+      cmv: fmt(cmvRow.cmv),
+      comisiones: fmt(comRow.com),
+      resultado: fmt(resultado),
+      margenPct: ventasNetas > 0 ? fmt((resultado / ventasNetas) * 100) : null,
+    };
+  }
+
+  /** Antigüedad de la deuda de clientes: saldos abiertos por edad del comprobante. */
+  async getAntiguedadDeuda(): Promise<AntiguedadDeudaResult> {
+    this.requireRead();
+    const rows = this.ctx.db.$client
+      .prepare(`
+        SELECT
+          CASE
+            WHEN (? - created_at) <= 30 * 86400000 THEN '0-30'
+            WHEN (? - created_at) <= 60 * 86400000 THEN '31-60'
+            WHEN (? - created_at) <= 90 * 86400000 THEN '61-90'
+            ELSE '+90'
+          END AS rango,
+          SUM(CAST(balance AS REAL)) AS monto,
+          COUNT(*) AS comprobantes
+        FROM accounts_receivable
+        WHERE status != 'paid' AND CAST(balance AS REAL) > 0.005
+        GROUP BY rango
+      `)
+      .all(Date.now(), Date.now(), Date.now()) as Array<{ rango: string; monto: number; comprobantes: number }>;
+    const orden = ['0-30', '31-60', '61-90', '+90'];
+    const porRango = new Map(rows.map((r) => [r.rango, r]));
+    const clientes = this.ctx.db.$client
+      .prepare(`SELECT COUNT(DISTINCT customer_id) AS c FROM accounts_receivable WHERE status != 'paid' AND CAST(balance AS REAL) > 0.005`)
+      .get() as { c: number };
+    return {
+      total: fmt(rows.reduce((acc, r) => acc + (r.monto || 0), 0)),
+      clientesConDeuda: clientes.c || 0,
+      buckets: orden.map((rango) => ({
+        rango: rango === '+90' ? 'Más de 90 días' : `${rango} días`,
+        monto: fmt(porRango.get(rango)?.monto ?? 0),
+        comprobantes: porRango.get(rango)?.comprobantes ?? 0,
+      })),
+    };
+  }
+
+  /** Conversión de presupuestos del rango: cuántos terminan en venta. */
+  async getConversionPresupuestos(input: DateRange): Promise<ConversionPresupuestosResult> {
+    this.requireRead();
+    const rows = this.ctx.db.$client
+      .prepare(`SELECT status, COUNT(*) AS c, COALESCE(SUM(CAST(total AS REAL)), 0) AS t FROM quotes WHERE date BETWEEN ? AND ? GROUP BY status`)
+      .all(input.from, input.to) as Array<{ status: string; c: number; t: number }>;
+    const por = new Map(rows.map((r) => [r.status, r]));
+    const total = rows.reduce((acc, r) => acc + r.c, 0);
+    const convertidos = por.get('converted')?.c ?? 0;
+    return {
+      total,
+      convertidos,
+      aceptados: por.get('accepted')?.c ?? 0,
+      rechazados: por.get('rejected')?.c ?? 0,
+      pendientes: por.get('pending')?.c ?? 0,
+      tasaConversionPct: total > 0 ? fmt((convertidos / total) * 100) : null,
+      montoConvertido: fmt(por.get('converted')?.t ?? 0),
+    };
+  }
+
+  /** Stock sin movimiento: capital inmovilizado en artículos sin ventas en N días. */
+  async getStockSinMovimiento(input: { dias?: number; limit?: number }): Promise<StockSinMovimientoResult> {
+    this.requireRead();
+    const dias = input.dias ?? 90;
+    const limit = input.limit ?? 20;
+    const desde = Date.now() - dias * 86400000;
+    const sql = `
+      SELECT
+        a.id AS articleId,
+        a.description AS description,
+        CAST(a.stock AS REAL) AS stock,
+        CAST(a.stock AS REAL) * CAST(a.cost_price AS REAL) AS capital,
+        v.ultimaVenta AS ultimaVenta
+      FROM articles a
+      LEFT JOIN (
+        SELECT sl.article_id, MAX(s.date) AS ultimaVenta
+        FROM sale_lines sl JOIN sales s ON s.id = sl.sale_id
+        WHERE s.status != 'voided'
+        GROUP BY sl.article_id
+      ) v ON v.article_id = a.id
+      WHERE a.active = 1 AND CAST(a.stock AS REAL) > 0
+        AND (v.ultimaVenta IS NULL OR v.ultimaVenta < ?)
+    `;
+    const rows = this.ctx.db.$client.prepare(sql).all(desde) as Array<{
+      articleId: string;
+      description: string;
+      stock: number;
+      capital: number;
+      ultimaVenta: number | null;
+    }>;
+    const capitalTotal = rows.reduce((acc, r) => acc + (r.capital || 0), 0);
+    const top = rows
+      .sort((x, y) => (y.capital || 0) - (x.capital || 0))
+      .slice(0, limit)
+      .map((r) => ({
+        articleId: r.articleId,
+        description: r.description,
+        stock: fmt(r.stock),
+        capitalInmovilizado: fmt(r.capital),
+        ultimaVenta: r.ultimaVenta,
+      }));
+    return { capitalTotal: fmt(capitalTotal), articulos: rows.length, top };
+  }
+
+  /** Reposición prioritaria: bajo el stock mínimo Y con ventas en el rango. */
+  async getReposicionPrioritaria(input: DateRange & { limit?: number }): Promise<ReposicionPrioritariaRow[]> {
+    this.requireRead();
+    const limit = input.limit ?? 20;
+    const sql = `
+      SELECT
+        a.id AS articleId,
+        a.description AS description,
+        CAST(a.stock AS REAL) AS stock,
+        CAST(a.min_stock AS REAL) AS minStock,
+        v.qty AS vendido
+      FROM articles a
+      JOIN (
+        SELECT sl.article_id, SUM(CAST(sl.quantity AS REAL)) AS qty
+        FROM sale_lines sl JOIN sales s ON s.id = sl.sale_id
+        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        GROUP BY sl.article_id
+      ) v ON v.article_id = a.id
+      WHERE a.active = 1
+        AND CAST(a.min_stock AS REAL) > 0
+        AND CAST(a.stock AS REAL) <= CAST(a.min_stock AS REAL)
+      ORDER BY v.qty DESC
+      LIMIT ?
+    `;
+    const rows = this.ctx.db.$client.prepare(sql).all(input.from, input.to, limit) as Array<{
+      articleId: string;
+      description: string;
+      stock: number;
+      minStock: number;
+      vendido: number;
+    }>;
+    return rows.map((r) => ({
+      articleId: r.articleId,
+      description: r.description,
+      stock: fmt(r.stock),
+      minStock: fmt(r.minStock),
+      vendidoEnRango: fmt(r.vendido),
+    }));
   }
 }

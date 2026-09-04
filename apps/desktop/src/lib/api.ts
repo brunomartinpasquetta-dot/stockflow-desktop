@@ -424,6 +424,20 @@ export const api = {
       unwrap(sf().cashGeneral.transferFromClosed(input)),
   },
   analytics: {
+    resumenDelDia: (input: { hoy: { from: number; to: number }; ayer: { from: number; to: number }; mismoDiaSemanaAnterior: { from: number; to: number } }) =>
+      unwrap(sf().analytics.resumenDelDia(input)),
+    avanceDelMes: (input: {
+      mesActual: { from: number; to: number }
+      mesAnteriorParcial: { from: number; to: number }
+      mesAnteriorCompleto: { from: number; to: number }
+      diasTranscurridos: number
+      diasDelMes: number
+    }) => unwrap(sf().analytics.avanceDelMes(input)),
+    resultadoNeto: (input: { from: number; to: number }) => unwrap(sf().analytics.resultadoNeto(input)),
+    antiguedadDeuda: () => unwrap(sf().analytics.antiguedadDeuda()),
+    conversionPresupuestos: (input: { from: number; to: number }) => unwrap(sf().analytics.conversionPresupuestos(input)),
+    stockSinMovimiento: (input: { dias?: number; limit?: number }) => unwrap(sf().analytics.stockSinMovimiento(input)),
+    reposicionPrioritaria: (input: { from: number; to: number; limit?: number }) => unwrap(sf().analytics.reposicionPrioritaria(input)),
     getTopSellingProducts: (input: { from: number; to: number; limit?: number }) =>
       unwrap(sf().analytics.getTopSellingProducts(input)),
     getBottomSellingProducts: (input: { from: number; to: number; limit?: number }) =>

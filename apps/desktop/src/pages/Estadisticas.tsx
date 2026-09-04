@@ -45,6 +45,14 @@ import {
   useStockRotation,
   useVentasPorFormaPago,
   useVentasPorFormaPagoEnTiempo,
+  useResumenDelDia,
+  useAvanceDelMes,
+  useResultadoNeto,
+  useAntiguedadDeuda,
+  useConversionPresupuestos,
+  useStockSinMovimiento,
+  useReposicionPrioritaria,
+  useSalesByVendorReport,
 } from '@/lib/hooks'
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899', '#0ea5e9', '#f97316']
@@ -57,6 +65,39 @@ function isoDaysAgo(days: number): string {
   const d = new Date()
   d.setDate(d.getDate() - days)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/* Rangos en hora local de la máquina (misma zona que usa el resto de la
+   pantalla y que 'localtime' en las consultas). */
+function diaRange(offsetDias: number): { from: number; to: number } {
+  const d = new Date()
+  d.setDate(d.getDate() - offsetDias)
+  const from = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime()
+  const to = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime()
+  return { from, to }
+}
+function rangosDeMes(): {
+  mesActual: { from: number; to: number }
+  mesAnteriorParcial: { from: number; to: number }
+  mesAnteriorCompleto: { from: number; to: number }
+  diasTranscurridos: number
+  diasDelMes: number
+} {
+  const ahora = new Date()
+  const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).getTime()
+  const inicioMesAnterior = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1).getTime()
+  // Mismo día y hora, un mes atrás (Date normaliza los fines de mes solo).
+  const mismaAlturaMesAnterior = new Date(
+    ahora.getFullYear(), ahora.getMonth() - 1, ahora.getDate(),
+    ahora.getHours(), ahora.getMinutes(), 59, 999,
+  ).getTime()
+  return {
+    mesActual: { from: inicioMes, to: ahora.getTime() },
+    mesAnteriorParcial: { from: inicioMesAnterior, to: mismaAlturaMesAnterior },
+    mesAnteriorCompleto: { from: inicioMesAnterior, to: inicioMes - 1 },
+    diasTranscurridos: ahora.getDate(),
+    diasDelMes: new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).getDate(),
+  }
 }
 function dayStart(iso: string): number {
   return new Date(`${iso}T00:00:00`).getTime()
@@ -104,6 +145,26 @@ export function Estadisticas() {
   const trend = useSalesTrend({ ...range, granularity }, activeTab === 'resumen')
   const margin = useMarginByCategory(range, activeTab === 'resumen' || activeTab === 'productos')
   const dow = useSalesByDayOfWeek(range, activeTab === 'resumen' || activeTab === 'tiempo')
+
+  // Resumen del día / Avance del mes / Resultado (rangos locales, memo por render)
+  const rangosDia = useMemo(() => ({ hoy: diaRange(0), ayer: diaRange(1), mismoDiaSemanaAnterior: diaRange(7) }), [])
+  const rangosMes = useMemo(() => rangosDeMes(), [])
+  const resumenDia = useResumenDelDia(rangosDia, activeTab === 'resumen')
+  const avanceMes = useAvanceDelMes(rangosMes, activeTab === 'resumen')
+  const resHoy = useResultadoNeto(rangosDia.hoy, activeTab === 'resumen')
+  const resMes = useResultadoNeto(rangosMes.mesActual, activeTab === 'resumen')
+  const resPeriodo = useResultadoNeto(range, activeTab === 'resumen')
+  const vfpHoy = useVentasPorFormaPago(rangosDia.hoy, activeTab === 'resumen')
+  const vfpMes = useVentasPorFormaPago(rangosMes.mesActual, activeTab === 'resumen')
+
+  // Vendedores
+  const vendedores = useSalesByVendorReport(range, activeTab === 'vendedores')
+
+  // Gestión
+  const aging = useAntiguedadDeuda(activeTab === 'gestion')
+  const conversion = useConversionPresupuestos(range, activeTab === 'gestion')
+  const sinMovimiento = useStockSinMovimiento({ dias: 90, limit: 20 }, activeTab === 'gestion')
+  const reposicion = useReposicionPrioritaria({ ...range, limit: 20 }, activeTab === 'gestion')
 
   // Productos
   const topP = useTopProducts({ ...range, limit: 10 }, activeTab === 'productos')
@@ -341,11 +402,65 @@ export function Estadisticas() {
           <TabsTrigger value="productos">Productos</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="proveedores">Proveedores</TabsTrigger>
+          <TabsTrigger value="vendedores">Vendedores</TabsTrigger>
           <TabsTrigger value="pagos">Formas de Pago</TabsTrigger>
           <TabsTrigger value="tiempo">Tiempo</TabsTrigger>
+          <TabsTrigger value="gestion">Gestión</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="flex flex-col gap-3">
+          {/* ── Resumen del día ── */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <KpiCard
+              label="Ventas de hoy"
+              value={formatCurrency(resumenDia.data?.hoy.total ?? '0')}
+              detail={`${resumenDia.data?.hoy.count ?? 0} operación(es)`}
+            />
+            <KpiCard
+              label="Ayer"
+              value={formatCurrency(resumenDia.data?.ayer.total ?? '0')}
+              detail={`${resumenDia.data?.ayer.count ?? 0} operación(es)`}
+            />
+            <KpiCard
+              label="Mismo día de la semana anterior"
+              value={formatCurrency(resumenDia.data?.mismoDiaSemanaAnterior.total ?? '0')}
+              detail={`${resumenDia.data?.mismoDiaSemanaAnterior.count ?? 0} operación(es)`}
+            />
+          </div>
+
+          {/* ── Avance del mes ── */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <KpiCard label="Mes en curso" value={formatCurrency(avanceMes.data?.mesActual ?? '0')} />
+            <KpiCard
+              label="Mes anterior a igual altura"
+              value={formatCurrency(avanceMes.data?.mesAnteriorParcial ?? '0')}
+              detail={
+                avanceMes.data?.variacionPct != null
+                  ? `Variación: ${Number(avanceMes.data.variacionPct) >= 0 ? '+' : ''}${avanceMes.data.variacionPct}%`
+                  : undefined
+              }
+            />
+            <KpiCard label="Mes anterior completo" value={formatCurrency(avanceMes.data?.mesAnteriorCompleto ?? '0')} />
+            <KpiCard
+              label="Proyección de cierre del mes"
+              value={formatCurrency(avanceMes.data?.proyeccionCierre ?? '0')}
+              detail="Al ritmo de venta actual"
+            />
+          </div>
+
+          {/* ── Resultado: ventas netas − costo de mercadería − comisiones ── */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <ResultadoCard titulo="Resultado del día" data={resHoy.data} />
+            <ResultadoCard titulo="Resultado del mes en curso" data={resMes.data} />
+            <ResultadoCard titulo="Resultado del período seleccionado" data={resPeriodo.data} />
+          </div>
+
+          {/* ── Formas de pago del día y del mes ── */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <MediosMini titulo="Formas de pago — hoy" rows={vfpHoy.data ?? []} />
+            <MediosMini titulo="Formas de pago — mes en curso" rows={vfpMes.data ?? []} />
+          </div>
+
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {/* Neto de devoluciones: la tendencia (fuente de este total) resta
                 las devoluciones en el día en que ocurrieron. */}
@@ -676,17 +791,220 @@ export function Estadisticas() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="vendedores" className="flex flex-col gap-3">
+          <Card>
+            <CardContent className="pt-4">
+              <div className="mb-2 text-sm font-medium">Ventas por vendedor — período seleccionado</div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead className="text-right">Ventas</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="text-right">Ticket promedio</TableHead>
+                    <TableHead className="text-right">Participación</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(vendedores.data?.rows ?? []).map((r) => (
+                    <TableRow key={r.userId}>
+                      <TableCell>{r.userName}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.salesCount}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(r.totalAmount)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(r.averageTicket)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.percentageOfTotal}%</TableCell>
+                    </TableRow>
+                  ))}
+                  {(vendedores.data?.rows ?? []).length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Sin ventas en el período.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="gestion" className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="text-sm font-medium">Antigüedad de la deuda de clientes</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {aging.data ? `${aging.data.clientesConDeuda} cliente(s) con deuda — total ${formatCurrency(aging.data.total)}` : '…'}
+                </div>
+                <div className="mt-2 flex flex-col gap-1 text-sm tabular-nums">
+                  {(aging.data?.buckets ?? []).map((b) => (
+                    <div key={b.rango} className="flex items-center justify-between">
+                      <span>{b.rango}</span>
+                      <span>
+                        {formatCurrency(b.monto)}
+                        <span className="ml-2 text-xs text-muted-foreground">{b.comprobantes} comp.</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <div className="text-sm font-medium">Conversión de presupuestos — período seleccionado</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-sm tabular-nums">
+                  <div className="flex justify-between"><span>Emitidos</span><span>{conversion.data?.total ?? 0}</span></div>
+                  <div className="flex justify-between"><span>Convertidos en venta</span><span>{conversion.data?.convertidos ?? 0}</span></div>
+                  <div className="flex justify-between"><span>Aceptados</span><span>{conversion.data?.aceptados ?? 0}</span></div>
+                  <div className="flex justify-between"><span>Pendientes</span><span>{conversion.data?.pendientes ?? 0}</span></div>
+                  <div className="flex justify-between"><span>Rechazados</span><span>{conversion.data?.rechazados ?? 0}</span></div>
+                  <div className="flex justify-between font-semibold">
+                    <span>Tasa de conversión</span>
+                    <span>{conversion.data?.tasaConversionPct == null ? '—' : `${conversion.data.tasaConversionPct}%`}</span>
+                  </div>
+                </div>
+                <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
+                  Monto convertido: {formatCurrency(conversion.data?.montoConvertido ?? '0')}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-sm font-medium">Stock sin movimiento (últimos 90 días)</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {sinMovimiento.data
+                  ? `${sinMovimiento.data.articulos} artículo(s) — capital inmovilizado ${formatCurrency(sinMovimiento.data.capitalTotal)} (valuado al costo)`
+                  : '…'}
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="text-right">Capital inmovilizado</TableHead>
+                    <TableHead className="text-right">Última venta</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(sinMovimiento.data?.top ?? []).map((r) => (
+                    <TableRow key={r.articleId}>
+                      <TableCell className="text-sm">{r.description}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.stock}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(r.capitalInmovilizado)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {r.ultimaVenta == null ? 'Sin ventas registradas' : new Date(r.ultimaVenta).toLocaleDateString('es-AR')}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-sm font-medium">Reposición prioritaria — bajo mínimo y con ventas en el período</div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead className="text-right">Stock actual</TableHead>
+                    <TableHead className="text-right">Stock mínimo</TableHead>
+                    <TableHead className="text-right">Vendido en el período</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(reposicion.data ?? []).map((r) => (
+                    <TableRow key={r.articleId}>
+                      <TableCell className="text-sm">{r.description}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.stock}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.minStock}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.vendidoEnRango}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(reposicion.data ?? []).length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">Sin artículos bajo mínimo con ventas en el período.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   )
 }
 
-function KpiCard({ label, value }: { label: string; value: string }) {
+function KpiCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <Card>
       <CardContent className="pt-4">
         <div className="text-xs text-muted-foreground">{label}</div>
         <div className="mt-1 text-xl font-bold tabular-nums">{value}</div>
+        {detail && <div className="mt-0.5 text-xs text-muted-foreground">{detail}</div>}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Resultado del período: ventas netas − costo de mercadería vendida − comisiones. */
+function ResultadoCard({
+  titulo,
+  data,
+}: {
+  titulo: string
+  data?: { ventasNetas: string; cmv: string; comisiones: string; resultado: string; margenPct: string | null }
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="text-xs font-medium text-muted-foreground">{titulo}</div>
+        <div className="mt-2 flex flex-col gap-1 text-sm tabular-nums">
+          <div className="flex justify-between"><span>Ventas netas</span><span>{formatCurrency(data?.ventasNetas ?? '0')}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>Costo de mercadería</span><span>− {formatCurrency(data?.cmv ?? '0')}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>Comisiones de medios</span><span>− {formatCurrency(data?.comisiones ?? '0')}</span></div>
+          <div className="mt-1 flex justify-between border-t pt-1 font-bold">
+            <span>Resultado</span>
+            <span className={Number(data?.resultado ?? 0) < 0 ? 'text-destructive' : 'text-success'}>
+              {formatCurrency(data?.resultado ?? '0')}
+            </span>
+          </div>
+          {data?.margenPct != null && (
+            <div className="text-right text-xs text-muted-foreground">Margen: {data.margenPct}%</div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Tabla compacta de formas de pago (monto y participación) para un rango fijo. */
+function MediosMini({
+  titulo,
+  rows,
+}: {
+  titulo: string
+  rows: Array<{ paymentMethodId: string; name: string; montoTotal: string; porcentajeDelTotal: string }>
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="text-xs font-medium text-muted-foreground">{titulo}</div>
+        {rows.length === 0 ? (
+          <div className="py-3 text-sm text-muted-foreground">Sin cobros en el rango.</div>
+        ) : (
+          <div className="mt-2 flex flex-col gap-1 text-sm tabular-nums">
+            {rows.map((r) => {
+              const Icon = iconForMedio(r.name)
+              return (
+                <div key={r.paymentMethodId} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2"><Icon className="h-3.5 w-3.5 text-muted-foreground" />{r.name}</span>
+                  <span>
+                    {formatCurrency(r.montoTotal)}
+                    <span className="ml-2 text-xs text-muted-foreground">{r.porcentajeDelTotal}%</span>
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

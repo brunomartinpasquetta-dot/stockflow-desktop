@@ -582,6 +582,13 @@ export function createApiBridge(
       transferFromClosed: (p) => c<never>('cashGeneral:transferFromClosed', p),
     },
     analytics: {
+      resumenDelDia: (p) => c<never>('analytics:resumenDelDia', p),
+      avanceDelMes: (p) => c<never>('analytics:avanceDelMes', p),
+      resultadoNeto: (p) => c<never>('analytics:resultadoNeto', p),
+      antiguedadDeuda: () => c<never>('analytics:antiguedadDeuda'),
+      conversionPresupuestos: (p) => c<never>('analytics:conversionPresupuestos', p),
+      stockSinMovimiento: (p) => c<never>('analytics:stockSinMovimiento', p),
+      reposicionPrioritaria: (p) => c<never>('analytics:reposicionPrioritaria', p),
       getTopSellingProducts: (p) => c<never>('analytics:getTopSellingProducts', p),
       getBottomSellingProducts: (p) => c<never>('analytics:getBottomSellingProducts', p),
       getPaymentMethodsRanking: (p) => c<never>('analytics:getPaymentMethodsRanking', p),

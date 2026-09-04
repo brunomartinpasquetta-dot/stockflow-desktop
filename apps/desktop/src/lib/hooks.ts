@@ -442,6 +442,62 @@ export function useTopSuppliers(input: DR & { limit?: number }, enabled = true) 
     enabled,
   })
 }
+export function useResumenDelDia(input: Parameters<typeof api.analytics.resumenDelDia>[0], enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'resumenDelDia', input],
+    queryFn: () => api.analytics.resumenDelDia(input),
+    enabled,
+  })
+}
+
+export function useAvanceDelMes(input: Parameters<typeof api.analytics.avanceDelMes>[0], enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'avanceDelMes', input],
+    queryFn: () => api.analytics.avanceDelMes(input),
+    enabled,
+  })
+}
+
+export function useResultadoNeto(input: { from: number; to: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'resultadoNeto', input],
+    queryFn: () => api.analytics.resultadoNeto(input),
+    enabled,
+  })
+}
+
+export function useAntiguedadDeuda(enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'antiguedadDeuda'],
+    queryFn: () => api.analytics.antiguedadDeuda(),
+    enabled,
+  })
+}
+
+export function useConversionPresupuestos(input: { from: number; to: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'conversionPresupuestos', input],
+    queryFn: () => api.analytics.conversionPresupuestos(input),
+    enabled,
+  })
+}
+
+export function useStockSinMovimiento(input: { dias?: number; limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'stockSinMovimiento', input],
+    queryFn: () => api.analytics.stockSinMovimiento(input),
+    enabled,
+  })
+}
+
+export function useReposicionPrioritaria(input: { from: number; to: number; limit?: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'reposicionPrioritaria', input],
+    queryFn: () => api.analytics.reposicionPrioritaria(input),
+    enabled,
+  })
+}
+
 export function useSalesTrend(
   input: DR & { granularity: 'daily' | 'weekly' | 'monthly' },
   enabled = true,

@@ -14,6 +14,13 @@ import type {
   AnalyticsTopProductRowDTO,
   AnalyticsVentaPorFormaPagoRowDTO,
   AnalyticsVentaPorFormaPagoEnTiempoRowDTO,
+  AnalyticsResumenDelDiaDTO,
+  AnalyticsAvanceDelMesDTO,
+  AnalyticsResultadoNetoDTO,
+  AnalyticsAntiguedadDeudaDTO,
+  AnalyticsConversionPresupuestosDTO,
+  AnalyticsStockSinMovimientoDTO,
+  AnalyticsReposicionPrioritariaRowDTO,
 } from '../types';
 
 type DateRange = { from: number; to: number };
@@ -89,6 +96,41 @@ export function buildAnalyticsHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: DateRange & { limit?: number }, ctx): Promise<AnalyticsStockRotationRowDTO[]> =>
         new AnalyticsService(ctx).getStockRotation(payload),
+    ),
+    'analytics:resumenDelDia': withSession(
+      deps,
+      (payload: { hoy: DateRange; ayer: DateRange; mismoDiaSemanaAnterior: DateRange }, ctx): Promise<AnalyticsResumenDelDiaDTO> =>
+        new AnalyticsService(ctx).getResumenDelDia(payload),
+    ),
+    'analytics:avanceDelMes': withSession(
+      deps,
+      (
+        payload: { mesActual: DateRange; mesAnteriorParcial: DateRange; mesAnteriorCompleto: DateRange; diasTranscurridos: number; diasDelMes: number },
+        ctx,
+      ): Promise<AnalyticsAvanceDelMesDTO> => new AnalyticsService(ctx).getAvanceDelMes(payload),
+    ),
+    'analytics:resultadoNeto': withSession(
+      deps,
+      (payload: DateRange, ctx): Promise<AnalyticsResultadoNetoDTO> => new AnalyticsService(ctx).getResultadoNeto(payload),
+    ),
+    'analytics:antiguedadDeuda': withSession(
+      deps,
+      (_payload, ctx): Promise<AnalyticsAntiguedadDeudaDTO> => new AnalyticsService(ctx).getAntiguedadDeuda(),
+    ),
+    'analytics:conversionPresupuestos': withSession(
+      deps,
+      (payload: DateRange, ctx): Promise<AnalyticsConversionPresupuestosDTO> =>
+        new AnalyticsService(ctx).getConversionPresupuestos(payload),
+    ),
+    'analytics:stockSinMovimiento': withSession(
+      deps,
+      (payload: { dias?: number; limit?: number }, ctx): Promise<AnalyticsStockSinMovimientoDTO> =>
+        new AnalyticsService(ctx).getStockSinMovimiento(payload),
+    ),
+    'analytics:reposicionPrioritaria': withSession(
+      deps,
+      (payload: DateRange & { limit?: number }, ctx): Promise<AnalyticsReposicionPrioritariaRowDTO[]> =>
+        new AnalyticsService(ctx).getReposicionPrioritaria(payload),
     ),
   };
 }

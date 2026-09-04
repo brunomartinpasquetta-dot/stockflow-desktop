@@ -1540,6 +1540,70 @@ export interface NovedadesPendientesDTO {
 }
 
 /** Guía de primeros pasos: estado one-shot por máquina. */
+
+/** Estadísticas: resumen del día (hoy / ayer / mismo día de la semana anterior). */
+export interface AnalyticsResumenDiaSegmentoDTO {
+  total: string;
+  count: number;
+}
+export interface AnalyticsResumenDelDiaDTO {
+  hoy: AnalyticsResumenDiaSegmentoDTO;
+  ayer: AnalyticsResumenDiaSegmentoDTO;
+  mismoDiaSemanaAnterior: AnalyticsResumenDiaSegmentoDTO;
+}
+export interface AnalyticsAvanceDelMesDTO {
+  mesActual: string;
+  mesAnteriorParcial: string;
+  mesAnteriorCompleto: string;
+  proyeccionCierre: string;
+  variacionPct: string | null;
+}
+export interface AnalyticsResultadoNetoDTO {
+  ventasNetas: string;
+  cmv: string;
+  comisiones: string;
+  resultado: string;
+  margenPct: string | null;
+}
+export interface AnalyticsAntiguedadDeudaBucketDTO {
+  rango: string;
+  monto: string;
+  comprobantes: number;
+}
+export interface AnalyticsAntiguedadDeudaDTO {
+  total: string;
+  clientesConDeuda: number;
+  buckets: AnalyticsAntiguedadDeudaBucketDTO[];
+}
+export interface AnalyticsConversionPresupuestosDTO {
+  total: number;
+  convertidos: number;
+  aceptados: number;
+  rechazados: number;
+  pendientes: number;
+  tasaConversionPct: string | null;
+  montoConvertido: string;
+}
+export interface AnalyticsStockSinMovimientoRowDTO {
+  articleId: string;
+  description: string;
+  stock: string;
+  capitalInmovilizado: string;
+  ultimaVenta: number | null;
+}
+export interface AnalyticsStockSinMovimientoDTO {
+  capitalTotal: string;
+  articulos: number;
+  top: AnalyticsStockSinMovimientoRowDTO[];
+}
+export interface AnalyticsReposicionPrioritariaRowDTO {
+  articleId: string;
+  description: string;
+  stock: string;
+  minStock: string;
+  vendidoEnRango: string;
+}
+
 export interface GuiaEstadoDTO {
   vista: boolean;
   paso: number;
@@ -1905,6 +1969,19 @@ export interface ApiSurface {
     getSalesByHour(payload: DateRangeDTO): Res<AnalyticsSalesByHourRowDTO[]>;
     getSalesByDayOfWeek(payload: DateRangeDTO): Res<AnalyticsSalesByDayOfWeekRowDTO[]>;
     getMarginByCategory(payload: DateRangeDTO): Res<AnalyticsMarginRowDTO[]>;
+    resumenDelDia(payload: { hoy: DateRangeDTO; ayer: DateRangeDTO; mismoDiaSemanaAnterior: DateRangeDTO }): Res<AnalyticsResumenDelDiaDTO>;
+    avanceDelMes(payload: {
+      mesActual: DateRangeDTO;
+      mesAnteriorParcial: DateRangeDTO;
+      mesAnteriorCompleto: DateRangeDTO;
+      diasTranscurridos: number;
+      diasDelMes: number;
+    }): Res<AnalyticsAvanceDelMesDTO>;
+    resultadoNeto(payload: DateRangeDTO): Res<AnalyticsResultadoNetoDTO>;
+    antiguedadDeuda(): Res<AnalyticsAntiguedadDeudaDTO>;
+    conversionPresupuestos(payload: DateRangeDTO): Res<AnalyticsConversionPresupuestosDTO>;
+    stockSinMovimiento(payload: { dias?: number; limit?: number }): Res<AnalyticsStockSinMovimientoDTO>;
+    reposicionPrioritaria(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsReposicionPrioritariaRowDTO[]>;
     getStockRotation(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsStockRotationRowDTO[]>;
   };
   priceUpdate: {
