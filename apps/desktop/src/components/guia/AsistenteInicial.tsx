@@ -193,8 +193,10 @@ export function AsistenteInicial({ visible, onClose }: { visible: boolean; onClo
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-6 backdrop-blur-md">
-      {/* max-w-4xl (896px) +40% pedido por Bruno → 1254px. */}
-      <div className="flex max-h-[92vh] w-full max-w-[1254px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
+      {/* +40% en AMBAS direcciones (pedido de Bruno): 1254px de ancho y alto
+          FIJO generoso — el objetivo es que las capturas se vean grandes y
+          legibles, no una tarjeta chata que crece con el texto. */}
+      <div className="flex h-[780px] max-h-[92vh] w-full max-w-[1254px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
         {/* Encabezado: progreso + saltar */}
         <div className="flex items-center justify-between border-b px-5 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold">
@@ -215,7 +217,7 @@ export function AsistenteInicial({ visible, onClose }: { visible: boolean; onClo
         <div className="flex min-h-0 flex-1">
           {/* Panel visual */}
           {imagen && (
-            <div className="hidden w-[38%] items-center justify-center border-r bg-muted/40 p-6 md:flex">
+            <div className="hidden w-[48%] items-center justify-center border-r bg-muted/40 p-5 md:flex">
               <img src={imagen} alt="" className="max-h-full w-full rounded-lg border object-contain shadow-md" />
             </div>
           )}
