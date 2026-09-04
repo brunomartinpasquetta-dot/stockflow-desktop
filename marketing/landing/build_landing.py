@@ -610,7 +610,7 @@ BODY=f"""
       dos secciones más abajo — se movieron acá, no duplicar). -->
  <div class="hero-acciones">
   <a class="btn btn-blue" data-sf-cta="download-win" href="/dl/StockFlow-Setup.exe">Descargar directo para Windows</a>
-  <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.</div>
+  <div class="dl-alt"><a data-sf-cta="download-mac" href="/dl/StockFlow.dmg">Descargar para Mac</a> · En Mac, la primera vez: clic derecho sobre StockFlow → Abrir.<span id="dlver"></span></div>
   <div class="hero-logos">
    <img class="hl-mp" src="{L_MP}" {wh(L_MP)} alt="Mercado Pago" loading="lazy"/>
    <span title="WhatsApp" class="hl-wa">{WA_SVG}</span>
@@ -769,6 +769,9 @@ BODY=f"""
 </div>
 
 <script>
+/* Versión publicada: la escribe el cron de instaladores del VPS en /dl/.version
+   — el texto junto al botón de descarga siempre refleja lo que se baja. */
+(function(){{var el=document.getElementById('dlver');if(!el)return;fetch('/dl/.version').then(function(r){{return r.ok?r.text():'';}}).then(function(v){{v=(v||'').trim();if(/^v?\\d+\\./.test(v))el.textContent=' · Última versión: '+v;}}).catch(function(){{}});}})();
 (function(){{var io=new IntersectionObserver(function(es){{es.forEach(function(e){{if(e.isIntersecting){{e.target.classList.add('in');io.unobserve(e.target);}}}});}},{{threshold:.12}});document.querySelectorAll('.rv').forEach(function(e){{io.observe(e);}});}})();
 (function(){{
  var cf=document.getElementById('cf'); if(!cf) return;
