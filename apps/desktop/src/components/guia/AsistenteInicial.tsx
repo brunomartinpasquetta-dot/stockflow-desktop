@@ -193,7 +193,8 @@ export function AsistenteInicial({ visible, onClose }: { visible: boolean; onClo
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-6 backdrop-blur-md">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
+      {/* max-w-4xl (896px) +40% pedido por Bruno → 1254px. */}
+      <div className="flex max-h-[92vh] w-full max-w-[1254px] flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
         {/* Encabezado: progreso + saltar */}
         <div className="flex items-center justify-between border-b px-5 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold">
