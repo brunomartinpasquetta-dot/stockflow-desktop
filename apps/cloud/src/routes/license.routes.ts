@@ -112,6 +112,7 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
           user.lk,
           user.tid,
           (p) => app.jwt.sign(p),
+          user.kind,
         );
         return reply.send(
           result.suspended ? { jwt: result.jwt, suspended: true } : { jwt: result.jwt },

@@ -64,8 +64,15 @@ export function AcercaDe() {
   const plan = license?.plan ?? '—'
   const fullName = license?.fullName ?? '—'
   const tenantName = license?.tenantName ?? '—'
+  // La clave se muestra COMPLETA: es la que el cliente dicta al pagar para
+  // convertir su prueba en licencia definitiva (antes se truncaba a 16+"...").
   const licenseKey = license?.licenseKey ?? '—'
-  const keyShort = licenseKey === '—' ? '—' : licenseKey.length > 19 ? `${licenseKey.slice(0, 16)}...` : licenseKey
+  const copiarClave = (): void => {
+    void navigator.clipboard.writeText(licenseKey).then(
+      () => toast.success('Clave de licencia copiada'),
+      () => toast.error('No se pudo copiar la clave'),
+    )
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
@@ -89,7 +96,14 @@ export function AcercaDe() {
           <div className="font-medium">Empresa</div>
           <div className="font-mono">{tenantName}</div>
           <div className="font-medium">Licencia</div>
-          <div className="font-mono">{keyShort}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono">{licenseKey}</span>
+            {licenseKey !== '—' && (
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={copiarClave}>
+                Copiar
+              </Button>
+            )}
+          </div>
           <div className="col-span-2 mt-3 border-t pt-3">
             {!confirmDeact ? (
               <Button variant="outline" size="sm" onClick={() => setConfirmDeact(true)}>

@@ -284,6 +284,28 @@ async function main(): Promise<void> {
   ) as { kind?: string; texp?: number };
   check('re-activate trial vencido: jwt con texp en el pasado', tr5Payload.kind === 'trial' && (tr5Payload.texp ?? 0) * 1000 < Date.now(), tr5Payload.texp);
 
+  // --- CONVERSIÓN A PAGA (el cobro real): con un JWT trial FRESCO en mano
+  // (el hb2 renovó uno con ~7 días de vida), el UPDATE a kind='paid' debe
+  // desbloquear en el PRÓXIMO heartbeat — jwt nuevo sin kind/texp, sin
+  // suspended — y no ~6 días después cuando venza el token viejo. ---
+  await cloudDb
+    .update(licenses)
+    .set({ kind: 'paid', expiresAt: null })
+    .where(eq(licenses.licenseKey, trBody.licenseKey ?? ''));
+  const hb3 = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/heartbeat',
+    headers: { authorization: `Bearer ${hb2Body.jwt}` },
+  });
+  check('heartbeat tras convertir a paga → 200', hb3.statusCode === 200, hb3.statusCode);
+  const hb3Body = hb3.json() as { suspended?: boolean; jwt?: string | null };
+  check('convertida: ya no viene suspended', hb3Body.suspended !== true, hb3.body);
+  check('convertida: renueva el jwt YA (no jwt:null)', (hb3Body.jwt ?? '').split('.').length === 3, hb3.body);
+  const hb3Payload = JSON.parse(
+    Buffer.from((hb3Body.jwt ?? '..').split('.')[1]!, 'base64url').toString(),
+  ) as { kind?: string; texp?: number };
+  check('convertida: jwt limpio, sin kind ni texp', hb3Payload.kind === undefined && hb3Payload.texp === undefined, JSON.stringify(hb3Payload));
+
   await app.close();
   await pg.close();
 

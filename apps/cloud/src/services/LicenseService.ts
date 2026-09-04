@@ -218,6 +218,11 @@ export class LicenseService {
     lk: string,
     tid: string,
     signJwt: (payload: object) => string,
+    /** `kind` que traía el JWT presentado: si difiere del de la fila (una
+     *  prueba convertida a paga), se renueva YA — sin esto el desktop quedaba
+     *  en sólo-lectura hasta ~6 días después de cobrar (el JWT trial recién
+     *  renovado no vencía y el heartbeat contestaba jwt:null). */
+    jwtKind?: 'trial',
   ): Promise<{ jwt: string | null; suspended?: boolean }> {
     await db.update(licenses).set({ lastHeartbeat: new Date() }).where(eq(licenses.id, licenseId));
 
@@ -240,8 +245,11 @@ export class LicenseService {
 
     // Renovación deslizante: si al JWT le quedan <24h, emitimos uno nuevo.
     // Cuando está suspendido renovamos siempre para mantener vivo el token
-    // (la app sigue abierta en sólo-lectura).
-    if (suspended || currentExpMs - Date.now() < ONE_DAY_MS) {
+    // (la app sigue abierta en sólo-lectura). Y si el kind del JWT quedó
+    // desactualizado (prueba convertida a paga), renovamos YA: es lo que
+    // desbloquea la app del cliente en el próximo contacto tras el cobro.
+    const jwtDesactualizado = (jwtKind === 'trial') !== (license.kind === 'trial');
+    if (suspended || jwtDesactualizado || currentExpMs - Date.now() < ONE_DAY_MS) {
       const jwt = signJwt(LicenseService.jwtPayloadFor(license, tenant));
       return suspended ? { jwt, suspended: true } : { jwt };
     }
