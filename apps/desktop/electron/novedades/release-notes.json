@@ -2,6 +2,15 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
+      "version": "1.5.0",
+      "novedades": [
+        "Guía de primeros pasos: un asistente visual acompaña la configuración inicial del sistema (datos del comercio, modo de precios, impresora y carga de artículos). Está siempre disponible en Ayuda → Guía de primeros pasos.",
+        "Al actualizarse, el sistema ahora muestra una ventana como esta con las novedades de cada versión.",
+        "La clave de licencia se muestra completa en Ayuda → Acerca de, con un botón para copiarla."
+      ],
+      "internas": false
+    },
+    {
       "version": "1.4.2",
       "novedades": [
         "El asistente Flowy ahora responde consultas sobre cómo cobrar o pagar un período de fechas en Cuentas Corrientes."
