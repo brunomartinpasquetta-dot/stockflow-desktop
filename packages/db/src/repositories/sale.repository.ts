@@ -248,6 +248,30 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             discountStock(l.articleId, l.quantity, `el artículo ${l.articleId}`);
           }
 
+          // Costo CONGELADO al vender (migración 0024): el margen histórico
+          // deja de moverse con los reprecios. En promos, el costo real es la
+          // suma de componentes (el artículo espejo suele tener costo 0).
+          let costAtSale: string | null = null;
+          if (promoComponents && promoComponents.length > 0) {
+            let acc = '0.0000';
+            for (const comp of promoComponents) {
+              const compArt = tx
+                .select({ costPrice: articles.costPrice })
+                .from(articles)
+                .where(eq(articles.id, comp.componentId))
+                .get();
+              if (compArt) acc = addDecimal(acc, mulDecimal(comp.componentQty, compArt.costPrice, 4), 4);
+            }
+            costAtSale = acc;
+          } else if (l.articleId) {
+            const art = tx
+              .select({ costPrice: articles.costPrice })
+              .from(articles)
+              .where(eq(articles.id, l.articleId))
+              .get();
+            costAtSale = art?.costPrice ?? null;
+          }
+
           const lineRow: NewSaleLine = {
             saleId: insertedSale.id,
             articleId: l.articleId,
@@ -258,6 +282,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             discount: l.discount,
             vatRate: l.vatRate,
             lineTotal: l.lineTotal,
+            costAtSale,
           };
           const inserted = tx.insert(saleLines).values(lineRow).returning().all()[0];
           if (inserted) insertedLines.push(inserted);

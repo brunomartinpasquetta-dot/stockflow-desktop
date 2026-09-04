@@ -1324,7 +1324,8 @@ export interface AnalyticsTopProductRowDTO {
   brand: string | null;
   quantity: string;
   revenue: string;
-  marginPct: string;
+  /** null = artículo sin costo cargado: el margen no puede calcularse. */
+  marginPct: string | null;
 }
 
 export interface AnalyticsPaymentMethodRankRowDTO {
@@ -1398,7 +1399,8 @@ export interface AnalyticsMarginRowDTO {
   revenue: string;
   cost: string;
   margin: string;
-  marginPct: string;
+  /** null = sin costo cargado en los artículos de la familia. */
+  marginPct: string | null;
 }
 
 export interface AnalyticsStockRotationRowDTO {

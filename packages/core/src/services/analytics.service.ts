@@ -25,7 +25,8 @@ export interface TopProductRow {
   brand: string | null;
   quantity: string;
   revenue: string;
-  marginPct: string;
+  /** null = el artículo no tiene costo cargado: no se puede calcular. */
+  marginPct: string | null;
 }
 
 export interface PaymentMethodRankRow {
@@ -99,7 +100,8 @@ export interface MarginRow {
   revenue: string;
   cost: string;
   margin: string;
-  marginPct: string;
+  /** null = sin costo cargado en los artículos de la familia. */
+  marginPct: string | null;
 }
 
 export interface StockRotationRow {
@@ -135,7 +137,7 @@ export class AnalyticsService {
         a.brand AS brand,
         SUM(CAST(sl.quantity AS REAL)) AS qty,
         SUM(CAST(sl.line_total AS REAL)) AS revenue,
-        SUM(CAST(sl.quantity AS REAL) * CAST(a.cost_price AS REAL)) AS cost
+        SUM(CAST(sl.quantity AS REAL) * CAST(COALESCE(sl.cost_at_sale, a.cost_price) AS REAL)) AS cost
       FROM sale_lines sl
       JOIN sales s ON s.id = sl.sale_id
       JOIN articles a ON a.id = sl.article_id
@@ -155,6 +157,7 @@ export class AnalyticsService {
       cost: number;
     }>;
     return rows.map((r) => {
+      const sinCosto = (r.cost || 0) <= 0 && (r.revenue || 0) > 0;
       const margin = r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue) * 100 : 0;
       return {
         articleId: r.articleId,
@@ -163,7 +166,7 @@ export class AnalyticsService {
         brand: r.brand,
         quantity: fmt(r.qty),
         revenue: fmt(r.revenue),
-        marginPct: fmt(margin),
+        marginPct: sinCosto ? null : fmt(margin),
       };
     });
   }
@@ -171,20 +174,29 @@ export class AnalyticsService {
   async getBottomSellingProducts(input: DateRange & { limit?: number }): Promise<TopProductRow[]> {
     this.requireRead();
     const limit = input.limit ?? 10;
-    // LEFT JOIN para incluir artículos sin ventas
+    // LEFT JOIN contra una SUBCONSULTA ya filtrada por rango y estado: con el
+    // filtro en el ON del join de sales (como estaba), las sale_lines entraban
+    // TODAS igual (con s NULL) y el selector de fechas no tenía efecto real —
+    // el ranking sumaba la historia completa, anuladas incluidas.
     const sql = `
       SELECT
         a.id AS articleId,
         a.barcode AS code,
         a.description AS description,
         a.brand AS brand,
-        COALESCE(SUM(CAST(sl.quantity AS REAL)), 0) AS qty,
-        COALESCE(SUM(CAST(sl.line_total AS REAL)), 0) AS revenue,
-        COALESCE(SUM(CAST(sl.quantity AS REAL) * CAST(a.cost_price AS REAL)), 0) AS cost
+        COALESCE(v.qty, 0) AS qty,
+        COALESCE(v.revenue, 0) AS revenue,
+        COALESCE(v.qty, 0) * CAST(a.cost_price AS REAL) AS cost
       FROM articles a
-      LEFT JOIN sale_lines sl ON sl.article_id = a.id
-      LEFT JOIN sales s ON s.id = sl.sale_id AND s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+      LEFT JOIN (
+        SELECT sl.article_id,
+               SUM(CAST(sl.quantity AS REAL)) AS qty,
+               SUM(CAST(sl.line_total AS REAL)) AS revenue
+        FROM sale_lines sl
+        JOIN sales s ON s.id = sl.sale_id
+        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        GROUP BY sl.article_id
+      ) v ON v.article_id = a.id
       WHERE a.active = 1
       GROUP BY a.id, a.barcode, a.description, a.brand
       ORDER BY qty ASC
@@ -200,6 +212,7 @@ export class AnalyticsService {
       cost: number;
     }>;
     return rows.map((r) => {
+      const sinCosto = (r.cost || 0) <= 0 && (r.revenue || 0) > 0;
       const margin = r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue) * 100 : 0;
       return {
         articleId: r.articleId,
@@ -208,7 +221,7 @@ export class AnalyticsService {
         brand: r.brand,
         quantity: fmt(r.qty),
         revenue: fmt(r.revenue),
-        marginPct: fmt(margin),
+        marginPct: sinCosto ? null : fmt(margin),
       };
     });
   }
@@ -338,7 +351,7 @@ export class AnalyticsService {
     const sql = `
       SELECT bucket, paymentMethodId, name, SUM(monto) AS monto FROM (
         SELECT
-          strftime('${fmtSpec}', s.date / 1000, 'unixepoch') AS bucket,
+          strftime('${fmtSpec}', s.date / 1000, 'unixepoch', 'localtime') AS bucket,
           pm.id AS paymentMethodId,
           pm.name AS name,
           CAST(sp.amount AS REAL) AS monto
@@ -348,7 +361,7 @@ export class AnalyticsService {
         WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
         UNION ALL
         SELECT
-          strftime('${fmtSpec}', s.date / 1000, 'unixepoch') AS bucket,
+          strftime('${fmtSpec}', s.date / 1000, 'unixepoch', 'localtime') AS bucket,
           'cuenta-corriente' AS paymentMethodId,
           'Cuenta Corriente' AS name,
           CAST(s.total AS REAL) AS monto
@@ -448,18 +461,29 @@ export class AnalyticsService {
         : input.granularity === 'weekly'
           ? "%Y-W%W"
           : "%Y-%m";
+    // VENTAS NETAS: las devoluciones restan en el bucket del día en que se
+    // hicieron (antes todo era venta bruta y el KPI sobreestimaba). El count
+    // sigue siendo la cantidad de VENTAS (operaciones), no se mezcla.
     const sql = `
-      SELECT
-        strftime('${fmtSpec}', s.date / 1000, 'unixepoch') AS bucket,
-        COUNT(*) AS count,
-        SUM(CAST(s.total AS REAL)) AS total
-      FROM sales s
-      WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+      SELECT bucket, SUM(cnt) AS count, SUM(total) AS total FROM (
+        SELECT
+          strftime('${fmtSpec}', s.date / 1000, 'unixepoch', 'localtime') AS bucket,
+          1 AS cnt,
+          CAST(s.total AS REAL) AS total
+        FROM sales s
+        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        UNION ALL
+        SELECT
+          strftime('${fmtSpec}', r.date / 1000, 'unixepoch', 'localtime') AS bucket,
+          0 AS cnt,
+          -CAST(r.total AS REAL) AS total
+        FROM returns r
+        WHERE r.date BETWEEN ? AND ?
+      )
       GROUP BY bucket
       ORDER BY bucket ASC
     `;
-    const rows = this.ctx.db.$client.prepare(sql).all(input.from, input.to) as Array<{
+    const rows = this.ctx.db.$client.prepare(sql).all(input.from, input.to, input.from, input.to) as Array<{
       bucket: string;
       count: number;
       total: number;
@@ -497,7 +521,7 @@ export class AnalyticsService {
     this.requireRead();
     const sql = `
       SELECT
-        CAST(strftime('%H', s.date / 1000, 'unixepoch') AS INTEGER) AS hour,
+        CAST(strftime('%H', s.date / 1000, 'unixepoch', 'localtime') AS INTEGER) AS hour,
         COUNT(*) AS count,
         SUM(CAST(s.total AS REAL)) AS total
       FROM sales s
@@ -518,7 +542,7 @@ export class AnalyticsService {
     this.requireRead();
     const sql = `
       SELECT
-        CAST(strftime('%w', s.date / 1000, 'unixepoch') AS INTEGER) AS dayOfWeek,
+        CAST(strftime('%w', s.date / 1000, 'unixepoch', 'localtime') AS INTEGER) AS dayOfWeek,
         COUNT(*) AS count,
         SUM(CAST(s.total AS REAL)) AS total
       FROM sales s
@@ -542,7 +566,7 @@ export class AnalyticsService {
         f.id AS familyId,
         COALESCE(f.name, '(Sin familia)') AS familyName,
         SUM(CAST(sl.line_total AS REAL)) AS revenue,
-        SUM(CAST(sl.quantity AS REAL) * CAST(a.cost_price AS REAL)) AS cost
+        SUM(CAST(sl.quantity AS REAL) * CAST(COALESCE(sl.cost_at_sale, a.cost_price) AS REAL)) AS cost
       FROM sale_lines sl
       JOIN sales s ON s.id = sl.sale_id
       JOIN articles a ON a.id = sl.article_id
@@ -560,14 +584,17 @@ export class AnalyticsService {
     }>;
     return rows.map((r) => {
       const margin = (r.revenue || 0) - (r.cost || 0);
+      // Sin costo cargado el "margen" daría 100% (mentira): se informa null y
+      // la pantalla lo muestra como "s/costo" en lugar de inflar la ganancia.
+      const sinCosto = (r.cost || 0) <= 0 && (r.revenue || 0) > 0;
       const marginPct = r.revenue > 0 ? (margin / r.revenue) * 100 : 0;
       return {
         familyId: r.familyId,
         familyName: r.familyName,
         revenue: fmt(r.revenue),
         cost: fmt(r.cost),
-        margin: fmt(margin),
-        marginPct: fmt(marginPct),
+        margin: sinCosto ? fmt(0) : fmt(margin),
+        marginPct: sinCosto ? null : fmt(marginPct),
       };
     });
   }
@@ -575,16 +602,22 @@ export class AnalyticsService {
   async getStockRotation(input: DateRange & { limit?: number }): Promise<StockRotationRow[]> {
     this.requireRead();
     const limit = input.limit ?? 20;
+    // Mismo fix que en getBottomSellingProducts: el filtro va en una
+    // subconsulta, no en el ON — si no, suma la historia completa.
     const sql = `
       SELECT
         a.id AS articleId,
         a.description AS description,
-        COALESCE(SUM(CAST(sl.quantity AS REAL)), 0) AS quantitySold,
+        COALESCE(v.qty, 0) AS quantitySold,
         CAST(a.stock AS REAL) AS currentStock
       FROM articles a
-      LEFT JOIN sale_lines sl ON sl.article_id = a.id
-      LEFT JOIN sales s ON s.id = sl.sale_id AND s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+      LEFT JOIN (
+        SELECT sl.article_id, SUM(CAST(sl.quantity AS REAL)) AS qty
+        FROM sale_lines sl
+        JOIN sales s ON s.id = sl.sale_id
+        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        GROUP BY sl.article_id
+      ) v ON v.article_id = a.id
       WHERE a.active = 1
       GROUP BY a.id, a.description, a.stock
       ORDER BY quantitySold DESC

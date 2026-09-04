@@ -219,7 +219,7 @@ export function Estadisticas() {
       Marca: r.brand,
       Cantidad: Number(r.quantity),
       Facturación: Number(r.revenue),
-      'Margen %': Number(r.marginPct),
+      'Margen %': r.marginPct == null ? 's/costo' : Number(r.marginPct),
     })))
     append('Bottom Productos', (bottomP.data ?? []).map((r) => ({
       Código: r.code,
@@ -238,7 +238,7 @@ export function Estadisticas() {
       Facturación: Number(r.revenue),
       Costo: Number(r.cost),
       Margen: Number(r.margin),
-      '% Margen': Number(r.marginPct),
+      '% Margen': r.marginPct == null ? 's/costo' : Number(r.marginPct),
     })))
     append('Top Clientes', (topC.data ?? []).map((r) => ({
       Cliente: r.fullName,
@@ -347,7 +347,9 @@ export function Estadisticas() {
 
         <TabsContent value="resumen" className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <KpiCard label="Ventas" value={formatCurrency(totalRevenue)} />
+            {/* Neto de devoluciones: la tendencia (fuente de este total) resta
+                las devoluciones en el día en que ocurrieron. */}
+            <KpiCard label="Ventas netas" value={formatCurrency(totalRevenue)} />
             <KpiCard label="Cantidad" value={String(avgTicket.data?.count ?? 0)} />
             <KpiCard label="Ticket Promedio" value={formatCurrency(avgTicket.data?.avg ?? '0')} />
             <KpiCard label="Margen Bruto" value={`${formatCurrency(grossMargin.amount)} (${grossMargin.pct.toFixed(1)}%)`} />
@@ -690,7 +692,7 @@ function KpiCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ProductTable({ title, rows }: { title: string; rows: Array<{ articleId: string; code: string; description: string; quantity: string; revenue: string; marginPct: string }> }) {
+function ProductTable({ title, rows }: { title: string; rows: Array<{ articleId: string; code: string; description: string; quantity: string; revenue: string; marginPct: string | null }> }) {
   return (
     <Card>
       <CardContent className="pt-4">
@@ -712,7 +714,7 @@ function ProductTable({ title, rows }: { title: string; rows: Array<{ articleId:
                 <TableCell className="text-xs">{r.description}</TableCell>
                 <TableCell className="text-right tabular-nums text-xs">{r.quantity}</TableCell>
                 <TableCell className="text-right tabular-nums text-xs">{formatCurrency(r.revenue)}</TableCell>
-                <TableCell className="text-right tabular-nums text-xs">{r.marginPct}%</TableCell>
+                <TableCell className="text-right tabular-nums text-xs">{r.marginPct == null ? 's/costo' : `${r.marginPct}%`}</TableCell>
               </TableRow>
             ))}
           </TableBody>

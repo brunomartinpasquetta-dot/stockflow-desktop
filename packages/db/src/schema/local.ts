@@ -462,6 +462,13 @@ export const saleLines = sqliteTable(
     discount: text('discount').notNull().default('0.0000'),
     vatRate: text('vat_rate').notNull().default('21.00'),
     lineTotal: text('line_total').notNull(),
+    /**
+     * Costo del artículo CONGELADO al momento de la venta (migración 0024):
+     * el margen histórico deja de moverse con cada reprecio. NULL en filas
+     * anteriores a la migración y en artículos rápidos — los cálculos hacen
+     * COALESCE(cost_at_sale, costo actual del artículo).
+     */
+    costAtSale: text('cost_at_sale'),
     createdAt: createdAtCol(),
   },
   (t) => ({
