@@ -473,7 +473,11 @@ export function Estadisticas() {
               tarjeta responde una pregunta del dueño con la misma anatomía —
               ventas grandes, comparaciones, y el RESULTADO en la única banda
               con color (verde ganancia / rojo pérdida). */}
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+          {/* auto-fit por ancho REAL de la ventana: los breakpoints de Tailwind miran
+              el viewport y esta pantalla vive en una ventana propia de tamaño
+              variable — con xl:grid-cols-4 la fila quebraba en dos en ventanas
+              de 1100px (lo que veía Bruno) mientras el chequeo en 1440 pasaba. */}
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
             <TarjetaHorizonte
               icono={CalendarDays}
               titulo="Hoy"

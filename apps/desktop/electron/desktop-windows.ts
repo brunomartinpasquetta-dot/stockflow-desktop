@@ -11,7 +11,7 @@
  *   ventana principal: NO se setea `partition`.
  * - Las child windows cargan la app en modo "embedded": `#/embedded/<pageKey>`.
  */
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, screen } from 'electron';
 
 export interface DesktopWindowOpenInput {
   /** pageKey del registry (también es la windowKey). */
@@ -112,10 +112,16 @@ export class DesktopWindowsManager {
       this.windows.delete(windowKey);
     }
 
+    // Tamaño por defecto: ~92% del área útil de la pantalla (tope 1500x900).
+    // Con 1100x720 fijos, pantallas grandes abrían ventanas chicas y los
+    // layouts anchos (la fila del resumen de Estadísticas) quebraban en dos.
+    const area = screen.getPrimaryDisplay().workAreaSize;
+    const defW = Math.min(1500, Math.round(area.width * 0.92));
+    const defH = Math.min(900, Math.round(area.height * 0.92));
     const win = new BrowserWindow({
       ...barraDeTitulo(),
-      width: input.width ?? 1100,
-      height: input.height ?? 720,
+      width: input.width ?? defW,
+      height: input.height ?? defH,
       minWidth: input.minWidth ?? 480,
       minHeight: input.minHeight ?? 360,
       title: input.title ?? 'StockFlow',
