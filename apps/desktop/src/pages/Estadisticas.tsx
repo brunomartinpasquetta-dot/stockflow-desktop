@@ -46,6 +46,7 @@ import {
   useStockRotation,
   useVentasPorFormaPago,
   useVentasPorFormaPagoEnTiempo,
+  usePaymentMethods,
   useResumenDelDia,
   useAvanceDelMes,
   useResultadoNeto,
@@ -189,6 +190,11 @@ export function Estadisticas() {
   const resMes = useResultadoNeto(rangosMes.mesActual, activeTab === 'resumen')
   const resPeriodo = useResultadoNeto(range, activeTab === 'resumen')
   const vfpHoy = useVentasPorFormaPago(rangosDia.hoy, activeTab === 'resumen')
+  const metodosQuery = usePaymentMethods()
+  const metodosActivos = useMemo(
+    () => (metodosQuery.data ?? []).filter((m) => m.active).slice(0, 5).map((m) => m.name),
+    [metodosQuery.data],
+  )
   const vfpMes = useVentasPorFormaPago(rangosMes.mesActual, activeTab === 'resumen')
 
   // Vendedores
@@ -283,6 +289,21 @@ export function Estadisticas() {
     const rows = trend.data ?? []
     return rows.reduce((acc, r) => acc + Number(r.total), 0)
   }, [trend.data])
+  // Serie CONTINUA para el gráfico: los días sin ventas van en $0 — sin esto
+  // el eje era categórico (un hueco de 3 días medía igual que uno de 1) y la
+  // línea "terminaba" antes del fin del período.
+  const trendContinua = useMemo(() => {
+    const rows = trend.data ?? []
+    if (granularity !== 'daily' || rows.length === 0) return rows
+    const por = new Map(rows.map((r) => [r.bucket, r]))
+    const out: typeof rows = []
+    for (let t = range.from; t <= range.to; t += 86_400_000) {
+      const d = new Date(t)
+      const clave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      out.push(por.get(clave) ?? { bucket: clave, count: 0, total: '0.00' })
+    }
+    return out
+  }, [trend.data, granularity, range])
   const grossMargin = useMemo(() => {
     const rows = margin.data ?? []
     const m = rows.reduce((acc, r) => acc + Number(r.margin), 0)
@@ -452,7 +473,7 @@ export function Estadisticas() {
               tarjeta responde una pregunta del dueño con la misma anatomía —
               ventas grandes, comparaciones, y el RESULTADO en la única banda
               con color (verde ganancia / rojo pérdida). */}
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
             <TarjetaHorizonte
               icono={CalendarDays}
               titulo="Hoy"
@@ -513,8 +534,7 @@ export function Estadisticas() {
               resultado={resPeriodo.data}
               etiquetaResultado="Resultado"
             />
-            <BarrasMedios titulo="Formas de pago — hoy" vacio="Sin cobros registrados hoy." rows={vfpHoy.data ?? []} />
-            <BarrasMedios titulo="Formas de pago — mes en curso" vacio="Sin cobros registrados en el mes." rows={vfpMes.data ?? []} />
+            <MediosHoyMes hoy={vfpHoy.data ?? []} mes={vfpMes.data ?? []} metodos={metodosActivos} />
           </div>
 
           <Card>
@@ -523,7 +543,7 @@ export function Estadisticas() {
               <p className="mb-2 text-xs text-muted-foreground">Total vendido por día del período seleccionado, descontadas las devoluciones.</p>
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trend.data ?? []}>
+                  <LineChart data={trendContinua}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickFormatter={formatBucket} />
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={formatEjeMoneda} width={70} />
@@ -1110,44 +1130,58 @@ function TarjetaHorizonte({
   )
 }
 
-/** Formas de pago con barra de participación: la comparación es visual. */
-function BarrasMedios({
-  titulo,
-  rows,
-  vacio = 'Sin cobros en el período.',
+/**
+ * Formas de pago en UNA tarjeta con dos columnas (Hoy | Mes en curso). Sin
+ * cobros, se listan los medios activos en $0: la tarjeta pesa lo mismo llena
+ * o vacía y la fila del resumen queda SIMÉTRICA (reclamo de Bruno, sep-2026).
+ */
+function MediosHoyMes({
+  hoy,
+  mes,
+  metodos,
 }: {
-  titulo: string
-  rows: Array<{ paymentMethodId: string; name: string; montoTotal: string; porcentajeDelTotal: string }>
-  vacio?: string
+  hoy: Array<{ paymentMethodId: string; name: string; montoTotal: string; porcentajeDelTotal: string }>
+  mes: Array<{ paymentMethodId: string; name: string; montoTotal: string; porcentajeDelTotal: string }>
+  metodos: string[]
 }) {
-  return (
-    <Card>
-      <CardContent className="p-2">
+  const relleno = metodos.map((name, i) => ({ paymentMethodId: `m${i}`, name, montoTotal: '0.00', porcentajeDelTotal: '0' }))
+  const col = (titulo: string, rows: typeof hoy) => {
+    const filas = rows.length > 0 ? rows.slice(0, 5) : relleno
+    return (
+      <div className="min-w-0 flex-1">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{titulo}</div>
-        {rows.length === 0 ? (
-          <div className="flex h-full items-center justify-center py-2 text-[11px] text-muted-foreground">{vacio}</div>
-        ) : (
-          <div className="mt-1.5 flex flex-col gap-1">
-            {rows.map((r) => {
-              const Icon = iconForMedio(r.name)
-              const pct = Math.max(0, Math.min(100, Number(r.porcentajeDelTotal)))
-              return (
-                <div key={r.paymentMethodId} className="grid grid-cols-[90px_1fr_auto] items-center gap-1.5 text-[11px]">
-                  <span className="flex items-center gap-1.5 truncate text-muted-foreground">
-                    <Icon className="h-3 w-3 shrink-0" />{r.name}
-                  </span>
-                  <div className="h-2 overflow-hidden rounded-sm bg-muted">
+        <div className="mt-1 flex flex-col gap-0.5">
+          {filas.map((r) => {
+            const Icon = iconForMedio(r.name)
+            const pct = Math.max(0, Math.min(100, Number(r.porcentajeDelTotal)))
+            return (
+              <div key={r.paymentMethodId} className="grid grid-cols-[16px_1fr_auto] items-center gap-1 text-[11px]">
+                <Icon className="h-3 w-3 text-muted-foreground" />
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="max-w-[72px] truncate text-muted-foreground">{r.name}</span>
+                  <div className="h-1.5 min-w-[20px] flex-1 overflow-hidden rounded-sm bg-muted">
                     <div className="h-full rounded-sm bg-primary/70" style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="tabular-nums">
-                    {formatCurrency(r.montoTotal)}
-                    <span className="ml-1.5 text-muted-foreground">{formatPct(r.porcentajeDelTotal)}</span>
-                  </span>
                 </div>
-              )
-            })}
-          </div>
-        )}
+                <span className="tabular-nums">{formatCurrency(r.montoTotal)}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <Card>
+      <CardContent className="flex h-full flex-col gap-1 p-2">
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Wallet className="h-3.5 w-3.5" />
+          Formas de pago
+        </div>
+        <div className="flex min-h-0 flex-1 gap-3">
+          {col('Hoy', hoy)}
+          {col('Mes en curso', mes)}
+        </div>
       </CardContent>
     </Card>
   )
