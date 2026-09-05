@@ -409,8 +409,8 @@ export function Estadisticas() {
         </TabsList>
 
         <TabsContent value="resumen" className="flex flex-col gap-3">
-          {/* ── Resumen del día ── */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {/* ── Resumen del día + Avance del mes: UNA fila compacta ── */}
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
             <KpiCard
               label="Ventas de hoy"
               value={formatCurrency(resumenDia.data?.hoy.total ?? '0')}
@@ -422,14 +422,10 @@ export function Estadisticas() {
               detail={`${resumenDia.data?.ayer.count ?? 0} operación(es)`}
             />
             <KpiCard
-              label="Mismo día de la semana anterior"
+              label="Mismo día sem. anterior"
               value={formatCurrency(resumenDia.data?.mismoDiaSemanaAnterior.total ?? '0')}
               detail={`${resumenDia.data?.mismoDiaSemanaAnterior.count ?? 0} operación(es)`}
             />
-          </div>
-
-          {/* ── Avance del mes ── */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <KpiCard label="Mes en curso" value={formatCurrency(avanceMes.data?.mesActual ?? '0')} />
             <KpiCard
               label="Mes anterior a igual altura"
@@ -442,9 +438,9 @@ export function Estadisticas() {
             />
             <KpiCard label="Mes anterior completo" value={formatCurrency(avanceMes.data?.mesAnteriorCompleto ?? '0')} />
             <KpiCard
-              label="Proyección de cierre del mes"
+              label="Proyección de cierre"
               value={formatCurrency(avanceMes.data?.proyeccionCierre ?? '0')}
-              detail="Al ritmo de venta actual"
+              detail="Al ritmo actual"
             />
           </div>
 
@@ -935,10 +931,10 @@ export function Estadisticas() {
 function KpiCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <Card>
-      <CardContent className="pt-4">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="mt-1 text-xl font-bold tabular-nums">{value}</div>
-        {detail && <div className="mt-0.5 text-xs text-muted-foreground">{detail}</div>}
+      <CardContent className="p-2.5">
+        <div className="text-[11px] leading-tight text-muted-foreground">{label}</div>
+        <div className="mt-0.5 text-sm font-bold tabular-nums">{value}</div>
+        {detail && <div className="text-[10px] text-muted-foreground">{detail}</div>}
       </CardContent>
     </Card>
   )
@@ -954,9 +950,9 @@ function ResultadoCard({
 }) {
   return (
     <Card>
-      <CardContent className="pt-4">
-        <div className="text-xs font-medium text-muted-foreground">{titulo}</div>
-        <div className="mt-2 flex flex-col gap-1 text-sm tabular-nums">
+      <CardContent className="p-2.5">
+        <div className="text-[11px] font-medium text-muted-foreground">{titulo}</div>
+        <div className="mt-1 flex flex-col gap-0.5 text-xs tabular-nums">
           <div className="flex justify-between"><span>Ventas netas</span><span>{formatCurrency(data?.ventasNetas ?? '0')}</span></div>
           <div className="flex justify-between text-muted-foreground"><span>Costo de mercadería</span><span>− {formatCurrency(data?.cmv ?? '0')}</span></div>
           <div className="flex justify-between text-muted-foreground"><span>Comisiones de medios</span><span>− {formatCurrency(data?.comisiones ?? '0')}</span></div>
@@ -985,12 +981,12 @@ function MediosMini({
 }) {
   return (
     <Card>
-      <CardContent className="pt-4">
-        <div className="text-xs font-medium text-muted-foreground">{titulo}</div>
+      <CardContent className="p-2.5">
+        <div className="text-[11px] font-medium text-muted-foreground">{titulo}</div>
         {rows.length === 0 ? (
-          <div className="py-3 text-sm text-muted-foreground">Sin cobros en el rango.</div>
+          <div className="py-2 text-xs text-muted-foreground">Sin cobros en el rango.</div>
         ) : (
-          <div className="mt-2 flex flex-col gap-1 text-sm tabular-nums">
+          <div className="mt-1 flex flex-col gap-0.5 text-xs tabular-nums">
             {rows.map((r) => {
               const Icon = iconForMedio(r.name)
               return (
