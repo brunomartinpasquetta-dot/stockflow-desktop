@@ -409,62 +409,48 @@ export function Estadisticas() {
         </TabsList>
 
         <TabsContent value="resumen" className="flex flex-col gap-3">
-          {/* ── Resumen del día + Avance del mes: UNA fila compacta ── */}
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
-            <KpiCard
-              label="Ventas de hoy"
-              value={formatCurrency(resumenDia.data?.hoy.total ?? '0')}
-              detail={`${resumenDia.data?.hoy.count ?? 0} operación(es)`}
-            />
-            <KpiCard
-              label="Ayer"
-              value={formatCurrency(resumenDia.data?.ayer.total ?? '0')}
-              detail={`${resumenDia.data?.ayer.count ?? 0} operación(es)`}
-            />
-            <KpiCard
-              label="Mismo día sem. anterior"
-              value={formatCurrency(resumenDia.data?.mismoDiaSemanaAnterior.total ?? '0')}
-              detail={`${resumenDia.data?.mismoDiaSemanaAnterior.count ?? 0} operación(es)`}
-            />
-            <KpiCard label="Mes en curso" value={formatCurrency(avanceMes.data?.mesActual ?? '0')} />
-            <KpiCard
-              label="Mes anterior a igual altura"
-              value={formatCurrency(avanceMes.data?.mesAnteriorParcial ?? '0')}
-              detail={
-                avanceMes.data?.variacionPct != null
-                  ? `Variación: ${Number(avanceMes.data.variacionPct) >= 0 ? '+' : ''}${avanceMes.data.variacionPct}%`
-                  : undefined
-              }
-            />
-            <KpiCard label="Mes anterior completo" value={formatCurrency(avanceMes.data?.mesAnteriorCompleto ?? '0')} />
-            <KpiCard
-              label="Proyección de cierre"
-              value={formatCurrency(avanceMes.data?.proyeccionCierre ?? '0')}
-              detail="Al ritmo actual"
-            />
-          </div>
+          {/* Franjas de datos de alta densidad (pedido de Bruno: nada de
+              contenedores gigantes para un solo número). */}
+          <FilaDatos
+            titulo="Día"
+            items={[
+              { label: 'Hoy', value: `${formatCurrency(resumenDia.data?.hoy.total ?? '0')} (${resumenDia.data?.hoy.count ?? 0} op.)` },
+              { label: 'Ayer', value: `${formatCurrency(resumenDia.data?.ayer.total ?? '0')} (${resumenDia.data?.ayer.count ?? 0} op.)` },
+              { label: 'Mismo día semana anterior', value: `${formatCurrency(resumenDia.data?.mismoDiaSemanaAnterior.total ?? '0')} (${resumenDia.data?.mismoDiaSemanaAnterior.count ?? 0} op.)` },
+            ]}
+          />
+          <FilaDatos
+            titulo="Mes"
+            items={[
+              { label: 'En curso', value: formatCurrency(avanceMes.data?.mesActual ?? '0') },
+              {
+                label: 'Anterior a igual altura',
+                value:
+                  formatCurrency(avanceMes.data?.mesAnteriorParcial ?? '0') +
+                  (avanceMes.data?.variacionPct != null
+                    ? ` (${Number(avanceMes.data.variacionPct) >= 0 ? '+' : ''}${avanceMes.data.variacionPct}%)`
+                    : ''),
+              },
+              { label: 'Anterior completo', value: formatCurrency(avanceMes.data?.mesAnteriorCompleto ?? '0') },
+              { label: 'Proyección de cierre', value: formatCurrency(avanceMes.data?.proyeccionCierre ?? '0') },
+            ]}
+          />
+          <FilaDatos titulo="Resultado del día" items={itemsResultado(resHoy.data)} />
+          <FilaDatos titulo="Resultado del mes" items={itemsResultado(resMes.data)} />
+          <FilaDatos titulo="Resultado del período" items={itemsResultado(resPeriodo.data)} />
+          <FilaDatos titulo="Formas de pago — hoy" items={itemsMedios(vfpHoy.data ?? [])} />
+          <FilaDatos titulo="Formas de pago — mes" items={itemsMedios(vfpMes.data ?? [])} />
 
-          {/* ── Resultado: ventas netas − costo de mercadería − comisiones ── */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <ResultadoCard titulo="Resultado del día" data={resHoy.data} />
-            <ResultadoCard titulo="Resultado del mes en curso" data={resMes.data} />
-            <ResultadoCard titulo="Resultado del período seleccionado" data={resPeriodo.data} />
-          </div>
-
-          {/* ── Formas de pago del día y del mes ── */}
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <MediosMini titulo="Formas de pago — hoy" rows={vfpHoy.data ?? []} />
-            <MediosMini titulo="Formas de pago — mes en curso" rows={vfpMes.data ?? []} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {/* Neto de devoluciones: la tendencia (fuente de este total) resta
-                las devoluciones en el día en que ocurrieron. */}
-            <KpiCard label="Ventas netas" value={formatCurrency(totalRevenue)} />
-            <KpiCard label="Cantidad" value={String(avgTicket.data?.count ?? 0)} />
-            <KpiCard label="Ticket Promedio" value={formatCurrency(avgTicket.data?.avg ?? '0')} />
-            <KpiCard label="Margen Bruto" value={`${formatCurrency(grossMargin.amount)} (${grossMargin.pct.toFixed(1)}%)`} />
-          </div>
+          {/* Ventas netas: la tendencia (fuente del total) resta devoluciones. */}
+          <FilaDatos
+            titulo="Período seleccionado"
+            items={[
+              { label: 'Ventas netas', value: formatCurrency(totalRevenue) },
+              { label: 'Cantidad', value: String(avgTicket.data?.count ?? 0) },
+              { label: 'Ticket promedio', value: formatCurrency(avgTicket.data?.avg ?? '0') },
+              { label: 'Margen bruto', value: `${formatCurrency(grossMargin.amount)} (${grossMargin.pct.toFixed(1)}%)` },
+            ]}
+          />
           <Card>
             <CardContent className="pt-4">
               <div className="text-xs text-muted-foreground">
@@ -928,82 +914,41 @@ export function Estadisticas() {
   )
 }
 
-function KpiCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
+/** Franja de datos: una línea "Etiqueta: valor · Etiqueta: valor" de alto mínimo. */
+function FilaDatos({ titulo, items }: { titulo: string; items: Array<{ label: string; value: string; destacado?: boolean }> }) {
   return (
-    <Card>
-      <CardContent className="p-2.5">
-        <div className="text-[11px] leading-tight text-muted-foreground">{label}</div>
-        <div className="mt-0.5 text-sm font-bold tabular-nums">{value}</div>
-        {detail && <div className="text-[10px] text-muted-foreground">{detail}</div>}
-      </CardContent>
-    </Card>
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 rounded-md border bg-muted/30 px-3 py-1.5 text-xs">
+      <span className="font-semibold">{titulo}</span>
+      {items.map((it) => (
+        <span key={it.label} className="whitespace-nowrap text-muted-foreground">
+          {it.label}:{' '}
+          <span className={it.destacado ? 'font-bold text-foreground' : 'font-medium tabular-nums text-foreground'}>{it.value}</span>
+        </span>
+      ))}
+    </div>
   )
 }
 
-/** Resultado del período: ventas netas − costo de mercadería vendida − comisiones. */
-function ResultadoCard({
-  titulo,
-  data,
-}: {
-  titulo: string
-  data?: { ventasNetas: string; cmv: string; comisiones: string; resultado: string; margenPct: string | null }
-}) {
-  return (
-    <Card>
-      <CardContent className="p-2.5">
-        <div className="text-[11px] font-medium text-muted-foreground">{titulo}</div>
-        <div className="mt-1 flex flex-col gap-0.5 text-xs tabular-nums">
-          <div className="flex justify-between"><span>Ventas netas</span><span>{formatCurrency(data?.ventasNetas ?? '0')}</span></div>
-          <div className="flex justify-between text-muted-foreground"><span>Costo de mercadería</span><span>− {formatCurrency(data?.cmv ?? '0')}</span></div>
-          <div className="flex justify-between text-muted-foreground"><span>Comisiones de medios</span><span>− {formatCurrency(data?.comisiones ?? '0')}</span></div>
-          <div className="mt-1 flex justify-between border-t pt-1 font-bold">
-            <span>Resultado</span>
-            <span className={Number(data?.resultado ?? 0) < 0 ? 'text-destructive' : 'text-success'}>
-              {formatCurrency(data?.resultado ?? '0')}
-            </span>
-          </div>
-          {data?.margenPct != null && (
-            <div className="text-right text-xs text-muted-foreground">Margen: {data.margenPct}%</div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
+function itemsResultado(
+  d?: { ventasNetas: string; cmv: string; comisiones: string; resultado: string; margenPct: string | null },
+): Array<{ label: string; value: string; destacado?: boolean }> {
+  return [
+    { label: 'Ventas netas', value: formatCurrency(d?.ventasNetas ?? '0') },
+    { label: 'Costo de mercadería', value: `− ${formatCurrency(d?.cmv ?? '0')}` },
+    { label: 'Comisiones', value: `− ${formatCurrency(d?.comisiones ?? '0')}` },
+    {
+      label: 'Resultado',
+      value: formatCurrency(d?.resultado ?? '0') + (d?.margenPct != null ? ` (${d.margenPct}%)` : ''),
+      destacado: true,
+    },
+  ]
 }
 
-/** Tabla compacta de formas de pago (monto y participación) para un rango fijo. */
-function MediosMini({
-  titulo,
-  rows,
-}: {
-  titulo: string
-  rows: Array<{ paymentMethodId: string; name: string; montoTotal: string; porcentajeDelTotal: string }>
-}) {
-  return (
-    <Card>
-      <CardContent className="p-2.5">
-        <div className="text-[11px] font-medium text-muted-foreground">{titulo}</div>
-        {rows.length === 0 ? (
-          <div className="py-2 text-xs text-muted-foreground">Sin cobros en el rango.</div>
-        ) : (
-          <div className="mt-1 flex flex-col gap-0.5 text-xs tabular-nums">
-            {rows.map((r) => {
-              const Icon = iconForMedio(r.name)
-              return (
-                <div key={r.paymentMethodId} className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2"><Icon className="h-3.5 w-3.5 text-muted-foreground" />{r.name}</span>
-                  <span>
-                    {formatCurrency(r.montoTotal)}
-                    <span className="ml-2 text-xs text-muted-foreground">{r.porcentajeDelTotal}%</span>
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
+function itemsMedios(
+  rows: Array<{ name: string; montoTotal: string; porcentajeDelTotal: string }>,
+): Array<{ label: string; value: string }> {
+  if (rows.length === 0) return [{ label: 'Sin cobros', value: '—' }]
+  return rows.map((r) => ({ label: r.name, value: `${formatCurrency(r.montoTotal)} (${r.porcentajeDelTotal}%)` }))
 }
 
 function ProductTable({ title, rows }: { title: string; rows: Array<{ articleId: string; code: string; description: string; quantity: string; revenue: string; marginPct: string | null }> }) {
