@@ -424,36 +424,6 @@ export function Estadisticas() {
             <Label className="text-xs">Hasta</Label>
             <Input type="date" value={toIso} onChange={(e) => { setToIso(e.target.value); setPreset('custom') }} />
           </div>
-          {activeTab === 'pagos' && (vfp.data ?? []).length > 0 && (
-            <div className="flex w-full flex-col gap-1">
-              <Label className="text-xs">Formas de pago</Label>
-              <div className="flex flex-wrap items-center gap-1">
-                <Button
-                  size="sm"
-                  variant={mediosSel.size === 0 ? 'default' : 'outline'}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setMediosSel(new Set())}
-                >
-                  Todos
-                </Button>
-                {(vfp.data ?? []).map((r) => {
-                  const active = isSel(r.paymentMethodId)
-                  return (
-                    <Button
-                      key={r.paymentMethodId}
-                      size="sm"
-                      variant={active ? 'default' : 'outline'}
-                      className="h-7 px-2 text-xs"
-                      style={active ? { backgroundColor: colorMap[r.paymentMethodId], borderColor: colorMap[r.paymentMethodId] } : undefined}
-                      onClick={() => toggleMedio(r.paymentMethodId)}
-                    >
-                      {r.name}
-                    </Button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -579,7 +549,7 @@ export function Estadisticas() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="productos" className="flex flex-col gap-3">
+        <TabsContent value="productos" className="flex flex-col gap-3 pb-14">
           <ConsultaArticulo range={range} />
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <ProductTable title="Top 10 más vendidos" rows={topP.data ?? []} />
@@ -714,6 +684,36 @@ export function Estadisticas() {
         </TabsContent>
 
         <TabsContent value="pagos" className="flex flex-col gap-3">
+          {(vfp.data ?? []).length > 0 && (
+            <div className="flex w-full flex-col gap-1">
+              <Label className="text-xs">Formas de pago</Label>
+              <div className="flex flex-wrap items-center gap-1">
+                <Button
+                  size="sm"
+                  variant={mediosSel.size === 0 ? 'default' : 'outline'}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setMediosSel(new Set())}
+                >
+                  Todos
+                </Button>
+                {(vfp.data ?? []).map((r) => {
+                  const active = isSel(r.paymentMethodId)
+                  return (
+                    <Button
+                      key={r.paymentMethodId}
+                      size="sm"
+                      variant={active ? 'default' : 'outline'}
+                      className="h-7 px-2 text-xs"
+                      style={active ? { backgroundColor: colorMap[r.paymentMethodId], borderColor: colorMap[r.paymentMethodId] } : undefined}
+                      onClick={() => toggleMedio(r.paymentMethodId)}
+                    >
+                      {r.name}
+                    </Button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           {/* a) Grid de cards por medio */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {vfpFiltrado.length === 0 ? (
@@ -750,15 +750,15 @@ export function Estadisticas() {
                       data={vfpFiltrado.map((r) => ({ name: r.name, value: Number(r.montoTotal) }))}
                       dataKey="value"
                       nameKey="name"
-                      outerRadius={90}
-                      label
+                      outerRadius={62}
+                      innerRadius={30}
                     >
                       {vfpFiltrado.map((r) => (
                         <Cell key={r.paymentMethodId} fill={colorMap[r.paymentMethodId]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Legend />
+                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
