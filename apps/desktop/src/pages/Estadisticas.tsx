@@ -110,6 +110,15 @@ function dayEnd(iso: string): number {
 
 const DOW_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
+/** Bucket del eje X en formato argentino: 2026-08-15→15/08 · 2026-08→08/26 · 2026-W33 igual. */
+function formatBucket(b: string): string {
+  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(b)
+  if (m) return `${m[3]!}/${m[2]!}`
+  m = /^(\d{4})-(\d{2})$/.exec(b)
+  if (m) return `${m[2]!}/${m[1]!.slice(2)}`
+  return b
+}
+
 /** Porcentaje en formato argentino: coma decimal, 1 decimal ("37,9%"). */
 function formatPct(v: string | number | null | undefined): string {
   if (v == null) return '—'
@@ -456,7 +465,7 @@ export function Estadisticas() {
                 { label: 'Mismo día sem. anterior', value: formatCurrency(resumenDia.data?.mismoDiaSemanaAnterior.total ?? '0'), tendencia: tendenciaVs(resumenDia.data?.hoy.total, resumenDia.data?.mismoDiaSemanaAnterior.total) },
               ]}
               resultado={resHoy.data}
-              etiquetaResultado="Resultado del día"
+              etiquetaResultado="Resultado"
             />
             <TarjetaHorizonte
               icono={CalendarRange}
@@ -488,7 +497,7 @@ export function Estadisticas() {
                 },
               ]}
               resultado={resMes.data}
-              etiquetaResultado="Resultado del mes"
+              etiquetaResultado="Resultado"
             />
             <TarjetaHorizonte
               icono={CalendarSearch}
@@ -502,7 +511,7 @@ export function Estadisticas() {
                 { label: 'Margen bruto', value: `${formatCurrency(grossMargin.amount)} · ${formatPct(grossMargin.pct)}` },
               ]}
               resultado={resPeriodo.data}
-              etiquetaResultado="Resultado del período"
+              etiquetaResultado="Resultado"
             />
             <BarrasMedios titulo="Formas de pago — hoy" vacio="Sin cobros registrados hoy." rows={vfpHoy.data ?? []} />
             <BarrasMedios titulo="Formas de pago — mes en curso" vacio="Sin cobros registrados en el mes." rows={vfpMes.data ?? []} />
@@ -516,7 +525,7 @@ export function Estadisticas() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trend.data ?? []}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucket" />
+                    <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickFormatter={formatBucket} />
                     <YAxis tick={{ fontSize: 10 }} tickFormatter={formatEjeMoneda} width={70} />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                     <Line type="monotone" dataKey="total" stroke="#6366f1" name="Total" />
@@ -783,7 +792,7 @@ export function Estadisticas() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={vfpTiempoPivot}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucket" />
+                    <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickFormatter={formatBucket} />
                     <YAxis />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                     <Legend />
@@ -1229,7 +1238,10 @@ function HeatmapHour({ data }: { data: Array<{ hour: number; count: number; tota
       {hours.map((h) => {
         const d = byHour.get(h)
         const intensity = d ? d.count / max : 0
-        const bg = `rgba(99, 102, 241, ${Math.max(0.08, intensity)})`
+        // Piso 0.3 para horas CON ventas: 2 ventas junto a un pico de 32 se
+        // veían igual que cero; ahora cualquier actividad se distingue.
+        const alpha = d && d.count > 0 ? Math.max(0.3, intensity) : 0.08
+        const bg = `rgba(99, 102, 241, ${alpha})`
         return (
           <div
             key={h}
