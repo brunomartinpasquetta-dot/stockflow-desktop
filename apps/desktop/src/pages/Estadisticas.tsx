@@ -488,7 +488,8 @@ export function Estadisticas() {
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Tendencia de ventas</h3>
+              <h3 className="text-sm font-medium">Tendencia de ventas</h3>
+              <p className="mb-2 text-xs text-muted-foreground">Total vendido por día del período seleccionado, descontadas las devoluciones.</p>
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trend.data ?? []}>
@@ -504,15 +505,16 @@ export function Estadisticas() {
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Ventas por día de la semana</h3>
-              <div className="h-36">
+              <h3 className="text-sm font-medium">Ventas por día de la semana</h3>
+              <p className="mb-2 text-xs text-muted-foreground">Suma de ventas del período según el día de la semana: permite identificar los días más fuertes del comercio.</p>
+              <div className="mx-auto h-36 w-full max-w-md">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(dow.data ?? []).map((d) => ({ ...d, name: DOW_NAMES[d.dayOfWeek] ?? d.dayOfWeek, totalN: Number(d.total) }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Bar dataKey="totalN" fill="#10b981" name="Total" />
+                    <Bar dataKey="totalN" fill="#10b981" name="Total" maxBarSize={32} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -527,7 +529,8 @@ export function Estadisticas() {
           </div>
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Margen por familia</h3>
+              <h3 className="text-sm font-medium">Margen por familia</h3>
+              <p className="mb-2 text-xs text-muted-foreground">Participación de cada familia de artículos en la ganancia bruta del período.</p>
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -579,7 +582,8 @@ export function Estadisticas() {
         <TabsContent value="clientes" className="flex flex-col gap-3">
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Top 10 Clientes</h3>
+              <h3 className="text-sm font-medium">Top 10 Clientes</h3>
+              <p className="mb-2 text-xs text-muted-foreground">Clientes con mayor monto de compras en el período seleccionado.</p>
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(topC.data ?? []).map((r) => ({ name: r.fullName, value: Number(r.totalAmount) }))} layout="vertical">
@@ -587,7 +591,7 @@ export function Estadisticas() {
                     <XAxis type="number" />
                     <YAxis dataKey="name" type="category" width={150} />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Bar dataKey="value" fill="#6366f1" />
+                    <Bar dataKey="value" fill="#6366f1" maxBarSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -616,7 +620,8 @@ export function Estadisticas() {
         <TabsContent value="proveedores" className="flex flex-col gap-3">
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Top 10 Proveedores</h3>
+              <h3 className="text-sm font-medium">Top 10 Proveedores</h3>
+              <p className="mb-2 text-xs text-muted-foreground">Proveedores a los que se les compró mayor monto en el período seleccionado.</p>
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(topS.data ?? []).map((r) => ({ name: r.supplierName, value: Number(r.totalAmount) }))} layout="vertical">
@@ -624,7 +629,7 @@ export function Estadisticas() {
                     <XAxis type="number" />
                     <YAxis dataKey="name" type="category" width={150} />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Bar dataKey="value" fill="#f59e0b" />
+                    <Bar dataKey="value" fill="#f59e0b" maxBarSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -678,7 +683,8 @@ export function Estadisticas() {
           {/* b) Gráfico de torta */}
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Distribución por forma de pago</h3>
+              <h3 className="text-sm font-medium">Distribución por forma de pago</h3>
+              <p className="mb-2 text-xs text-muted-foreground">Participación de cada medio de pago sobre el total cobrado en el período.</p>
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -749,7 +755,8 @@ export function Estadisticas() {
           {/* d) Evolución temporal apilada */}
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-2 text-sm font-medium">Evolución por forma de pago</h3>
+              <h3 className="text-sm font-medium">Evolución por forma de pago</h3>
+              <p className="mb-2 text-xs text-muted-foreground">Monto cobrado con cada medio de pago a lo largo del tiempo del período.</p>
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={vfpTiempoPivot}>
@@ -760,6 +767,7 @@ export function Estadisticas() {
                     <Legend />
                     {vfpFiltrado.map((r) => (
                       <Bar
+                        maxBarSize={26}
                         key={r.paymentMethodId}
                         stackId="m"
                         dataKey={r.paymentMethodId}
