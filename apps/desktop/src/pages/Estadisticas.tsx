@@ -21,7 +21,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts'
-import { BarChart3, Download, Banknote, CreditCard, QrCode, Landmark, Wallet } from 'lucide-react'
+import { BarChart3, CalendarDays, CalendarRange, CalendarSearch, Download, Banknote, CreditCard, Minus, QrCode, Landmark, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -417,39 +417,67 @@ export function Estadisticas() {
         </TabsList>
 
         <TabsContent value="resumen" className="flex flex-col gap-3">
-          {/* MATRIZ del núcleo financiero (pedido de Bruno: máxima densidad).
-              Filas = conceptos; columnas = Hoy | Mes en curso | Período. El
-              color queda solo en la fila Resultado. */}
-          <TablaResumenFinanciero
-            columnas={[
-              `Hoy (${new Date().toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })})`,
-              `Mes en curso (día ${rangosMes.diasTranscurridos} de ${rangosMes.diasDelMes})`,
-              `Período (${fromIso.slice(8, 10)}/${fromIso.slice(5, 7)} – ${toIso.slice(8, 10)}/${toIso.slice(5, 7)})`,
-            ]}
-            operaciones={[resumenDia.data?.hoy.count ?? 0, null, avgTicket.data?.count ?? 0]}
-            resultados={[resHoy.data, resMes.data, resPeriodo.data]}
-          />
-          <FilaDatos
-            titulo="Referencias"
-            items={[
-              { label: 'Ayer', value: formatCurrency(resumenDia.data?.ayer.total ?? '0') },
-              { label: 'Mismo día sem. anterior', value: formatCurrency(resumenDia.data?.mismoDiaSemanaAnterior.total ?? '0') },
-              {
-                label: 'Mes anterior a igual altura',
-                value:
-                  formatCurrency(avanceMes.data?.mesAnteriorParcial ?? '0') +
-                  (avanceMes.data?.variacionPct != null
-                    ? ` (${Number(avanceMes.data.variacionPct) >= 0 ? '+' : ''}${avanceMes.data.variacionPct}%)`
-                    : ''),
-              },
-              { label: 'Mes anterior completo', value: formatCurrency(avanceMes.data?.mesAnteriorCompleto ?? '0') },
-              { label: 'Proyección de cierre', value: `≈ ${formatCurrency(avanceMes.data?.proyeccionCierre ?? '0')}`, destacado: true },
-              { label: 'Ticket promedio del período', value: formatCurrency(avgTicket.data?.avg ?? '0') },
-            ]}
-          />
-
-          {/* Formas de pago con barras de participación: hoy y mes lado a lado. */}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {/* Tríptico HOY | MES | PERÍODO (panel de diseño, sep-2026): cada
+              tarjeta responde una pregunta del dueño con la misma anatomía —
+              ventas grandes, comparaciones, y el RESULTADO en la única banda
+              con color (verde ganancia / rojo pérdida). */}
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
+            <TarjetaHorizonte
+              icono={CalendarDays}
+              titulo="Hoy"
+              contexto={new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              heroe={formatCurrency(resumenDia.data?.hoy.total ?? '0')}
+              heroeDerecha={<span className="text-xs tabular-nums text-muted-foreground">{resumenDia.data?.hoy.count ?? 0} operación(es)</span>}
+              subEtiqueta="ventas de hoy"
+              comparaciones={[
+                { label: 'Ayer', value: formatCurrency(resumenDia.data?.ayer.total ?? '0'), tendencia: tendenciaVs(resumenDia.data?.hoy.total, resumenDia.data?.ayer.total) },
+                { label: 'Mismo día sem. anterior', value: formatCurrency(resumenDia.data?.mismoDiaSemanaAnterior.total ?? '0'), tendencia: tendenciaVs(resumenDia.data?.hoy.total, resumenDia.data?.mismoDiaSemanaAnterior.total) },
+              ]}
+              resultado={resHoy.data}
+              etiquetaResultado="Resultado del día"
+            />
+            <TarjetaHorizonte
+              icono={CalendarRange}
+              titulo="Mes en curso"
+              contexto={`${new Date().toLocaleDateString('es-AR', { month: 'long' })} — día ${rangosMes.diasTranscurridos} de ${rangosMes.diasDelMes}`}
+              heroe={formatCurrency(avanceMes.data?.mesActual ?? '0')}
+              heroeDerecha={
+                avanceMes.data?.variacionPct != null ? (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+                      Number(avanceMes.data.variacionPct) >= 0
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
+                        : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400'
+                    }`}
+                  >
+                    {Number(avanceMes.data.variacionPct) >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {Number(avanceMes.data.variacionPct) >= 0 ? '+' : ''}{avanceMes.data.variacionPct}%
+                  </span>
+                ) : null
+              }
+              subEtiqueta="frente a igual altura del mes anterior"
+              comparaciones={[
+                { label: 'Anterior a igual altura', value: formatCurrency(avanceMes.data?.mesAnteriorParcial ?? '0') },
+                { label: 'Anterior completo', value: formatCurrency(avanceMes.data?.mesAnteriorCompleto ?? '0') },
+                { label: 'Proyección de cierre', value: `≈ ${formatCurrency(avanceMes.data?.proyeccionCierre ?? '0')}`, destacar: true },
+              ]}
+              resultado={resMes.data}
+              etiquetaResultado="Resultado del mes"
+            />
+            <TarjetaHorizonte
+              icono={CalendarSearch}
+              titulo="Período seleccionado"
+              contexto={`${fromIso.slice(8, 10)}/${fromIso.slice(5, 7)} – ${toIso.slice(8, 10)}/${toIso.slice(5, 7)}`}
+              heroe={formatCurrency(totalRevenue)}
+              heroeDerecha={<span className="text-xs tabular-nums text-muted-foreground">{avgTicket.data?.count ?? 0} venta(s)</span>}
+              subEtiqueta="ventas netas del período"
+              comparaciones={[
+                { label: 'Ticket promedio', value: formatCurrency(avgTicket.data?.avg ?? '0') },
+                { label: 'Margen bruto', value: `${formatCurrency(grossMargin.amount)} · ${grossMargin.pct.toFixed(1)}%` },
+              ]}
+              resultado={resPeriodo.data}
+              etiquetaResultado="Resultado del período"
+            />
             <BarrasMedios titulo="Formas de pago — hoy" rows={vfpHoy.data ?? []} />
             <BarrasMedios titulo="Formas de pago — mes en curso" rows={vfpMes.data ?? []} />
           </div>
@@ -969,89 +997,87 @@ export function Estadisticas() {
   )
 }
 
-/** Fila de datos: una línea "Etiqueta: valor · Etiqueta: valor" (densidad máxima). */
-function FilaDatos({ titulo, items }: { titulo: string; items: Array<{ label: string; value: string; destacado?: boolean }> }) {
-  return (
-    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 rounded-md border bg-muted/30 px-3 py-1.5 text-xs">
-      <span className="font-semibold">{titulo}</span>
-      {items.map((it) => (
-        <span key={it.label} className="whitespace-nowrap text-muted-foreground">
-          {it.label}:{' '}
-          <span className={it.destacado ? 'font-bold text-foreground' : 'font-medium tabular-nums text-foreground'}>{it.value}</span>
-        </span>
-      ))}
-    </div>
-  )
+/** Tendencia de HOY frente a una referencia (solo signo visual, sin %). */
+function tendenciaVs(actual?: string, referencia?: string): 'up' | 'down' | 'flat' {
+  const a = Number(actual ?? 0)
+  const r = Number(referencia ?? 0)
+  if (r === 0 || Math.abs(a - r) < 0.005) return 'flat'
+  return a > r ? 'up' : 'down'
 }
 
 /**
- * Matriz del núcleo financiero: conceptos en filas, horizontes en columnas.
- * Es el formato de mayor densidad: todo el estado de resultados de los tres
- * horizontes en ~170px, comparable por columna Y por fila.
+ * Tarjeta del tríptico HOY/MES/PERÍODO: misma anatomía en las tres —
+ * encabezado, ventas en grande, comparaciones alineadas, ledger del
+ * resultado y banda final coloreada (el único color fuerte de la tarjeta).
  */
-function TablaResumenFinanciero({
-  columnas,
-  operaciones,
-  resultados,
+function TarjetaHorizonte({
+  icono: Icono,
+  titulo,
+  contexto,
+  heroe,
+  heroeDerecha,
+  subEtiqueta,
+  comparaciones,
+  resultado,
+  etiquetaResultado,
 }: {
-  columnas: [string, string, string]
-  operaciones: [number, number | null, number]
-  resultados: Array<{ ventasNetas: string; cmv: string; comisiones: string; resultado: string; margenPct: string | null } | undefined>
+  icono: typeof CalendarDays
+  titulo: string
+  contexto: string
+  heroe: string
+  heroeDerecha: React.ReactNode
+  subEtiqueta: string
+  comparaciones: Array<{ label: string; value: string; tendencia?: 'up' | 'down' | 'flat'; destacar?: boolean }>
+  resultado?: { ventasNetas: string; cmv: string; comisiones: string; resultado: string; margenPct: string | null }
+  etiquetaResultado: string
 }) {
-  const celda = 'px-2 py-1 text-right tabular-nums'
+  const negativo = Number(resultado?.resultado ?? 0) < 0
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b bg-muted/40 text-muted-foreground">
-            <th className="px-2 py-1 text-left font-medium" />
-            {columnas.map((c) => (
-              <th key={c} className="px-2 py-1 text-right font-semibold">{c}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="border-b">
-            <td className="px-2 py-1 text-muted-foreground">Ventas netas</td>
-            {resultados.map((r, i) => (
-              <td key={i} className={`${celda} font-semibold`}>
-                {formatCurrency(r?.ventasNetas ?? '0')}
-                {operaciones[i] != null && <span className="ml-1 font-normal text-muted-foreground">({operaciones[i]} op.)</span>}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b">
-            <td className="px-2 py-1 text-muted-foreground">Costo de mercadería</td>
-            {resultados.map((r, i) => (
-              <td key={i} className={celda}>− {formatCurrency(r?.cmv ?? '0')}</td>
-            ))}
-          </tr>
-          <tr className="border-b">
-            <td className="px-2 py-1 text-muted-foreground">Comisiones de medios</td>
-            {resultados.map((r, i) => (
-              <td key={i} className={celda}>− {formatCurrency(r?.comisiones ?? '0')}</td>
-            ))}
-          </tr>
-          <tr className="border-b bg-muted/20">
-            <td className="px-2 py-1 font-semibold">Resultado</td>
-            {resultados.map((r, i) => {
-              const neg = Number(r?.resultado ?? 0) < 0
-              return (
-                <td key={i} className={`${celda} font-bold ${neg ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                  {formatCurrency(r?.resultado ?? '0')}
-                </td>
-              )
-            })}
-          </tr>
-          <tr>
-            <td className="px-2 py-1 text-muted-foreground">Margen</td>
-            {resultados.map((r, i) => (
-              <td key={i} className={celda}>{r?.margenPct == null ? '—' : `${r.margenPct}%`}</td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <Card>
+      <CardContent className="flex h-full flex-col gap-1 p-2">
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Icono className="h-3.5 w-3.5" />
+          {titulo}
+          <span className="font-normal normal-case tracking-normal">· {contexto}</span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-lg font-bold leading-6 tabular-nums tracking-tight">{heroe}</span>
+          {heroeDerecha}
+        </div>
+        <div className="-mt-1 text-[10px] text-muted-foreground">{subEtiqueta}</div>
+        <div className="flex min-h-[48px] flex-col justify-start gap-0">
+          {comparaciones.map((c) => (
+            <div key={c.label} className="flex items-baseline justify-between text-[11px] leading-4">
+              <span className="truncate text-muted-foreground">{c.label}</span>
+              <span className={`flex items-center gap-1 tabular-nums ${c.destacar ? 'font-semibold' : 'font-medium'}`}>
+                {c.tendencia === 'up' && <TrendingUp className="h-3 w-3 text-emerald-600" />}
+                {c.tendencia === 'down' && <TrendingDown className="h-3 w-3 text-rose-600" />}
+                {c.tendencia === 'flat' && <Minus className="h-3 w-3 text-muted-foreground" />}
+                {c.value}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-auto flex flex-col gap-0 border-t border-dashed pt-0.5 text-[10px] leading-4">
+          <div className="flex justify-between"><span className="text-muted-foreground">Ventas netas</span><span className="tabular-nums">{formatCurrency(resultado?.ventasNetas ?? '0')}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Costo de mercadería</span><span className="tabular-nums"><span className="text-muted-foreground">− </span>{formatCurrency(resultado?.cmv ?? '0')}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Comisiones</span><span className="tabular-nums"><span className="text-muted-foreground">− </span>{formatCurrency(resultado?.comisiones ?? '0')}</span></div>
+        </div>
+        <div
+          className={`flex items-baseline justify-between rounded-md px-2 py-0.5 ${
+            negativo ? 'bg-rose-50 dark:bg-rose-950/40' : 'bg-emerald-50 dark:bg-emerald-950/40'
+          }`}
+        >
+          <span className={`text-[10px] font-semibold uppercase tracking-wide ${negativo ? 'text-rose-800 dark:text-rose-300' : 'text-emerald-800 dark:text-emerald-300'}`}>
+            {etiquetaResultado}
+          </span>
+          <span className={`text-sm font-bold tabular-nums ${negativo ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+            {formatCurrency(resultado?.resultado ?? '0')}
+            {resultado?.margenPct != null && <span className="ml-1 text-xs font-semibold">· {resultado.margenPct}%</span>}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -1065,8 +1091,8 @@ function BarrasMedios({
 }) {
   return (
     <Card>
-      <CardContent className="p-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{titulo}</div>
+      <CardContent className="p-2">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{titulo}</div>
         {rows.length === 0 ? (
           <div className="py-2 text-xs text-muted-foreground">Sin cobros en el rango.</div>
         ) : (
@@ -1075,7 +1101,7 @@ function BarrasMedios({
               const Icon = iconForMedio(r.name)
               const pct = Math.max(0, Math.min(100, Number(r.porcentajeDelTotal)))
               return (
-                <div key={r.paymentMethodId} className="grid grid-cols-[130px_1fr_auto] items-center gap-2 text-xs">
+                <div key={r.paymentMethodId} className="grid grid-cols-[90px_1fr_auto] items-center gap-1.5 text-[11px]">
                   <span className="flex items-center gap-1.5 truncate text-muted-foreground">
                     <Icon className="h-3 w-3 shrink-0" />{r.name}
                   </span>
