@@ -110,6 +110,29 @@ function dayEnd(iso: string): number {
 
 const DOW_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
+/** Porcentaje en formato argentino: coma decimal, 1 decimal ("37,9%"). */
+function formatPct(v: string | number | null | undefined): string {
+  if (v == null) return '—'
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n)) return '—'
+  return `${n.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+}
+/** Cantidad sin decimales muertos ("49" y no "49.00"; "2,5" si los tiene). */
+function formatQty(v: string | number): string {
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n)) return String(v)
+  return n.toLocaleString('es-AR', { maximumFractionDigits: 3 })
+}
+/** Plural real, sin "(s)". */
+function plural(n: number, singular: string, plurales: string): string {
+  return `${n} ${n === 1 ? singular : plurales}`
+}
+/** Eje monetario compacto es-AR para los gráficos. */
+function formatEjeMoneda(v: number): string {
+  if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 1 })} M`
+  return `$${v.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
+}
+
 /** Ícono por nombre de forma de pago. */
 function iconForMedio(name: string): typeof Wallet {
   const n = name.toLowerCase()
@@ -228,7 +251,6 @@ export function Estadisticas() {
     operaciones: vfpTotOper,
     ticket: vfpTotVentas > 0 ? vfpTotMonto / vfpTotVentas : 0,
   }
-  const totalSeleccionado = vfpTotMonto
 
   // Pivot largo → ancho para el gráfico de evolución temporal (sin useMemo).
   const vfpTiempoPivot = ((): Record<string, number | string>[] => {
@@ -427,7 +449,7 @@ export function Estadisticas() {
               titulo="Hoy"
               contexto={new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
               heroe={formatCurrency(resumenDia.data?.hoy.total ?? '0')}
-              heroeDerecha={<span className="text-xs tabular-nums text-muted-foreground">{resumenDia.data?.hoy.count ?? 0} operación(es)</span>}
+              heroeDerecha={<span className="text-xs tabular-nums text-muted-foreground">{plural(resumenDia.data?.hoy.count ?? 0, 'operación', 'operaciones')}</span>}
               subEtiqueta="ventas de hoy"
               comparaciones={[
                 { label: 'Ayer', value: formatCurrency(resumenDia.data?.ayer.total ?? '0'), tendencia: tendenciaVs(resumenDia.data?.hoy.total, resumenDia.data?.ayer.total) },
@@ -451,15 +473,19 @@ export function Estadisticas() {
                     }`}
                   >
                     {Number(avanceMes.data.variacionPct) >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {Number(avanceMes.data.variacionPct) >= 0 ? '+' : ''}{avanceMes.data.variacionPct}%
+                    {Number(avanceMes.data.variacionPct) >= 0 ? '+' : ''}{formatPct(avanceMes.data.variacionPct)}
                   </span>
                 ) : null
               }
               subEtiqueta="frente a igual altura del mes anterior"
               comparaciones={[
-                { label: 'Anterior a igual altura', value: formatCurrency(avanceMes.data?.mesAnteriorParcial ?? '0') },
+                { label: 'Mes anterior a esta altura', value: formatCurrency(avanceMes.data?.mesAnteriorParcial ?? '0') },
                 { label: 'Anterior completo', value: formatCurrency(avanceMes.data?.mesAnteriorCompleto ?? '0') },
-                { label: 'Proyección de cierre', value: `≈ ${formatCurrency(avanceMes.data?.proyeccionCierre ?? '0')}`, destacar: true },
+                {
+                  label: 'Proyección de cierre',
+                  value: Number(avanceMes.data?.mesActual ?? 0) > 0 ? `≈ ${formatCurrency(avanceMes.data?.proyeccionCierre ?? '0')}` : 'Sin datos para proyectar',
+                  destacar: Number(avanceMes.data?.mesActual ?? 0) > 0,
+                },
               ]}
               resultado={resMes.data}
               etiquetaResultado="Resultado del mes"
@@ -469,27 +495,19 @@ export function Estadisticas() {
               titulo="Período seleccionado"
               contexto={`${fromIso.slice(8, 10)}/${fromIso.slice(5, 7)} – ${toIso.slice(8, 10)}/${toIso.slice(5, 7)}`}
               heroe={formatCurrency(totalRevenue)}
-              heroeDerecha={<span className="text-xs tabular-nums text-muted-foreground">{avgTicket.data?.count ?? 0} venta(s)</span>}
+              heroeDerecha={<span className="text-xs tabular-nums text-muted-foreground">{plural(avgTicket.data?.count ?? 0, 'venta', 'ventas')}</span>}
               subEtiqueta="ventas netas del período"
               comparaciones={[
                 { label: 'Ticket promedio', value: formatCurrency(avgTicket.data?.avg ?? '0') },
-                { label: 'Margen bruto', value: `${formatCurrency(grossMargin.amount)} · ${grossMargin.pct.toFixed(1)}%` },
+                { label: 'Margen bruto', value: `${formatCurrency(grossMargin.amount)} · ${formatPct(grossMargin.pct)}` },
               ]}
               resultado={resPeriodo.data}
               etiquetaResultado="Resultado del período"
             />
-            <BarrasMedios titulo="Formas de pago — hoy" rows={vfpHoy.data ?? []} />
-            <BarrasMedios titulo="Formas de pago — mes en curso" rows={vfpMes.data ?? []} />
+            <BarrasMedios titulo="Formas de pago — hoy" vacio="Sin cobros registrados hoy." rows={vfpHoy.data ?? []} />
+            <BarrasMedios titulo="Formas de pago — mes en curso" vacio="Sin cobros registrados en el mes." rows={vfpMes.data ?? []} />
           </div>
 
-          <Card>
-            <CardContent className="pt-4">
-              <div className="text-xs text-muted-foreground">
-                Ventas por medios seleccionados{mediosSel.size === 0 ? ' (todos)' : ''}
-              </div>
-              <div className="mt-1 text-xl font-bold tabular-nums">{formatCurrency(totalSeleccionado)}</div>
-            </CardContent>
-          </Card>
           <Card>
             <CardContent className="pt-4">
               <h3 className="text-sm font-medium">Tendencia de ventas</h3>
@@ -499,7 +517,7 @@ export function Estadisticas() {
                   <LineChart data={trend.data ?? []}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="bucket" />
-                    <YAxis />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={formatEjeMoneda} width={70} />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                     <Line type="monotone" dataKey="total" stroke="#6366f1" name="Total" />
                   </LineChart>
@@ -516,7 +534,7 @@ export function Estadisticas() {
                   <BarChart data={(dow.data ?? []).map((d) => ({ ...d, name: DOW_NAMES[d.dayOfWeek] ?? d.dayOfWeek, totalN: Number(d.total) }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
-                    <YAxis />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={formatEjeMoneda} width={70} />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                     <Bar dataKey="totalN" fill="#10b981" name="Total" maxBarSize={32} />
                   </BarChart>
@@ -846,13 +864,13 @@ export function Estadisticas() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="gestion" className="flex flex-col gap-3">
+        <TabsContent value="gestion" className="flex flex-col gap-3 pb-14">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Card>
               <CardContent className="pt-4">
                 <div className="text-sm font-medium">Antigüedad de la deuda de clientes</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {aging.data ? `${aging.data.clientesConDeuda} cliente(s) con deuda — total ${formatCurrency(aging.data.total)}` : '…'}
+                  {aging.data ? `${plural(aging.data.clientesConDeuda, 'cliente', 'clientes')} con deuda — total ${formatCurrency(aging.data.total)}` : '…'}
                 </div>
                 <div className="mt-2 flex flex-col gap-1 text-sm tabular-nums">
                   {(aging.data?.buckets ?? []).map((b) => (
@@ -860,7 +878,7 @@ export function Estadisticas() {
                       <span>{b.rango}</span>
                       <span>
                         {formatCurrency(b.monto)}
-                        <span className="ml-2 text-xs text-muted-foreground">{b.comprobantes} comp.</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{plural(b.comprobantes, 'comprobante', 'comprobantes')}</span>
                       </span>
                     </div>
                   ))}
@@ -878,7 +896,7 @@ export function Estadisticas() {
                   <div className="flex justify-between"><span>Rechazados</span><span>{conversion.data?.rechazados ?? 0}</span></div>
                   <div className="flex justify-between font-semibold">
                     <span>Tasa de conversión</span>
-                    <span>{conversion.data?.tasaConversionPct == null ? '—' : `${conversion.data.tasaConversionPct}%`}</span>
+                    <span>{conversion.data?.tasaConversionPct == null ? '—' : formatPct(conversion.data.tasaConversionPct)}</span>
                   </div>
                 </div>
                 <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
@@ -892,7 +910,7 @@ export function Estadisticas() {
               <div className="text-sm font-medium">Stock sin movimiento (últimos 90 días)</div>
               <div className="mt-1 text-xs text-muted-foreground">
                 {sinMovimiento.data
-                  ? `${sinMovimiento.data.articulos} artículo(s) — capital inmovilizado ${formatCurrency(sinMovimiento.data.capitalTotal)} (valuado al costo)`
+                  ? `${plural(sinMovimiento.data.articulos, 'artículo', 'artículos')} — capital inmovilizado ${formatCurrency(sinMovimiento.data.capitalTotal)} (valuado al costo)`
                   : '…'}
               </div>
               <Table>
@@ -908,7 +926,7 @@ export function Estadisticas() {
                   {(sinMovimiento.data?.top ?? []).map((r) => (
                     <TableRow key={r.articleId}>
                       <TableCell className="text-sm">{r.description}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.stock}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatQty(r.stock)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(r.capitalInmovilizado)}</TableCell>
                       <TableCell className="text-right tabular-nums text-xs">
                         {r.ultimaVenta == null ? 'Sin ventas registradas' : new Date(r.ultimaVenta).toLocaleDateString('es-AR')}
@@ -935,9 +953,9 @@ export function Estadisticas() {
                   {(reposicion.data ?? []).map((r) => (
                     <TableRow key={r.articleId}>
                       <TableCell className="text-sm">{r.description}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.stock}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.minStock}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.vendidoEnRango}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatQty(r.stock)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatQty(r.minStock)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatQty(r.vendidoEnRango)}</TableCell>
                     </TableRow>
                   ))}
                   {(reposicion.data ?? []).length === 0 && (
@@ -1072,8 +1090,10 @@ function TarjetaHorizonte({
             {etiquetaResultado}
           </span>
           <span className={`text-sm font-bold tabular-nums ${negativo ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-            {formatCurrency(resultado?.resultado ?? '0')}
-            {resultado?.margenPct != null && <span className="ml-1 text-xs font-semibold">· {resultado.margenPct}%</span>}
+            <span className="whitespace-nowrap">
+              {formatCurrency(resultado?.resultado ?? '0')}
+              {resultado?.margenPct != null && <span className="ml-1 text-xs font-semibold">· {formatPct(resultado.margenPct)}</span>}
+            </span>
           </span>
         </div>
       </CardContent>
@@ -1085,16 +1105,18 @@ function TarjetaHorizonte({
 function BarrasMedios({
   titulo,
   rows,
+  vacio = 'Sin cobros en el período.',
 }: {
   titulo: string
   rows: Array<{ paymentMethodId: string; name: string; montoTotal: string; porcentajeDelTotal: string }>
+  vacio?: string
 }) {
   return (
     <Card>
       <CardContent className="p-2">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{titulo}</div>
         {rows.length === 0 ? (
-          <div className="py-2 text-xs text-muted-foreground">Sin cobros en el rango.</div>
+          <div className="flex h-full items-center justify-center py-2 text-[11px] text-muted-foreground">{vacio}</div>
         ) : (
           <div className="mt-1.5 flex flex-col gap-1">
             {rows.map((r) => {
@@ -1110,7 +1132,7 @@ function BarrasMedios({
                   </div>
                   <span className="tabular-nums">
                     {formatCurrency(r.montoTotal)}
-                    <span className="ml-1.5 text-muted-foreground">{r.porcentajeDelTotal}%</span>
+                    <span className="ml-1.5 text-muted-foreground">{formatPct(r.porcentajeDelTotal)}</span>
                   </span>
                 </div>
               )
@@ -1188,7 +1210,7 @@ function ProductTable({ title, rows }: { title: string; rows: Array<{ articleId:
                 <TableCell className="text-xs">{r.description}</TableCell>
                 <TableCell className="text-right tabular-nums text-xs">{r.quantity}</TableCell>
                 <TableCell className="text-right tabular-nums text-xs">{formatCurrency(r.revenue)}</TableCell>
-                <TableCell className="text-right tabular-nums text-xs">{r.marginPct == null ? 's/costo' : `${r.marginPct}%`}</TableCell>
+                <TableCell className="text-right tabular-nums text-xs">{r.marginPct == null ? 's/costo' : formatPct(r.marginPct)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

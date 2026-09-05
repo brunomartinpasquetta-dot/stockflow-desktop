@@ -38,7 +38,10 @@ const TabsContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
-    className={cn('mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', className)}
+    // data-[state=inactive]:hidden: el atributo `hidden` de Radix pierde contra
+    // clases display (flex/grid) y los paneles ocultos, aunque midan 0, cobran
+    // el gap del contenedor — en Estadísticas eso sumaba 160px de aire muerto.
+    className={cn('mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=inactive]:hidden', className)}
     {...props}
   />
 ))
