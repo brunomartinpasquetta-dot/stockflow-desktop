@@ -17,6 +17,7 @@ import type {
   ApiSurface,
   AssistantAskResultDTO,
   DemoStatusDTO,
+  CatalogoEstadisticasDTO,
   GuiaEstadoDTO,
   NovedadesPendientesDTO,
   OnboardingStatusDTO,
@@ -88,6 +89,8 @@ export const LAN_ROUTED_GROUPS = new Set([
   'accounting',
   'cashGeneral',
   'analytics',
+  // Catálogo web: la config vive en la base (companies) del servidor.
+  'catalogo',
   'audit',
   'maintenance',
   'fiscal',
@@ -282,6 +285,9 @@ export function createApiBridge(
       estado: () => c<GuiaEstadoDTO>('guia:estado'),
       progreso: (p) => c<{ ok: true }>('guia:progreso', p),
       vista: () => c<{ ok: true }>('guia:vista'),
+    },
+    catalogo: {
+      estadisticas: (p) => c<CatalogoEstadisticasDTO>('catalogo:estadisticas', p),
     },
     demo: {
       status: () => c<DemoStatusDTO>('demo:status'),

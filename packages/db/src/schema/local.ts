@@ -68,6 +68,10 @@ export const companies = sqliteTable(
      * backup y sobrevive a las actualizaciones.
      */
     logoDataUrl: text('logo_data_url'),
+    /** Integración con el catálogo web del comercio (migración 0025).
+     *  NULL = sin catálogo: Estadísticas oculta la pestaña "Catálogo web". */
+    catalogoUrl: text('catalogo_url'),
+    catalogoToken: text('catalogo_token'),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },

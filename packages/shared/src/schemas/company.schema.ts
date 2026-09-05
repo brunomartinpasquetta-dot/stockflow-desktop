@@ -20,6 +20,8 @@ export const CompanySchema = z.object({
   allowNegativeStock: z.boolean(),
   /** Logo para la factura, como data URL. */
   logoDataUrl: z.string().nullable(),
+  catalogoUrl: z.string().nullable(),
+  catalogoToken: z.string().nullable(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -39,6 +41,8 @@ const companyBase = z.object({
   priceMode: priceModeSchema.optional(),
   allowNegativeStock: z.boolean().optional(),
   logoDataUrl: z.string().nullable().optional(),
+  catalogoUrl: z.string().url('Dirección inválida').nullable().optional().or(z.literal('').transform(() => null)),
+  catalogoToken: z.string().nullable().optional(),
 });
 
 export const CreateCompanySchema = companyBase;

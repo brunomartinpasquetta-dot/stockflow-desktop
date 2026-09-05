@@ -169,6 +169,13 @@
       "when": 1786725682776,
       "tag": "0024_sale_line_cost_at_sale",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1786725682777,
+      "tag": "0025_company_catalogo_web",
+      "breakpoints": true
     }
   ]
 }

@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/format'
 import { usePermission } from '@/contexts/AuthContext'
+import { useCompany } from '@/lib/hooks'
 import { SinPermiso } from '@/components/SinPermiso'
 import {
   useTopProducts,
@@ -53,6 +54,7 @@ import {
   useStockSinMovimiento,
   useReposicionPrioritaria,
   useSalesByVendorReport,
+  useCatalogoEstadisticas,
 } from '@/lib/hooks'
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899', '#0ea5e9', '#f97316']
@@ -159,6 +161,11 @@ export function Estadisticas() {
 
   // Vendedores
   const vendedores = useSalesByVendorReport(range, activeTab === 'vendedores')
+
+  // Catálogo web (pestaña condicional: solo con la integración configurada)
+  const companyQuery = useCompany()
+  const catalogoIntegrado = Boolean(companyQuery.data?.catalogoUrl)
+  const catalogo = useCatalogoEstadisticas(range, activeTab === 'catalogo' && catalogoIntegrado)
 
   // Gestión
   const aging = useAntiguedadDeuda(activeTab === 'gestion')
@@ -406,6 +413,7 @@ export function Estadisticas() {
           <TabsTrigger value="pagos">Formas de Pago</TabsTrigger>
           <TabsTrigger value="tiempo">Tiempo</TabsTrigger>
           <TabsTrigger value="gestion">Gestión</TabsTrigger>
+          {catalogoIntegrado && <TabsTrigger value="catalogo">Catálogo web</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="resumen" className="flex flex-col gap-3">
@@ -944,6 +952,50 @@ export function Estadisticas() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="catalogo" className="flex flex-col gap-3">
+          {catalogo.data?.disponible === false ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                No se pudieron obtener las estadísticas del catálogo web.
+                {catalogo.data.motivo ? ` (${catalogo.data.motivo})` : ''} Verifique la dirección y la clave en Mi Empresa.
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <FilaDatosCatalogo
+                visitas={catalogo.data?.visitas ?? 0}
+                visitantes={catalogo.data?.visitantes ?? null}
+              />
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <TablaCatalogo
+                  titulo="Productos más vistos"
+                  descripcion="Artículos del catálogo con más visitas en el período."
+                  columnas={['Producto', 'Vistas']}
+                  filas={(catalogo.data?.productosMasVistos ?? []).map((r) => [r.descripcion, String(r.vistas)])}
+                />
+                <TablaCatalogo
+                  titulo="Productos más comprados"
+                  descripcion="Artículos con más unidades pedidas desde el catálogo en el período."
+                  columnas={['Producto', 'Cantidad']}
+                  filas={(catalogo.data?.productosMasComprados ?? []).map((r) => [r.descripcion, String(r.cantidad)])}
+                />
+                <TablaCatalogo
+                  titulo="Términos más buscados"
+                  descripcion="Qué buscan los visitantes dentro del catálogo."
+                  columnas={['Búsqueda', 'Veces']}
+                  filas={(catalogo.data?.terminosMasBuscados ?? []).map((r) => [r.termino, String(r.veces)])}
+                />
+                <TablaCatalogo
+                  titulo="Búsquedas sin resultado"
+                  descripcion="Lo que los visitantes buscan y el catálogo no ofrece: demanda sin cubrir."
+                  columnas={['Búsqueda', 'Veces']}
+                  filas={(catalogo.data?.busquedasSinResultado ?? []).map((r) => [r.termino, String(r.veces)])}
+                />
+              </div>
+            </>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   )
@@ -1069,6 +1121,50 @@ function BarrasMedios({
             })}
           </div>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Franja de visitas del catálogo web. */
+function FilaDatosCatalogo({ visitas, visitantes }: { visitas: number; visitantes: number | null }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-4 rounded-md border bg-muted/30 px-3 py-1.5 text-xs">
+      <span className="font-semibold">Catálogo web — período seleccionado</span>
+      <span className="text-muted-foreground">Visitas: <span className="font-medium tabular-nums text-foreground">{visitas}</span></span>
+      {visitantes != null && (
+        <span className="text-muted-foreground">Visitantes: <span className="font-medium tabular-nums text-foreground">{visitantes}</span></span>
+      )}
+    </div>
+  )
+}
+
+/** Tabla simple de dos columnas para las estadísticas del catálogo. */
+function TablaCatalogo({ titulo, descripcion, columnas, filas }: { titulo: string; descripcion: string; columnas: [string, string]; filas: string[][] }) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <h3 className="text-sm font-medium">{titulo}</h3>
+        <p className="mb-2 text-xs text-muted-foreground">{descripcion}</p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{columnas[0]}</TableHead>
+              <TableHead className="text-right">{columnas[1]}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filas.map((f, i) => (
+              <TableRow key={i}>
+                <TableCell className="text-sm">{f[0]}</TableCell>
+                <TableCell className="text-right tabular-nums">{f[1]}</TableCell>
+              </TableRow>
+            ))}
+            {filas.length === 0 && (
+              <TableRow><TableCell colSpan={2} className="py-4 text-center text-xs text-muted-foreground">Sin datos en el período.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   )

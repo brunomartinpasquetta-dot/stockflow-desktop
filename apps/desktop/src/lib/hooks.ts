@@ -442,6 +442,15 @@ export function useTopSuppliers(input: DR & { limit?: number }, enabled = true) 
     enabled,
   })
 }
+export function useCatalogoEstadisticas(input: { from: number; to: number }, enabled = true) {
+  return useQuery({
+    queryKey: ['catalogo', 'estadisticas', input],
+    queryFn: () => api.catalogo.estadisticas(input),
+    enabled,
+    retry: false,
+  })
+}
+
 export function useResumenDelDia(input: Parameters<typeof api.analytics.resumenDelDia>[0], enabled = true) {
   return useQuery({
     queryKey: ['analytics', 'resumenDelDia', input],

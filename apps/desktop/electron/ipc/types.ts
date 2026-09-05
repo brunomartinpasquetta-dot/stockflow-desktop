@@ -219,6 +219,8 @@ export interface CompanyDTO {
   allowNegativeStock: boolean;
   /** Logo del comercio para la factura (data URL). */
   logoDataUrl?: string | null;
+  catalogoUrl?: string | null;
+  catalogoToken?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -1539,6 +1541,21 @@ export interface NovedadesPendientesDTO {
   internas: boolean;
 }
 
+/** Estadísticas del catálogo web (contrato en catalogo.handlers.ts). */
+export interface CatalogoEstadisticasDTO {
+  /** false = el comercio no tiene catálogo configurado: no mostrar la pestaña. */
+  integrado: boolean;
+  /** true = el catálogo respondió; false = configurado pero inaccesible. */
+  disponible?: boolean;
+  motivo?: string;
+  visitas?: number;
+  visitantes?: number | null;
+  productosMasVistos?: Array<{ descripcion: string; vistas: number }>;
+  productosMasComprados?: Array<{ descripcion: string; cantidad: number }>;
+  terminosMasBuscados?: Array<{ termino: string; veces: number }>;
+  busquedasSinResultado?: Array<{ termino: string; veces: number }>;
+}
+
 /** Guía de primeros pasos: estado one-shot por máquina. */
 
 /** Estadísticas: resumen del día (hoy / ayer / mismo día de la semana anterior). */
@@ -1787,6 +1804,9 @@ export interface ApiSurface {
     estado(): Res<GuiaEstadoDTO>;
     progreso(payload: { paso: number }): Res<{ ok: true }>;
     vista(): Res<{ ok: true }>;
+  };
+  catalogo: {
+    estadisticas(payload: DateRangeDTO): Res<CatalogoEstadisticasDTO>;
   };
   demo: {
     status(): Res<DemoStatusDTO>;

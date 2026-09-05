@@ -24,6 +24,7 @@ import type {
   ImportMappingDTO,
   ImportOptionsDTO,
   ImportValidationResultDTO,
+  CatalogoEstadisticasDTO,
   GuiaEstadoDTO,
   NovedadesPendientesDTO,
   OnboardingStatusDTO,
@@ -161,6 +162,10 @@ export const api = {
     estado: (): Promise<GuiaEstadoDTO> => unwrap(sf().guia.estado()),
     progreso: (paso: number): Promise<{ ok: true }> => unwrap(sf().guia.progreso({ paso })),
     vista: (): Promise<{ ok: true }> => unwrap(sf().guia.vista()),
+  },
+  catalogo: {
+    estadisticas: (input: { from: number; to: number }): Promise<CatalogoEstadisticasDTO> =>
+      unwrap(sf().catalogo.estadisticas(input)),
   },
   onboarding: {
     status: (): Promise<OnboardingStatusDTO> => unwrap(sf().onboarding.status()),

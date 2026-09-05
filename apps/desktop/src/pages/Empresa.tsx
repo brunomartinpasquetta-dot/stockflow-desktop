@@ -24,6 +24,9 @@ interface FormState {
   allowNegativeStock: boolean
   /** Logo para la factura, como data URL. `null` = sin logo. */
   logoDataUrl: string | null
+  /** Integración con el catálogo web (vacío = sin catálogo). */
+  catalogoUrl: string
+  catalogoToken: string
 }
 
 function fromCompany(c: CompanyDTO): FormState {
@@ -37,6 +40,8 @@ function fromCompany(c: CompanyDTO): FormState {
     priceMode: c.priceMode,
     allowNegativeStock: c.allowNegativeStock,
     logoDataUrl: c.logoDataUrl ?? null,
+    catalogoUrl: c.catalogoUrl ?? '',
+    catalogoToken: c.catalogoToken ?? '',
   }
 }
 
@@ -121,6 +126,8 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
         cuit: form.cuit.trim() || null,
         logoDataUrl: form.logoDataUrl,
         ingBrutos: form.ingBrutos.trim() || null,
+        catalogoUrl: form.catalogoUrl.trim() || null,
+        catalogoToken: form.catalogoToken.trim() || null,
         priceMode: form.priceMode,
         allowNegativeStock: form.allowNegativeStock,
       }),
@@ -168,6 +175,23 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
           <div className="flex flex-col gap-1">
             <Label htmlFor="emp-iibb">Ingresos Brutos</Label>
             <Input id="emp-iibb" value={form.ingBrutos} onChange={(e) => set('ingBrutos', e.target.value)} />
+          </div>
+          <div className="col-span-2 mt-2 flex flex-col gap-2 border-t pt-3">
+            <div className="text-sm font-medium">Catálogo web (integración)</div>
+            <p className="text-xs text-muted-foreground">
+              Si el comercio tiene su catálogo web de StockFlow, al cargar estos datos la pantalla de
+              Estadísticas incorpora la pestaña con las visitas, los productos más vistos y las búsquedas.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="emp-cat-url">Dirección del catálogo</Label>
+                <Input id="emp-cat-url" placeholder="https://catalogo.sucomercio.com.ar" value={form.catalogoUrl} onChange={(e) => set('catalogoUrl', e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="emp-cat-token">Clave de acceso</Label>
+                <Input id="emp-cat-token" value={form.catalogoToken} onChange={(e) => set('catalogoToken', e.target.value)} />
+              </div>
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="emp-phone">Teléfono</Label>
