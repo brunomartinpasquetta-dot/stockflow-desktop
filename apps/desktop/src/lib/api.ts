@@ -443,6 +443,7 @@ export const api = {
     conversionPresupuestos: (input: { from: number; to: number }) => unwrap(sf().analytics.conversionPresupuestos(input)),
     stockSinMovimiento: (input: { dias?: number; limit?: number }) => unwrap(sf().analytics.stockSinMovimiento(input)),
     reposicionPrioritaria: (input: { from: number; to: number; limit?: number }) => unwrap(sf().analytics.reposicionPrioritaria(input)),
+    ventasDeArticulo: (input: { from: number; to: number; articleId: string }) => unwrap(sf().analytics.ventasDeArticulo(input)),
     getTopSellingProducts: (input: { from: number; to: number; limit?: number }) =>
       unwrap(sf().analytics.getTopSellingProducts(input)),
     getBottomSellingProducts: (input: { from: number; to: number; limit?: number }) =>

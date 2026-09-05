@@ -451,6 +451,14 @@ export function useCatalogoEstadisticas(input: { from: number; to: number }, ena
   })
 }
 
+export function useVentasDeArticulo(input: { from: number; to: number; articleId: string }, enabled = true) {
+  return useQuery({
+    queryKey: ['analytics', 'ventasDeArticulo', input],
+    queryFn: () => api.analytics.ventasDeArticulo(input),
+    enabled: enabled && input.articleId.length > 0,
+  })
+}
+
 export function useResumenDelDia(input: Parameters<typeof api.analytics.resumenDelDia>[0], enabled = true) {
   return useQuery({
     queryKey: ['analytics', 'resumenDelDia', input],

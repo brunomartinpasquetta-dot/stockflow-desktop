@@ -1613,6 +1613,12 @@ export interface AnalyticsStockSinMovimientoDTO {
   articulos: number;
   top: AnalyticsStockSinMovimientoRowDTO[];
 }
+export interface AnalyticsVentasDeArticuloDTO {
+  cantidad: string;
+  monto: string;
+  operaciones: number;
+  margenPct: string | null;
+}
 export interface AnalyticsReposicionPrioritariaRowDTO {
   articleId: string;
   description: string;
@@ -2002,6 +2008,7 @@ export interface ApiSurface {
     conversionPresupuestos(payload: DateRangeDTO): Res<AnalyticsConversionPresupuestosDTO>;
     stockSinMovimiento(payload: { dias?: number; limit?: number }): Res<AnalyticsStockSinMovimientoDTO>;
     reposicionPrioritaria(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsReposicionPrioritariaRowDTO[]>;
+    ventasDeArticulo(payload: DateRangeDTO & { articleId: string }): Res<AnalyticsVentasDeArticuloDTO>;
     getStockRotation(payload: DateRangeDTO & { limit?: number }): Res<AnalyticsStockRotationRowDTO[]>;
   };
   priceUpdate: {

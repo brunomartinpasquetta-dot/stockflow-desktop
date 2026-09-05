@@ -183,6 +183,14 @@ export interface StockSinMovimientoResult {
   top: StockSinMovimientoRow[];
 }
 
+export interface VentasDeArticuloResult {
+  cantidad: string;
+  monto: string;
+  operaciones: number;
+  /** null = sin costo conocido. */
+  margenPct: string | null;
+}
+
 export interface ReposicionPrioritariaRow {
   articleId: string;
   description: string;
@@ -935,5 +943,30 @@ export class AnalyticsService {
       minStock: fmt(r.minStock),
       vendidoEnRango: fmt(r.vendido),
     }));
+  }
+  /** Ventas de UN artículo en el rango: cantidad, monto, operaciones y margen. */
+  async getVentasDeArticulo(input: DateRange & { articleId: string }): Promise<VentasDeArticuloResult> {
+    this.requireRead();
+    const row = this.ctx.db.$client
+      .prepare(`
+        SELECT
+          COALESCE(SUM(CAST(sl.quantity AS REAL)), 0) AS cantidad,
+          COALESCE(SUM(CAST(sl.line_total AS REAL)), 0) AS monto,
+          COUNT(DISTINCT sl.sale_id) AS operaciones,
+          COALESCE(SUM(CAST(sl.quantity AS REAL) * CAST(COALESCE(sl.cost_at_sale, a.cost_price) AS REAL)), 0) AS costo
+        FROM sale_lines sl
+        JOIN sales s ON s.id = sl.sale_id
+        JOIN articles a ON a.id = sl.article_id
+        WHERE sl.article_id = ? AND s.status != 'voided' AND s.date BETWEEN ? AND ?
+      `)
+      .get(input.articleId, input.from, input.to) as { cantidad: number; monto: number; operaciones: number; costo: number };
+    const sinCosto = (row.costo || 0) <= 0 && (row.monto || 0) > 0;
+    const margen = row.monto > 0 ? ((row.monto - row.costo) / row.monto) * 100 : 0;
+    return {
+      cantidad: fmt(row.cantidad),
+      monto: fmt(row.monto),
+      operaciones: row.operaciones || 0,
+      margenPct: sinCosto ? null : fmt(margen),
+    };
   }
 }

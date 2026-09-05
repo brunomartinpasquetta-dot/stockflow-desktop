@@ -4,7 +4,7 @@
  * 6 tabs: Resumen, Productos, Clientes, Proveedores, Formas de Pago, Tiempo.
  * Gráficos con `recharts`. Export Excel multi-sheet.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import {
   BarChart,
@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/format'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCompany } from '@/lib/hooks'
@@ -56,6 +57,7 @@ import {
   useReposicionPrioritaria,
   useSalesByVendorReport,
   useCatalogoEstadisticas,
+  useVentasDeArticulo,
 } from '@/lib/hooks'
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899', '#0ea5e9', '#f97316']
@@ -422,7 +424,7 @@ export function Estadisticas() {
             <Label className="text-xs">Hasta</Label>
             <Input type="date" value={toIso} onChange={(e) => { setToIso(e.target.value); setPreset('custom') }} />
           </div>
-          {(vfp.data ?? []).length > 0 && (
+          {activeTab === 'pagos' && (vfp.data ?? []).length > 0 && (
             <div className="flex w-full flex-col gap-1">
               <Label className="text-xs">Formas de pago</Label>
               <div className="flex flex-wrap items-center gap-1">
@@ -578,6 +580,7 @@ export function Estadisticas() {
         </TabsContent>
 
         <TabsContent value="productos" className="flex flex-col gap-3">
+          <ConsultaArticulo range={range} />
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <ProductTable title="Top 10 más vendidos" rows={topP.data ?? []} />
             <ProductTable title="Bottom 10 menos vendidos" rows={bottomP.data ?? []} />
@@ -593,15 +596,15 @@ export function Estadisticas() {
                       data={(margin.data ?? []).map((r) => ({ name: r.familyName, value: Number(r.margin) }))}
                       dataKey="value"
                       nameKey="name"
-                      outerRadius={90}
-                      label
+                      outerRadius={62}
+                      innerRadius={30}
                     >
                       {(margin.data ?? []).map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Legend />
+                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -1186,6 +1189,68 @@ function MediosHoyMes({
           {col('Hoy', hoy)}
           {col('Mes en curso', mes)}
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Consulta por artículo: buscar un producto y ver cuánto se vendió en el
+ * período seleccionado (pedido de Bruno, sep-2026).
+ */
+function ConsultaArticulo({ range }: { range: { from: number; to: number } }) {
+  const [busqueda, setBusqueda] = useState('')
+  const [resultados, setResultados] = useState<Array<{ id: string; description: string; brand: string | null; barcode: string }>>([])
+  const [elegido, setElegido] = useState<{ id: string; description: string; brand: string | null } | null>(null)
+  const ventas = useVentasDeArticulo({ ...range, articleId: elegido?.id ?? '' }, elegido != null)
+
+  useEffect(() => {
+    const q = busqueda.trim()
+    if (q.length < 2) { setResultados([]); return }
+    const timer = setTimeout(() => {
+      void api.articles.searchByText(q).then((arts) => {
+        setResultados(arts.slice(0, 8).map((a) => ({ id: a.id, description: a.description, brand: a.brand, barcode: a.barcode })))
+      }).catch(() => setResultados([]))
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [busqueda])
+
+  return (
+    <Card>
+      <CardContent className="p-3">
+        <div className="text-sm font-medium">Consulta por artículo</div>
+        <p className="mb-2 text-xs text-muted-foreground">Cantidad vendida de un artículo en el período seleccionado.</p>
+        <div className="relative max-w-md">
+          <Input
+            placeholder="Buscar artículo por nombre, código o marca…"
+            value={busqueda}
+            onChange={(e) => { setBusqueda(e.target.value); setElegido(null) }}
+          />
+          {resultados.length > 0 && elegido == null && (
+            <div className="absolute z-20 mt-1 w-full rounded-md border bg-background shadow-lg">
+              {resultados.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className="flex w-full items-baseline justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent"
+                  onClick={() => { setElegido(a); setBusqueda(a.description); setResultados([]) }}
+                >
+                  <span className="truncate">{a.description}{a.brand ? ` — ${a.brand}` : ''}</span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{a.barcode}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {elegido && (
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 rounded-md border bg-muted/30 px-3 py-1.5 text-xs">
+            <span className="max-w-[300px] truncate font-semibold">{elegido.description}</span>
+            <span className="text-muted-foreground">Cantidad vendida: <span className="font-bold tabular-nums text-foreground">{formatQty(ventas.data?.cantidad ?? '0')}</span></span>
+            <span className="text-muted-foreground">Monto: <span className="font-medium tabular-nums text-foreground">{formatCurrency(ventas.data?.monto ?? '0')}</span></span>
+            <span className="text-muted-foreground">Operaciones: <span className="font-medium tabular-nums text-foreground">{ventas.data?.operaciones ?? 0}</span></span>
+            <span className="text-muted-foreground">Margen: <span className="font-medium tabular-nums text-foreground">{ventas.data?.margenPct == null ? 's/costo' : formatPct(ventas.data.margenPct)}</span></span>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

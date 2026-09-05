@@ -21,6 +21,7 @@ import type {
   AnalyticsConversionPresupuestosDTO,
   AnalyticsStockSinMovimientoDTO,
   AnalyticsReposicionPrioritariaRowDTO,
+  AnalyticsVentasDeArticuloDTO,
 } from '../types';
 
 type DateRange = { from: number; to: number };
@@ -131,6 +132,11 @@ export function buildAnalyticsHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       (payload: DateRange & { limit?: number }, ctx): Promise<AnalyticsReposicionPrioritariaRowDTO[]> =>
         new AnalyticsService(ctx).getReposicionPrioritaria(payload),
+    ),
+    'analytics:ventasDeArticulo': withSession(
+      deps,
+      (payload: DateRange & { articleId: string }, ctx): Promise<AnalyticsVentasDeArticuloDTO> =>
+        new AnalyticsService(ctx).getVentasDeArticulo(payload),
     ),
   };
 }

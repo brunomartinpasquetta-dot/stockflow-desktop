@@ -595,6 +595,7 @@ export function createApiBridge(
       conversionPresupuestos: (p) => c<never>('analytics:conversionPresupuestos', p),
       stockSinMovimiento: (p) => c<never>('analytics:stockSinMovimiento', p),
       reposicionPrioritaria: (p) => c<never>('analytics:reposicionPrioritaria', p),
+      ventasDeArticulo: (p) => c<never>('analytics:ventasDeArticulo', p),
       getTopSellingProducts: (p) => c<never>('analytics:getTopSellingProducts', p),
       getBottomSellingProducts: (p) => c<never>('analytics:getBottomSellingProducts', p),
       getPaymentMethodsRanking: (p) => c<never>('analytics:getPaymentMethodsRanking', p),
