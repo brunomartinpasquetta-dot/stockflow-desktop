@@ -1110,7 +1110,15 @@ function PDV() {
       lines,
       customerName:
         cf || !customer ? null : `${customer.lastName}${customer.firstName ? `, ${customer.firstName}` : ''}`,
-      customerDoc: !cf && customer?.docNumber ? `${customer.docType ?? ''} ${customer.docNumber}`.trim() : null,
+      // El documento que se imprime es el que se INFORMÓ: si se cargó a mano en
+      // la venta, ese. Si no, el de la ficha. En un comercio que entrega solo el
+      // ticket térmico, ese papel ES el comprobante que se lleva el cliente.
+      customerDoc:
+        docReceptor.tipo !== 'CF' && docReceptor.nro.trim() !== ''
+          ? `${docReceptor.tipo} ${docReceptor.nro.trim()}`
+          : !cf && customer?.docNumber
+            ? `${customer.docType ?? ''} ${customer.docNumber}`.trim()
+            : null,
       customerVatCondition: cf || !customer ? null : VAT_CONDITION_LABELS[customer.category] ?? null,
       sellerName: currentUser?.fullName ?? null,
       isAccountSale: result.sale.isAccountSale,
