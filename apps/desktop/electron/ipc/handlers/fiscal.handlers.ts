@@ -428,7 +428,12 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
     'fiscal:issueInvoice': withSession(
       deps,
       async (
-        payload: { saleId: string; salePoint: number; letter?: 'A' | 'B' | 'C' },
+        payload: {
+          saleId: string;
+          salePoint: number;
+          letter?: 'A' | 'B' | 'C';
+          receiverDoc?: { docType: string | null; docNumber: string | null };
+        },
         ctx,
       ): Promise<IssuedVoucherDTO> => {
         const svc = new FiscalService(ctx, buildGateway(deps));

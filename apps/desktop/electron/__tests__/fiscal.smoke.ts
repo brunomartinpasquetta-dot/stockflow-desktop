@@ -224,6 +224,34 @@ async function main(): Promise<void> {
     check('existe el cliente CONSUMIDOR FINAL del seed', false);
   }
 
+  /* ------- Documento cargado en la venta (pisa el de la ficha) ------- */
+  console.log('\n[documento del receptor cargado en la venta]');
+  if (cfSeed) {
+    const saleId = await venderA(cfSeed.id, 'B');
+    const v = await service.issueInvoiceForSale({
+      saleId,
+      salePoint: 1,
+      receiverDoc: { docType: 'DNI', docNumber: '36.724.776' },
+    });
+    const xml = ultimoPedidoCae();
+    check(
+      'el DNI cargado en la venta viaja a ARCA, aunque la ficha no lo tenga',
+      xml.includes('<ar:DocTipo>96</ar:DocTipo>') && xml.includes('<ar:DocNro>36724776</ar:DocNro>'),
+      `DocTipo/DocNro enviados: ${/<ar:DocTipo>(\d+)<\/ar:DocTipo>/.exec(xml)?.[1]}/${/<ar:DocNro>(\d+)<\/ar:DocNro>/.exec(xml)?.[1]}`,
+    );
+    check(
+      '… y la condición IVA sigue saliendo de la ficha (consumidor final)',
+      condicionEnviada(xml) === RECEIVER_VAT_CONDITION_IDS.CF,
+      `enviado: ${condicionEnviada(xml)}`,
+    );
+    const guardado = repos.fiscal.findVoucherById(v.id);
+    check(
+      '… y queda congelado en el comprobante',
+      guardado?.customerDocType === 96 && guardado?.customerDocNumber === '36724776',
+      `${guardado?.customerDocType}/${guardado?.customerDocNumber}`,
+    );
+  }
+
   /* ------------- Combinaciones que ARCA rechaza (10243) -------------- */
   console.log('\n[validaciones locales: no se pide CAE si ARCA lo va a rechazar]');
   const cuit = { docType: 80, docNumber: '27222222228' };

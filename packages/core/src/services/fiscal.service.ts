@@ -73,6 +73,12 @@ export interface IssueInvoiceInput {
   salePoint: number;
   /** Fuerza la letra (por defecto se deduce del cliente). */
   letter?: VoucherLetter;
+  /**
+   * Documento del receptor cargado EN LA VENTA. Pisa el de la ficha del
+   * cliente: al que pide factura en el mostrador se le toma el documento en el
+   * momento, sin darlo de alta como cliente.
+   */
+  receiverDoc?: { docType?: string | null; docNumber?: string | null };
 }
 
 export interface IssueNoteInput {
@@ -165,7 +171,10 @@ export class FiscalService {
         cfg.vatCondition as IssuerVatCondition,
         customer.category as CustomerVatCategory,
       );
-    const doc = resolveCustomerDoc(customer.docType, customer.docNumber);
+    const doc = resolveCustomerDoc(
+      (input.receiverDoc?.docType ?? customer.docType) as Parameters<typeof resolveCustomerDoc>[0],
+      input.receiverDoc?.docNumber ?? customer.docNumber,
+    );
     // Condición IVA del receptor: sale de la categoría fiscal del cliente y es
     // obligatoria en todo comprobante (RG 5616), consumidor final incluido.
     const receiverVatConditionId = resolveReceiverVatConditionId(

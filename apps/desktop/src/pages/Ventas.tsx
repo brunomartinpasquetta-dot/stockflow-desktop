@@ -41,7 +41,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQuery } from '@tanstack/react-query'
-import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, PriceMode, PrinterConfigDTO, VoucherType } from '@/types/api'
+import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, DocType, PriceMode, PrinterConfigDTO, VoucherType } from '@/types/api'
 
 interface CartLine {
   /**
@@ -70,15 +70,17 @@ function cartLineLabel(l: CartLine): string {
   return l.article?.description ?? l.description ?? 'Artículo rápido'
 }
 
-// Opciones del comprobante. Cuando la facturación electrónica está configurada
-// y activa, las facturas se emiten con CAE real; si no, quedan marcadas
-// "requiere ARCA" y solo el Remito X (no fiscal) es utilizable.
-function voucherOptions(fiscalEnabled: boolean): { value: VoucherType; label: string }[] {
-  // Sin facturación electrónica ACTIVA sólo se puede emitir Remito X. Antes se
-  // ofrecían A/B/C igual y la venta salía impresa como "FACTURA A" SIN CAE: un
-  // papel que parece fiscal y no lo es. Le pasó a Leo Citzia — creyó que estaba
-  // facturando y no había ni un comprobante emitido.
-  if (!fiscalEnabled) return [{ value: 'X', label: 'Remito X (no fiscal)' }]
+// Opciones del comprobante. Basta con que la facturación electrónica esté
+// CONFIGURADA: el tilde "Facturar todas las ventas" decide el comprobante por
+// defecto, no qué se puede emitir. El comercio que trabaja con remito y factura
+// una venta cada tanto tiene que poder elegirla en el momento, sin ir a
+// cambiar una configuración general y volver a dejarla como estaba.
+function voucherOptions(fiscalDisponible: boolean): { value: VoucherType; label: string }[] {
+  // Sin facturación electrónica configurada sólo se puede emitir Remito X.
+  // Antes se ofrecían A/B/C igual y la venta salía impresa como "FACTURA A" SIN
+  // CAE: un papel que parece fiscal y no lo es. Le pasó a Leo Citzia — creyó
+  // que estaba facturando y no había ni un comprobante emitido.
+  if (!fiscalDisponible) return [{ value: 'X', label: 'Remito X (no fiscal)' }]
   return [
     { value: 'X', label: 'Remito X (no fiscal)' },
     { value: 'A', label: 'Factura A (con CAE)' },
@@ -651,12 +653,26 @@ function PDV() {
     setVoucherType(tipoSugerido)
   }
   /**
+   * DOCUMENTO DEL RECEPTOR PARA ESTA VENTA.
+   *
+   * Arranca con el de la ficha del cliente y se puede completar en el momento:
+   * al que pasa por el mostrador y pide factura no se le arma una ficha, pero
+   * el documento hay que poder cargárselo igual. `null` = todavía no se tocó,
+   * así sigue al cliente elegido; apenas se escribe, manda lo escrito.
+   */
+  const [docManual, setDocManual] = useState<{ tipo: DocType; nro: string } | null>(null)
+  const docReceptor = docManual ?? {
+    tipo: (selectedCustomer?.docType ?? 'CF') as DocType,
+    nro: selectedCustomer?.docNumber ?? '',
+  }
+
+  /**
    * Una Factura A exige el CUIT del receptor: sin él ARCA la rechaza. Se avisa
    * ANTES de cobrar — si se descubre al pedir el CAE, la venta ya está hecha y
    * el comprobante queda pendiente con el cliente en el mostrador.
    */
   const faltaCuitParaFacturaA =
-    voucherType === 'A' && selectedCustomer != null && selectedCustomer.docType !== 'CUIT'
+    voucherType === 'A' && (docReceptor.tipo !== 'CUIT' || docReceptor.nro.trim() === '')
 
   const activeSalePoints = useMemo(
     () => (salePointsQuery.data ?? []).filter((p) => p.active),
@@ -854,6 +870,9 @@ function PDV() {
   function elegirCliente(id: string | null): void {
     setCustomerId(id)
     setTipoForzado(false)
+    // El documento vuelve a seguir al cliente nuevo: lo tipeado para el
+    // anterior no puede quedar pegado.
+    setDocManual(null)
   }
 
   function clearSale(): void {
@@ -863,6 +882,11 @@ function PDV() {
     setIsAccountSale(false)
     setMixedMode(false)
     split.reset()
+    // El documento cargado a mano vale para ESA venta. Y el comprobante vuelve
+    // a la sugerencia: si se facturó una venta suelta trabajando con remito, la
+    // siguiente no puede salir facturada sin que nadie lo pida.
+    setDocManual(null)
+    setTipoForzado(false)
     // La búsqueda SÍ se limpia acá: durante la venta el desplegable queda
     // abierto para cargar varios del mismo resultado, pero terminada la venta
     // la siguiente arranca de cero, sin la lista de la anterior tapando.
@@ -1180,6 +1204,8 @@ function PDV() {
             saleId: result.sale.id,
             salePoint: effectiveSalePoint,
             letter: voucherType,
+            // El documento cargado en la venta manda sobre el de la ficha.
+            receiverDoc: { docType: docReceptor.tipo, docNumber: docReceptor.nro },
           })
           fiscal = {
             cae: v.cae,
@@ -1367,7 +1393,7 @@ function PDV() {
               setTipoForzado(true)
             }}
           >
-            {voucherOptions(fiscalEnabled && facturar).map((o) => (
+            {voucherOptions(fiscalEnabled).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -1420,11 +1446,43 @@ function PDV() {
               La facturación electrónica no está activa: se registrará sin CAE.
             </span>
           )}
+          {/* Documento del receptor: aparece al elegir una factura, que es
+              cuando ARCA lo pide. En Remito X no tiene sentido y sería ruido. */}
+          {fiscalEnabled && voucherType !== 'X' && (
+            <div className="mt-1 flex items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Documento del cliente</Label>
+                <Select
+                  className="w-28"
+                  value={docReceptor.tipo}
+                  onChange={(e) =>
+                    setDocManual({ tipo: e.target.value as DocType, nro: docReceptor.nro })
+                  }
+                >
+                  <option value="CF">Sin identificar</option>
+                  <option value="DNI">DNI</option>
+                  <option value="CUIT">CUIT</option>
+                  <option value="CUIL">CUIL</option>
+                  <option value="PASS">Pasaporte</option>
+                </Select>
+              </div>
+              <Input
+                className="flex-1 tabular-nums"
+                value={docReceptor.nro}
+                disabled={docReceptor.tipo === 'CF'}
+                placeholder={docReceptor.tipo === 'CF' ? 'Consumidor final' : 'Número, sin puntos ni guiones'}
+                inputMode="numeric"
+                onChange={(e) =>
+                  setDocManual({ tipo: docReceptor.tipo, nro: e.target.value.replace(/\D/g, '') })
+                }
+              />
+            </div>
+          )}
           {fiscalEnabled && faltaCuitParaFacturaA && (
             <span className="text-xs text-destructive">
               {selectedCustomer?.category === 'MT'
-                ? 'Al cliente Monotributista corresponde emitirle Factura A, que requiere su CUIT. Cárguelo en la ficha del cliente.'
-                : 'La Factura A requiere el CUIT del cliente. Cárguelo en la ficha del cliente.'}
+                ? 'Al cliente Monotributista corresponde emitirle Factura A, que requiere su CUIT.'
+                : 'La Factura A requiere el CUIT del cliente.'}
             </span>
           )}
         </div>

@@ -277,6 +277,8 @@ export const api = {
       saleId: string
       salePoint: number
       letter?: 'A' | 'B' | 'C'
+      /** Documento del receptor cargado en la venta; pisa el de la ficha. */
+      receiverDoc?: { docType: string | null; docNumber: string | null }
     }): Promise<IssuedVoucherDTO> => unwrap(sf().fiscal.issueInvoice(payload)),
     issueNote: (payload: {
       relatedVoucherId: string
