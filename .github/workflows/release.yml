@@ -51,6 +51,10 @@ jobs:
       - run: pnpm --filter @stockflow/desktop run test:flows
       - run: pnpm --filter @stockflow/desktop run test:demo
       - run: pnpm --filter @stockflow/desktop run test:onboarding
+      # Facturación electrónica: que el pedido de CAE siga llevando la condición
+      # frente al IVA del receptor (RG 5616). Sin ese campo ARCA rechaza TODOS
+      # los comprobantes desde el 1/12/2026 — no puede romperse en silencio.
+      - run: pnpm --filter @stockflow/desktop run test:fiscal-xml
       - run: pnpm --filter @stockflow/desktop run build:web
       - run: pnpm --filter @stockflow/desktop run build:electron
       - name: Publish (macOS)
