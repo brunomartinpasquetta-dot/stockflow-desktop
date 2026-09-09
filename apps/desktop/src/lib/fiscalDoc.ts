@@ -22,6 +22,29 @@ export const VAT_CONDITION_LABELS: Record<FiscalCategory, string> = {
   EX: 'Exento',
 }
 
+/**
+ * Descripción oficial de la condición IVA del receptor informada a ARCA
+ * (código `CondicionIVAReceptorId`, RG 5616), tal como quedó congelada en el
+ * comprobante. Misma tabla que `RECEIVER_VAT_CONDITION_LABELS` en shared.
+ */
+const RECEIVER_VAT_CONDITION_BY_ID: Record<number, string> = {
+  1: 'IVA Responsable Inscripto',
+  4: 'IVA Sujeto Exento',
+  5: 'Consumidor Final',
+  6: 'Responsable Monotributo',
+  7: 'Sujeto No Categorizado',
+  8: 'Proveedor del Exterior',
+  9: 'Cliente del Exterior',
+  10: 'IVA Liberado – Ley N° 19.640',
+  13: 'Monotributista Social',
+  15: 'IVA No Alcanzado',
+  16: 'Monotributo Trabajador Independiente Promovido',
+}
+
+/** Leyenda obligatoria en una Factura A a un receptor monotributista (RG 5616). */
+const MONOTRIBUTO_CLASS_A_LEGEND =
+  'El crédito fiscal discriminado en el presente comprobante solo podrá ser computado a efectos del Procedimiento permanente de transición al Régimen General.'
+
 /** Nombre legible del comprobante para el título del documento. */
 export function fiscalTitle(v: Pick<FiscalVoucherDTO, 'letter' | 'kind'>): string {
   const base =
@@ -65,6 +88,11 @@ export interface BuildFiscalDocInput {
   descriptionById?: Map<string, string>
   sellerName?: string | null
   paymentNote?: string | null
+  /**
+   * Condición IVA del cliente a mostrar si el comprobante no la tiene guardada
+   * (emitido antes de que el sistema la informara a ARCA).
+   */
+  customerVatCondition?: string | null
 }
 
 /**
@@ -77,6 +105,16 @@ export async function buildFiscalDoc(input: BuildFiscalDocInput): Promise<Formal
   const { company, voucher, sale, lines, descriptionById, sellerName, paymentNote } = input
 
   const qrDataUrl = await buildQrDataUrl(voucher.qrUrl)
+
+  // La condición IVA del receptor es un dato obligatorio del comprobante: se
+  // imprime la que se informó a ARCA al emitir.
+  const vatConditionId = voucher.customerVatConditionId ?? null
+  const vatCondition =
+    (vatConditionId != null ? RECEIVER_VAT_CONDITION_BY_ID[vatConditionId] : null) ??
+    input.customerVatCondition ??
+    null
+  const footerNote =
+    voucher.letter === 'A' && vatConditionId === 6 ? MONOTRIBUTO_CLASS_A_LEGEND : null
 
   const docLines =
     lines && lines.length > 0
@@ -121,6 +159,7 @@ export async function buildFiscalDoc(input: BuildFiscalDocInput): Promise<Formal
         voucher.customerDocType === 99
           ? null
           : `${voucher.customerDocType === 80 ? 'CUIT' : 'Doc'}: ${voucher.customerDocNumber}`,
+      vatCondition,
     },
     lines: docLines,
     totals: {
@@ -130,7 +169,7 @@ export async function buildFiscalDoc(input: BuildFiscalDocInput): Promise<Formal
       total: voucher.total,
     },
     paymentNote: paymentNote ?? null,
-    footerNote: null,
+    footerNote,
     fiscal: {
       cae: voucher.cae ?? '',
       caeExpiry: fmtCaeExpiry(voucher.caeExpiry),

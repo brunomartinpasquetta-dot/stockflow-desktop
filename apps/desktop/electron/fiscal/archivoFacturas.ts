@@ -54,6 +54,8 @@ export interface DatosFactura {
     inicioActividad?: number | null;
   };
   cliente: { nombre: string; documento?: string | null; condicionIva?: string | null } | null;
+  /** Leyenda exigida por ARCA (p. ej. Factura A a un monotributista, RG 5616). */
+  leyenda?: string | null;
   comprobante: {
     etiqueta: string;
     letra: string;
@@ -233,7 +235,10 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
   // El detalle de alícuotas ocupa lugar abajo: si no se reserva, se monta con
   // el pie fiscal.
   const alicuotas = c.letra === 'A' ? (d.alicuotas ?? []) : [];
-  const reservaPie = 62 + (alicuotas.length > 0 ? 6 + alicuotas.length * 5 : 0);
+  // La leyenda de ARCA va entre los totales y el pie: se le reserva su alto.
+  const leyenda = d.leyenda?.trim() ? doc.splitTextToSize(d.leyenda.trim(), 186) as string[] : [];
+  const reservaPie =
+    62 + (alicuotas.length > 0 ? 6 + alicuotas.length * 5 : 0) + (leyenda.length > 0 ? 4 + leyenda.length * 3.5 : 0);
   const yTotales = Math.max(finDetalle + 6, ALTO_A4 - reservaPie);
 
   // Marco del detalle hasta donde arrancan los totales: así la hoja se ve
@@ -280,6 +285,15 @@ function construirPdf(d: DatosFactura): ArrayBuffer {
   doc.setFontSize(13).setFont('helvetica', 'bold');
   doc.text('TOTAL', 140, y);
   doc.text(money(d.totales.total), 200, y, { align: 'right' });
+
+  // ── Leyenda exigida por ARCA (si corresponde), debajo de los totales.
+  if (leyenda.length > 0) {
+    y += 8;
+    doc.setFontSize(7.5).setFont('helvetica', 'italic');
+    doc.text(leyenda, 14, y);
+    y += (leyenda.length - 1) * 3.5;
+    doc.setFont('helvetica', 'normal');
+  }
 
   // ── Pie fiscal: QR obligatorio (RG 4892) + CAE y vencimiento.
   y += 10;

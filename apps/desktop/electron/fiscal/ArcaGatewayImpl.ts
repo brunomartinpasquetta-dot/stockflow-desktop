@@ -61,6 +61,7 @@ export class ArcaGatewayImpl implements ArcaGateway {
       date: req.date,
       docType: req.docType,
       docNumber: req.docNumber,
+      receiverVatConditionId: req.receiverVatConditionId,
       netAmount: req.netAmount,
       vatAmount: req.vatAmount,
       exemptAmount: req.exemptAmount,

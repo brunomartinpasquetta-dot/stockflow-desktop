@@ -13,7 +13,10 @@
 import {
   DOC_TYPES,
   VAT_IDS,
+  defaultReceiverVatConditionForLetter,
+  isReceiverVatConditionAllowed,
   resolveCustomerDoc,
+  resolveReceiverVatConditionId,
   resolveVoucherCode,
   resolveVoucherLetter,
   validateForLetter,
@@ -41,6 +44,8 @@ export interface ArcaGateway {
     date: number;
     docType: number;
     docNumber: string;
+    /** Condición IVA del receptor (`CondicionIVAReceptorId`, RG 5616). */
+    receiverVatConditionId: number;
     netAmount: number;
     vatAmount: number;
     exemptAmount: number;
@@ -161,7 +166,12 @@ export class FiscalService {
         customer.category as CustomerVatCategory,
       );
     const doc = resolveCustomerDoc(customer.docType, customer.docNumber);
-    const check = validateForLetter(letter, doc);
+    // Condición IVA del receptor: sale de la categoría fiscal del cliente y es
+    // obligatoria en todo comprobante (RG 5616), consumidor final incluido.
+    const receiverVatConditionId = resolveReceiverVatConditionId(
+      customer.category as CustomerVatCategory,
+    );
+    const check = validateForLetter(letter, doc, receiverVatConditionId);
     if (!check.ok) throw new ValidationError('customer', check.reason);
 
     const voucherCode = resolveVoucherCode(letter, 'invoice');
@@ -224,6 +234,7 @@ export class FiscalService {
         date,
         docType: doc.docType,
         docNumber: doc.docNumber,
+        receiverVatConditionId,
         netAmount,
         vatAmount,
         exemptAmount: 0,
@@ -259,6 +270,7 @@ export class FiscalService {
           customerName: customer.firstName
             ? `${customer.lastName}, ${customer.firstName}`
             : customer.lastName,
+          customerVatConditionId: receiverVatConditionId,
           netAmount: String(netAmount),
           vatAmount: String(vatAmount),
           total: sale.total,
@@ -301,6 +313,7 @@ export class FiscalService {
         customerDocType: doc.docType,
         customerDocNumber: doc.docNumber,
         customerName: customer.lastName,
+        customerVatConditionId: receiverVatConditionId,
         total: sale.total,
         userId: currentUser.id,
         errors: [err instanceof Error ? err.message : String(err)],
@@ -344,6 +357,10 @@ export class FiscalService {
     const netAmount = n2(Number(related.netAmount) * ratio);
     const vatAmount = n2(Number(related.vatAmount) * ratio);
 
+    // La nota repite la condición IVA del receptor del comprobante que ajusta.
+    const receiverVatConditionId =
+      related.customerVatConditionId ?? (await this.receiverVatConditionFor(related));
+
     const nextNumber = (await this.gateway.lastAuthorized(related.salePoint, voucherCode)) + 1;
     const date = Date.now();
 
@@ -354,6 +371,7 @@ export class FiscalService {
       date,
       docType: related.customerDocType,
       docNumber: related.customerDocNumber,
+      receiverVatConditionId,
       netAmount,
       vatAmount,
       exemptAmount: 0,
@@ -395,6 +413,7 @@ export class FiscalService {
         customerDocType: related.customerDocType,
         customerDocNumber: related.customerDocNumber,
         customerName: related.customerName,
+        customerVatConditionId: receiverVatConditionId,
         netAmount: String(netAmount),
         vatAmount: String(vatAmount),
         total: String(total),
@@ -425,6 +444,24 @@ export class FiscalService {
       qrUrl,
       observations: res.observations,
     };
+  }
+
+  /**
+   * Condición IVA del receptor para ajustar un comprobante emitido ANTES de que
+   * el sistema la informara (no la tiene guardada). Se toma la categoría actual
+   * del cliente si ARCA la admite para esa letra; si no, la típica de la letra.
+   */
+  private async receiverVatConditionFor(related: {
+    letter: string;
+    customerId: string;
+  }): Promise<number> {
+    const letter = related.letter as VoucherLetter;
+    const customer = await this.ctx.repos.customers.findById(related.customerId);
+    if (customer) {
+      const id = resolveReceiverVatConditionId(customer.category as CustomerVatCategory);
+      if (isReceiverVatConditionAllowed(id, letter)) return id;
+    }
+    return defaultReceiverVatConditionForLetter(letter);
   }
 
   /** YYYYMMDD → epoch ms. */

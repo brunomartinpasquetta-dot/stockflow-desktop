@@ -631,7 +631,8 @@ function PDV() {
   const fiscalEnabled = fiscalConfigQuery.data?.enabled === true
 
   // ── El tipo de comprobante lo decide el CLIENTE ──────────────────────────
-  // Emisor Responsable Inscripto: cliente RI → A, el resto → B.
+  // Emisor Responsable Inscripto: cliente RI o Monotributo → A (RG 5616: ARCA
+  // no admite Factura B a un monotributista), el resto → B.
   // Emisor Monotributo: siempre C.
   // El comercio factura decenas de ventas por día; elegir el tipo en cada una
   // es fricción pura y se presta a error. El desplegable queda como override
@@ -642,12 +643,21 @@ function PDV() {
     if (!fiscalEnabled || !facturar) return 'X'
     const emisor = fiscalConfigQuery.data?.vatCondition ?? 'RI'
     if (emisor === 'MT') return 'C'
-    return selectedCustomer?.category === 'RI' ? 'A' : 'B'
+    const categoria = selectedCustomer?.category
+    return categoria === 'RI' || categoria === 'MT' ? 'A' : 'B'
   }, [fiscalEnabled, facturar, fiscalConfigQuery.data, selectedCustomer])
 
   if (!tipoForzado && voucherType !== tipoSugerido) {
     setVoucherType(tipoSugerido)
   }
+  /**
+   * Una Factura A exige el CUIT del receptor: sin él ARCA la rechaza. Se avisa
+   * ANTES de cobrar — si se descubre al pedir el CAE, la venta ya está hecha y
+   * el comprobante queda pendiente con el cliente en el mostrador.
+   */
+  const faltaCuitParaFacturaA =
+    voucherType === 'A' && selectedCustomer != null && selectedCustomer.docType !== 'CUIT'
+
   const activeSalePoints = useMemo(
     () => (salePointsQuery.data ?? []).filter((p) => p.active),
     [salePointsQuery.data],
@@ -1408,6 +1418,13 @@ function PDV() {
           {!fiscalEnabled && voucherType !== 'X' && (
             <span className="text-xs text-destructive">
               La facturación electrónica no está activa: se registrará sin CAE.
+            </span>
+          )}
+          {fiscalEnabled && faltaCuitParaFacturaA && (
+            <span className="text-xs text-destructive">
+              {selectedCustomer?.category === 'MT'
+                ? 'Al cliente Monotributista corresponde emitirle Factura A, que requiere su CUIT. Cárguelo en la ficha del cliente.'
+                : 'La Factura A requiere el CUIT del cliente. Cárguelo en la ficha del cliente.'}
             </span>
           )}
         </div>

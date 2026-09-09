@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "1.6.0",
+  "version": "1.7.0",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -33,7 +33,8 @@
     "test:kb": "node scripts/validate-kb.mjs",
     "test:flows": "tsx electron/__tests__/flows.smoke.ts",
     "test:demo": "tsx electron/__tests__/demo.smoke.ts",
-    "test:onboarding": "tsx electron/__tests__/onboarding.smoke.ts"
+    "test:onboarding": "tsx electron/__tests__/onboarding.smoke.ts",
+    "test:fiscal": "tsx electron/__tests__/fiscal.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

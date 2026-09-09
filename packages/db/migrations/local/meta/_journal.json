@@ -176,6 +176,13 @@
       "when": 1786725682777,
       "tag": "0025_company_catalogo_web",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1786725682778,
+      "tag": "0026_fiscal_voucher_vat_condition",
+      "breakpoints": true
     }
   ]
 }

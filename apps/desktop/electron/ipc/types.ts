@@ -1736,6 +1736,8 @@ export interface FiscalVoucherDTO {
   customerDocType: number;
   customerDocNumber: string;
   customerName: string;
+  /** Condición IVA del receptor informada a ARCA (RG 5616); null en comprobantes anteriores. */
+  customerVatConditionId: number | null;
   netAmount: string;
   vatAmount: string;
   exemptAmount: string;

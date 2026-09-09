@@ -240,6 +240,9 @@ function SaleDetailDialog({
           import('react'),
         ])
       const d = detailQuery.data
+      // Comprobantes emitidos antes de guardar la condición IVA del receptor:
+      // se toma la categoría actual del cliente.
+      const clienteActual = (customersQuery.data ?? []).find((x) => x.id === v.customerId)
       const doc = await buildFiscalDoc({
         company,
         voucher: v,
@@ -247,6 +250,7 @@ function SaleDetailDialog({
         lines: d?.lines,
         descriptionById: descById,
         paymentNote: d?.sale.isAccountSale ? 'Cuenta corriente' : null,
+        customerVatCondition: clienteActual ? (VAT_CONDITION_LABELS[clienteActual.category] ?? null) : null,
       })
       printNode(createElement(FormalDocA4, { data: doc }), 'a4')
     } catch (err) {

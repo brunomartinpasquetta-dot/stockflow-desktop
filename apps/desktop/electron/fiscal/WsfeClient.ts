@@ -36,6 +36,11 @@ export interface VoucherRequest {
   date: Date | number;
   docType: number;
   docNumber: string;
+  /**
+   * Condición frente al IVA del receptor (`CondicionIVAReceptorId`, RG 5616).
+   * Obligatoria en todo comprobante, consumidor final incluido (código 5).
+   */
+  receiverVatConditionId: number;
   /** Neto gravado. */
   netAmount: number;
   vatAmount: number;
@@ -271,6 +276,10 @@ export class WsfeClient {
       `<ar:ImpIVA>${fmt(req.vatAmount)}</ar:ImpIVA>`,
       '<ar:MonId>PES</ar:MonId>',
       '<ar:MonCotiz>1</ar:MonCotiz>',
+      // El esquema de ARCA es posicional: va después de la moneda y antes de
+      // los comprobantes asociados y del IVA. En otro lugar el servicio lo
+      // ignora y responde "campo obligatorio" (10246).
+      `<ar:CondicionIVAReceptorId>${req.receiverVatConditionId}</ar:CondicionIVAReceptorId>`,
       assocXml,
       vatXml,
       '</ar:FECAEDetRequest>',

@@ -51,22 +51,97 @@ export type IssuerVatCondition = 'RI' | 'MT';
 export type CustomerVatCategory = 'RI' | 'MT' | 'CF' | 'EX';
 
 /**
+ * Condición frente al IVA del receptor (ARCA `CondicionIVAReceptorId`,
+ * RG 5616). Obligatoria en TODA solicitud de CAE, consumidor final incluido:
+ * sin este campo ARCA rechaza el comprobante (errores 10245/10246).
+ * Códigos según `FEParamGetCondicionIvaReceptor` (manual WSFEv1 v4.7, pág. 203).
+ */
+export const RECEIVER_VAT_CONDITION_IDS: Record<CustomerVatCategory, number> = {
+  RI: 1,
+  EX: 4,
+  CF: 5,
+  MT: 6,
+};
+
+/** Descripción oficial de cada código, para imprimirla en el comprobante. */
+export const RECEIVER_VAT_CONDITION_LABELS: Record<number, string> = {
+  1: 'IVA Responsable Inscripto',
+  4: 'IVA Sujeto Exento',
+  5: 'Consumidor Final',
+  6: 'Responsable Monotributo',
+  7: 'Sujeto No Categorizado',
+  8: 'Proveedor del Exterior',
+  9: 'Cliente del Exterior',
+  10: 'IVA Liberado – Ley N° 19.640',
+  13: 'Monotributista Social',
+  15: 'IVA No Alcanzado',
+  16: 'Monotributo Trabajador Independiente Promovido',
+};
+
+/**
+ * Clases de comprobante que admite cada condición del receptor (misma tabla
+ * de ARCA). Mandar una combinación que no figure acá es el error 10243.
+ * Lo que más importa: Monotributo (6) NO admite clase B — el Responsable
+ * Inscripto le emite Factura A al monotributista.
+ */
+export const RECEIVER_VAT_CONDITION_CLASSES: Record<number, readonly VoucherLetter[]> = {
+  1: ['A', 'C'],
+  4: ['B', 'C'],
+  5: ['B', 'C'],
+  6: ['A', 'C'],
+  7: ['B', 'C'],
+  8: ['B', 'C'],
+  9: ['B', 'C'],
+  10: ['B', 'C'],
+  13: ['A', 'C'],
+  15: ['B', 'C'],
+  16: ['A', 'C'],
+};
+
+/**
+ * Leyenda que ARCA exige en una Factura A cuyo receptor es monotributista
+ * (observación 10217 del manual WSFEv1).
+ */
+export const MONOTRIBUTO_CLASS_A_LEGEND =
+  'El crédito fiscal discriminado en el presente comprobante solo podrá ser computado a efectos del Procedimiento permanente de transición al Régimen General.';
+
+/** Código ARCA de condición IVA del receptor a partir de la categoría del cliente. */
+export function resolveReceiverVatConditionId(category: CustomerVatCategory): number {
+  return RECEIVER_VAT_CONDITION_IDS[category] ?? RECEIVER_VAT_CONDITION_IDS.CF;
+}
+
+/** ¿ARCA admite esa condición del receptor en un comprobante de esa clase? */
+export function isReceiverVatConditionAllowed(id: number, letter: VoucherLetter): boolean {
+  return RECEIVER_VAT_CONDITION_CLASSES[id]?.includes(letter) ?? false;
+}
+
+/**
+ * Condición del receptor a asumir cuando un comprobante viejo no la tiene
+ * guardada (emitido antes de que el sistema la informara). Se usa sólo para
+ * que las notas de crédito/débito sobre esos comprobantes puedan salir.
+ */
+export function defaultReceiverVatConditionForLetter(letter: VoucherLetter): number {
+  return letter === 'A' ? RECEIVER_VAT_CONDITION_IDS.RI : RECEIVER_VAT_CONDITION_IDS.CF;
+}
+
+/**
  * Determina la LETRA del comprobante según quién emite y quién recibe.
  *
- * Reglas de ARCA:
+ * Reglas de ARCA (RG 5616):
  *  - Emisor Monotributista → siempre C (no discrimina IVA).
  *  - Emisor Responsable Inscripto:
- *      · receptor RI                     → A (se discrimina el IVA)
- *      · receptor MT / CF / Exento       → B (IVA incluido en el precio)
+ *      · receptor RI o Monotributo       → A (se discrimina el IVA)
+ *      · receptor CF / Exento            → B (IVA incluido en el precio)
  *
- * Es la regla que evita el error más caro: emitir A a un consumidor final.
+ * Es la regla que evita el error más caro: emitir A a un consumidor final, o
+ * B a un monotributista (ARCA la rechaza con el error 10243).
  */
 export function resolveVoucherLetter(
   issuer: IssuerVatCondition,
   customer: CustomerVatCategory,
 ): VoucherLetter {
   if (issuer === 'MT') return 'C';
-  return customer === 'RI' ? 'A' : 'B';
+  return customer === 'RI' || customer === 'MT' ? 'A' : 'B';
 }
 
 /** Código ARCA a partir de la letra y la clase de comprobante. */
@@ -122,24 +197,46 @@ export function resolveCustomerDoc(
 }
 
 /**
- * Factura A exige identificar al receptor con CUIT: ARCA la rechaza si va como
- * consumidor final. Se valida ANTES de emitir para no quemar numeración.
+ * Validaciones locales ANTES de pedir el CAE, para no depender del rechazo de
+ * ARCA ni quemar numeración:
+ *  - Factura A exige identificar al receptor con CUIT.
+ *  - La condición IVA del receptor tiene que ser admitida por la clase del
+ *    comprobante (tabla de `FEParamGetCondicionIvaReceptor`).
  */
 export function validateForLetter(
   letter: VoucherLetter,
   doc: { docType: number; docNumber: string },
+  receiverVatConditionId?: number,
 ): { ok: true } | { ok: false; reason: string } {
   if (letter === 'A' && doc.docType !== DOC_TYPES.CUIT) {
     return {
       ok: false,
-      reason: 'Una Factura A necesita el CUIT del cliente. Cargalo en su ficha o emití una Factura B.',
+      reason:
+        'Una Factura A requiere el CUIT del cliente. Debe cargarse en la ficha del cliente antes de facturar.',
     };
   }
-  if (letter === 'B' && doc.docType === DOC_TYPES.CONSUMIDOR_FINAL) {
-    // Permitido, pero ARCA exige identificar al receptor cuando el total supera
-    // el tope vigente para consumidor final.
-    return { ok: true };
+  if (receiverVatConditionId != null) {
+    const allowed = RECEIVER_VAT_CONDITION_CLASSES[receiverVatConditionId];
+    if (!allowed) {
+      return {
+        ok: false,
+        reason: `La condición frente al IVA del cliente (código ${receiverVatConditionId}) no es un valor admitido por ARCA.`,
+      };
+    }
+    if (!allowed.includes(letter)) {
+      const label = RECEIVER_VAT_CONDITION_LABELS[receiverVatConditionId] ?? 'informada';
+      const sugerida =
+        receiverVatConditionId === RECEIVER_VAT_CONDITION_IDS.MT
+          ? ' Según la RG 5616, a un cliente Monotributista corresponde emitirle Factura A.'
+          : '';
+      return {
+        ok: false,
+        reason: `ARCA no admite un comprobante clase ${letter} para un receptor con condición "${label}".${sugerida} Verifique la categoría fiscal en la ficha del cliente.`,
+      };
+    }
   }
+  // Factura B a consumidor final sin identificar es válida; ARCA exige
+  // identificar al receptor sólo cuando el total supera el tope vigente.
   return { ok: true };
 }
 

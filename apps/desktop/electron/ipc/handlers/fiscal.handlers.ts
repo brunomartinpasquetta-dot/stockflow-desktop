@@ -9,6 +9,11 @@ import path from 'node:path';
 
 import { FiscalService, type ArcaGateway } from '@stockflow/core';
 import { PermissionDeniedError, ValidationError } from '@stockflow/core';
+import {
+  MONOTRIBUTO_CLASS_A_LEGEND,
+  RECEIVER_VAT_CONDITION_IDS,
+  RECEIVER_VAT_CONDITION_LABELS,
+} from '@stockflow/shared';
 
 import { ArcaGatewayImpl } from '../../fiscal/ArcaGatewayImpl';
 import {
@@ -157,6 +162,11 @@ async function archivar(
     const empresa = await deps.repos.company.getOrCreate();
     const cfg = deps.repos.fiscal.getConfig();
     const cliente = sale.customerId ? await deps.repos.customers.findById(sale.customerId) : null;
+    // Condición IVA del receptor tal como se informó a ARCA (congelada en el
+    // comprobante). Los comprobantes anteriores no la tienen: se usa la
+    // categoría actual del cliente.
+    const emitido = deps.repos.fiscal.findVoucherById(v.id);
+    const condicionIvaId = emitido?.customerVatConditionId ?? null;
 
     // Los artículos rápidos no tienen ficha: su descripción viaja en la línea.
     const articulos = new Map<string, { descripcion: string; codigo: string | null }>();
@@ -196,9 +206,16 @@ async function archivar(
             nombre: `${cliente.lastName}${cliente.firstName ? ' ' + cliente.firstName : ''}`.trim(),
             documento:
               cliente.docNumber ? `${cliente.docType ?? 'Doc'}: ${cliente.docNumber}` : null,
-            condicionIva: CONDICION_IVA_CLIENTE[cliente.category] ?? null,
+            condicionIva:
+              (condicionIvaId != null ? RECEIVER_VAT_CONDITION_LABELS[condicionIvaId] : null) ??
+              CONDICION_IVA_CLIENTE[cliente.category] ??
+              null,
           }
         : null,
+      leyenda:
+        v.letter === 'A' && condicionIvaId === RECEIVER_VAT_CONDITION_IDS.MT
+          ? MONOTRIBUTO_CLASS_A_LEGEND
+          : null,
       comprobante: {
         etiqueta: v.label,
         letra: v.letter,

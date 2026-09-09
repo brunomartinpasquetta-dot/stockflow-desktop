@@ -51,6 +51,8 @@ export interface CreateVoucherInput {
   customerDocType: number;
   customerDocNumber: string;
   customerName: string;
+  /** Condición IVA del receptor informada a ARCA (RG 5616). */
+  customerVatConditionId?: number | null;
   netAmount: string;
   vatAmount: string;
   exemptAmount?: string;
@@ -225,6 +227,7 @@ export class FiscalRepository {
           customerDocType: input.customerDocType,
           customerDocNumber: input.customerDocNumber,
           customerName: input.customerName,
+          customerVatConditionId: input.customerVatConditionId ?? null,
           netAmount: input.netAmount,
           vatAmount: input.vatAmount,
           exemptAmount: input.exemptAmount ?? '0.0000',
@@ -272,6 +275,7 @@ export class FiscalRepository {
     customerDocType: number;
     customerDocNumber: string;
     customerName: string;
+    customerVatConditionId?: number | null;
     total: string;
     userId: string;
     errors: string[];
@@ -297,6 +301,7 @@ export class FiscalRepository {
           customerDocType: input.customerDocType,
           customerDocNumber: input.customerDocNumber,
           customerName: input.customerName,
+          customerVatConditionId: input.customerVatConditionId ?? null,
           netAmount: '0.0000',
           vatAmount: '0.0000',
           exemptAmount: '0.0000',

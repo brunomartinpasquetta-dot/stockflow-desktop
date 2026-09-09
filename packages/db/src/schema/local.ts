@@ -988,6 +988,8 @@ export const fiscalVouchers = sqliteTable(
     customerDocType: integer('customer_doc_type').notNull(),
     customerDocNumber: text('customer_doc_number').notNull(),
     customerName: text('customer_name').notNull(),
+    /** Condición IVA del receptor informada a ARCA (RG 5616). NULL en comprobantes anteriores. */
+    customerVatConditionId: integer('customer_vat_condition_id'),
     netAmount: text('net_amount').notNull().default('0.0000'),
     vatAmount: text('vat_amount').notNull().default('0.0000'),
     exemptAmount: text('exempt_amount').notNull().default('0.0000'),

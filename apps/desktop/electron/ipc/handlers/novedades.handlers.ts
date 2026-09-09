@@ -4,11 +4,24 @@
  * `novedades:pendientes` decide si corresponde mostrar la ventana tras el
  * login; `novedades:vistas` persiste el "ya la vi" (por máquina).
  */
-import { app } from 'electron';
 import Database from 'better-sqlite3';
 
 import { computarPendientes, leerNotas, marcarVista, versionVista, type NovedadesPendientes } from '../../novedades/novedades';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
+
+/**
+ * Versión de la app. `electron` se importa DENTRO de la función a propósito:
+ * importarlo arriba rompe el arranque de los smokes (que corren el bridge IPC
+ * sin Electron y ahí el módulo no exporta `app`). En la app real es idéntico.
+ */
+async function versionApp(fallback: string): Promise<string> {
+  try {
+    const { app } = await import('electron');
+    return app?.getVersion() ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function hayEmpresa(dbPath: string): boolean {
   // Si la base local no se puede consultar (p.ej. un puesto en red), se asume
@@ -28,7 +41,7 @@ function hayEmpresa(dbPath: string): boolean {
 export function buildNovedadesHandlers(deps: HandlerDeps): HandlerMap {
   return {
     'novedades:pendientes': withSession(deps, async (): Promise<NovedadesPendientes> => {
-      const actual = app.getVersion();
+      const actual = await versionApp(deps.appVersion);
       // Instalación virgen (sin empresa): no tiene sentido contarle "qué
       // cambió" a quien recién llega — se marca visto en silencio para que
       // tampoco vea novedades viejas cuando termine de configurar.
@@ -40,7 +53,7 @@ export function buildNovedadesHandlers(deps: HandlerDeps): HandlerMap {
     }),
 
     'novedades:vistas': withSession(deps, async (): Promise<{ ok: true }> => {
-      marcarVista(deps.userDataDir, app.getVersion());
+      marcarVista(deps.userDataDir, await versionApp(deps.appVersion));
       return { ok: true };
     }),
   };
