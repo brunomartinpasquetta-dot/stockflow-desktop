@@ -83,6 +83,14 @@ export const RECEIVER_VAT_CONDITION_LABELS: Record<number, string> = {
  * de ARCA). Mandar una combinación que no figure acá es el error 10243.
  * Lo que más importa: Monotributo (6) NO admite clase B — el Responsable
  * Inscripto le emite Factura A al monotributista.
+ *
+ * OJO SI ALGUNA VEZ SE REGENERA ESTA TABLA DESDE EL SERVICIO: verificado
+ * contra `FEParamGetCondicionIvaReceptor` en homologación (9-sep-2026), ARCA
+ * devuelve para Consumidor Final (5) el `Cmp_Clase` **"C/49"**, sin la B. Es
+ * incompleto: en la misma corrida se emitió una Factura B a consumidor final
+ * con el código 5 y ARCA otorgó CAE (86360871273085). Si se toma ese campo al
+ * pie de la letra se bloquea la factura más común del país. Los otros diez
+ * códigos sí coinciden exactamente con lo que está acá.
  */
 export const RECEIVER_VAT_CONDITION_CLASSES: Record<number, readonly VoucherLetter[]> = {
   1: ['A', 'C'],
