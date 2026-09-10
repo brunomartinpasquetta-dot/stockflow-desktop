@@ -412,13 +412,28 @@ export function Articulos() {
       wholesalePrice: form.wholesalePrice || '0',
       wholesaleMinQty: form.wholesaleMinQty || '0',
       vatRate: form.vatRate,
-      stock: form.stock || '0',
       minStock: form.minStock || '0',
       idealStock: form.idealStock || '0',
       soldByWeight: form.soldByWeight,
       unit: form.unit,
       notes: form.notes.trim() || null,
     }
+    /**
+     * EL STOCK NO VIAJA SI NO SE TOCÓ.
+     *
+     * Antes se mandaba siempre el valor que la ficha había leído al abrirse, y
+     * eso PISABA las ventas hechas mientras tanto: se abría la ficha con 10, otra
+     * terminal vendía 3, se guardaba un cambio de precio y las 3 unidades
+     * resucitaban. Sin rastro, porque la auditoría solo dice "Artículo
+     * modificado". Reproducido y verificado (9-sep-2026).
+     *
+     * Al crear, el stock inicial siempre va. Al editar, solo si el usuario
+     * escribió en el campo — y ahí es un ajuste deliberado.
+     */
+    const stockTocado =
+      mode === 'create' || (selectedArticle != null && form.stock !== articleToForm(selectedArticle).stock)
+    if (stockTocado) payload.stock = form.stock || '0'
+
     try {
       if (mode === 'create') {
         const created = await m.create.mutateAsync(payload)
