@@ -27,6 +27,13 @@ export interface CatalogoSyncOptions {
   repos: Repositories;
   /** Qué lista de precios se publica. Por defecto la 1. */
   precioLista?: 1 | 2 | 3;
+  /**
+   * Si el catálogo debe CREAR los artículos que no tiene (inactivos, sin
+   * clasificar) o ignorarlos. Prendido, el comerciante carga el artículo una
+   * sola vez —en el sistema— y después lo termina de vestir en el panel.
+   * Apagado, el catálogo solo se actualiza con lo que ya curó.
+   */
+  crearFaltantes?: boolean;
   /** Para poder probarlo sin red. */
   fetchImpl?: typeof fetch;
 }
@@ -89,7 +96,7 @@ export class CatalogoSync {
         const res = await this.fetch(`${url}/api/stockflow/articulos`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({ articulos, crear_faltantes: true }),
+          body: JSON.stringify({ articulos, crear_faltantes: this.opts.crearFaltantes ?? true }),
           signal: controller.signal,
         });
         if (!res.ok) {
