@@ -294,6 +294,7 @@ export function createApiBridge(
       syncEstado: () => c<CatalogoSyncEstadoDTO>('catalogo:syncEstado'),
       syncActivar: (p) => c<{ ok: true }>('catalogo:syncActivar', p),
       syncAhora: (p) => c<CatalogoSyncResultadoDTO>('catalogo:syncAhora', p),
+      pedidosContarPendientes: () => c<{ pendientes: number }>('catalogo:pedidosContarPendientes'),
       pedidosListar: (p) => c<PedidoWebDTO[]>('catalogo:pedidosListar', p),
       pedidoConvertir: (p) => c<{ ok: true; ventaNumero: number; ventaTipo: string }>('catalogo:pedidoConvertir', p),
       pedidoRechazar: (p) => c<{ ok: true }>('catalogo:pedidoRechazar', p),

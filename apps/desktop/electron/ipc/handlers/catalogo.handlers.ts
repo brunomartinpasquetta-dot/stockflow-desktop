@@ -77,6 +77,11 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
 
     /* ---------------------------- Pedidos web ---------------------------- */
 
+    /** Liviano: solo el número, para pintar el aviso en el menú sin resolver líneas. */
+    'catalogo:pedidosContarPendientes': withSession(deps, async () => {
+      return { pendientes: deps.repos.catalogoPedidos.contarPendientes() };
+    }),
+
     'catalogo:pedidosListar': withSession(deps, async (payload: { estado?: 'pendiente' | 'convertido' | 'rechazado' }) => {
       const filas = deps.repos.catalogoPedidos.listar(payload?.estado);
       // Cada línea se resuelve contra el catálogo de artículos: la que no tiene

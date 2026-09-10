@@ -9,7 +9,7 @@
  *
  * Si necesitás tocar la fórmula, sincronizá ambos lados.
  */
-import { format } from 'date-fns'
+import { format, formatDistanceToNowStrict } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 function toNumber(value: string | number | null | undefined): number {
@@ -122,4 +122,10 @@ export function formatDate(date: number | Date | null | undefined): string {
 export function formatDateTime(date: number | Date | null | undefined): string {
   if (date == null) return ''
   return format(toDate(date), 'dd/MM/yyyy HH:mm', { locale: es })
+}
+
+/** "hace 5 minutos" / "hace 2 horas". Para bandejas donde importa la antigüedad, no la fecha exacta. */
+export function formatRelativeTime(date: number | Date | null | undefined): string {
+  if (date == null) return ''
+  return `hace ${formatDistanceToNowStrict(toDate(date), { locale: es })}`
 }

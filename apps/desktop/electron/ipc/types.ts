@@ -1866,6 +1866,7 @@ export interface ApiSurface {
     syncEstado(): Res<CatalogoSyncEstadoDTO>;
     syncActivar(payload: { activo: boolean }): Res<{ ok: true }>;
     syncAhora(payload?: { todo?: boolean }): Res<CatalogoSyncResultadoDTO>;
+    pedidosContarPendientes(): Res<{ pendientes: number }>;
     pedidosListar(payload?: { estado?: 'pendiente' | 'convertido' | 'rechazado' }): Res<PedidoWebDTO[]>;
     pedidoConvertir(payload: { id: string; paymentMethodId: string }): Res<{ ok: true; ventaNumero: number; ventaTipo: string }>;
     pedidoRechazar(payload: { id: string }): Res<{ ok: true }>;

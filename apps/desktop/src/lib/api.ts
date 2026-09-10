@@ -174,6 +174,7 @@ export const api = {
       unwrap(sf().catalogo.syncActivar({ activo })),
     syncAhora: (todo = false): Promise<CatalogoSyncResultadoDTO> =>
       unwrap(sf().catalogo.syncAhora({ todo })),
+    pedidosContarPendientes: (): Promise<{ pendientes: number }> => unwrap(sf().catalogo.pedidosContarPendientes()),
     pedidosListar: (estado?: 'pendiente' | 'convertido' | 'rechazado'): Promise<PedidoWebDTO[]> =>
       unwrap(sf().catalogo.pedidosListar({ estado })),
     pedidoConvertir: (id: string, paymentMethodId: string): Promise<{ ok: true; ventaNumero: number; ventaTipo: string }> =>

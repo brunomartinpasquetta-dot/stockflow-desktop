@@ -50,6 +50,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { useQuery } from '@tanstack/react-query'
+
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
 import { api } from '@/lib/api'
@@ -89,7 +91,6 @@ const GROUPS: MenuGroup[] = [
     name: 'Archivo',
     items: [
       { pageKey: 'empresa', label: 'Mi Empresa', icon: Building2, roles: ['admin'], requires: 'manage_company' },
-      { pageKey: 'pedidos-web', label: 'Pedidos web', icon: ShoppingBag },
       { pageKey: 'configuracion', label: 'Configuración General', icon: Settings, roles: ['admin'] },
       { pageKey: 'configuracion', label: 'Configuración Hardware', icon: HardDrive, roles: ['admin'], initialTab: 'hardware' },
       { pageKey: 'configuracion', label: 'Configuración LAN', icon: Network, roles: ['admin'], initialTab: 'lan' },
@@ -122,6 +123,8 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'presupuestos', label: 'Presupuestos', icon: FileText, requires: 'view_quotes' },
       { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F2', requires: 'manage_purchases' },
       { pageKey: 'caja', label: 'Caja diaria', icon: Wallet, shortcut: 'F4' },
+      { separator: true, label: '' },
+      { pageKey: 'pedidos-web', label: 'Pedidos web', icon: ShoppingBag, requires: 'create_sale' },
     ],
   },
   {
@@ -179,6 +182,16 @@ export function MenuBar() {
   const { currentUser, logout } = useAuth()
   const wm = useWindowManager()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+
+  // Pedidos web esperando confirmación. Se consulta LOCAL (no al catálogo): es
+  // instantáneo y no depende de que haya internet en este momento.
+  const pedidosPendientes = useQuery({
+    queryKey: ['catalogo', 'pedidosContarPendientes'],
+    queryFn: () => api.catalogo.pedidosContarPendientes(),
+    refetchInterval: 20_000,
+    staleTime: 10_000,
+  })
+  const cantidadPendiente = pedidosPendientes.data?.pendientes ?? 0
 
   /**
    * Explica por qué una opción está bloqueada. Dice el rol con el que se entró
@@ -251,11 +264,17 @@ export function MenuBar() {
                 type="button"
                 onMouseEnter={() => { if (openMenu) setOpenMenu(g.name) }}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm hover:bg-accent data-[state=open]:bg-accent',
+                  'relative inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm hover:bg-accent data-[state=open]:bg-accent',
                 )}
               >
                 {g.name}
                 <ChevronDown className="h-3 w-3 opacity-60" />
+                {/* Aviso de pedidos web sin resolver, visible sin abrir el menú. */}
+                {g.name === 'Operaciones' && cantidadPendiente > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">
+                    {cantidadPendiente > 9 ? '9+' : cantidadPendiente}
+                  </span>
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[240px]">
@@ -288,6 +307,11 @@ export function MenuBar() {
                   >
                     {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground group-data-[highlighted]:text-inherit" />}
                     <span className="flex-1">{it.label}</span>
+                    {it.pageKey === 'pedidos-web' && cantidadPendiente > 0 && (
+                      <span className="ml-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white group-data-[highlighted]:bg-white/90 group-data-[highlighted]:text-amber-700">
+                        {cantidadPendiente > 99 ? '99+' : cantidadPendiente}
+                      </span>
+                    )}
                     {it.shortcut && (
                       <kbd className="ml-2 rounded bg-muted px-1 text-[10px] text-muted-foreground group-data-[highlighted]:bg-white/25 group-data-[highlighted]:text-inherit">
                         {it.shortcut}
