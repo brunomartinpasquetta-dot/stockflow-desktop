@@ -17,6 +17,7 @@
  *       busquedasSinResultado: [{ termino: string, veces: number }],
  *     }
  */
+import { CatalogoSync } from '../../catalogo/CatalogoSync';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type { CatalogoEstadisticasDTO } from '../types';
 
@@ -24,6 +25,30 @@ const TIMEOUT_MS = 8000;
 
 export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
   return {
+    /* ------------------------- Espejo de artículos ------------------------- */
+
+    'catalogo:syncEstado': withSession(deps, async () => {
+      const e = deps.repos.catalogo.getState();
+      return {
+        activo: e.enabled,
+        pendientes: deps.repos.catalogo.pendientes(e.cursor),
+        publicadosTotal: e.pushedTotal,
+        ultimaCorrida: e.lastRunAt,
+        ultimoExito: e.lastOkAt,
+        ultimoError: e.lastError,
+      };
+    }),
+
+    'catalogo:syncActivar': withSession(deps, async (payload: { activo: boolean }) => {
+      deps.repos.catalogo.saveState({ enabled: Boolean(payload?.activo) });
+      return { ok: true as const };
+    }),
+
+    'catalogo:syncAhora': withSession(deps, async (payload: { todo?: boolean }) => {
+      const sync = new CatalogoSync({ repos: deps.repos });
+      return payload?.todo ? sync.republicarTodo() : sync.correr();
+    }),
+
     'catalogo:estadisticas': withSession(
       deps,
       async (payload: { from: number; to: number }, ctx): Promise<CatalogoEstadisticasDTO> => {

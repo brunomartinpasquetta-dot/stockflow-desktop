@@ -23,6 +23,7 @@ import { RolePermissionRepository } from './rolePermission.repository';
 import { PromotionRepository } from './promotion.repository';
 import { ReturnRepository } from './return.repository';
 import { AuditRepository } from './audit.repository';
+import { CatalogoRepository } from './catalogo.repository';
 import { MaintenanceRepository } from './maintenance.repository';
 import { FiscalRepository } from './fiscal.repository';
 import { QuoteRepository } from './quote.repository';
@@ -66,6 +67,7 @@ export {
 } from './rolePermission.repository';
 export { PromotionRepository, type PromotionDetail, type PromotionItemDetail, type PromotionWriteInput } from './promotion.repository';
 export { AuditRepository, type InsertAuditInput, type ListAuditInput } from './audit.repository';
+export { CatalogoRepository, type ArticuloParaCatalogo } from './catalogo.repository';
 export { MaintenanceRepository, type ResetOperationalResult } from './maintenance.repository';
 export {
   FiscalRepository,
@@ -98,6 +100,7 @@ export interface Repositories {
   promotions: PromotionRepository;
   returns: ReturnRepository;
   audit: AuditRepository;
+  catalogo: CatalogoRepository;
   maintenance: MaintenanceRepository;
   fiscal: FiscalRepository;
   quotes: QuoteRepository;
@@ -132,6 +135,7 @@ export function createRepositories(db: LocalDatabase): Repositories {
     promotions: new PromotionRepository(db),
     returns: new ReturnRepository(db),
     audit: new AuditRepository(db),
+    catalogo: new CatalogoRepository(db),
     maintenance: new MaintenanceRepository(db),
     fiscal: new FiscalRepository(db),
     quotes: new QuoteRepository(db),

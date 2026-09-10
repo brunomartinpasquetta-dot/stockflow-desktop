@@ -36,7 +36,8 @@
     "test:onboarding": "tsx electron/__tests__/onboarding.smoke.ts",
     "test:fiscal": "tsx electron/__tests__/fiscal.smoke.ts",
     "test:fiscal-xml": "tsx electron/__tests__/fiscal-xml.smoke.ts",
-    "test:arca": "tsx scripts/verificar-arca.ts"
+    "test:arca": "tsx scripts/verificar-arca.ts",
+    "test:catalogo": "tsx electron/__tests__/catalogo.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

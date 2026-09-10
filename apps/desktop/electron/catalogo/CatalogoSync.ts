@@ -1,0 +1,131 @@
+/**
+ * ESPEJO DEL CATÁLOGO WEB — el que empuja.
+ *
+ * StockFlow publica en el catálogo online el código, el nombre, el precio y el
+ * stock de los artículos. Toda la comunicación la inicia ESTE lado: la PC del
+ * comercio no tiene IP fija, vive detrás del router de un local y se apaga a la
+ * noche, así que nadie puede llamarla. El catálogo solo responde.
+ *
+ * Tres reglas que sostienen el diseño:
+ *
+ *  1. Se publica ESTADO, no eventos: "este artículo tiene 7", nunca "salieron 3".
+ *     Por eso mandar de más es inofensivo, y una PC apagada una semana se pone
+ *     al día con una sola corrida en vez de reproducir un historial.
+ *  2. Corre en UN SOLO lugar: la máquina que tiene la base. En una terminal LAN
+ *     los datos son remotos y dos empujadores se pisarían.
+ *  3. Nunca frena la venta: si el catálogo no responde, se anota el error y se
+ *     reintenta en el tick siguiente. El cursor no avanza.
+ *
+ * Contrato del otro lado: ~/CATALOGOCITZIA/docs/INTEGRACION-STOCKFLOW.md
+ */
+import type { Repositories } from '@stockflow/db';
+
+const TIMEOUT_MS = 15_000;
+const TANDA = 500;
+
+export interface CatalogoSyncOptions {
+  repos: Repositories;
+  /** Qué lista de precios se publica. Por defecto la 1. */
+  precioLista?: 1 | 2 | 3;
+  /** Para poder probarlo sin red. */
+  fetchImpl?: typeof fetch;
+}
+
+export interface ResultadoSync {
+  ok: boolean;
+  publicados: number;
+  pendientes: number;
+  motivo?: string;
+}
+
+export class CatalogoSync {
+  private corriendo = false;
+
+  constructor(private readonly opts: CatalogoSyncOptions) {}
+
+  private get fetch(): typeof fetch {
+    return this.opts.fetchImpl ?? fetch;
+  }
+
+  /**
+   * Empuja una tanda. Devuelve cuántos publicó y cuántos quedan, para que la
+   * pantalla pueda mostrar avance sin adivinar.
+   *
+   * Es reentrante-seguro: si ya hay una corrida en curso, esta se saltea. Sin
+   * esto, el disparo por `data:changed` y el del reloj se solaparían y podrían
+   * publicar la misma tanda dos veces con el cursor a medio avanzar.
+   */
+  async correr(forzarDesdeCero = false): Promise<ResultadoSync> {
+    if (this.corriendo) return { ok: true, publicados: 0, pendientes: 0, motivo: 'ya estaba corriendo' };
+    this.corriendo = true;
+    const { repos } = this.opts;
+    try {
+      const estado = repos.catalogo.getState();
+      if (!estado.enabled) return { ok: true, publicados: 0, pendientes: 0, motivo: 'desactivado' };
+
+      const empresa = await repos.company.getOrCreate();
+      const url = (empresa.catalogoUrl ?? '').trim().replace(/\/$/, '');
+      const token = (empresa.catalogoToken ?? '').trim();
+      if (!url || !token) {
+        return { ok: false, publicados: 0, pendientes: 0, motivo: 'falta la dirección o la clave del catálogo' };
+      }
+
+      const desde = forzarDesdeCero ? 0 : estado.cursor;
+      const { articulos, cursorFinal } = repos.catalogo.listarParaPublicar({
+        desde,
+        limite: TANDA,
+        precioLista: this.opts.precioLista ?? 1,
+      });
+
+      repos.catalogo.saveState({ lastRunAt: Date.now() });
+      if (articulos.length === 0) {
+        repos.catalogo.saveState({ lastOkAt: Date.now(), lastError: null });
+        return { ok: true, publicados: 0, pendientes: 0 };
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      try {
+        const res = await this.fetch(`${url}/api/stockflow/articulos`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ articulos, crear_faltantes: true }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const motivo = `el catálogo respondió ${res.status}`;
+          repos.catalogo.saveState({ lastError: motivo });
+          return { ok: false, publicados: 0, pendientes: repos.catalogo.pendientes(desde), motivo };
+        }
+        // El cursor avanza SOLO con respuesta buena. Si esto falla a mitad de
+        // camino, la tanda entera se vuelve a mandar: como se publica estado y
+        // no eventos, repetirla no tiene consecuencias.
+        repos.catalogo.saveState({
+          cursor: cursorFinal,
+          lastOkAt: Date.now(),
+          lastError: null,
+          pushedTotal: estado.pushedTotal + articulos.length,
+        });
+        return { ok: true, publicados: articulos.length, pendientes: repos.catalogo.pendientes(cursorFinal) };
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (err) {
+      const motivo = err instanceof Error ? err.message : String(err);
+      try {
+        this.opts.repos.catalogo.saveState({ lastError: motivo });
+      } catch {
+        /* si ni el estado se puede guardar, no hay nada que hacer acá */
+      }
+      return { ok: false, publicados: 0, pendientes: 0, motivo };
+    } finally {
+      this.corriendo = false;
+    }
+  }
+
+  /** Vacía el espejo y vuelve a publicar todo desde cero. */
+  async republicarTodo(): Promise<ResultadoSync> {
+    this.opts.repos.catalogo.saveState({ cursor: 0 });
+    return this.correr(true);
+  }
+}

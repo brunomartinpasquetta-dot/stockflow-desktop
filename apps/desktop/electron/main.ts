@@ -11,6 +11,7 @@ import { HardwareManager } from './hardware/HardwareManager';
 import { ExcelImportService } from './import/ExcelImportService';
 import { registerIpcHandlers, buildAllHandlers } from './ipc';
 import { SessionStore } from './ipc/session-store';
+import { CatalogoSync } from './catalogo/CatalogoSync';
 import { LanManager } from './lan/LanManager';
 import { LanServer } from './lan/LanServer';
 import { DEFAULT_LAN_PORT } from './lan/types';
@@ -32,6 +33,7 @@ let dbHandle: DbHandle | null = null;
 let licenseManager: LicenseManager | null = null;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 let mpCronTimer: NodeJS.Timeout | null = null;
+let catalogoTimer: NodeJS.Timeout | null = null;
 let hardwareManager: HardwareManager | null = null;
 let backupService: BackupService | null = null;
 let lanServer: LanServer | null = null;
@@ -328,6 +330,29 @@ function bootstrap(): { lanArgs: string[] } {
     })();
   }, 60_000);
 
+  // Espejo del catálogo web: publica artículos hacia afuera cada 60 s.
+  // Corre SOLO donde está la base — en una terminal LAN los datos son remotos y
+  // dos empujadores se pisarían. Nunca frena nada: si falla, queda anotado y se
+  // reintenta en el tick siguiente.
+  if (lanCfg.mode !== 'client') {
+    catalogoTimer = setInterval(() => {
+      void (async () => {
+        try {
+          if (!dbHandle) return;
+          if (!dbHandle.repos.catalogo.getState().enabled) return;
+          const r = await new CatalogoSync({ repos: dbHandle.repos }).correr();
+          if (r.publicados > 0) {
+            console.info(`[catalogo] publicados ${r.publicados}, quedan ${r.pendientes}`);
+          } else if (!r.ok) {
+            console.warn(`[catalogo] no se pudo publicar: ${r.motivo}`);
+          }
+        } catch (e) {
+          console.error('[catalogo] el espejo falló:', e);
+        }
+      })();
+    }, 60_000);
+  }
+
   if (lanCfg.mode === 'server' && lanCfg.token) {
     const handlers = buildAllHandlers(deps);
     const port = lanCfg.port ?? DEFAULT_LAN_PORT;
@@ -472,6 +497,7 @@ if (!app.requestSingleInstanceLock()) {
     // single-instance lock y impide reabrir la app.
     if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
     if (mpCronTimer) { clearInterval(mpCronTimer); mpCronTimer = null; }
+    if (catalogoTimer) { clearInterval(catalogoTimer); catalogoTimer = null; }
     updaterController?.dispose?.();
     void hardwareManager?.dispose(); // cierra puertos serie (balanza/impresora)
     if (lanServer) {

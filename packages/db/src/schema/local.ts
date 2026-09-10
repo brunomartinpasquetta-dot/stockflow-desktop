@@ -923,6 +923,33 @@ export const auditLog = sqliteTable(
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 
 /* ------------------------------------------------------------------ */
+/* CATÁLOGO WEB — espejo saliente                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Estado del sincronizador que empuja los artículos al catálogo online
+ * (singleton, id='singleton'). La dirección y la clave del catálogo viven en
+ * `companies.catalogoUrl/catalogoToken`; acá solo el estado del espejo.
+ *
+ * `cursor` es la marca de agua sobre `articles.updatedAt`. Es una OPTIMIZACIÓN,
+ * no la fuente de verdad: se publica ESTADO ("este artículo tiene 7"), no
+ * eventos, así que reenviar de más es inofensivo y perder un tick se corrige
+ * solo en la corrida siguiente.
+ */
+export const catalogoSync = sqliteTable('catalogo_sync', {
+  id: text('id').primaryKey(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  cursor: integer('cursor').notNull().default(0),
+  lastRunAt: integer('last_run_at'),
+  lastOkAt: integer('last_ok_at'),
+  lastError: text('last_error'),
+  pushedTotal: integer('pushed_total').notNull().default(0),
+  createdAt: createdAtCol(),
+  updatedAt: updatedAtCol(),
+});
+export type CatalogoSync = typeof catalogoSync.$inferSelect;
+
+/* ------------------------------------------------------------------ */
 /* FACTURACIÓN ELECTRÓNICA ARCA (ex AFIP)                              */
 /* ------------------------------------------------------------------ */
 
@@ -1484,6 +1511,7 @@ export const localSchema = {
   mpPosDevices,
   mpOrders,
   auditLog,
+  catalogoSync,
   fiscalConfig,
   salePoints,
   fiscalVouchers,
