@@ -25,6 +25,8 @@ import type {
   ImportOptionsDTO,
   ImportValidationResultDTO,
   CatalogoEstadisticasDTO,
+  CatalogoSyncEstadoDTO,
+  CatalogoSyncResultadoDTO,
   GuiaEstadoDTO,
   NovedadesPendientesDTO,
   OnboardingStatusDTO,
@@ -166,6 +168,11 @@ export const api = {
   catalogo: {
     estadisticas: (input: { from: number; to: number }): Promise<CatalogoEstadisticasDTO> =>
       unwrap(sf().catalogo.estadisticas(input)),
+    syncEstado: (): Promise<CatalogoSyncEstadoDTO> => unwrap(sf().catalogo.syncEstado()),
+    syncActivar: (activo: boolean): Promise<{ ok: true }> =>
+      unwrap(sf().catalogo.syncActivar({ activo })),
+    syncAhora: (todo = false): Promise<CatalogoSyncResultadoDTO> =>
+      unwrap(sf().catalogo.syncAhora({ todo })),
   },
   onboarding: {
     status: (): Promise<OnboardingStatusDTO> => unwrap(sf().onboarding.status()),

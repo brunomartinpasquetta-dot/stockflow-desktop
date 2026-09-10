@@ -1541,6 +1541,24 @@ export interface NovedadesPendientesDTO {
   internas: boolean;
 }
 
+/** Estado del espejo de artículos hacia el catálogo web. */
+export interface CatalogoSyncEstadoDTO {
+  activo: boolean;
+  /** Artículos con cambios todavía sin publicar. */
+  pendientes: number;
+  publicadosTotal: number;
+  ultimaCorrida: number | null;
+  ultimoExito: number | null;
+  ultimoError: string | null;
+}
+
+export interface CatalogoSyncResultadoDTO {
+  ok: boolean;
+  publicados: number;
+  pendientes: number;
+  motivo?: string;
+}
+
 /** Estadísticas del catálogo web (contrato en catalogo.handlers.ts). */
 export interface CatalogoEstadisticasDTO {
   /** false = el comercio no tiene catálogo configurado: no mostrar la pestaña. */
@@ -1815,6 +1833,9 @@ export interface ApiSurface {
   };
   catalogo: {
     estadisticas(payload: DateRangeDTO): Res<CatalogoEstadisticasDTO>;
+    syncEstado(): Res<CatalogoSyncEstadoDTO>;
+    syncActivar(payload: { activo: boolean }): Res<{ ok: true }>;
+    syncAhora(payload?: { todo?: boolean }): Res<CatalogoSyncResultadoDTO>;
   };
   demo: {
     status(): Res<DemoStatusDTO>;

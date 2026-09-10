@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Loader2, RefreshCw, UploadCloud } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useCompany } from '@/lib/hooks'
 import { cn } from '@/lib/utils'
+import { formatDateTime } from '@/lib/format'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -192,6 +193,7 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
                 <Input id="emp-cat-token" value={form.catalogoToken} onChange={(e) => set('catalogoToken', e.target.value)} />
               </div>
             </div>
+            <EspejoCatalogo />
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="emp-phone">Teléfono</Label>
@@ -331,4 +333,98 @@ export function Empresa() {
     )
   }
   return <EmpresaForm company={company.data} />
+}
+
+/**
+ * ESPEJO DEL CATÁLOGO: el sistema publica sus artículos en el catálogo web.
+ *
+ * Se muestra acá, debajo de la dirección y la clave, porque sin esos datos no
+ * hay nada que hacer. El estado se refresca solo: el que empuja es un reloj del
+ * proceso principal, no esta pantalla.
+ */
+function EspejoCatalogo(): React.ReactElement {
+  const qc = useQueryClient()
+  const estado = useQuery({
+    queryKey: ['catalogo', 'syncEstado'],
+    queryFn: () => api.catalogo.syncEstado(),
+    refetchInterval: 10_000,
+  })
+
+  const activar = useMutation({
+    mutationFn: (activo: boolean) => api.catalogo.syncActivar(activo),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['catalogo', 'syncEstado'] }),
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo cambiar'),
+  })
+
+  const publicar = useMutation({
+    mutationFn: (todo: boolean) => api.catalogo.syncAhora(todo),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'syncEstado'] })
+      if (!r.ok) toast.error(`No se pudo publicar: ${r.motivo ?? 'error desconocido'}`, { duration: 10_000 })
+      else if (r.publicados === 0) toast.info('No había cambios para publicar')
+      else toast.success(`Se publicaron ${r.publicados} artículos${r.pendientes > 0 ? `, quedan ${r.pendientes}` : ''}`)
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo publicar'),
+  })
+
+  const e = estado.data
+  const trabajando = publicar.isPending || activar.isPending
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-md border p-3">
+      <label className="flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-primary"
+          checked={e?.activo ?? false}
+          disabled={trabajando}
+          onChange={(ev) => activar.mutate(ev.target.checked)}
+        />
+        <span className="font-medium">Publicar los artículos en el catálogo</span>
+      </label>
+      <p className="text-xs text-muted-foreground">
+        El sistema mantiene actualizados en el catálogo el código, el nombre, el precio y el stock.
+        Las fotos, las categorías y las descripciones se siguen manejando desde el catálogo.
+      </p>
+
+      {e?.activo && (
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <span className={e.pendientes > 0 ? 'text-amber-600' : 'text-muted-foreground'}>
+            {e.pendientes > 0 ? `${e.pendientes} artículos por publicar` : 'Todo publicado'}
+          </span>
+          {e.ultimoExito != null && (
+            <span className="text-muted-foreground">
+              Última publicación: {formatDateTime(e.ultimoExito)}
+            </span>
+          )}
+          {e.publicadosTotal > 0 && (
+            <span className="text-muted-foreground">{e.publicadosTotal} enviados en total</span>
+          )}
+        </div>
+      )}
+
+      {e?.ultimoError && (
+        <p className="text-xs text-destructive">Último error: {e.ultimoError}</p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={trabajando} onClick={() => publicar.mutate(false)}>
+          {publicar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+          Publicar ahora
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={trabajando}
+          title="Vuelve a mandar TODOS los artículos, no solo los que cambiaron"
+          onClick={() => {
+            if (window.confirm('¿Volver a publicar todos los artículos en el catálogo?')) publicar.mutate(true)
+          }}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Republicar todo
+        </Button>
+      </div>
+    </div>
+  )
 }

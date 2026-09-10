@@ -18,6 +18,8 @@ import type {
   AssistantAskResultDTO,
   DemoStatusDTO,
   CatalogoEstadisticasDTO,
+  CatalogoSyncEstadoDTO,
+  CatalogoSyncResultadoDTO,
   GuiaEstadoDTO,
   NovedadesPendientesDTO,
   OnboardingStatusDTO,
@@ -288,6 +290,9 @@ export function createApiBridge(
     },
     catalogo: {
       estadisticas: (p) => c<CatalogoEstadisticasDTO>('catalogo:estadisticas', p),
+      syncEstado: () => c<CatalogoSyncEstadoDTO>('catalogo:syncEstado'),
+      syncActivar: (p) => c<{ ok: true }>('catalogo:syncActivar', p),
+      syncAhora: (p) => c<CatalogoSyncResultadoDTO>('catalogo:syncAhora', p),
     },
     demo: {
       status: () => c<DemoStatusDTO>('demo:status'),
