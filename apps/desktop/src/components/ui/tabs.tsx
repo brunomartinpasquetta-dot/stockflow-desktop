@@ -32,6 +32,13 @@ const TabsTrigger = React.forwardRef<
 ))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
+/**
+ * GOTCHA: `defaultValue` en `<Tabs>` puede activar el trigger EQUIVOCADO si el
+ * `<TabsContent>` de ese valor no es el que aparece PRIMERO en el JSX (visto en
+ * HistorialCajas: con "por-dia" declarado antes que "listado", abría en
+ * "por-dia" pese a `defaultValue="listado"`). Mantené el orden de los
+ * `<TabsContent>` igual al de los `<TabsTrigger>` — el primero en JSX manda.
+ */
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>

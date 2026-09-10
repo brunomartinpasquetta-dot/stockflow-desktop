@@ -13,7 +13,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { api } from '@/lib/api'
 import { usePrintHistoricalCashReport, usePrintCashCloseReport } from '@/lib/usePrint'
-import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type {
   HistoricalCashRegisterDTO,
@@ -42,6 +44,194 @@ function dayStart(iso: string): number {
 }
 function dayEnd(iso: string): number {
   return new Date(`${iso}T23:59:59.999`).getTime()
+}
+
+/**
+ * TURNO — inferido por la hora de apertura, sin campo cargado a mano.
+ *
+ * Pedirle al cajero que tipee el turno cada vez que abre la caja es un paso
+ * más y una fuente segura de inconsistencia (cada uno lo escribe distinto,
+ * o se olvida). Los cortes de abajo son un supuesto razonable para un
+ * comercio de mostrador; si el negocio tiene horarios muy irregulares, el
+ * turno mostrado puede no coincidir con el real — es una lectura aproximada,
+ * no un dato que el cajero confirmó.
+ */
+type Turno = 'Mañana' | 'Tarde' | 'Noche'
+function inferirTurno(openDate: number): Turno {
+  const h = new Date(openDate).getHours()
+  if (h >= 6 && h < 14) return 'Mañana'
+  if (h >= 14 && h < 21) return 'Tarde'
+  return 'Noche'
+}
+function horaDe(ts: number): string {
+  const d = new Date(ts)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+function isoDeFecha(ts: number): string {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+/** Todos los días ISO entre dos fechas (inclusive), para que el calendario
+ *  muestre también los días sin ninguna caja. Tope de un año por seguridad. */
+function diasEntre(fromIso: string, toIso: string): string[] {
+  const out: string[] = []
+  let cur = new Date(`${fromIso}T00:00:00`)
+  const fin = new Date(`${toIso}T00:00:00`)
+  let guard = 0
+  while (cur.getTime() <= fin.getTime() && guard < 366) {
+    out.push(isoDeFecha(cur.getTime()))
+    cur = new Date(cur.getTime() + 86_400_000)
+    guard++
+  }
+  return out
+}
+
+function TurnoBadge({ turno }: { turno: Turno }) {
+  const cls =
+    turno === 'Mañana'
+      ? 'bg-amber-100 text-amber-800'
+      : turno === 'Tarde'
+        ? 'bg-sky-100 text-sky-800'
+        : 'bg-indigo-100 text-indigo-800'
+  return <Badge variant="outline" className={cls}>{turno}</Badge>
+}
+
+/** Un día del calendario: coloreado por lo que pasó ese día, no por el monto. */
+function DiaCuadro({
+  iso,
+  registros,
+  seleccionado,
+  onClick,
+}: {
+  iso: string
+  registros: HistoricalCashRegisterDTO[]
+  seleccionado: boolean
+  onClick: () => void
+}) {
+  const dia = Number(iso.slice(8, 10))
+  const esPrimeroDeMes = dia === 1
+  const hayAbierta = registros.some((r) => r.status === 'open')
+  const hayDiferencia = registros.some((r) => r.difference != null && Math.abs(Number(r.difference)) > 0.005)
+  const tono =
+    registros.length === 0
+      ? 'border-dashed border-muted-foreground/30 bg-muted/20 text-muted-foreground'
+      : hayAbierta
+        ? 'border-blue-300 bg-blue-50'
+        : hayDiferencia
+          ? 'border-amber-300 bg-amber-50'
+          : 'border-emerald-300 bg-emerald-50'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={registros.length > 0 ? `${registros.length} caja${registros.length > 1 ? 's' : ''} este día` : 'Sin cajas este día'}
+      className={cn(
+        'flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md border text-xs transition-colors hover:brightness-95',
+        tono,
+        seleccionado && 'ring-2 ring-primary ring-offset-1',
+      )}
+    >
+      <span className="font-semibold leading-none">{dia}</span>
+      {esPrimeroDeMes && (
+        <span className="text-[9px] uppercase leading-none text-muted-foreground">
+          {new Date(`${iso}T00:00:00`).toLocaleDateString('es-AR', { month: 'short' })}
+        </span>
+      )}
+      {registros.length > 0 && (
+        <span className="text-[9px] leading-none text-muted-foreground">
+          {registros.length === 1 ? '1 caja' : `${registros.length} cajas`}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/**
+ * Pestaña "Por día": la planilla de papel, en pantalla — un cuadrado por día,
+ * y al tocarlo, el detalle que antes se anotaba a mano: turno, cajero, hora
+ * de apertura, hora de cierre y saldo final.
+ */
+function PorDiaTab({
+  list,
+  fromIso,
+  toIso,
+}: {
+  list: HistoricalCashRegisterDTO[]
+  fromIso: string
+  toIso: string
+}) {
+  const [diaSel, setDiaSel] = useState<string | null>(null)
+
+  const porDia = useMemo(() => {
+    const map = new Map<string, HistoricalCashRegisterDTO[]>()
+    for (const r of list) {
+      const k = isoDeFecha(r.openDate)
+      const arr = map.get(k) ?? []
+      arr.push(r)
+      map.set(k, arr)
+    }
+    return map
+  }, [list])
+
+  const dias = useMemo(() => diasEntre(fromIso, toIso), [fromIso, toIso])
+  const registrosDelDia = useMemo(
+    () => (diaSel ? (porDia.get(diaSel) ?? []).slice().sort((a, b) => a.openDate - b.openDate) : []),
+    [diaSel, porDia],
+  )
+
+  if (dias.length === 0) {
+    return <p className="text-sm text-muted-foreground">Elegí un rango de fechas para ver el calendario.</p>
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-1.5">
+        {dias.map((iso) => (
+          <DiaCuadro
+            key={iso}
+            iso={iso}
+            registros={porDia.get(iso) ?? []}
+            seleccionado={diaSel === iso}
+            onClick={() => setDiaSel((cur) => (cur === iso ? null : iso))}
+          />
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm border border-emerald-300 bg-emerald-50" /> cerrada, sin diferencia</span>
+        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm border border-amber-300 bg-amber-50" /> cerrada, con diferencia</span>
+        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm border border-blue-300 bg-blue-50" /> abierta</span>
+        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm border border-dashed border-muted-foreground/30 bg-muted/20" /> sin cajas</span>
+      </div>
+
+      {diaSel && (
+        <Card>
+          <CardContent className="flex flex-col gap-2 pt-4">
+            <span className="text-sm font-medium">{formatDate(dayStart(diaSel))}</span>
+            {registrosDelDia.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin cajas este día.</p>
+            ) : (
+              <div className="flex flex-col divide-y">
+                {registrosDelDia.map((r) => (
+                  <div key={r.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
+                    <TurnoBadge turno={inferirTurno(r.openDate)} />
+                    <span className="min-w-32 font-medium">{r.userName}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {horaDe(r.openDate)} – {r.closeDate ? horaDe(r.closeDate) : 'en curso'}
+                    </span>
+                    <span className="ml-auto tabular-nums">
+                      {r.closingAmount ? formatCurrency(r.closingAmount) : '—'}
+                    </span>
+                    <StatusBadge r={r} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
 }
 
 function StatusBadge({ r }: { r: HistoricalCashRegisterDTO }) {
@@ -397,6 +587,7 @@ export function HistorialCajas() {
   const [fromIso, setFromIso] = useState(() => isoDaysAgo(30))
   const [toIso, setToIso] = useState(() => todayIso())
   const [userId, setUserId] = useState('')
+  const [turnoFiltro, setTurnoFiltro] = useState<Turno | ''>('')
   const [detailId, setDetailId] = useState<string | null>(null)
   const [depositRegId, setDepositRegId] = useState<string | null>(null)
   const canWrite = useCanWrite()
@@ -420,12 +611,19 @@ export function HistorialCajas() {
     [usersQuery.data],
   )
 
+  // El filtro de turno es SOLO de este lado (se infiere de la hora, no hay
+  // nada que consultarle al servidor): se aplica sobre lo que ya trajo el
+  // rango de fechas, igual que el filtro de medio de pago en el detalle.
+  const list = useMemo(
+    () => (listQuery.data ?? []).filter((r) => !turnoFiltro || inferirTurno(r.openDate) === turnoFiltro),
+    [listQuery.data, turnoFiltro],
+  )
+
   const totals = useMemo(() => {
-    const list = listQuery.data ?? []
     const income = list.reduce((a, r) => a + Number(r.totalIncome), 0)
     const expense = list.reduce((a, r) => a + Number(r.totalExpense), 0)
     return { income, expense, net: income - expense }
-  }, [listQuery.data])
+  }, [list])
 
   function calcular(): void {
     setAppliedRange({ from: dayStart(fromIso), to: dayEnd(toIso), userId: userId || undefined })
@@ -438,11 +636,9 @@ export function HistorialCajas() {
       from: appliedRange.from,
       to: appliedRange.to,
       userName: appliedRange.userId ? userNameById.get(appliedRange.userId) : undefined,
-      registers: listQuery.data ?? [],
+      registers: list,
     })
   }
-
-  const list = listQuery.data ?? []
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -453,7 +649,7 @@ export function HistorialCajas() {
 
 
       <Card>
-        <CardContent className="grid grid-cols-2 items-end gap-3 pt-4 md:grid-cols-5">
+        <CardContent className="grid grid-cols-2 items-end gap-3 pt-4 md:grid-cols-6">
           <div className="flex flex-col gap-1">
             <Label>Desde</Label>
             <Input type="date" value={fromIso} onChange={(e) => setFromIso(e.target.value)} />
@@ -473,6 +669,15 @@ export function HistorialCajas() {
               </Select>
             </div>
           )}
+          <div className="flex flex-col gap-1">
+            <Label>Turno</Label>
+            <Select value={turnoFiltro} onChange={(e) => setTurnoFiltro(e.target.value as Turno | '')}>
+              <option value="">Todos</option>
+              <option value="Mañana">Mañana</option>
+              <option value="Tarde">Tarde</option>
+              <option value="Noche">Noche</option>
+            </Select>
+          </div>
           <Button onClick={calcular}>Calcular</Button>
           <Button variant="outline" onClick={imprimirRango} disabled={list.length === 0}>
             <Printer className="h-4 w-4" />
@@ -481,6 +686,13 @@ export function HistorialCajas() {
         </CardContent>
       </Card>
 
+      <Tabs defaultValue="listado" className="flex min-h-0 flex-1 flex-col gap-2">
+        <TabsList>
+          <TabsTrigger value="listado">Listado</TabsTrigger>
+          <TabsTrigger value="por-dia">Por día</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="listado" className="flex min-h-0 flex-1 flex-col gap-0">
       <Card className="flex min-h-0 flex-1 flex-col">
         <CardContent className="flex min-h-0 flex-1 flex-col p-0">
           <div className="min-h-0 flex-1 overflow-auto">
@@ -488,6 +700,7 @@ export function HistorialCajas() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha apertura</TableHead>
+                  <TableHead>Turno</TableHead>
                   <TableHead>Cajero</TableHead>
                   <TableHead className="text-right">Apertura</TableHead>
                   <TableHead className="text-right">Ingresos</TableHead>
@@ -501,9 +714,9 @@ export function HistorialCajas() {
               </TableHeader>
               <TableBody>
                 {listQuery.isLoading ? (
-                  <TableRow><TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
                 ) : list.length === 0 ? (
-                  <TableRow><TableCell colSpan={10} className="py-10 text-center text-muted-foreground">No hay cajas en el rango seleccionado.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="py-10 text-center text-muted-foreground">No hay cajas en el rango seleccionado.</TableCell></TableRow>
                 ) : (
                   list.map((r) => (
                     <TableRow
@@ -513,6 +726,7 @@ export function HistorialCajas() {
                       onClick={() => setDetailId(r.id)}
                     >
                       <TableCell className="whitespace-nowrap text-xs">{formatDateTime(r.openDate)}</TableCell>
+                      <TableCell><TurnoBadge turno={inferirTurno(r.openDate)} /></TableCell>
                       <TableCell className="text-xs">{r.userName}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(r.openingAmount)}</TableCell>
                       <TableCell className="text-right tabular-nums text-success">{formatCurrency(r.totalIncome)}</TableCell>
@@ -568,6 +782,12 @@ export function HistorialCajas() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="por-dia" className="min-h-0 flex-1 overflow-auto">
+          <PorDiaTab list={list} fromIso={isoDeFecha(appliedRange.from)} toIso={isoDeFecha(appliedRange.to)} />
+        </TabsContent>
+      </Tabs>
 
       {/* SIN panel de detalle en la página: el detalle por movimiento vive en
           el diálogo (doble clic sobre la caja), con su propio filtro por medio
