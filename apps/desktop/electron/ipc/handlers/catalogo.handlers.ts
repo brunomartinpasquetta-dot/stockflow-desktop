@@ -17,11 +17,36 @@
  *       busquedasSinResultado: [{ termino: string, veces: number }],
  *     }
  */
+import { SalesService, ValidationError } from '@stockflow/core';
+
 import { CatalogoSync } from '../../catalogo/CatalogoSync';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type { CatalogoEstadisticasDTO } from '../types';
 
 const TIMEOUT_MS = 8000;
+
+/** Le avisa al catálogo en qué quedó el pedido. Best-effort: si falla, el
+ *  pedido ya está resuelto de este lado y se corrige desde el panel. */
+async function avisarCatalogo(
+  deps: HandlerDeps,
+  pedidoId: string,
+  estado: 'confirmado' | 'cancelado',
+  ventaSistema?: string,
+): Promise<void> {
+  try {
+    const empresa = await deps.repos.company.getOrCreate();
+    const url = (empresa.catalogoUrl ?? '').trim().replace(/\/$/, '');
+    const token = (empresa.catalogoToken ?? '').trim();
+    if (!url || !token) return;
+    await fetch(`${url}/api/stockflow/pedidos/${pedidoId}/estado`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ estado, venta_sistema: ventaSistema }),
+    });
+  } catch {
+    /* el pedido ya está resuelto en el sistema; el catálogo se corrige a mano */
+  }
+}
 
 export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
   return {
@@ -46,8 +71,128 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
 
     'catalogo:syncAhora': withSession(deps, async (payload: { todo?: boolean }) => {
       const sync = new CatalogoSync({ repos: deps.repos });
+      await sync.traerPedidos();
       return payload?.todo ? sync.republicarTodo() : sync.correr();
     }),
+
+    /* ---------------------------- Pedidos web ---------------------------- */
+
+    'catalogo:pedidosListar': withSession(deps, async (payload: { estado?: 'pendiente' | 'convertido' | 'rechazado' }) => {
+      const filas = deps.repos.catalogoPedidos.listar(payload?.estado);
+      // Cada línea se resuelve contra el catálogo de artículos: la que no tiene
+      // código, o cuyo código no existe en el sistema, se marca para que la
+      // pantalla la muestre como suelta y no se pueda confundir con un artículo.
+      const resueltos = await Promise.all(
+        filas.map(async (p) => {
+          const items = JSON.parse(p.items) as {
+            sku: string; codigo_sistema: string; nombre: string; cant: number; precio: number; subtotal: number; servicio: boolean;
+          }[];
+          const lineas = await Promise.all(
+            items.map(async (i) => {
+              const art = i.codigo_sistema
+                ? await deps.repos.articles.findByBarcode(i.codigo_sistema)
+                : null;
+              return {
+                nombre: i.nombre,
+                cantidad: i.cant,
+                precio: i.precio,
+                subtotal: i.subtotal,
+                articleId: art?.id ?? null,
+                codigoSistema: i.codigo_sistema || null,
+                nombreSistema: art?.description ?? null,
+                stockActual: art ? Number(art.stock) : null,
+                sinPrecio: !i.precio || i.precio <= 0,
+              };
+            }),
+          );
+          return {
+            id: p.id,
+            numero: p.numero,
+            fecha: p.fecha,
+            clienteNombre: p.clienteNombre,
+            clienteTelefono: p.clienteTelefono,
+            clienteEmail: p.clienteEmail,
+            entrega: p.entrega,
+            direccion: p.direccion,
+            notas: p.notas,
+            total: p.total,
+            estado: p.estado,
+            saleId: p.saleId,
+            lineas,
+          };
+        }),
+      );
+      return resueltos;
+    }),
+
+    'catalogo:pedidoRechazar': withSession(deps, async (payload: { id: string }) => {
+      const pedido = deps.repos.catalogoPedidos.buscar(payload.id);
+      if (!pedido) throw new ValidationError('id', 'El pedido no existe');
+      deps.repos.catalogoPedidos.marcar(payload.id, 'rechazado');
+      // Avisarle al catálogo para que devuelva el stock reservado.
+      void avisarCatalogo(deps, pedido.pedidoId, 'cancelado');
+      return { ok: true as const };
+    }),
+
+    /**
+     * Convierte el pedido en una VENTA real: descuenta stock, entra a la caja
+     * con la forma de pago elegida y queda en el historial como cualquier otra.
+     */
+    'catalogo:pedidoConvertir': withSession(
+      deps,
+      async (
+        payload: { id: string; paymentMethodId: string; customerId?: string; type?: 'X' | 'A' | 'B' | 'C' },
+        ctx,
+      ) => {
+        const pedido = deps.repos.catalogoPedidos.buscar(payload.id);
+        if (!pedido) throw new ValidationError('id', 'El pedido no existe');
+        if (pedido.estado !== 'pendiente') {
+          throw new ValidationError('id', 'Ese pedido ya fue procesado');
+        }
+        const items = JSON.parse(pedido.items) as {
+          codigo_sistema: string; nombre: string; cant: number; precio: number;
+        }[];
+        if (items.length === 0) throw new ValidationError('items', 'El pedido no tiene líneas');
+        // Una línea sin precio no puede convertirse en venta: entraría en $0 y
+        // descuadraría la caja. El comerciante la cotiza en el catálogo primero.
+        const sinPrecio = items.filter((i) => !i.precio || i.precio <= 0);
+        if (sinPrecio.length > 0) {
+          throw new ValidationError(
+            'items',
+            `Hay ${sinPrecio.length} artículo(s) sin precio ("${sinPrecio[0]!.nombre}"). Cargue el precio en el catálogo antes de convertir el pedido.`,
+          );
+        }
+
+        const cf = await deps.repos.customers.findOne({ lastName: 'CONSUMIDOR FINAL' });
+        const customerId = payload.customerId ?? cf?.id;
+        if (!customerId) throw new ValidationError('customerId', 'Falta el cliente');
+
+        const lineas = await Promise.all(
+          items.map(async (i) => {
+            const art = i.codigo_sistema ? await deps.repos.articles.findByBarcode(i.codigo_sistema) : null;
+            // Sin artículo en el sistema entra como artículo rápido: se cobra,
+            // pero no mueve stock de algo que no existe en el inventario.
+            return art
+              ? { articleId: art.id, quantity: String(i.cant), unitPrice: i.precio.toFixed(4) }
+              : { description: i.nombre, quantity: String(i.cant), unitPrice: i.precio.toFixed(4) };
+          }),
+        );
+
+        const total = lineas.reduce((a, l) => a + Number(l.unitPrice) * Number(l.quantity), 0);
+        const svc = new SalesService(ctx);
+        const venta = await svc.createSale({
+          type: payload.type ?? 'X',
+          customerId,
+          payments: [{ paymentMethodId: payload.paymentMethodId, amount: total.toFixed(4) }],
+          notes: `Pedido web N° ${pedido.numero} — ${pedido.clienteNombre}`,
+          lines: lineas as never,
+        });
+
+        deps.repos.catalogoPedidos.marcar(payload.id, 'convertido', venta.sale.id);
+        void avisarCatalogo(deps, pedido.pedidoId, 'confirmado', `${venta.sale.type}-${venta.sale.number}`);
+        return { ok: true as const, ventaNumero: venta.sale.number, ventaTipo: venta.sale.type };
+      },
+    ),
 
     'catalogo:estadisticas': withSession(
       deps,

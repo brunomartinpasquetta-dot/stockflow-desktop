@@ -19,6 +19,7 @@ import type {
   DemoStatusDTO,
   CatalogoEstadisticasDTO,
   CatalogoSyncEstadoDTO,
+  PedidoWebDTO,
   CatalogoSyncResultadoDTO,
   GuiaEstadoDTO,
   NovedadesPendientesDTO,
@@ -293,6 +294,9 @@ export function createApiBridge(
       syncEstado: () => c<CatalogoSyncEstadoDTO>('catalogo:syncEstado'),
       syncActivar: (p) => c<{ ok: true }>('catalogo:syncActivar', p),
       syncAhora: (p) => c<CatalogoSyncResultadoDTO>('catalogo:syncAhora', p),
+      pedidosListar: (p) => c<PedidoWebDTO[]>('catalogo:pedidosListar', p),
+      pedidoConvertir: (p) => c<{ ok: true; ventaNumero: number; ventaTipo: string }>('catalogo:pedidoConvertir', p),
+      pedidoRechazar: (p) => c<{ ok: true }>('catalogo:pedidoRechazar', p),
     },
     demo: {
       status: () => c<DemoStatusDTO>('demo:status'),

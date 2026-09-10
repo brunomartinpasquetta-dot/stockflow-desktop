@@ -14,6 +14,7 @@ import { BRANDING } from "@/assets/branding"
 import { useState } from 'react'
 import {
   ArrowLeftRight,
+  ShoppingBag,
   BadgePercent,
   BarChart3,
   BookOpen,
@@ -88,6 +89,7 @@ const GROUPS: MenuGroup[] = [
     name: 'Archivo',
     items: [
       { pageKey: 'empresa', label: 'Mi Empresa', icon: Building2, roles: ['admin'], requires: 'manage_company' },
+      { pageKey: 'pedidos-web', label: 'Pedidos web', icon: ShoppingBag },
       { pageKey: 'configuracion', label: 'Configuración General', icon: Settings, roles: ['admin'] },
       { pageKey: 'configuracion', label: 'Configuración Hardware', icon: HardDrive, roles: ['admin'], initialTab: 'hardware' },
       { pageKey: 'configuracion', label: 'Configuración LAN', icon: Network, roles: ['admin'], initialTab: 'lan' },

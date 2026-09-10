@@ -1541,6 +1541,36 @@ export interface NovedadesPendientesDTO {
   internas: boolean;
 }
 
+/** Una línea de un pedido web, ya resuelta contra el catálogo de artículos. */
+export interface PedidoWebLineaDTO {
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  subtotal: number;
+  /** null = ese artículo no existe en el sistema (no va a mover stock). */
+  articleId: string | null;
+  codigoSistema: string | null;
+  nombreSistema: string | null;
+  stockActual: number | null;
+  sinPrecio: boolean;
+}
+
+export interface PedidoWebDTO {
+  id: string;
+  numero: number;
+  fecha: number;
+  clienteNombre: string;
+  clienteTelefono: string | null;
+  clienteEmail: string | null;
+  entrega: 'retiro' | 'envio';
+  direccion: string | null;
+  notas: string | null;
+  total: string;
+  estado: 'pendiente' | 'convertido' | 'rechazado';
+  saleId: string | null;
+  lineas: PedidoWebLineaDTO[];
+}
+
 /** Estado del espejo de artículos hacia el catálogo web. */
 export interface CatalogoSyncEstadoDTO {
   activo: boolean;
@@ -1836,6 +1866,9 @@ export interface ApiSurface {
     syncEstado(): Res<CatalogoSyncEstadoDTO>;
     syncActivar(payload: { activo: boolean }): Res<{ ok: true }>;
     syncAhora(payload?: { todo?: boolean }): Res<CatalogoSyncResultadoDTO>;
+    pedidosListar(payload?: { estado?: 'pendiente' | 'convertido' | 'rechazado' }): Res<PedidoWebDTO[]>;
+    pedidoConvertir(payload: { id: string; paymentMethodId: string }): Res<{ ok: true; ventaNumero: number; ventaTipo: string }>;
+    pedidoRechazar(payload: { id: string }): Res<{ ok: true }>;
   };
   demo: {
     status(): Res<DemoStatusDTO>;

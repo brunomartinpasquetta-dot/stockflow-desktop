@@ -26,6 +26,7 @@ import type {
   ImportValidationResultDTO,
   CatalogoEstadisticasDTO,
   CatalogoSyncEstadoDTO,
+  PedidoWebDTO,
   CatalogoSyncResultadoDTO,
   GuiaEstadoDTO,
   NovedadesPendientesDTO,
@@ -173,6 +174,11 @@ export const api = {
       unwrap(sf().catalogo.syncActivar({ activo })),
     syncAhora: (todo = false): Promise<CatalogoSyncResultadoDTO> =>
       unwrap(sf().catalogo.syncAhora({ todo })),
+    pedidosListar: (estado?: 'pendiente' | 'convertido' | 'rechazado'): Promise<PedidoWebDTO[]> =>
+      unwrap(sf().catalogo.pedidosListar({ estado })),
+    pedidoConvertir: (id: string, paymentMethodId: string): Promise<{ ok: true; ventaNumero: number; ventaTipo: string }> =>
+      unwrap(sf().catalogo.pedidoConvertir({ id, paymentMethodId })),
+    pedidoRechazar: (id: string): Promise<{ ok: true }> => unwrap(sf().catalogo.pedidoRechazar({ id })),
   },
   onboarding: {
     status: (): Promise<OnboardingStatusDTO> => unwrap(sf().onboarding.status()),

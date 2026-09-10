@@ -210,6 +210,12 @@ export const WINDOWS: Record<string, WindowDef> = {
     iconName: 'Landmark',
     component: lazy(() => import('@/pages/CuentasCorrientesProveedores').then((m) => ({ default: m.CuentasCorrientesProveedores }))),
   },
+  'pedidos-web': {
+    pageKey: 'pedidos-web',
+    title: 'Pedidos web',
+    iconName: 'ShoppingBag',
+    component: lazy(() => import('@/pages/PedidosWeb').then((m) => ({ default: m.PedidosWeb }))),
+  },
   empresa: {
     pageKey: 'empresa',
     title: 'Mi Empresa',
@@ -326,6 +332,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/medios-de-pago': 'medios-de-pago',
   '/cuentas-corrientes': 'cuentas-corrientes',
   '/cuentas-corrientes-proveedores': 'cuentas-corrientes-proveedores',
+  '/pedidos-web': 'pedidos-web',
   '/empresa': 'empresa',
   '/configuracion': 'configuracion',
   '/configuracion/mercadopago': 'configuracion-mp',
