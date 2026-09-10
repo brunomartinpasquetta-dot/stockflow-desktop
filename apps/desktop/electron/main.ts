@@ -340,7 +340,12 @@ function bootstrap(): { lanArgs: string[] } {
         try {
           if (!dbHandle) return;
           if (!dbHandle.repos.catalogo.getState().enabled) return;
-          const r = await new CatalogoSync({ repos: dbHandle.repos }).correr();
+          const sync = new CatalogoSync({ repos: dbHandle.repos });
+          // Pedidos PRIMERO: al revés, el empujón le devolvería al catálogo las
+          // unidades que el checkout acababa de descontar.
+          const p = await sync.traerPedidos();
+          if (p.nuevos > 0) console.info(`[catalogo] ${p.nuevos} pedidos nuevos`);
+          const r = await sync.correr();
           if (r.publicados > 0) {
             console.info(`[catalogo] publicados ${r.publicados}, quedan ${r.pendientes}`);
           } else if (!r.ok) {

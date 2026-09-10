@@ -949,6 +949,43 @@ export const catalogoSync = sqliteTable('catalogo_sync', {
 });
 export type CatalogoSync = typeof catalogoSync.$inferSelect;
 
+/**
+ * Pedidos del catálogo web bajados al sistema. NO son ventas todavía: el
+ * comerciante los revisa y al confirmarlos se convierten en venta. Vender de
+ * una sería imposible — una venta exige caja abierta y forma de pago, y un
+ * pedido de las 3 de la mañana no tiene ninguna de las dos.
+ */
+export const catalogoPedidos = sqliteTable(
+  'catalogo_pedidos',
+  {
+    id: pk(),
+    /** Id del pedido EN EL CATÁLOGO. Único: impide bajarlo dos veces. */
+    pedidoId: text('pedido_id').notNull(),
+    numero: integer('numero').notNull(),
+    fecha: integer('fecha').notNull(),
+    clienteNombre: text('cliente_nombre').notNull(),
+    clienteTelefono: text('cliente_telefono'),
+    clienteEmail: text('cliente_email'),
+    entrega: text('entrega', { enum: ['retiro', 'envio'] }).notNull().default('retiro'),
+    direccion: text('direccion'),
+    notas: text('notas'),
+    total: text('total').notNull().default('0.0000'),
+    /** Snapshot de las líneas, como llegó del catálogo. */
+    items: text('items').notNull(),
+    estado: text('estado', { enum: ['pendiente', 'convertido', 'rechazado'] })
+      .notNull()
+      .default('pendiente'),
+    saleId: text('sale_id'),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    pedidoIdx: uniqueIndex('idx_catalogo_pedidos_pedido').on(t.pedidoId),
+    estadoIdx: index('idx_catalogo_pedidos_estado').on(t.estado),
+  }),
+);
+export type CatalogoPedido = typeof catalogoPedidos.$inferSelect;
+
 /* ------------------------------------------------------------------ */
 /* FACTURACIÓN ELECTRÓNICA ARCA (ex AFIP)                              */
 /* ------------------------------------------------------------------ */
@@ -1512,6 +1549,7 @@ export const localSchema = {
   mpOrders,
   auditLog,
   catalogoSync,
+  catalogoPedidos,
   fiscalConfig,
   salePoints,
   fiscalVouchers,

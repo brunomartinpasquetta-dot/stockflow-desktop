@@ -8,11 +8,18 @@
  * nunca "salieron 3". Por eso reenviar un artículo de más no rompe nada y la PC
  * puede estar apagada una semana sin que haya que reconstruir un historial.
  */
-import { and, eq, gt, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, sql } from 'drizzle-orm';
+import { v7 as uuidv7 } from 'uuid';
 
 import { rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
-import { articles, catalogoSync, type CatalogoSync } from '../schema/local';
+import {
+  articles,
+  catalogoPedidos,
+  catalogoSync,
+  type CatalogoPedido,
+  type CatalogoSync,
+} from '../schema/local';
 
 const SYNC_ID = 'singleton';
 
@@ -133,6 +140,124 @@ export class CatalogoRepository {
         .where(and(gt(articles.updatedAt, desde), isNotNull(articles.barcode)))
         .get();
       return Number(row?.n ?? 0);
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Pedidos del catálogo                                                */
+/* ------------------------------------------------------------------ */
+
+/** Una línea del pedido, tal como llega del catálogo. */
+export interface LineaPedidoWeb {
+  sku: string;
+  codigo_sistema: string;
+  nombre: string;
+  cant: number;
+  precio: number;
+  subtotal: number;
+  servicio: boolean;
+}
+
+export interface PedidoWebEntrante {
+  pedidoId: string;
+  numero: number;
+  fecha: number;
+  clienteNombre: string;
+  clienteTelefono?: string | null;
+  clienteEmail?: string | null;
+  entrega: 'retiro' | 'envio';
+  direccion?: string | null;
+  notas?: string | null;
+  total: string;
+  items: LineaPedidoWeb[];
+}
+
+export class CatalogoPedidoRepository {
+  constructor(private readonly db: LocalDatabase) {}
+
+  /**
+   * Guarda un pedido bajado del catálogo. Si ya estaba, NO hace nada y devuelve
+   * false: el índice único sobre `pedido_id` es la última defensa contra bajar
+   * dos veces el mismo pedido cuando se corta la conexión justo después de
+   * traerlo y antes de avisar que se tomó.
+   */
+  guardar(p: PedidoWebEntrante): boolean {
+    try {
+      const ya = this.db
+        .select({ id: catalogoPedidos.id })
+        .from(catalogoPedidos)
+        .where(eq(catalogoPedidos.pedidoId, p.pedidoId))
+        .get();
+      if (ya) return false;
+      const now = Date.now();
+      this.db
+        .insert(catalogoPedidos)
+        .values({
+          id: uuidv7(),
+          pedidoId: p.pedidoId,
+          numero: p.numero,
+          fecha: p.fecha,
+          clienteNombre: p.clienteNombre,
+          clienteTelefono: p.clienteTelefono ?? null,
+          clienteEmail: p.clienteEmail ?? null,
+          entrega: p.entrega,
+          direccion: p.direccion ?? null,
+          notas: p.notas ?? null,
+          total: p.total,
+          items: JSON.stringify(p.items),
+          estado: 'pendiente',
+          saleId: null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      return true;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  listar(estado?: 'pendiente' | 'convertido' | 'rechazado'): CatalogoPedido[] {
+    try {
+      const q = this.db.select().from(catalogoPedidos).$dynamic();
+      const rows = estado ? q.where(eq(catalogoPedidos.estado, estado)).all() : q.all();
+      return rows.sort((a, b) => b.fecha - a.fecha);
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  contarPendientes(): number {
+    try {
+      const r = this.db
+        .select({ n: sql<number>`COUNT(*)` })
+        .from(catalogoPedidos)
+        .where(eq(catalogoPedidos.estado, 'pendiente'))
+        .get();
+      return Number(r?.n ?? 0);
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  marcar(id: string, estado: 'convertido' | 'rechazado', saleId?: string | null): void {
+    try {
+      this.db
+        .update(catalogoPedidos)
+        .set({ estado, saleId: saleId ?? null, updatedAt: Date.now() })
+        .where(eq(catalogoPedidos.id, id))
+        .run();
+    } catch (err) {
+      rethrowDbError(err);
+    }
+  }
+
+  buscar(id: string): CatalogoPedido | null {
+    try {
+      return this.db.select().from(catalogoPedidos).where(eq(catalogoPedidos.id, id)).get() ?? null;
     } catch (err) {
       return rethrowDbError(err);
     }
