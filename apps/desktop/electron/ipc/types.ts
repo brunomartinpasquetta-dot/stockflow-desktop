@@ -1571,6 +1571,28 @@ export interface PedidoWebDTO {
   lineas: PedidoWebLineaDTO[];
 }
 
+/** Un producto del catálogo sugerido para vincular a un artículo del sistema. */
+export interface CatalogoSugerenciaItemDTO {
+  sku: string;
+  nombreCatalogo: string;
+  codigo: string;
+  nombreSistema: string;
+}
+
+export interface CatalogoSugerenciaVinculacionDTO {
+  totalCatalogo: number;
+  totalSinVincular: number;
+  sugeridos: CatalogoSugerenciaItemDTO[];
+  sinCandidato: { sku: string; nombre: string }[];
+}
+
+export interface CatalogoVincularLoteResultadoDTO {
+  ok: boolean;
+  vinculados: number;
+  errores: { sku: string; motivo: string }[];
+  motivo?: string;
+}
+
 /** Estado del espejo de artículos hacia el catálogo web. */
 export interface CatalogoSyncEstadoDTO {
   activo: boolean;
@@ -1866,6 +1888,8 @@ export interface ApiSurface {
     syncEstado(): Res<CatalogoSyncEstadoDTO>;
     syncActivar(payload: { activo: boolean }): Res<{ ok: true }>;
     syncAhora(payload?: { todo?: boolean }): Res<CatalogoSyncResultadoDTO>;
+    sugerirVinculacion(): Res<CatalogoSugerenciaVinculacionDTO>;
+    vincularLote(payload: { vinculos: { sku: string; codigoSistema: string }[] }): Res<CatalogoVincularLoteResultadoDTO>;
     pedidosContarPendientes(): Res<{ pendientes: number }>;
     pedidosListar(payload?: { estado?: 'pendiente' | 'convertido' | 'rechazado' }): Res<PedidoWebDTO[]>;
     pedidoConvertir(payload: { id: string; paymentMethodId: string }): Res<{ ok: true; ventaNumero: number; ventaTipo: string }>;

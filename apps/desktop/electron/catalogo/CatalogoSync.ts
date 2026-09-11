@@ -207,4 +207,144 @@ export class CatalogoSync {
     this.opts.repos.catalogo.saveState({ cursor: 0 });
     return this.correr(true);
   }
+
+  /**
+   * Trae TODOS los productos del catálogo (paginado, endpoint 3.1 del
+   * contrato). Es la única llamada "de lectura completa": se usa solo para
+   * armar la pantalla de vinculación, no en el ciclo automático.
+   */
+  private async listarProductosDelCatalogo(): Promise<ProductoCatalogo[]> {
+    const { repos } = this.opts;
+    const empresa = await repos.company.getOrCreate();
+    const url = (empresa.catalogoUrl ?? '').trim().replace(/\/$/, '');
+    const token = (empresa.catalogoToken ?? '').trim();
+    if (!url || !token) throw new Error('falta la dirección o la clave del catálogo');
+
+    const out: ProductoCatalogo[] = [];
+    let pagina = 1;
+    // Tope de seguridad: 50 páginas de 500 = 25.000 productos. Un catálogo
+    // real no llega ahí; esto es para no colgar la pantalla ante una
+    // respuesta que nunca reporte 'total' correctamente.
+    for (let i = 0; i < 50; i++) {
+      const res = await this.fetch(`${url}/api/stockflow/productos?pagina=${pagina}&por_pagina=500`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`el catálogo respondió ${res.status}`);
+      const data = (await res.json()) as { productos?: ProductoCatalogo[]; total?: number };
+      const lote = Array.isArray(data.productos) ? data.productos : [];
+      out.push(...lote);
+      if (lote.length === 0 || out.length >= (data.total ?? out.length)) break;
+      pagina += 1;
+    }
+    return out;
+  }
+
+  /**
+   * Propuesta de vinculación: los productos del catálogo que TODAVÍA no
+   * tienen `codigo_sistema`, cruzados por NOMBRE contra los artículos activos
+   * del sistema. Solo se sugiere cuando el nombre coincide con UN ÚNICO
+   * artículo — si coincide con más de uno, es ambiguo y se deja para elegir
+   * a mano.
+   */
+  async sugerirVinculacion(): Promise<SugerenciaVinculacion> {
+    const productos = await this.listarProductosDelCatalogo();
+    const sinVincular = productos.filter((p) => !p.codigo_sistema);
+    const articulos = await this.opts.repos.articles.findAll({ active: true });
+
+    const normalizar = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const porNombre = new Map<string, typeof articulos>();
+    for (const a of articulos) {
+      const k = normalizar(a.description);
+      const arr = porNombre.get(k) ?? [];
+      arr.push(a);
+      porNombre.set(k, arr);
+    }
+
+    const sugeridos: SugerenciaItem[] = [];
+    const sinCandidato: { sku: string; nombre: string }[] = [];
+    for (const p of sinVincular) {
+      const candidatos = porNombre.get(normalizar(p.nombre)) ?? [];
+      if (candidatos.length === 1) {
+        const a = candidatos[0]!;
+        sugeridos.push({
+          sku: p.sku,
+          nombreCatalogo: p.nombre,
+          codigo: a.barcode,
+          nombreSistema: a.description,
+        });
+      } else {
+        sinCandidato.push({ sku: p.sku, nombre: p.nombre });
+      }
+    }
+    return {
+      totalCatalogo: productos.length,
+      totalSinVincular: sinVincular.length,
+      sugeridos,
+      sinCandidato,
+    };
+  }
+
+  /** Confirma una tanda de vinculaciones (endpoint 3.2 del contrato). */
+  async vincularLote(
+    vinculos: { sku: string; codigoSistema: string }[],
+  ): Promise<{ ok: boolean; vinculados: number; errores: { sku: string; motivo: string }[]; motivo?: string }> {
+    const { repos } = this.opts;
+    const empresa = await repos.company.getOrCreate();
+    const url = (empresa.catalogoUrl ?? '').trim().replace(/\/$/, '');
+    const token = (empresa.catalogoToken ?? '').trim();
+    if (!url || !token) return { ok: false, vinculados: 0, errores: [], motivo: 'falta la dirección o la clave del catálogo' };
+
+    try {
+      const res = await this.fetch(`${url}/api/stockflow/vincular`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          vinculos: vinculos.map((v) => ({ sku: v.sku, codigo_sistema: v.codigoSistema })),
+        }),
+      });
+      // Un 409 en este endpoint es un CONFLICTO documentado (el código ya está
+      // en otro producto), no un error de transporte: el catálogo devuelve un
+      // cuerpo con detalle (`error`, `sku` del dueño actual). Se intenta leer
+      // igual, y solo se cae al mensaje genérico si el cuerpo no es JSON.
+      const data = (await res.json().catch(() => null)) as
+        | { vinculados?: number; errores?: { sku: string; motivo: string }[]; error?: string; sku?: string }
+        | null;
+      if (!res.ok) {
+        if (data?.error) {
+          const motivo = data.sku ? `${data.error} (lo tiene "${data.sku}")` : data.error;
+          return { ok: false, vinculados: 0, errores: [], motivo };
+        }
+        return { ok: false, vinculados: 0, errores: [], motivo: `el catálogo respondió ${res.status}` };
+      }
+      return { ok: true, vinculados: data?.vinculados ?? 0, errores: data?.errores ?? [] };
+    } catch (err) {
+      return { ok: false, vinculados: 0, errores: [], motivo: err instanceof Error ? err.message : String(err) };
+    }
+  }
+}
+
+/** Un producto del catálogo, tal como lo devuelve GET /api/stockflow/productos. */
+export interface ProductoCatalogo {
+  id: string;
+  sku: string;
+  nombre: string;
+  codigo_sistema: string;
+  precio: number;
+  activo: boolean;
+  categoria?: string;
+}
+
+export interface SugerenciaItem {
+  sku: string;
+  nombreCatalogo: string;
+  /** Código de barras del artículo del sistema propuesto. */
+  codigo: string;
+  nombreSistema: string;
+}
+
+export interface SugerenciaVinculacion {
+  totalCatalogo: number;
+  totalSinVincular: number;
+  sugeridos: SugerenciaItem[];
+  sinCandidato: { sku: string; nombre: string }[];
 }

@@ -75,6 +75,26 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
       return payload?.todo ? sync.republicarTodo() : sync.correr();
     }),
 
+    /* --------------------------- Vinculación -------------------------- */
+
+    /**
+     * Propuesta de apareo: productos del catálogo sin `codigo_sistema`,
+     * cruzados por nombre contra los artículos activos. Solo lectura — no
+     * escribe nada hasta que se confirme con `catalogo:vincularLote`.
+     */
+    'catalogo:sugerirVinculacion': withSession(deps, async () => {
+      const sync = new CatalogoSync({ repos: deps.repos });
+      return sync.sugerirVinculacion();
+    }),
+
+    'catalogo:vincularLote': withSession(
+      deps,
+      async (payload: { vinculos: { sku: string; codigoSistema: string }[] }) => {
+        const sync = new CatalogoSync({ repos: deps.repos });
+        return sync.vincularLote(payload.vinculos);
+      },
+    ),
+
     /* ---------------------------- Pedidos web ---------------------------- */
 
     /** Liviano: solo el número, para pintar el aviso en el menú sin resolver líneas. */

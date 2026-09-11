@@ -26,6 +26,8 @@ import type {
   ImportValidationResultDTO,
   CatalogoEstadisticasDTO,
   CatalogoSyncEstadoDTO,
+  CatalogoSugerenciaVinculacionDTO,
+  CatalogoVincularLoteResultadoDTO,
   PedidoWebDTO,
   CatalogoSyncResultadoDTO,
   GuiaEstadoDTO,
@@ -174,6 +176,10 @@ export const api = {
       unwrap(sf().catalogo.syncActivar({ activo })),
     syncAhora: (todo = false): Promise<CatalogoSyncResultadoDTO> =>
       unwrap(sf().catalogo.syncAhora({ todo })),
+    sugerirVinculacion: (): Promise<CatalogoSugerenciaVinculacionDTO> => unwrap(sf().catalogo.sugerirVinculacion()),
+    vincularLote: (
+      vinculos: { sku: string; codigoSistema: string }[],
+    ): Promise<CatalogoVincularLoteResultadoDTO> => unwrap(sf().catalogo.vincularLote({ vinculos })),
     pedidosContarPendientes: (): Promise<{ pendientes: number }> => unwrap(sf().catalogo.pedidosContarPendientes()),
     pedidosListar: (estado?: 'pendiente' | 'convertido' | 'rechazado'): Promise<PedidoWebDTO[]> =>
       unwrap(sf().catalogo.pedidosListar({ estado })),

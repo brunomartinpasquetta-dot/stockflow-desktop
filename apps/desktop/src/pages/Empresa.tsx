@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2, RefreshCw, UploadCloud } from 'lucide-react'
+import { CheckCircle2, Link2, Loader2, RefreshCw, Search, UploadCloud } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useCompany } from '@/lib/hooks'
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { CompanyDTO, PriceMode } from '@/types/api'
+import type { ArticleDTO, CompanyDTO, PriceMode } from '@/types/api'
 
 interface FormState {
   name: string
@@ -424,7 +424,206 @@ function EspejoCatalogo(): React.ReactElement {
           <RefreshCw className="h-4 w-4" />
           Republicar todo
         </Button>
+        <VincularArticulosDialog />
       </div>
+    </div>
+  )
+}
+
+/**
+ * VINCULACIÓN — el `codigo_sistema` es lo único que une un producto del
+ * catálogo con un artículo del sistema. Sin vincular, el producto NO recibe
+ * stock ni precio del espejo, y un pedido de ese producto no descuenta nada.
+ *
+ * El apareo automático es SOLO por nombre idéntico y SOLO cuando coincide con
+ * un único artículo — un nombre ambiguo (coincide con más de uno, o con
+ * ninguno) queda para resolver a mano, nunca se adivina.
+ */
+function VincularArticulosDialog(): React.ReactElement {
+  const qc = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [busquedaManual, setBusquedaManual] = useState<Record<string, string>>({})
+
+  const sugerencia = useQuery({
+    queryKey: ['catalogo', 'sugerirVinculacion'],
+    queryFn: () => api.catalogo.sugerirVinculacion(),
+    enabled: open,
+  })
+
+  const vincularAuto = useMutation({
+    mutationFn: () =>
+      api.catalogo.vincularLote(
+        (sugerencia.data?.sugeridos ?? []).map((s) => ({ sku: s.sku, codigoSistema: s.codigo })),
+      ),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(`No se pudo vincular: ${r.motivo ?? 'error desconocido'}`, { duration: 10_000 })
+        return
+      }
+      toast.success(`Se vincularon ${r.vinculados} artículos por nombre`)
+      if (r.errores.length > 0) {
+        toast.warning(`${r.errores.length} no se pudieron vincular (código ya usado por otro producto)`, { duration: 10_000 })
+      }
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'sugerirVinculacion'] })
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'syncEstado'] })
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo vincular'),
+  })
+
+  const vincularUno = useMutation({
+    mutationFn: (v: { sku: string; codigoSistema: string }) => api.catalogo.vincularLote([v]),
+    onSuccess: (r, v) => {
+      if (!r.ok || r.errores.length > 0) {
+        toast.error(r.errores[0]?.motivo ?? r.motivo ?? 'No se pudo vincular ese artículo')
+        return
+      }
+      toast.success('Artículo vinculado')
+      setBusquedaManual((prev) => {
+        const next = { ...prev }
+        delete next[v.sku]
+        return next
+      })
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'sugerirVinculacion'] })
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'syncEstado'] })
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo vincular'),
+  })
+
+  const s = sugerencia.data
+
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Link2 className="h-4 w-4" />
+        Vincular artículos
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Vincular artículos del catálogo</DialogTitle>
+          </DialogHeader>
+
+          {sugerencia.isLoading && (
+            <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Comparando el catálogo con los artículos del sistema…
+            </p>
+          )}
+
+          {sugerencia.isError && (
+            <p className="py-4 text-sm text-destructive">
+              No se pudo consultar el catálogo. Verificá la dirección y la clave, o que esté levantado.
+            </p>
+          )}
+
+          {s && (
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                El catálogo tiene {s.totalCatalogo} productos; {s.totalSinVincular} todavía sin vincular a un
+                artículo del sistema. Vinculado un producto, el espejo le mantiene el precio y el stock
+                actualizados — el nombre, la foto y la categoría siguen siendo del catálogo.
+              </p>
+
+              {s.sugeridos.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-md border p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {s.sugeridos.length} coinciden por nombre con un único artículo
+                    </span>
+                    <Button size="sm" disabled={vincularAuto.isPending} onClick={() => vincularAuto.mutate()}>
+                      {vincularAuto.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Vincular estos {s.sugeridos.length}
+                    </Button>
+                  </div>
+                  <ul className="max-h-32 overflow-y-auto text-xs text-muted-foreground">
+                    {s.sugeridos.slice(0, 30).map((it) => (
+                      <li key={it.sku} className="truncate">{it.nombreSistema}</li>
+                    ))}
+                    {s.sugeridos.length > 30 && <li>… y {s.sugeridos.length - 30} más</li>}
+                  </ul>
+                </div>
+              )}
+
+              {s.sinCandidato.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium">
+                    {s.sinCandidato.length} sin coincidencia por nombre — vincular a mano
+                  </span>
+                  <div className="flex max-h-72 flex-col divide-y overflow-y-auto rounded-md border">
+                    {s.sinCandidato.map((p) => (
+                      <FilaVinculacionManual
+                        key={p.sku}
+                        nombre={p.nombre}
+                        query={busquedaManual[p.sku] ?? ''}
+                        onQuery={(q) => setBusquedaManual((prev) => ({ ...prev, [p.sku]: q }))}
+                        onVincular={(codigo) => vincularUno.mutate({ sku: p.sku, codigoSistema: codigo })}
+                        vinculando={vincularUno.isPending}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {s.sugeridos.length === 0 && s.sinCandidato.length === 0 && (
+                <p className="text-sm text-muted-foreground">Todo el catálogo ya está vinculado.</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+/** Una fila de vinculación manual: busca un artículo del sistema por texto y lo liga a este producto del catálogo. */
+function FilaVinculacionManual({
+  nombre,
+  query,
+  onQuery,
+  onVincular,
+  vinculando,
+}: {
+  nombre: string
+  query: string
+  onQuery: (q: string) => void
+  onVincular: (codigo: string) => void
+  vinculando: boolean
+}) {
+  const busqueda = useQuery({
+    queryKey: ['articles', 'search', query],
+    queryFn: () => api.articles.searchByText(query),
+    enabled: query.trim().length >= 2,
+  })
+  const resultados: ArticleDTO[] = query.trim().length >= 2 ? (busqueda.data ?? []).slice(0, 6) : []
+
+  return (
+    <div className="flex flex-col gap-1.5 p-2.5">
+      <span className="text-sm">{nombre}</span>
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="h-8 pl-7 text-xs"
+          placeholder="Buscar artículo del sistema por nombre o código…"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+        />
+      </div>
+      {resultados.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {resultados.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              disabled={vinculando}
+              onClick={() => onVincular(a.barcode)}
+              className="flex items-center justify-between rounded border px-2 py-1 text-left text-xs hover:bg-accent"
+            >
+              <span className="truncate">{a.description}</span>
+              <span className="ml-2 shrink-0 font-mono text-muted-foreground">{a.barcode}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
