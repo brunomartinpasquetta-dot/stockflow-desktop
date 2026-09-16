@@ -31,6 +31,7 @@ export {
 export { PromotionsService } from './promotions.service';
 export {
   FiscalService,
+  fechaArcaLocal,
   type ArcaGateway,
   type IssueInvoiceInput,
   type IssueNoteInput,

@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { closeLocalDb, createRepositories, initLocalDb } from '@stockflow/db';
-import { FiscalService, ValidationError, createServiceContext, createServices } from '@stockflow/core';
+import { FiscalService, ValidationError, createServiceContext, createServices, fechaArcaLocal } from '@stockflow/core';
 import {
   RECEIVER_VAT_CONDITION_IDS,
   resolveVoucherLetter,
@@ -333,6 +333,27 @@ async function main(): Promise<void> {
       `enviado: ${condicionEnviada(ultimoPedidoCae())} (esperado ${viejo.caso.codigo})`,
     );
     check('… y la nota sale con CAE', nota.cae.length > 0, nota.cae);
+  }
+
+  /* [fecha del QR] Tiene que declarar la misma fecha que el CbteFch real, en
+   * hora LOCAL — no en UTC. Una factura emitida entre las 21:00 y medianoche
+   * en Argentina (UTC−3) es el caso que rompía: `.toISOString()` la fechaba
+   * al día SIGUIENTE. Solo tiene sentido en un huso horario detrás de UTC
+   * (offset positivo en getTimezoneOffset), que es el de esta máquina. */
+  console.log('\n[fecha del QR — RG 4892]');
+  if (new Date().getTimezoneOffset() > 0) {
+    const veintitresYMedia = new Date();
+    veintitresYMedia.setHours(23, 30, 0, 0);
+    const ts = veintitresYMedia.getTime();
+    const esperado = `${veintitresYMedia.getFullYear()}${String(veintitresYMedia.getMonth() + 1).padStart(2, '0')}${String(veintitresYMedia.getDate()).padStart(2, '0')}`;
+    const utcViejo = new Date(ts).toISOString().slice(0, 10).replace(/-/g, '');
+    check(
+      'a las 23:30 locales, la fecha del QR es la del día real (no la de UTC)',
+      fechaArcaLocal(ts) === esperado && fechaArcaLocal(ts) !== utcViejo,
+      `local=${esperado} · UTC (el bug viejo)=${utcViejo} · fechaArcaLocal=${fechaArcaLocal(ts)}`,
+    );
+  } else {
+    console.log('  (omitido: esta máquina no está en un huso detrás de UTC)');
   }
 
   closeLocalDb(db);

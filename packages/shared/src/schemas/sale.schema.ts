@@ -81,21 +81,12 @@ export const CreateSaleWithLinesSchema = CreateSaleSchema.extend({
         message: 'La venta debe registrar al menos un pago',
       });
     }
-    for (const p of data.payments) {
-      if (!(Number(p.amount) > 0)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['payments'],
-          message: 'Cada pago debe tener un monto mayor a cero',
-        });
-      }
-    }
+    // El monto>0 de cada pago YA lo valida PaymentInputSchema (línea 62): para
+    // cuando este superRefine corre, data.payments ya pasó ese refine ítem por
+    // ítem. Repetirlo acá era inalcanzable.
   }
 });
-
-export const UpdateSaleSchema = CreateSaleSchema.partial();
 
 export type SaleOutput = z.infer<typeof SaleSchema>;
 export type CreateSaleInput = z.infer<typeof CreateSaleSchema>;
 export type CreateSaleWithLinesInput = z.infer<typeof CreateSaleWithLinesSchema>;
-export type UpdateSaleInput = z.infer<typeof UpdateSaleSchema>;

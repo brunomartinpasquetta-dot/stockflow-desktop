@@ -58,9 +58,6 @@ export const CreatePurchaseWithLinesSchema = CreatePurchaseSchema.extend({
   userId: idSchema.nullish(),
 });
 
-export const UpdatePurchaseSchema = CreatePurchaseSchema.partial();
-
 export type PurchaseOutput = z.infer<typeof PurchaseSchema>;
 export type CreatePurchaseInput = z.infer<typeof CreatePurchaseSchema>;
 export type CreatePurchaseWithLinesInput = z.infer<typeof CreatePurchaseWithLinesSchema>;
-export type UpdatePurchaseInput = z.infer<typeof UpdatePurchaseSchema>;

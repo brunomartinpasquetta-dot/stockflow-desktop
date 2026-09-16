@@ -108,6 +108,18 @@ function n2(v: string | number): number {
   return Math.round(Number(v) * 100) / 100;
 }
 
+/**
+ * YYYYMMDD en hora LOCAL, igual que `toArcaDate` de WsfeClient (que arma el
+ * `CbteFch` real enviado a ARCA). El QR (RG 4892) tiene que declarar la misma
+ * fecha que el comprobante: usar `.toISOString()` acá metía el desfasaje de
+ * `UTC−3` — una factura emitida entre las 21:00 y medianoche quedaba con el
+ * QR fechado al día siguiente del CbteFch real.
+ */
+export function fechaArcaLocal(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export class FiscalService {
   constructor(
     private readonly ctx: ServiceContext,
@@ -261,7 +273,7 @@ export class FiscalService {
         tipoDocRec: doc.docType,
         nroDocRec: doc.docNumber,
         codAut: res.cae,
-        fecha: new Date(date).toISOString().slice(0, 10).replace(/-/g, ''),
+        fecha: fechaArcaLocal(date),
       });
 
       const saved = repos.fiscal.createVoucher(
@@ -405,7 +417,7 @@ export class FiscalService {
       tipoDocRec: related.customerDocType,
       nroDocRec: related.customerDocNumber,
       codAut: res.cae,
-      fecha: new Date(date).toISOString().slice(0, 10).replace(/-/g, ''),
+      fecha: fechaArcaLocal(date),
     });
 
     const saved = repos.fiscal.createVoucher(
