@@ -197,6 +197,10 @@ export const articles = sqliteTable(
     barcodeIdx: index('idx_articles_barcode').on(t.barcode),
     familyIdx: index('idx_articles_family').on(t.familyId),
     supplierIdx: index('idx_articles_supplier').on(t.supplierId),
+    /** El espejo del catálogo web filtra y ordena por esta columna en CADA
+     *  corrida (cada 60s con el espejo activo): sin índice es un table scan
+     *  completo más un sort, siempre, aunque no haya nada nuevo. */
+    updatedAtIdx: index('idx_articles_updated_at').on(t.updatedAt),
     unitCheck: check(
       'articles_unit_check',
       sql`${t.unit} in ('UN', 'KG', 'GR', 'LT', 'ML')`,
@@ -975,13 +979,22 @@ export const catalogoPedidos = sqliteTable(
     estado: text('estado', { enum: ['pendiente', 'convertido', 'rechazado'] })
       .notNull()
       .default('pendiente'),
-    saleId: text('sale_id'),
+    /** La venta en la que se convirtió, si ya se confirmó. */
+    saleId: text('sale_id').references(() => sales.id),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },
   (t) => ({
     pedidoIdx: uniqueIndex('idx_catalogo_pedidos_pedido').on(t.pedidoId),
     estadoIdx: index('idx_catalogo_pedidos_estado').on(t.estado),
+    entregaCheck: check(
+      'catalogo_pedidos_entrega_check',
+      sql`${t.entrega} in ('retiro', 'envio')`,
+    ),
+    estadoCheck: check(
+      'catalogo_pedidos_estado_check',
+      sql`${t.estado} in ('pendiente', 'convertido', 'rechazado')`,
+    ),
   }),
 );
 export type CatalogoPedido = typeof catalogoPedidos.$inferSelect;

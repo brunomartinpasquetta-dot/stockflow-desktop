@@ -95,6 +95,107 @@ const main = async () => {
   const baja = (recibido[0]?.body?.articulos ?? []).find((a: any) => a.codigo === '7790000000001');
   check('el artículo dado de baja viaja como inactivo', baja?.activo === false, JSON.stringify(baja?.activo));
 
+  console.log('\n[empate de updated_at no pierde artículos]');
+  // Un UPDATE masivo (p.ej. el reset de operativa) deja a varios artículos con
+  // el MISMO milisegundo. Si la tanda corta justo en medio de ese grupo, el
+  // resto tiene que venir igual — no puede quedar del otro lado de un cursor
+  // que ya no los alcanza.
+  const empatados = await Promise.all(
+    Array.from({ length: 3 }, (_, i) =>
+      repos.articles.create({
+        barcode: `779000000101${i}`,
+        description: `Empatado ${i}`,
+        listPrice1: '100.0000',
+        stock: '5.000',
+      }),
+    ),
+  );
+  const mismoInstante = Date.now();
+  for (const a of empatados) {
+    db.$client.prepare('UPDATE articles SET updated_at = ? WHERE id = ?').run(mismoInstante, a.id);
+  }
+  repos.catalogo.saveState({ cursor: mismoInstante - 1 });
+  // TANDA real es 500; para forzar el corte en medio del empate sin crear 500
+  // artículos, se llama al repositorio directo con un límite chico.
+  const pagina = repos.catalogo.listarParaPublicar({ desde: mismoInstante - 1, limite: 2, precioLista: 1 });
+  check(
+    'la página se estira para no partir el grupo empatado',
+    pagina.articulos.length === 3,
+    `trajo ${pagina.articulos.length} (esperados los 3 empatados, aunque el límite era 2)`,
+  );
+  check(
+    'los 3 códigos empatados están, ninguno quedó afuera',
+    empatados.every((a) => pagina.articulos.some((p) => p.codigo === a.barcode)),
+  );
+
+  console.log('\n[redondeo exacto, sin el error de punto flotante]');
+  const conBorde = await repos.articles.create({
+    barcode: '7790000002000',
+    description: 'Precio borde',
+    listPrice1: '1.0050',
+    stock: '5.000',
+  });
+  recibido.length = 0;
+  await sync.correr();
+  const bordeEnviado = (recibido[0]?.body?.articulos ?? []).find((a: any) => a.codigo === conBorde.barcode);
+  check(
+    'un precio como 1.005 redondea a 1.01, no a 1.00 (el bug clásico de *100/100)',
+    bordeEnviado?.precio === 1.01,
+    `enviado: ${bordeEnviado?.precio}`,
+  );
+
+  console.log('\n[guardar() no revienta ante un pedido repetido]');
+  const pedido = {
+    pedidoId: 'pb-dup-1',
+    numero: 900,
+    fecha: Date.now(),
+    clienteNombre: 'Duplicado',
+    entrega: 'retiro' as const,
+    total: '100.0000',
+    items: [],
+  };
+  const primera = repos.catalogoPedidos.guardar(pedido);
+  let segundaOk = false;
+  let segundaValor: boolean | null = null;
+  try {
+    segundaValor = repos.catalogoPedidos.guardar(pedido);
+    segundaOk = true;
+  } catch {
+    segundaOk = false;
+  }
+  check('la primera vez guarda', primera === true);
+  check(
+    'la segunda vez NO revienta — devuelve false, como dice el comentario',
+    segundaOk && segundaValor === false,
+    segundaOk ? `devolvió ${segundaValor}` : 'tiró una excepción',
+  );
+
+  console.log('\n[integridad de catalogo_pedidos: FK y CHECK vigentes]');
+  const raw = db.$client;
+  let fkRechazo = false;
+  try {
+    raw
+      .prepare(
+        "INSERT INTO catalogo_pedidos (id, pedido_id, numero, fecha, cliente_nombre, entrega, total, items, estado, sale_id, created_at, updated_at) VALUES ('x-fk','pb-fk',1,0,'x','retiro','0','[]','pendiente','no-existe',0,0)",
+      )
+      .run();
+  } catch {
+    fkRechazo = true;
+  }
+  check('un sale_id que no existe en sales es rechazado (FK)', fkRechazo);
+
+  let checkRechazo = false;
+  try {
+    raw
+      .prepare(
+        "INSERT INTO catalogo_pedidos (id, pedido_id, numero, fecha, cliente_nombre, entrega, total, items, estado, created_at, updated_at) VALUES ('x-check','pb-check',1,0,'x','retiro','0','[]','no-es-un-estado-valido',0,0)",
+      )
+      .run();
+  } catch {
+    checkRechazo = true;
+  }
+  check('un estado fuera de la lista es rechazado (CHECK)', checkRechazo);
+
   closeLocalDb(db);
   rmSync(dir, { recursive: true, force: true });
   console.log(fallas === 0 ? '\n✅ TODO OK\n' : `\n❌ ${fallas} FALLAS\n`);

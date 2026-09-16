@@ -11,7 +11,7 @@ import { HardwareManager } from './hardware/HardwareManager';
 import { ExcelImportService } from './import/ExcelImportService';
 import { registerIpcHandlers, buildAllHandlers } from './ipc';
 import { SessionStore } from './ipc/session-store';
-import { CatalogoSync } from './catalogo/CatalogoSync';
+import { obtenerCatalogoSync } from './catalogo/CatalogoSync';
 import { LanManager } from './lan/LanManager';
 import { LanServer } from './lan/LanServer';
 import { DEFAULT_LAN_PORT } from './lan/types';
@@ -340,7 +340,7 @@ function bootstrap(): { lanArgs: string[] } {
         try {
           if (!dbHandle) return;
           if (!dbHandle.repos.catalogo.getState().enabled) return;
-          const sync = new CatalogoSync({ repos: dbHandle.repos });
+          const sync = obtenerCatalogoSync(dbHandle.repos);
           // Pedidos PRIMERO: al revés, el empujón le devolvería al catálogo las
           // unidades que el checkout acababa de descontar.
           const p = await sync.traerPedidos();

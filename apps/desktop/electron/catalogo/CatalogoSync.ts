@@ -113,7 +113,11 @@ export class CatalogoSync {
           lastError: null,
           pushedTotal: estado.pushedTotal + articulos.length,
         });
-        return { ok: true, publicados: articulos.length, pendientes: repos.catalogo.pendientes(cursorFinal) };
+        // Si la tanda vino más corta que el límite, la consulta ya recorrió
+        // todo lo que había — no queda nada pendiente y no hace falta un
+        // segundo escaneo idéntico solo para confirmarlo.
+        const pendientes = articulos.length < TANDA ? 0 : repos.catalogo.pendientes(cursorFinal);
+        return { ok: true, publicados: articulos.length, pendientes };
       } finally {
         clearTimeout(timer);
       }
@@ -347,4 +351,22 @@ export interface SugerenciaVinculacion {
   totalSinVincular: number;
   sugeridos: SugerenciaItem[];
   sinCandidato: { sku: string; nombre: string }[];
+}
+
+let instancia: { repos: Repositories; sync: CatalogoSync } | null = null;
+
+/**
+ * Devuelve SIEMPRE la misma instancia mientras `repos` no cambie.
+ *
+ * `corriendo` (el candado contra corridas superpuestas) es un campo de
+ * instancia: si cada llamador hace `new CatalogoSync(...)` por su cuenta —
+ * el reloj de 60s por un lado, cada botón de la pantalla por otro—, cada uno
+ * arranca con `corriendo = false` y el candado no protege nada. Con esto, el
+ * reloj y los tres canales IPC comparten el mismo objeto y el mismo candado.
+ */
+export function obtenerCatalogoSync(repos: Repositories): CatalogoSync {
+  if (!instancia || instancia.repos !== repos) {
+    instancia = { repos, sync: new CatalogoSync({ repos }) };
+  }
+  return instancia.sync;
 }

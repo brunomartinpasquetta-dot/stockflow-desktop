@@ -19,7 +19,7 @@
  */
 import { SalesService, ValidationError } from '@stockflow/core';
 
-import { CatalogoSync } from '../../catalogo/CatalogoSync';
+import { obtenerCatalogoSync } from '../../catalogo/CatalogoSync';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type { CatalogoEstadisticasDTO } from '../types';
 
@@ -70,7 +70,7 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
     }),
 
     'catalogo:syncAhora': withSession(deps, async (payload: { todo?: boolean }) => {
-      const sync = new CatalogoSync({ repos: deps.repos });
+      const sync = obtenerCatalogoSync(deps.repos);
       await sync.traerPedidos();
       return payload?.todo ? sync.republicarTodo() : sync.correr();
     }),
@@ -83,14 +83,14 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
      * escribe nada hasta que se confirme con `catalogo:vincularLote`.
      */
     'catalogo:sugerirVinculacion': withSession(deps, async () => {
-      const sync = new CatalogoSync({ repos: deps.repos });
+      const sync = obtenerCatalogoSync(deps.repos);
       return sync.sugerirVinculacion();
     }),
 
     'catalogo:vincularLote': withSession(
       deps,
       async (payload: { vinculos: { sku: string; codigoSistema: string }[] }) => {
-        const sync = new CatalogoSync({ repos: deps.repos });
+        const sync = obtenerCatalogoSync(deps.repos);
         return sync.vincularLote(payload.vinculos);
       },
     ),
