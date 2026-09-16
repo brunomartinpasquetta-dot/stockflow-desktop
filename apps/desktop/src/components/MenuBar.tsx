@@ -123,8 +123,6 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'presupuestos', label: 'Presupuestos', icon: FileText, requires: 'view_quotes' },
       { pageKey: 'compras', label: 'Compras', icon: ShoppingCart, shortcut: 'F2', requires: 'manage_purchases' },
       { pageKey: 'caja', label: 'Caja diaria', icon: Wallet, shortcut: 'F4' },
-      { separator: true, label: '' },
-      { pageKey: 'pedidos-web', label: 'Pedidos web', icon: ShoppingBag, requires: 'create_sale' },
     ],
   },
   {
@@ -132,6 +130,8 @@ const GROUPS: MenuGroup[] = [
     items: [
       { pageKey: 'cuentas-corrientes', label: 'Cuentas Corrientes — Clientes', icon: Landmark, shortcut: 'F9' },
       { pageKey: 'cuentas-corrientes-proveedores', label: 'Cuentas Corrientes — Proveedores', icon: Truck },
+      { separator: true, label: '' },
+      { pageKey: 'pedidos-web', label: 'Pedidos web', icon: ShoppingBag, requires: 'create_sale' },
       { separator: true, label: '' },
       { pageKey: 'configuracion-mp', label: 'MercadoPago QR (configuración)', icon: CreditCard, roles: ['admin'], requires: 'manage_mp_qr' },
     ],
@@ -270,7 +270,7 @@ export function MenuBar() {
                 {g.name}
                 <ChevronDown className="h-3 w-3 opacity-60" />
                 {/* Aviso de pedidos web sin resolver, visible sin abrir el menú. */}
-                {g.name === 'Operaciones' && cantidadPendiente > 0 && (
+                {g.name === 'Cobros y Pagos' && cantidadPendiente > 0 && (
                   <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">
                     {cantidadPendiente > 9 ? '9+' : cantidadPendiente}
                   </span>

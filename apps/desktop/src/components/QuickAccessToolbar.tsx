@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
+  Store,
   Truck,
   Users,
   Banknote,
@@ -134,6 +135,29 @@ export function QuickAccessToolbar() {
         <WhatsAppGlyph className="h-7 w-7 text-foreground/80 group-hover:text-foreground" strokeWidth={1.75} />
         <span className="text-center text-[11px] leading-tight text-foreground/90 [@media(max-width:899px)]:hidden">
           WhatsApp
+        </span>
+        <span aria-hidden className="invisible rounded px-1 text-[10px] font-medium">F</span>
+      </button>
+
+      {/* Catálogo web: vive dentro de "Mi Empresa" (espejo + vinculación) */}
+      <button
+        type="button"
+        disabled={!isEnabled('empresa')}
+        onClick={() => {
+          if (!isEnabled('empresa')) return
+          wm.openWindow({ pageKey: 'empresa' })
+        }}
+        title="Catálogo web"
+        className={cn(
+          'group flex h-full min-w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-2 py-1 transition-colors',
+          'hover:bg-accent focus:outline-none focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-primary/30',
+          focusedKey === 'empresa' && 'bg-accent text-accent-foreground ring-2 ring-primary/30 [&_.rounded.bg-muted]:bg-white/25 [&_.rounded.bg-muted]:text-inherit',
+          !isEnabled('empresa') && 'cursor-not-allowed opacity-50 hover:bg-transparent',
+        )}
+      >
+        <Store className="h-7 w-7 text-foreground/80 group-hover:text-foreground" strokeWidth={1.75} />
+        <span className="whitespace-nowrap text-center text-[11px] leading-tight text-foreground/90 [@media(max-width:899px)]:hidden">
+          Catálogo web
         </span>
         <span aria-hidden className="invisible rounded px-1 text-[10px] font-medium">F</span>
       </button>
