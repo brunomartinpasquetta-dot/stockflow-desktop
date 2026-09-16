@@ -141,6 +141,7 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
             direccion: p.direccion,
             notas: p.notas,
             total: p.total,
+            pagado: p.pagado,
             estado: p.estado,
             saleId: p.saleId,
             lineas,
@@ -218,6 +219,27 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
         return { ok: true as const, ventaNumero: venta.sale.number, ventaTipo: venta.sale.type };
       },
     ),
+
+    /**
+     * Pedido NO pagado: se carga en Ventas (distintas formas de pago, mixtas
+     * incluso) y el cajero cobra ahí como cualquier venta. Esto solo enlaza la
+     * venta que YA se creó — no crea nada. Idempotente: si el pedido ya no
+     * está pendiente (doble llamada), no rompe.
+     */
+    'catalogo:pedidoVincularVenta': withSession(deps, async (payload: { id: string; saleId: string }) => {
+      const pedido = deps.repos.catalogoPedidos.buscar(payload.id);
+      if (!pedido) throw new ValidationError('id', 'El pedido no existe');
+      if (pedido.estado !== 'pendiente') return { ok: true as const };
+      const venta = await deps.repos.sales.findById(payload.saleId);
+      deps.repos.catalogoPedidos.marcar(payload.id, 'convertido', payload.saleId);
+      void avisarCatalogo(
+        deps,
+        pedido.pedidoId,
+        'confirmado',
+        venta ? `${venta.type}-${venta.number}` : undefined,
+      );
+      return { ok: true as const };
+    }),
 
     'catalogo:estadisticas': withSession(
       deps,

@@ -220,6 +220,8 @@ export interface PedidoWebEntrante {
   direccion?: string | null;
   notas?: string | null;
   total: string;
+  /** Ya cobrado en el catálogo (Mercado Pago). Ver columna `pagado`. */
+  pagado: boolean;
   items: LineaPedidoWeb[];
 }
 
@@ -254,6 +256,7 @@ export class CatalogoPedidoRepository {
           direccion: p.direccion ?? null,
           notas: p.notas ?? null,
           total: p.total,
+          pagado: p.pagado,
           items: JSON.stringify(p.items),
           estado: 'pendiente',
           saleId: null,

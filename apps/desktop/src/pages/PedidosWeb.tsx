@@ -18,12 +18,14 @@ import {
   PackageX,
   RefreshCw,
   ShoppingBag,
+  ShoppingCart,
   Truck,
   WifiOff,
 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { formatCurrency, formatRelativeTime } from '@/lib/format'
+import { useWindowNav } from '@/lib/useWindowNav'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -77,9 +79,15 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
   const [metodo, setMetodo] = useState<string>('')
   const metodosQuery = useQuery({ queryKey: ['paymentMethods'], queryFn: () => api.paymentMethods.list() })
   const metodos = (metodosQuery.data ?? []).filter((m) => m.active)
+  const metodoMp = metodos.find((m) => m.type === 'mp')
+  const openInWindow = useWindowNav()
+
+  // Ya pagado en el catálogo (Mercado Pago): se registra con ese medio, sin
+  // preguntarle al comerciante cómo lo cobró — ya se cobró.
+  const metodoEfectivo = p.pagado && metodoMp ? metodoMp.id : metodo
 
   const convertir = useMutation({
-    mutationFn: () => api.catalogo.pedidoConvertir(p.id, metodo),
+    mutationFn: () => api.catalogo.pedidoConvertir(p.id, metodoEfectivo),
     onSuccess: (r) => {
       toast.success(`Venta ${r.ventaTipo} #${r.ventaNumero} registrada`)
       onCambio()
@@ -96,6 +104,21 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo rechazar'),
   })
 
+  function cargarEnVentas(): void {
+    openInWindow('ventas', {
+      extras: {
+        pedidoWebId: p.id,
+        notes: `Pedido web N° ${p.numero} — ${p.clienteNombre}`,
+        prefilledLines: p.lineas.map((l) => ({
+          articleId: l.articleId ?? undefined,
+          description: l.articleId ? undefined : (l.nombreSistema ?? l.nombre),
+          quantity: String(l.cantidad),
+          unitPrice: String(l.precio),
+        })),
+      },
+    })
+  }
+
   const trabajando = convertir.isPending || rechazar.isPending
   const haySinPrecio = p.lineas.some((l) => l.sinPrecio)
   const haySinVincular = p.lineas.some((l) => l.articleId == null)
@@ -110,6 +133,7 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold">Pedido N° {p.numero}</span>
               <EstadoBadge estado={p.estado} />
+              {p.pagado && <Badge variant="success">Pagado con Mercado Pago</Badge>}
             </div>
             <span className="text-sm font-medium">{p.clienteNombre}</span>
           </div>
@@ -191,15 +215,32 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
                 Hay artículos que no existen en el sistema: se van a cobrar igual, pero sin mover stock.
               </p>
             )}
+            {p.pagado && !metodoMp && (
+              <p className="text-xs text-amber-600">
+                Ya está pagado con Mercado Pago, pero no hay un medio de pago "Mercado Pago"
+                cargado en Medios de pago. Elegí uno para poder registrarlo.
+              </p>
+            )}
             <div className="flex flex-wrap items-end gap-2">
-              <div className="flex min-w-56 flex-1 flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">Cómo lo pagó</span>
-                <PaymentMethodSelect methods={metodos} value={metodo || null} onChange={setMetodo} />
-              </div>
-              <Button disabled={trabajando || !metodo || haySinPrecio} onClick={() => convertir.mutate()}>
-                {convertir.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Confirmar y registrar la venta
-              </Button>
+              {p.pagado ? (
+                <>
+                  {!metodoMp && (
+                    <div className="flex min-w-56 flex-1 flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">Cómo lo pagó</span>
+                      <PaymentMethodSelect methods={metodos} value={metodo || null} onChange={setMetodo} />
+                    </div>
+                  )}
+                  <Button disabled={trabajando || !metodoEfectivo || haySinPrecio} onClick={() => convertir.mutate()}>
+                    {convertir.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    Registrar venta
+                  </Button>
+                </>
+              ) : (
+                <Button disabled={trabajando || haySinPrecio} onClick={cargarEnVentas}>
+                  <ShoppingCart className="h-4 w-4" />
+                  Cargar en Ventas
+                </Button>
+              )}
               <Button
                 variant="outline"
                 disabled={trabajando}

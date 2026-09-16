@@ -302,6 +302,7 @@ export function createApiBridge(
       pedidosListar: (p) => c<PedidoWebDTO[]>('catalogo:pedidosListar', p),
       pedidoConvertir: (p) => c<{ ok: true; ventaNumero: number; ventaTipo: string }>('catalogo:pedidoConvertir', p),
       pedidoRechazar: (p) => c<{ ok: true }>('catalogo:pedidoRechazar', p),
+      pedidoVincularVenta: (p) => c<{ ok: true }>('catalogo:pedidoVincularVenta', p),
     },
     demo: {
       status: () => c<DemoStatusDTO>('demo:status'),

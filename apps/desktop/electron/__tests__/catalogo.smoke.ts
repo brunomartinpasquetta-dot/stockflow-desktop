@@ -152,6 +152,7 @@ const main = async () => {
     clienteNombre: 'Duplicado',
     entrega: 'retiro' as const,
     total: '100.0000',
+    pagado: false,
     items: [],
   };
   const primera = repos.catalogoPedidos.guardar(pedido);
@@ -169,6 +170,14 @@ const main = async () => {
     segundaOk && segundaValor === false,
     segundaOk ? `devolvió ${segundaValor}` : 'tiró una excepción',
   );
+
+  console.log('\n[pagado: un pedido ya cobrado en el catálogo se guarda como tal]');
+  const pedidoPagado = { ...pedido, pedidoId: 'pb-pagado-1', pagado: true };
+  repos.catalogoPedidos.guardar(pedidoPagado);
+  const guardadoPagado = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-pagado-1');
+  const guardadoNoPagado = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-dup-1');
+  check('pagado:true queda pagado=true', guardadoPagado?.pagado === true, JSON.stringify(guardadoPagado?.pagado));
+  check('pagado:false queda pagado=false', guardadoNoPagado?.pagado === false, JSON.stringify(guardadoNoPagado?.pagado));
 
   console.log('\n[integridad de catalogo_pedidos: FK y CHECK vigentes]');
   const raw = db.$client;

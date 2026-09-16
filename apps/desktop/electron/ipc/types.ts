@@ -1566,6 +1566,8 @@ export interface PedidoWebDTO {
   direccion: string | null;
   notas: string | null;
   total: string;
+  /** Ya cobrado en el catálogo (Mercado Pago): se registra sin pedir forma de pago. */
+  pagado: boolean;
   estado: 'pendiente' | 'convertido' | 'rechazado';
   saleId: string | null;
   lineas: PedidoWebLineaDTO[];
@@ -1894,6 +1896,8 @@ export interface ApiSurface {
     pedidosListar(payload?: { estado?: 'pendiente' | 'convertido' | 'rechazado' }): Res<PedidoWebDTO[]>;
     pedidoConvertir(payload: { id: string; paymentMethodId: string }): Res<{ ok: true; ventaNumero: number; ventaTipo: string }>;
     pedidoRechazar(payload: { id: string }): Res<{ ok: true }>;
+    /** Pedido no pagado, cargado y cobrado desde Ventas: enlaza la venta ya creada. */
+    pedidoVincularVenta(payload: { id: string; saleId: string }): Res<{ ok: true }>;
   };
   demo: {
     status(): Res<DemoStatusDTO>;

@@ -57,6 +57,10 @@ export interface DesktopWindowsConfig {
  * En dev: `http://localhost:5173/#/embedded/<pageKey>?<qs>`
  * En prod se usa `loadFile` con la opción `hash` (ver `openDesktopWindow`).
  */
+/** Mismo param reservado que `WindowManagerContext.tsx` (renderer): ahí viajan
+ *  los `extras` (initialTab, prefilledLines, ...) JSON-encodeados. */
+const EXTRAS_PARAM = '__extras';
+
 function buildEmbeddedHash(pageKey: string, params?: Record<string, unknown>): string {
   const qs = new URLSearchParams();
   if (params) {
@@ -103,6 +107,20 @@ export class DesktopWindowsManager {
       // `ready-to-show` puede no haber llegado nunca (carga colgada): si quedó
       // oculta, mostrarla acá es lo que la rescata.
       if (!existing.isVisible()) existing.show();
+      // Si el llamado trae `extras` (p.ej. "Cargar en Ventas" desde un pedido
+      // web), la ventana YA ABIERTA tiene que recibirlos. Antes se la enfocaba
+      // sin más: si Ventas ya estaba abierta (lo normal en una caja que labura
+      // todo el día), el pedido nunca llegaba — quedaba la pantalla de siempre,
+      // como si no hubiera pasado nada. Un click sin `extras` (el ícono del
+      // menú, F5, etc.) sigue siendo un simple foco: no pisa una venta en curso.
+      if (input.params && EXTRAS_PARAM in input.params) {
+        const hash = buildEmbeddedHash(input.pageKey, input.params);
+        if (this.config.isDev) {
+          void existing.loadURL(`${this.config.devServerUrl}/#${hash}`);
+        } else {
+          void existing.loadFile(this.config.prodIndexHtml, { hash });
+        }
+      }
       existing.focus();
       return { windowKey, created: false };
     }

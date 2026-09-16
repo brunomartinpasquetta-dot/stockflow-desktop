@@ -182,6 +182,10 @@ export class CatalogoSync {
           direccion: p.direccion ? String(p.direccion) : null,
           notas: p.notas ? String(p.notas) : null,
           total: Number(p.total ?? 0).toFixed(4),
+          // Ausente o cualquier valor que no sea `true`: se trata como no
+          // pagado. Sin esa cautela, un catálogo viejo (sin este campo) haría
+          // que TODO se registre solo, sin que nadie confirme el cobro.
+          pagado: p.pagado === true,
           items: Array.isArray(p.items) ? (p.items as PedidoWebEntrante['items']) : [],
         };
         if (repos.catalogoPedidos.guardar(entrante)) nuevos += 1;

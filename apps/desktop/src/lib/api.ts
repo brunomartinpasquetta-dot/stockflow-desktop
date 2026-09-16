@@ -186,6 +186,8 @@ export const api = {
     pedidoConvertir: (id: string, paymentMethodId: string): Promise<{ ok: true; ventaNumero: number; ventaTipo: string }> =>
       unwrap(sf().catalogo.pedidoConvertir({ id, paymentMethodId })),
     pedidoRechazar: (id: string): Promise<{ ok: true }> => unwrap(sf().catalogo.pedidoRechazar({ id })),
+    pedidoVincularVenta: (id: string, saleId: string): Promise<{ ok: true }> =>
+      unwrap(sf().catalogo.pedidoVincularVenta({ id, saleId })),
   },
   onboarding: {
     status: (): Promise<OnboardingStatusDTO> => unwrap(sf().onboarding.status()),

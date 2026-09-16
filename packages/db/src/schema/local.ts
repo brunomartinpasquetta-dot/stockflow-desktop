@@ -974,6 +974,11 @@ export const catalogoPedidos = sqliteTable(
     direccion: text('direccion'),
     notas: text('notas'),
     total: text('total').notNull().default('0.0000'),
+    /**
+     * Si ya se cobró en el catálogo (Mercado Pago). Mientras esa integración
+     * no exista, siempre llega en false: el comerciante cobra al confirmar.
+     */
+    pagado: integer('pagado', { mode: 'boolean' }).notNull().default(false),
     /** Snapshot de las líneas, como llegó del catálogo. */
     items: text('items').notNull(),
     estado: text('estado', { enum: ['pendiente', 'convertido', 'rechazado'] })

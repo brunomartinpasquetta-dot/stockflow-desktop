@@ -17,6 +17,7 @@ import {
   useSuppliers,
 } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
+import { useWindowSelf } from '@/contexts/WindowManagerContext'
 import { useWindowNav } from '@/lib/useWindowNav'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
@@ -548,6 +549,7 @@ function PDV() {
   const { currentUser } = useAuth()
   const canWrite = useCanWrite()
   const openWindow = useWindowNav()
+  const windowSelf = useWindowSelf()
   const articlesQuery = useArticles()
   const familiesQuery = useFamilies()
   const suppliersQuery = useSuppliers()
@@ -686,6 +688,14 @@ function PDV() {
   })
 
   const [cart, setCart] = useState<CartLine[]>([])
+  /**
+   * Si esta venta viene de un pedido web (Pedidos web → "Cargar en Ventas"):
+   * al cobrarla hay que avisarle al pedido cuál fue la venta, para que deje de
+   * figurar pendiente y el catálogo se entere. No pasa por SalesService: es
+   * un enlace aparte, best-effort, después de que la venta ya está hecha.
+   */
+  const [pedidoWebId, setPedidoWebId] = useState<string | null>(null)
+  const [pedidoWebNotes, setPedidoWebNotes] = useState<string | null>(null)
   const [globalDiscount, setGlobalDiscount] = useState('0')
   // El descuento global puede ingresarse como importe ($) o como porcentaje (%).
   // En modo %, se traduce a importe sobre el subtotal antes de calcular/enviar.
@@ -750,6 +760,43 @@ function PDV() {
   useEffect(() => {
     barcodeRef.current?.focus()
   }, [])
+
+  // Prefill desde "Pedidos web" (pedido NO pagado → se cobra acá, con
+  // cualquier forma de pago). Mismo patrón que Compras con "Generador de
+  // compras": los `extras` viajan en la ventana nativa, se aplican una sola
+  // vez apenas cargan los artículos.
+  const pedidoWebPrefillRef = useRef(false)
+  useEffect(() => {
+    if (pedidoWebPrefillRef.current) return
+    const extras = windowSelf?.extras as
+      | {
+          pedidoWebId?: string
+          notes?: string
+          prefilledLines?: Array<{ articleId?: string; description?: string; quantity: string; unitPrice: string }>
+        }
+      | undefined
+    if (!extras?.pedidoWebId || !Array.isArray(extras.prefilledLines) || extras.prefilledLines.length === 0) return
+    if (allArticles.length === 0) return
+    pedidoWebPrefillRef.current = true
+    const byId = new Map(allArticles.map((a) => [a.id, a]))
+    const lines: CartLine[] = extras.prefilledLines.map((p) => {
+      const art = p.articleId ? byId.get(p.articleId) : undefined
+      return {
+        article: art,
+        description: art ? undefined : (p.description ?? 'Artículo del catálogo'),
+        vatRate: art?.vatRate ?? '21.00',
+        quantity: String(Number(p.quantity)),
+        unitPrice: p.unitPrice,
+        discount: '0',
+        priceManuallySet: true,
+      }
+    })
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCart(lines)
+    setPedidoWebId(extras.pedidoWebId)
+    setPedidoWebNotes(extras.notes ?? null)
+    window.history.replaceState({}, '')
+  }, [windowSelf?.extras, allArticles])
 
   // Inicializar / corregir el medio de pago mono-medio default (efectivo físico).
   // Pattern de "derivar estado de props" recomendado por React: setState durante render.
@@ -877,6 +924,8 @@ function PDV() {
 
   function clearSale(): void {
     setCart([])
+    setPedidoWebId(null)
+    setPedidoWebNotes(null)
     setGlobalDiscount('0')
     setDiscountIsPct(false)
     setIsAccountSale(false)
@@ -1168,7 +1217,7 @@ function PDV() {
         isAccountSale: accountSale,
         payments: paymentsToSend,
         discount: globalDiscountAbs,
-        notes: null,
+        notes: pedidoWebNotes,
         lines: cart.map((l) => ({
           articleId: l.article?.id,
           description: l.article ? undefined : l.description,
@@ -1186,6 +1235,11 @@ function PDV() {
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} registrada — ${formatCurrency(result.sale.total)}`,
       )
+      // Venía de un pedido web (no pagado): avisarle que ya se cobró. Best
+      // effort — la venta ya está hecha, esto solo lo destacha de "Pedidos web".
+      if (pedidoWebId) {
+        api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).catch(() => {})
+      }
 
       // Facturación electrónica: si está activa y el comprobante es fiscal, se
       // pide el CAE a ARCA. La VENTA ya está registrada, así que un fallo acá no
@@ -1300,6 +1354,9 @@ function PDV() {
         })),
       })
       await api.mpQr.linkOrderToSale(orderId, result.sale.id).catch(() => {})
+      if (pedidoWebId) {
+        api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).catch(() => {})
+      }
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} cobrada con MercadoPago QR — ${formatCurrency(result.sale.total)}`,
       )
