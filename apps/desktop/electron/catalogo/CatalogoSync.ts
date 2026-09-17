@@ -221,19 +221,27 @@ export class CatalogoSync {
     estado: 'confirmado' | 'cancelado',
     ventaSistema?: string,
   ): Promise<boolean> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8_000);
     try {
       const empresa = await this.opts.repos.company.getOrCreate();
       const url = (empresa.catalogoUrl ?? '').trim().replace(/\/$/, '');
       const token = (empresa.catalogoToken ?? '').trim();
-      if (!url || !token) return false;
+      // Sin catálogo configurado no hay a quién avisar: se da por hecho.
+      if (!url || !token) return true;
       const res = await this.fetch(`${url}/api/stockflow/pedidos/${pedidoId}/estado`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify({ estado, venta_sistema: ventaSistema }),
+        signal: controller.signal,
       });
-      return res.ok;
+      // 404: el catálogo no conoce ese pedido (se borró allá, o era de prueba).
+      // No hay nada que cancelar y no tiene sentido insistir.
+      return res.ok || res.status === 404;
     } catch {
       return false;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -246,15 +254,23 @@ export class CatalogoSync {
    * manda "cancelado", que del otro lado repone lo descontado. Es un barrido,
    * no un gancho por venta: cubre cualquier camino de anulación (una, "las
    * de hoy", una terminal LAN) y reintenta lo que haya quedado sin avisar.
+   *
+   * El pedido se marca recién cuando el catálogo ACUSÓ el aviso: si se marcara
+   * antes y el catálogo estaba caído, el barrido siguiente ya no lo vería y
+   * el pedido quedaría "confirmado" allá para siempre. Mientras tanto la
+   * pantalla igual dice "venta anulada", porque eso lo lee de la venta.
    */
   async cancelarPedidosDeVentasAnuladas(): Promise<{ cancelados: number; sinAviso: number }> {
     const { repos } = this.opts;
     let cancelados = 0;
     let sinAviso = 0;
     for (const p of repos.catalogoPedidos.convertidosConVentaAnulada()) {
-      repos.catalogoPedidos.marcar(p.id, 'rechazado', p.saleId);
-      cancelados += 1;
-      if (!(await this.avisarEstado(p.pedidoId, 'cancelado'))) sinAviso += 1;
+      if (await this.avisarEstado(p.pedidoId, 'cancelado')) {
+        repos.catalogoPedidos.marcar(p.id, 'rechazado', p.saleId);
+        cancelados += 1;
+      } else {
+        sinAviso += 1;
+      }
     }
     return { cancelados, sinAviso };
   }

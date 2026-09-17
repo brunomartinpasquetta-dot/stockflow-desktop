@@ -90,9 +90,10 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
     }),
 
     'catalogo:pedidosListar': withSession(deps, async (payload: { estado?: 'pendiente' | 'convertido' | 'rechazado' }) => {
-      // Si alguna venta de pedido se anuló por un camino que no pasó por el
-      // barrido (o el aviso falló), acá se pone al día antes de mostrar.
-      await obtenerCatalogoSync(deps.repos).cancelarPedidosDeVentasAnuladas();
+      // Si alguna venta de pedido se anuló y el aviso al catálogo quedó
+      // pendiente (estaba caído), se reintenta acá. Sin esperar: la pantalla
+      // no depende del catálogo, y "venta anulada" lo lee de la venta.
+      void obtenerCatalogoSync(deps.repos).cancelarPedidosDeVentasAnuladas();
       const filas = deps.repos.catalogoPedidos.listar(payload?.estado);
       const ventas = deps.repos.catalogoPedidos.estadoDeVentas(
         filas.map((p) => p.saleId).filter((id): id is string => id != null),

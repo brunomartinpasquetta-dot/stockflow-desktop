@@ -194,6 +194,17 @@ const main = async () => {
   check('con la venta vigente no cancela nada', antesDeAnular.cancelados === 0 && recibido.length === 0);
   const stockAntes = Number((await repos.articles.findById(art.id))!.stock);
   await svc.sales.voidSale(ventaPedido.sale.id);
+  // Catálogo caído: el aviso falla y el pedido tiene que seguir pendiente de
+  // aviso (no marcarse), para reintentar cuando vuelva.
+  responder = 503;
+  const caido = await sync.cancelarPedidosDeVentasAnuladas();
+  check(
+    'con el catálogo caído no marca el pedido y lo deja para reintentar',
+    caido.cancelados === 0 && caido.sinAviso === 1 && repos.catalogoPedidos.buscar(pedAnular.id)!.estado === 'convertido',
+    JSON.stringify(caido),
+  );
+  responder = 200;
+  recibido.length = 0;
   const barrido = await sync.cancelarPedidosDeVentasAnuladas();
   const pedDespues = repos.catalogoPedidos.buscar(pedAnular.id)!;
   const aviso = recibido.find((r) => r.url.endsWith(`/api/stockflow/pedidos/pb-anular-1/estado`));
