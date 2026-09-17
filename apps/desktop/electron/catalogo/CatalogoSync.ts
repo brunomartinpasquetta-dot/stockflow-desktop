@@ -16,7 +16,7 @@
  *  3. Nunca frena la venta: si el catálogo no responde, se anota el error y se
  *     reintenta en el tick siguiente. El cursor no avanza.
  *
- * Contrato del otro lado: ~/CATALOGOCITZIA/docs/INTEGRACION-STOCKFLOW.md
+ * Contrato que debe cumplir cualquier catálogo: docs/CATALOGO_WEB_API.md
  */
 import type { PedidoWebEntrante, Repositories } from '@stockflow/db';
 
