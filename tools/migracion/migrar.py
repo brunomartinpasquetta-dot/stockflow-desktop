@@ -20,6 +20,10 @@ USO
     # 4) bajar el motor
     python3 migrar.py bajar
 
+    # TODO JUNTO (el día en el local, repetible con un .GDB más nuevo):
+    python3 migrar.py todo /ruta/DBPV.GDB /carpeta/salida PRECIO2
+    # → deja stockflow-migrado-<fecha>.zip para Configuración → Backup → Restaurar
+
 La base .GDB NO se modifica: se trabaja siempre sobre una copia.
 """
 from __future__ import annotations
@@ -543,6 +547,21 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             lista2 = r["PRECIO3"] or 0
             lista3 = r["PRECIO4"] or 0
             mayor = r["PRECIOU"] or 0
+        # Las listas 2 y 3 NUNCA quedan en cero ni en el costo. En Ventas la
+        # lista elegida se cobra tal cual (`resolvePrice`): una lista en $0
+        # vende gratis y una igual al costo vende sin ganancia. En Denver
+        # PRECIO3 era una copia del costo en 564 de 580 artículos y PRECIO4
+        # estaba vacío en la mitad. Lo que no es una lista de venta real se
+        # rellena con el precio de venta, y la pantalla de precios sigue
+        # mostrando algo cobrable en las tres.
+        def lista_segura(v, etiqueta: str):
+            v = Decimal(str(v or 0))
+            if v <= 0 or v == Decimal(str(costo)):
+                rep.suma(f"  …{etiqueta} vacía o igual al costo: se usa el precio de venta", 1)
+                return venta
+            return v
+        lista2 = lista_segura(lista2, "lista 2")
+        lista3 = lista_segura(lista3, "lista 3")
         aid = uuid7()
         try:
             sq.execute(
@@ -627,11 +646,17 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             "TRANSFERENCIA BANCARIA": "Transferencia",
         }
         destino = equivalencias.get(n, txt(nombre).title())
+        if n.replace(" ", "") == "MERCADOPAGO":
+            destino = "Mercado Pago"
         clave = destino.upper()
         if clave in pm_id:
             return pm_id[clave]
         # Efectivo de verdad: sólo lo que entra al cajón.
         fisico = 1 if ("CONTADO" in n or "EFECTIVO" in n) else 0
+        # Mercado Pago nace con su tipo real: es lo que usan el cobro por QR y
+        # los pedidos web pagados para encontrarlo. Como 'other' quedaba
+        # invisible para esas dos funciones.
+        tipo = "mp" if clave == "MERCADO PAGO" else "other"
         nid = uuid7()
         orden = (sq.execute("SELECT COALESCE(MAX(sort_order),0) FROM payment_methods").fetchone()[0] or 0) + 1
         # NACEN INACTIVOS. Los medios que trae StockFlow son los que el comercio
@@ -644,8 +669,8 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
         # verdad use (MercadoPago, Cuenta DNI...).
         sq.execute(
             "INSERT INTO payment_methods (id,name,type,is_physical_cash,commission_pct,"
-            "active,sort_order,created_at,updated_at) VALUES (?,?,'other',?,'0.0000',0,?,?,?)",
-            (nid, destino[:40], fisico, orden, ahora, ahora))
+            "active,sort_order,created_at,updated_at) VALUES (?,?,?,?,'0.0000',0,?,?,?)",
+            (nid, destino[:40], tipo, fisico, orden, ahora, ahora))
         pm_id[clave] = nid
         rep.suma("Medios de pago de StockFácil (inactivos)", 1)
         return nid
@@ -695,10 +720,32 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     venta_map: dict[int, str] = {}
     campos_v = ["IDVENTA", "FECHA", "HORA", "NUMERO", "LETRA", "TOTAL", "IVA", "DESCUENTO",
                 "IDPERSONA", "IDCLIENTE", "ESTADO", "CAE", "CODIGOCAE", "ESTADOFE",
-                "IDCAJA", "FORMAPAGO"]
+                "IDCAJA", "FORMAPAGO", "USUARIO"]
+    omitidas: dict[str, list] = {}
+
+    def vendedor_de(v) -> str:
+        """VENTA.USUARIO es el IDUSUARIO de quien cobró (en Denver, 5 vendedores
+        con 60.000 ventas repartidas). Antes todas quedaban a nombre del admin
+        y "Ventas por vendedor" arrancaba en blanco. Lo que no se reconoce
+        (0, vacío, texto) cae en el admin."""
+        try:
+            return usuario_map.get(int(str(v).strip()), uid) if v not in (None, "") else uid
+        except ValueError:
+            return uid
     for r in leer(con, "VENTA", campos_v, "ORDER BY IDVENTA") if "VENTA" in hay else []:
         total = r["TOTAL"]
         if total is None:
+            continue
+        letra_sf = txt(r["LETRA"]).upper()
+        # Notas de crédito y presupuestos NO son ventas. StockFácil los guarda
+        # en VENTA con LETRA "NOTA DE CREDITO B" / "PRESUPUESTO"; `letra()` los
+        # leería como Factura B y una devolución de $4.200 entraría como una
+        # venta más de $4.200. StockFlow tiene módulos propios para las dos
+        # cosas; acá se omiten y se avisa cuáles fueron.
+        if "NOTA DE CREDITO" in letra_sf or "PRESUPUESTO" in letra_sf:
+            omitidas.setdefault(letra_sf, []).append(
+                f"N° {r['NUMERO']} del {r['FECHA'].date() if r['FECHA'] else '?'} por ${total}"
+                + (" (CON CAE)" if txt(r["CAE"]) else ""))
             continue
         cliente = (cli_id.get(r["IDCLIENTE"]) if r["IDCLIENTE"] is not None else None) \
             or (cli_por_persona.get(r["IDPERSONA"]) if r["IDPERSONA"] is not None else None) \
@@ -707,23 +754,40 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             rep.aviso("venta sin cliente identificable: se omite")
             continue
         anulada = txt(r["ESTADO"]).upper().startswith("ANUL")
+        tipo = letra(r["LETRA"])
+        cae = txt(r["CAE"]) or None
+        nota = None
+        # Una "factura" que nunca obtuvo CAE no es una factura: ARCA no la
+        # conoce. Si entrara como tipo A/B/C sin CAE, StockFlow la mostraría
+        # como comprobante fiscal PENDIENTE con botón para pedir el CAE — de
+        # una venta de hace un mes, que ARCA rechaza por fecha o, peor,
+        # autoriza como si fuera de hoy. Entra como comprobante interno (X) y
+        # queda dicho en la nota qué era. En Denver eran 376 (ESTADOFE vacío o
+        # RECHAZADO).
+        if tipo in ("A", "B", "C") and not cae:
+            nota = f"En StockFácil figuraba como {letra_sf} sin CAE ({txt(r['ESTADOFE']) or 'sin respuesta de ARCA'})"
+            tipo = "X"
+            rep.suma("Facturas sin CAE (entran como comprobante interno X)", 1)
         vid = uuid7()
         fecha = ms(r["FECHA"], r["HORA"])
         iva = r["IVA"] or 0
         neto = Decimal(str(total)) - Decimal(str(iva))
         sq.execute(
             "INSERT INTO sales (id,number,type,date,customer_id,seller_id,cash_register_id,"
-            "is_account_sale,subtotal,discount,vat_amount,total,status,afip_cae,"
-            "created_at,updated_at) VALUES (?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?)",
-            (vid, r["NUMERO"] or 0, letra(r["LETRA"]), fecha, cliente, uid,
+            "is_account_sale,subtotal,discount,vat_amount,total,status,afip_cae,notes,"
+            "created_at,updated_at) VALUES (?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?)",
+            (vid, r["NUMERO"] or 0, tipo, fecha, cliente, vendedor_de(r["USUARIO"]),
              caja_map.get(r["IDCAJA"]) or caja_id,
              dec(neto), dec(r["DESCUENTO"]), dec(iva), dec(total),
-             "voided" if anulada else "completed", txt(r["CAE"]) or None, fecha, fecha))
+             "voided" if anulada else "completed", cae, nota, fecha, fecha))
         venta_map[r["IDVENTA"]] = vid
         rep.suma("Ventas", 1)
 
-        if txt(r["CAE"]):
+        if cae:
             rep.suma("Facturas con CAE", 1)
+    for letra_sf, lista in omitidas.items():
+        rep.aviso(f"{len(lista)} {letra_sf} NO migradas (no son ventas; cargar a mano si hace falta): "
+                  + "; ".join(lista[:4]) + (" …" if len(lista) > 4 else ""))
 
     art_borrado: str | None = None
     # OJO: en LINEAVENTA la referencia a la venta se llama VENTA, no IDVENTA.
@@ -993,6 +1057,10 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 continue
             cuit = re.sub(r"\D", "", txt(r["EMAIL"]))
             iibb = txt(r["WEB"])
+            # En Denver el comercio cargó el CUIT también en WEB: eso no es un
+            # número de Ingresos Brutos y no puede salir impreso como tal.
+            if re.sub(r"\D", "", iibb) == cuit:
+                iibb = ""
             sq.execute(
                 "UPDATE companies SET name = ?, address = ?, phone = ?, "
                 "cuit = COALESCE(NULLIF(?, ''), cuit), "
@@ -1029,6 +1097,12 @@ def empaquetar(db: str, version_app: str = "migracion") -> None:
     import zipfile
     if not os.path.isfile(db):
         sys.exit(f"No existe: {db}")
+    # Todo lo escrito tiene que estar EN el .db antes de zipearlo: si quedara
+    # algo en el -wal, el archivo dentro del zip estaría incompleto.
+    c = sqlite3.connect(db)
+    c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    c.execute("PRAGMA journal_mode=DELETE")
+    c.close()
     salida = os.path.join(os.path.dirname(os.path.abspath(db)),
                           f"stockflow-migrado-{time.strftime('%Y-%m-%d-%H%M%S')}.zip")
     with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
@@ -1043,6 +1117,41 @@ def empaquetar(db: str, version_app: str = "migracion") -> None:
     mb = os.path.getsize(salida) / 1048576
     print(f"Listo: {salida} ({mb:.1f} MB)")
     print("En la PC del cliente: StockFlow → Configuración → Backup → Restaurar → elegir este .zip.")
+
+
+# ---------------------------------------------------------------- todo junto
+
+def crear_base_vacia(destino: str) -> None:
+    """Base de StockFlow nueva (esquema al día + admin), con el Electron del
+    repo, que es el que tiene better-sqlite3 compilado para su ABI."""
+    aqui = os.path.dirname(os.path.abspath(__file__))
+    desktop = os.path.abspath(os.path.join(aqui, "..", "..", "apps", "desktop"))
+    electron = os.path.join(desktop, "node_modules", ".bin", "electron")
+    tsx = os.path.join(desktop, "node_modules", "tsx", "dist", "cli.mjs")
+    script = os.path.join(aqui, "crear-db-vacia.ts")
+    if not os.path.isfile(electron):
+        sys.exit(f"No encuentro Electron en {electron}: correr `pnpm install` en el repo.")
+    env = dict(os.environ, ELECTRON_RUN_AS_NODE="1")
+    subprocess.run([electron, tsx, script, destino], check=True, env=env, cwd=desktop)
+
+
+def todo(gdb: str, salida: str, precio: str, sin_iva: bool) -> None:
+    """Migración completa de una sola vez, para el día en el local: levanta el
+    motor, muestra qué hay, crea la base destino, migra, empaqueta y baja el
+    motor. Repetible: si se vuelve a copiar el .GDB (el cliente siguió
+    vendiendo), se corre de nuevo y sale un .zip nuevo."""
+    os.makedirs(salida, exist_ok=True)
+    destino = os.path.join(salida, f"stockflow-{time.strftime('%Y-%m-%d-%H%M%S')}.db")
+    servidor(gdb)
+    try:
+        inspeccionar()
+        print("\n" + "=" * 62 + f"\nMIGRANDO con lista {precio}, precios "
+              f"{'SIN' if sin_iva else 'CON'} IVA incluido\n" + "=" * 62)
+        crear_base_vacia(destino)
+        migrar(destino, precio, iva_incluido=not sin_iva)
+        empaquetar(destino)
+    finally:
+        bajar()
 
 
 # ---------------------------------------------------------------------- main
@@ -1077,6 +1186,12 @@ if __name__ == "__main__":
         if len(sys.argv) < 3:
             sys.exit("Falta la ruta a la base migrada (stockflow.db)")
         empaquetar(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "migracion")
+    elif cmd == "todo":
+        listas = ("PRECIO1", "PRECIO2", "PRECIO3", "PRECIO4", "PRECIOU")
+        if len(sys.argv) < 5 or sys.argv[4] not in listas:
+            sys.exit("Uso: python3 migrar.py todo /ruta/DBPV.GDB /carpeta/salida PRECIO2 [--sin-iva]\n"
+                     f"  (la lista de VENTA al público es obligatoria: {', '.join(listas)})")
+        todo(sys.argv[2], sys.argv[3], sys.argv[4], "--sin-iva" in sys.argv)
     elif cmd == "bajar":
         bajar()
     else:

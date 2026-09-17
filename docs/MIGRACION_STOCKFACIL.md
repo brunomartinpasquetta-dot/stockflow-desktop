@@ -110,15 +110,49 @@ precios usan al vender.
    38.852 ventas) → `empaquetar <db>` genera `stockflow-migrado-<fecha>.zip`.
    La base vacía se crea con `tools/migracion/crear-db-vacia.ts` (instrucciones
    en el archivo) o copiando la que dejó la app del cliente al abrirse.
-4. En el cliente: **Configuración → Backup → Restaurar** → elegir el `.zip`. La
-   app reemplaza la base, limpia el WAL y se reinicia. Verificar: cantidad de
-   artículos, un precio conocido, la deuda de un cliente de cuenta corriente,
-   que cada usuario entre con su clave de siempre.
+4. En el cliente, cargar la base. **Camino seguro con cualquier versión:** cerrar
+   StockFlow, copiar `database/stockflow.db` del zip sobre la ruta que muestra
+   Configuración ("Ruta de la base", en `%AppData%\Roaming\@stockflow\desktop\`),
+   borrar `stockflow.db-wal`/`-shm` si existen, abrir. **Configuración → Backup →
+   Restaurar** hace lo mismo desde la app, pero hasta v1.8.1 pisaba la base SIN
+   cerrarla: en Windows falla ("resource busy") y en Mac seguía escribiendo en el
+   archivo viejo hasta reiniciar. Desde el commit del 17-sep-2026 el restore
+   cierra todo, reemplaza y relanza solo — usar la opción de la app recién cuando
+   el cliente tenga esa versión. Verificar después: cantidad de artículos, un
+   precio conocido, la deuda de un cliente de cuenta corriente, que cada usuario
+   entre con su clave de siempre, y Estadísticas → Vendedores.
+   La base migrada puede tener migraciones más nuevas que la app instalada (el
+   `todo` la crea con el esquema del repo): drizzle sólo aplica las que faltan,
+   así que una app más vieja la abre igual y una más nueva no repite nada.
 5. Los medios de pago migrados nacen inactivos: activar los que usan. Las
    ventas viejas cuelgan de la caja "Caja histórica"; abrir la caja del día.
 6. ARCA: el punto de venta tiene que ser del sistema "RECE para aplicativo y
    web services" (ver memoria `arca-punto-de-venta-webservices`).
 
 Lo que NO se migra: contraseñas del `admin` de StockFlow (queda `admin`, es la
-puerta de soporte), configuraciones propias de StockFácil, y el certificado
-ARCA (es un archivo, no está en la base).
+puerta de soporte), configuraciones propias de StockFácil, el certificado
+ARCA (es un archivo, no está en la base), las **notas de crédito y presupuestos**
+(StockFácil los guarda en VENTA; no son ventas — se listan en los avisos) y las
+"facturas" que nunca tuvieron CAE (entran como comprobante X con la nota de qué
+eran: si entraran como A/B/C sin CAE, quedarían como fiscales pendientes con
+botón de reintento).
+
+## Dónde encontrar los datos de ARCA en la base vieja
+
+- **Punto de venta y tipo**: `VENTA.CODIGOCAE` es el código de barras del
+  comprobante: CUIT (11) + tipo (2: 01=A, 06=B, 11=C, 03/08=NC A/B) + **punto de
+  venta (4)** + CAE (14) + vencimiento (8) + dígito. `MIEMPRESA.PUNTO` puede
+  estar desactualizado (Denver decía 3 y facturaba por el 4).
+- **Número de comprobante**: `VENTA.NROCOMP` (y `ESTADO` repite ese número con
+  ceros a la izquierda en las facturadas — no es un estado).
+- **Razón social y CUIT**: en el CSR del certificado (`openssl req -in x.csr
+  -noout -subject`). `EMPRESA` son los PROVEEDORES, no el comercio; el comercio
+  está en `MIEMPRESA` (con el CUIT en la columna EMAIL).
+- **Certificado**: `homo.crt` puede ser de PRODUCCIÓN aunque se llame así
+  (Denver): mirar el emisor con `openssl x509 -noout -issuer` — "Computadores /
+  AFIP" es producción, "Computadores Test" es homologación.
+- **Condición IVA actual**: la letra de las últimas facturas con CAE (B → RI;
+  C → Monotributo). Un cambio MT→RI se ve como Facturas C en un PV y luego B en
+  otro, y explica un PV "viejo" que dejó de servir.
+
+Caso Denver Drugstore (17-sep-2026): `~/Desktop/DENVER-migracion/PARA-EL-PENDRIVE/LEEME-DENVER.txt`.

@@ -599,7 +599,9 @@ function BackupSection() {
   const restoreMut = useMutation({
     mutationFn: (zipPath: string) => api.backup.restore(zipPath),
     onSuccess: () => {
-      toast.success('Backup restaurado. Reiniciá la aplicación para usar la base restaurada.')
+      toast.success('Backup restaurado. StockFlow se reinicia en unos segundos con la base restaurada.', {
+        duration: 10_000,
+      })
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo restaurar el backup'),
   })

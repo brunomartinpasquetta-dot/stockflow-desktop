@@ -9,7 +9,9 @@
 // Después de usarlo en la misma terminal: `unset ELECTRON_RUN_AS_NODE`, o la
 // app de escritorio arranca como Node pelado y no abre.
 import { existsSync } from 'node:fs';
-import { closeLocalDb, initLocalDb } from '@stockflow/db';
+// Ruta relativa y no `@stockflow/db`: esta carpeta no es un workspace de pnpm
+// y el paquete no se resuelve desde acá.
+import { closeLocalDb, initLocalDb } from '../../packages/db/src/index';
 
 const destino = process.argv[2];
 if (!destino) throw new Error('Falta la ruta destino, p.ej. /tmp/stockflow.db');
