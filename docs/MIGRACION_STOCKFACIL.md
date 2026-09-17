@@ -83,8 +83,42 @@ SQL> OUTPUT;
 
 | Riesgo | Cómo se verifica |
 |---|---|
-| **Modo de precios** (con o sin IVA incluido) | Comparar una factura impresa contra el precio del artículo. Si se elige mal, TODOS los precios quedan ~21% desviados |
-| CUIT inválidos | El validador de StockFlow verifica dígito verificador; listar los que fallen y cargarlos sin documento |
-| Artículos sin código de barras | Generar código interno (`INT-000001`) antes de importar |
-| Stock negativo | StockFlow no lo acepta en la carga: se lleva a 0 y se informa |
-| `suppliers.code` faltante | Generar `PROV-0001` con secuencia estable |
+| **Cuál PRECIO es el de venta** | En Leo Citzia `PRECIO1` era el **COSTO** y `PRECIO2` el precio al público. Por eso `migrar` exige decirlo (`PRECIO2`), no asume. Confirmar con `inspeccionar` contra una factura impresa |
+| **Con o sin IVA incluido** | StockFácil y StockFlow guardan el precio final (con IVA). Por defecto NO se toca. Sólo si el comercio carga precios netos: `--sin-iva` (se les agrega el IVA). Si se elige mal, TODO queda ~21% corrido |
+| CUIT inválidos | Se migran con el tipo de documento de `TIPOCUIT`; el validador de StockFlow los frena recién al editar la ficha |
+| Artículos sin código de barras | Se les genera un EAN-13 interno válido (se puede etiquetar y leer) |
+| Stock negativo | Se migra **tal cual** (es información real del comercio); `allow_negative_stock` queda en 1 |
+| Artículos dados de baja (`VISIBLE=1`, al revés del nombre) | Se migran INACTIVOS, así el listado diario muestra lo mismo que veían |
+| Versión de Firebird | La imagen 2.5 abre ODS 10–11. Si no abre (ODS 12 = Firebird 3): `FIREBIRD_IMAGEN=jacobalberty/firebird:3.0` |
+
+## Procedimiento en el local (lo que funcionó con Leo Citzia, ago-2026)
+
+Antes de ir, preguntar: **versión de Windows** de cada PC (Electron no corre en
+Windows 7 → esa PC entra por navegador), cuántas PC, si facturan por ARCA con
+StockFácil (si sí, el `.crt/.key` está en el disco del servidor y se reutiliza:
+copiarlo a `C:\StockFlow\arca\`, nunca a `Program Files`), y qué lista de
+precios usan al vender.
+
+1. En el servidor del cliente: **cerrar StockFácil** y copiar su `DBPV.GDB`
+   (o `gbak -b`) a un pendrive. Anotar la carpeta de StockFácil (ahí están
+   `gbak.exe` y, si facturan, el certificado).
+2. Instalar StockFlow (último release público), abrirlo una vez y **activar la
+   licencia** (Prueba gratis 30 días → después `apps/cloud/scripts/convertir-a-paga.sh`).
+   No hace falta cargar nada: la base vacía que crea es la que se reemplaza.
+3. En la Mac: `servidor` → `inspeccionar` → decidir la lista y el IVA con una
+   factura impresa → `python3 migrar.py migrar <db-vacía> PRECIO2` (12 s para
+   38.852 ventas) → `empaquetar <db>` genera `stockflow-migrado-<fecha>.zip`.
+   La base vacía se crea con `tools/migracion/crear-db-vacia.ts` (instrucciones
+   en el archivo) o copiando la que dejó la app del cliente al abrirse.
+4. En el cliente: **Configuración → Backup → Restaurar** → elegir el `.zip`. La
+   app reemplaza la base, limpia el WAL y se reinicia. Verificar: cantidad de
+   artículos, un precio conocido, la deuda de un cliente de cuenta corriente,
+   que cada usuario entre con su clave de siempre.
+5. Los medios de pago migrados nacen inactivos: activar los que usan. Las
+   ventas viejas cuelgan de la caja "Caja histórica"; abrir la caja del día.
+6. ARCA: el punto de venta tiene que ser del sistema "RECE para aplicativo y
+   web services" (ver memoria `arca-punto-de-venta-webservices`).
+
+Lo que NO se migra: contraseñas del `admin` de StockFlow (queda `admin`, es la
+puerta de soporte), configuraciones propias de StockFácil, y el certificado
+ARCA (es un archivo, no está en la base).

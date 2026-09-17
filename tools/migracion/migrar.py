@@ -44,7 +44,10 @@ try:
 except ImportError:
     _bcrypt = None   # sin bcrypt se migran los usuarios con una clave provisoria
 
-IMAGEN = "jacobalberty/firebird:2.5-ss"
+# Firebird 2.5 abre bases ODS 10.x–11.x (StockFácil clásico). Si el cliente
+# tiene una base de Firebird 3 (ODS 12) el motor no la abre: correr con
+# FIREBIRD_IMAGEN=jacobalberty/firebird:3.0 (ya bajada en la Mac).
+IMAGEN = os.environ.get("FIREBIRD_IMAGEN", "jacobalberty/firebird:2.5-ss")
 CONTENEDOR = "stockfacil-migracion"
 WORK = "/tmp/stockfacil-migracion"
 
@@ -1014,6 +1017,34 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     print("\n  La base .GDB del cliente no fue modificada.")
 
 
+# ------------------------------------------------------------------ paquete
+
+def empaquetar(db: str, version_app: str = "migracion") -> None:
+    """Arma un .zip con el MISMO formato que los backups de StockFlow
+    (`database/stockflow.db` + `metadata.json`), así la base migrada se carga
+    en la PC del cliente desde Configuración → Backup → Restaurar: la app
+    cierra su base, la reemplaza, limpia el WAL y se reinicia. No hay que
+    buscar la carpeta AppData ni cerrar nada a mano."""
+    import json
+    import zipfile
+    if not os.path.isfile(db):
+        sys.exit(f"No existe: {db}")
+    salida = os.path.join(os.path.dirname(os.path.abspath(db)),
+                          f"stockflow-migrado-{time.strftime('%Y-%m-%d-%H%M%S')}.zip")
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(db, "database/stockflow.db")
+        z.writestr("metadata.json", json.dumps({
+            "createdAt": int(time.time() * 1000),
+            "appVersion": version_app,
+            "dbPath": os.path.abspath(db),
+            "schemaVersion": "auto",
+            "origen": "migracion StockFácil",
+        }, indent=2))
+    mb = os.path.getsize(salida) / 1048576
+    print(f"Listo: {salida} ({mb:.1f} MB)")
+    print("En la PC del cliente: StockFlow → Configuración → Backup → Restaurar → elegir este .zip.")
+
+
 # ---------------------------------------------------------------------- main
 
 if __name__ == "__main__":
@@ -1027,9 +1058,25 @@ if __name__ == "__main__":
     elif cmd == "migrar":
         if len(sys.argv) < 3:
             sys.exit("Falta la ruta a la base de StockFlow (stockflow.db)")
-        precio = sys.argv[3] if len(sys.argv) > 3 else "PRECIO1"
+        # La lista de venta se elige A PROPÓSITO, nunca por defecto: en la base
+        # de Leo Citzia PRECIO1 era el COSTO y PRECIO2 el precio al público. Un
+        # default silencioso hubiera vendido todo al costo. Se decide mirando
+        # `inspeccionar` contra una factura impresa del comercio.
+        listas = ("PRECIO1", "PRECIO2", "PRECIO3", "PRECIO4", "PRECIOU")
+        precio = sys.argv[3] if len(sys.argv) > 3 else ""
+        if precio not in listas:
+            sys.exit("Falta decir cuál de los precios de StockFácil es el de VENTA AL PÚBLICO.\n"
+                     f"  python3 migrar.py migrar {sys.argv[2]} PRECIO2 [--sin-iva]\n"
+                     f"  Opciones: {', '.join(listas)} (PRECIO1 suele ser el costo).\n"
+                     "  Mirá 'python3 migrar.py inspeccionar' y comparalo con una factura impresa.")
         sin_iva = "--sin-iva" in sys.argv
+        print(f"Lista de venta: {precio} — precios {'SIN' if sin_iva else 'CON'} IVA incluido "
+              f"({'se les agrega el IVA' if sin_iva else 'se guardan tal cual'}).")
         migrar(sys.argv[2], precio, iva_incluido=not sin_iva)
+    elif cmd == "empaquetar":
+        if len(sys.argv) < 3:
+            sys.exit("Falta la ruta a la base migrada (stockflow.db)")
+        empaquetar(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "migracion")
     elif cmd == "bajar":
         bajar()
     else:
