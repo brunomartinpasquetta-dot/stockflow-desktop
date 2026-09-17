@@ -765,19 +765,25 @@ function PDV() {
   // cualquier forma de pago). Mismo patrón que Compras con "Generador de
   // compras": los `extras` viajan en la ventana nativa, se aplican una sola
   // vez apenas cargan los artículos.
-  const pedidoWebPrefillRef = useRef(false)
+  // La guardia es POR PEDIDO, no un booleano: con Ventas ya abierta, cargar
+  // otro pedido solo cambia el hash de la URL (la página no se vuelve a
+  // montar), así que un "ya apliqué" global dejaba el segundo pedido afuera y
+  // el cajero veía el carrito vacío.
+  const pedidoWebPrefillRef = useRef<string | null>(null)
   useEffect(() => {
-    if (pedidoWebPrefillRef.current) return
     const extras = windowSelf?.extras as
       | {
           pedidoWebId?: string
+          nonce?: number
           notes?: string
           prefilledLines?: Array<{ articleId?: string; description?: string; quantity: string; unitPrice: string }>
         }
       | undefined
     if (!extras?.pedidoWebId || !Array.isArray(extras.prefilledLines) || extras.prefilledLines.length === 0) return
+    const clave = `${extras.pedidoWebId}:${extras.nonce ?? ''}`
+    if (pedidoWebPrefillRef.current === clave) return
     if (allArticles.length === 0) return
-    pedidoWebPrefillRef.current = true
+    pedidoWebPrefillRef.current = clave
     const byId = new Map(allArticles.map((a) => [a.id, a]))
     const lines: CartLine[] = extras.prefilledLines.map((p) => {
       const art = p.articleId ? byId.get(p.articleId) : undefined
@@ -1239,6 +1245,9 @@ function PDV() {
       // effort — la venta ya está hecha, esto solo lo destacha de "Pedidos web".
       if (pedidoWebId) {
         api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).catch(() => {})
+        toast.success(`${pedidoWebNotes?.split(' — ')[0] ?? 'Pedido web'} cobrado — ya no figura como pendiente`, {
+          duration: 8_000,
+        })
       }
 
       // Facturación electrónica: si está activa y el comprobante es fiscal, se

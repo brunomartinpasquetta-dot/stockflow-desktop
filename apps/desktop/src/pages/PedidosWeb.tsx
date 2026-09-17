@@ -108,6 +108,9 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
     openInWindow('ventas', {
       extras: {
         pedidoWebId: p.id,
+        // Cambia en cada click: si Ventas ya está abierta, la URL nueva tiene
+        // que ser distinta a la anterior para que la ventana reciba el pedido.
+        nonce: Date.now(),
         notes: `Pedido web N° ${p.numero} — ${p.clienteNombre}`,
         prefilledLines: p.lineas.map((l) => ({
           articleId: l.articleId ?? undefined,
