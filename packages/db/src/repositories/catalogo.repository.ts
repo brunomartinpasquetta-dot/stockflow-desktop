@@ -17,6 +17,7 @@ import {
   articles,
   catalogoPedidos,
   catalogoSync,
+  sales,
   type CatalogoPedido,
   type CatalogoSync,
 } from '../schema/local';
@@ -309,6 +310,42 @@ export class CatalogoPedidoRepository {
   buscar(id: string): CatalogoPedido | null {
     try {
       return this.db.select().from(catalogoPedidos).where(eq(catalogoPedidos.id, id)).get() ?? null;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Pedidos que se convirtieron en venta y cuya venta después se ANULÓ, y
+   * que todavía figuran como convertidos. Son los que hay que cancelar en el
+   * catálogo: la anulación repone el stock acá, pero del otro lado el pedido
+   * seguiría "confirmado" y su stock descontado.
+   */
+  convertidosConVentaAnulada(): CatalogoPedido[] {
+    try {
+      return this.db
+        .select({ pedido: catalogoPedidos })
+        .from(catalogoPedidos)
+        .innerJoin(sales, eq(sales.id, catalogoPedidos.saleId))
+        .where(and(eq(catalogoPedidos.estado, 'convertido'), eq(sales.status, 'voided')))
+        .all()
+        .map((r) => r.pedido);
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /** Estados de las ventas de un lote de pedidos, para que la pantalla pueda
+   *  decir "venta anulada" sin una consulta por fila. */
+  estadoDeVentas(saleIds: string[]): Map<string, string> {
+    if (saleIds.length === 0) return new Map();
+    try {
+      const rows = this.db
+        .select({ id: sales.id, status: sales.status })
+        .from(sales)
+        .where(sql`${sales.id} in (${sql.join(saleIds.map((id) => sql`${id}`), sql`, `)})`)
+        .all();
+      return new Map(rows.map((r) => [r.id, r.status]));
     } catch (err) {
       return rethrowDbError(err);
     }

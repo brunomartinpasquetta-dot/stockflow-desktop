@@ -210,6 +210,55 @@ export class CatalogoSync {
     }
   }
 
+  /**
+   * Le dice al catálogo en qué quedó un pedido (3.5 del contrato). No depende
+   * de que el espejo esté activo: el estado de un pedido se informa siempre.
+   * Best-effort: si falla, el pedido ya está resuelto de este lado y del otro
+   * se corrige desde el panel.
+   */
+  async avisarEstado(
+    pedidoId: string,
+    estado: 'confirmado' | 'cancelado',
+    ventaSistema?: string,
+  ): Promise<boolean> {
+    try {
+      const empresa = await this.opts.repos.company.getOrCreate();
+      const url = (empresa.catalogoUrl ?? '').trim().replace(/\/$/, '');
+      const token = (empresa.catalogoToken ?? '').trim();
+      if (!url || !token) return false;
+      const res = await this.fetch(`${url}/api/stockflow/pedidos/${pedidoId}/estado`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado, venta_sistema: ventaSistema }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Anular la venta cancela el pedido. StockFlow repone su stock al anular y
+   * el espejo lo publica después; pero el catálogo tiene su propio stock
+   * descontado en el checkout y el pedido "confirmado" — sin este aviso, el
+   * artículo seguiría agotado allá y el pedido figuraría entregado. Acá se
+   * marca el pedido como rechazado (conserva la venta para el historial) y se
+   * manda "cancelado", que del otro lado repone lo descontado. Es un barrido,
+   * no un gancho por venta: cubre cualquier camino de anulación (una, "las
+   * de hoy", una terminal LAN) y reintenta lo que haya quedado sin avisar.
+   */
+  async cancelarPedidosDeVentasAnuladas(): Promise<{ cancelados: number; sinAviso: number }> {
+    const { repos } = this.opts;
+    let cancelados = 0;
+    let sinAviso = 0;
+    for (const p of repos.catalogoPedidos.convertidosConVentaAnulada()) {
+      repos.catalogoPedidos.marcar(p.id, 'rechazado', p.saleId);
+      cancelados += 1;
+      if (!(await this.avisarEstado(p.pedidoId, 'cancelado'))) sinAviso += 1;
+    }
+    return { cancelados, sinAviso };
+  }
+
   /** Vacía el espejo y vuelve a publicar todo desde cero. */
   async republicarTodo(): Promise<ResultadoSync> {
     this.opts.repos.catalogo.saveState({ cursor: 0 });

@@ -25,27 +25,14 @@ import type { CatalogoEstadisticasDTO } from '../types';
 
 const TIMEOUT_MS = 8000;
 
-/** Le avisa al catálogo en qué quedó el pedido. Best-effort: si falla, el
- *  pedido ya está resuelto de este lado y se corrige desde el panel. */
+/** Le avisa al catálogo en qué quedó el pedido (ver `CatalogoSync.avisarEstado`). */
 async function avisarCatalogo(
   deps: HandlerDeps,
   pedidoId: string,
   estado: 'confirmado' | 'cancelado',
   ventaSistema?: string,
 ): Promise<void> {
-  try {
-    const empresa = await deps.repos.company.getOrCreate();
-    const url = (empresa.catalogoUrl ?? '').trim().replace(/\/$/, '');
-    const token = (empresa.catalogoToken ?? '').trim();
-    if (!url || !token) return;
-    await fetch(`${url}/api/stockflow/pedidos/${pedidoId}/estado`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: JSON.stringify({ estado, venta_sistema: ventaSistema }),
-    });
-  } catch {
-    /* el pedido ya está resuelto en el sistema; el catálogo se corrige a mano */
-  }
+  await obtenerCatalogoSync(deps.repos).avisarEstado(pedidoId, estado, ventaSistema);
 }
 
 export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
@@ -103,7 +90,13 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
     }),
 
     'catalogo:pedidosListar': withSession(deps, async (payload: { estado?: 'pendiente' | 'convertido' | 'rechazado' }) => {
+      // Si alguna venta de pedido se anuló por un camino que no pasó por el
+      // barrido (o el aviso falló), acá se pone al día antes de mostrar.
+      await obtenerCatalogoSync(deps.repos).cancelarPedidosDeVentasAnuladas();
       const filas = deps.repos.catalogoPedidos.listar(payload?.estado);
+      const ventas = deps.repos.catalogoPedidos.estadoDeVentas(
+        filas.map((p) => p.saleId).filter((id): id is string => id != null),
+      );
       // Cada línea se resuelve contra el catálogo de artículos: la que no tiene
       // código, o cuyo código no existe en el sistema, se marca para que la
       // pantalla la muestre como suelta y no se pueda confundir con un artículo.
@@ -144,6 +137,7 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
             pagado: p.pagado,
             estado: p.estado,
             saleId: p.saleId,
+            ventaAnulada: p.saleId != null && ventas.get(p.saleId) === 'voided',
             lineas,
           };
         }),

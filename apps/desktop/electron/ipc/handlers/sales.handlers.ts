@@ -1,5 +1,6 @@
 import { hasPermission, requirePermission, SalesService } from '@stockflow/core';
 
+import { obtenerCatalogoSync } from '../../catalogo/CatalogoSync';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type {
   CreateSaleInputDTO,
@@ -17,20 +18,26 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
       (payload: CreateSaleInputDTO, ctx): Promise<CreateSaleResultDTO> =>
         new SalesService(ctx).createSale(payload),
     ),
-    'sales:void': withSession(
-      deps,
-      (payload: { id: string }, ctx): Promise<SaleDTO> => new SalesService(ctx).voidSale(payload.id),
-    ),
+    'sales:void': withSession(deps, async (payload: { id: string }, ctx): Promise<SaleDTO> => {
+      const sale = await new SalesService(ctx).voidSale(payload.id);
+      // Si la venta venía de un pedido web, el pedido se cancela en el
+      // catálogo (repone el stock allá). Best-effort: la venta ya está anulada.
+      void obtenerCatalogoSync(deps.repos).cancelarPedidosDeVentasAnuladas();
+      return sale;
+    }),
     // Anulación en lote de un rango (la pantalla la usa para "las ventas de
     // hoy"). Devuelve el detalle de lo que quedó afuera en vez de fallar: ver
     // `voidSalesInRange`.
     'sales:voidRange': withSession(
       deps,
-      (
+      async (
         payload: { from: number; to: number },
         ctx,
-      ): Promise<{ anuladas: number; conCAE: number; omitidas: { number: number; motivo: string }[] }> =>
-        new SalesService(ctx).voidSalesInRange(payload.from, payload.to),
+      ): Promise<{ anuladas: number; conCAE: number; omitidas: { number: number; motivo: string }[] }> => {
+        const r = await new SalesService(ctx).voidSalesInRange(payload.from, payload.to);
+        void obtenerCatalogoSync(deps.repos).cancelarPedidosDeVentasAnuladas();
+        return r;
+      },
     ),
     'sales:get': withSession(
       deps,

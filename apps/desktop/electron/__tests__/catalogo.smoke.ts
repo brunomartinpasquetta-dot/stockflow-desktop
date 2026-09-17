@@ -179,6 +179,31 @@ const main = async () => {
   check('pagado:true queda pagado=true', guardadoPagado?.pagado === true, JSON.stringify(guardadoPagado?.pagado));
   check('pagado:false queda pagado=false', guardadoNoPagado?.pagado === false, JSON.stringify(guardadoNoPagado?.pagado));
 
+  console.log('\n[anular la venta cancela el pedido en el catálogo]');
+  const precioActual = (await repos.articles.findById(art.id))!.listPrice1;
+  const ventaPedido = await svc.sales.createSale({
+    type: 'X', customerId: cf!.id,
+    payments: [{ paymentMethodId: 'pm-efectivo', amount: precioActual }],
+    lines: [{ articleId: art.id, quantity: '1.000' }],
+  });
+  repos.catalogoPedidos.guardar({ ...pedido, pedidoId: 'pb-anular-1', numero: 901 });
+  const pedAnular = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-anular-1')!;
+  repos.catalogoPedidos.marcar(pedAnular.id, 'convertido', ventaPedido.sale.id);
+  recibido.length = 0;
+  const antesDeAnular = await sync.cancelarPedidosDeVentasAnuladas();
+  check('con la venta vigente no cancela nada', antesDeAnular.cancelados === 0 && recibido.length === 0);
+  const stockAntes = Number((await repos.articles.findById(art.id))!.stock);
+  await svc.sales.voidSale(ventaPedido.sale.id);
+  const barrido = await sync.cancelarPedidosDeVentasAnuladas();
+  const pedDespues = repos.catalogoPedidos.buscar(pedAnular.id)!;
+  const aviso = recibido.find((r) => r.url.endsWith(`/api/stockflow/pedidos/pb-anular-1/estado`));
+  check('el pedido queda rechazado y conserva la venta', pedDespues.estado === 'rechazado' && pedDespues.saleId === ventaPedido.sale.id, `${pedDespues.estado} / ${pedDespues.saleId?.slice(-6)}`);
+  check('le avisa "cancelado" al catálogo', barrido.cancelados === 1 && aviso?.body?.estado === 'cancelado', JSON.stringify(aviso?.body));
+  check('el stock volvió al sistema', Number((await repos.articles.findById(art.id))!.stock) === stockAntes + 1);
+  recibido.length = 0;
+  const segundoBarrido = await sync.cancelarPedidosDeVentasAnuladas();
+  check('el barrido es idempotente: no vuelve a avisar', segundoBarrido.cancelados === 0 && recibido.length === 0);
+
   console.log('\n[integridad de catalogo_pedidos: FK y CHECK vigentes]');
   const raw = db.$client;
   let fkRechazo = false;

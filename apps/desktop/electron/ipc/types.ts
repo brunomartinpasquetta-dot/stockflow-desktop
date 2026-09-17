@@ -1570,6 +1570,8 @@ export interface PedidoWebDTO {
   pagado: boolean;
   estado: 'pendiente' | 'convertido' | 'rechazado';
   saleId: string | null;
+  /** La venta en que se convirtió fue anulada: el pedido se canceló en el catálogo. */
+  ventaAnulada: boolean;
   lineas: PedidoWebLineaDTO[];
 }
 

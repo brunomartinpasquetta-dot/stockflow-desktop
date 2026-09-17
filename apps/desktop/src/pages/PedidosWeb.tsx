@@ -32,9 +32,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import type { PedidoWebDTO } from '@/types/api'
 
-function EstadoBadge({ estado }: { estado: PedidoWebDTO['estado'] }) {
-  if (estado === 'convertido') return <Badge variant="success">Convertido en venta</Badge>
-  if (estado === 'rechazado') return <Badge variant="outline">Rechazado</Badge>
+function EstadoBadge({ p }: { p: PedidoWebDTO }) {
+  if (p.ventaAnulada) return <Badge variant="destructive">Venta anulada — pedido cancelado</Badge>
+  if (p.estado === 'convertido') return <Badge variant="success">Convertido en venta</Badge>
+  if (p.estado === 'rechazado') return <Badge variant="outline">Rechazado</Badge>
   return <Badge variant="warning">Pendiente</Badge>
 }
 
@@ -135,7 +136,7 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold">Pedido N° {p.numero}</span>
-              <EstadoBadge estado={p.estado} />
+              <EstadoBadge p={p} />
               {p.pagado && <Badge variant="success">Pagado con Mercado Pago</Badge>}
             </div>
             <span className="text-sm font-medium">{p.clienteNombre}</span>
@@ -200,10 +201,16 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
           <span className="text-lg font-semibold tabular-nums">{formatCurrency(p.total)}</span>
         </div>
 
-        {p.estado === 'convertido' && (
+        {p.ventaAnulada ? (
           <p className="text-xs text-muted-foreground">
-            Registrado como venta{p.saleId ? '' : ' (ver Historial de Ventas)'}.
+            La venta se anuló: el stock volvió al sistema y el pedido quedó cancelado en el catálogo.
           </p>
+        ) : (
+          p.estado === 'convertido' && (
+            <p className="text-xs text-muted-foreground">
+              Registrado como venta{p.saleId ? '' : ' (ver Historial de Ventas)'}.
+            </p>
+          )
         )}
 
         {esPendiente && (
