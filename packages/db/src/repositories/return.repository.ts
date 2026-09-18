@@ -13,7 +13,15 @@
  * la transacción.
  */
 import { and, desc, eq, inArray, max, sql } from 'drizzle-orm';
-import { gteDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
+import {
+  type PriceMode,
+  cmpDecimal,
+  gteDecimal,
+  mulDecimal,
+  subDecimal,
+  sumDecimals,
+  vatBreakdown,
+} from '@stockflow/shared';
 
 import {
   accountsReceivable,
@@ -83,6 +91,9 @@ function effectiveUnit(lineTotal: string, quantity: string): number {
   return q > 0 ? Number(lineTotal) / q : 0;
 }
 
+/** Tipo del `tx` dentro de `db.transaction((tx) => …)`. */
+type Tx = Parameters<Parameters<LocalDatabase['transaction']>[0]>[0];
+
 export class ReturnRepository extends BaseRepository<Return, NewReturn> {
   constructor(db: LocalDatabase) {
     super(db, returns, 'Devolución');
@@ -90,61 +101,118 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
 
   /* ------------------------- VENTAS ------------------------- */
 
+  /**
+   * Valida las líneas a devolver y calcula cuánto se reintegra: lo que el
+   * cliente PAGÓ por esas unidades, no el importe de lista de la línea.
+   *
+   * Auditoría sep-2026 (C2): una venta de $1000 con $100 de descuento global
+   * cobraba $900 y la devolución reintegraba $1000; en modo 'net' pasaba lo
+   * inverso (cobraba $1210 con IVA y devolvía $1000). Por eso cada línea lleva
+   * su parte del descuento global —el mismo prorrateo que `proratedVatBreakdown`
+   * usa para el IVA persistido— y, en 'net', el IVA que el cliente pagó.
+   * Tope: la suma de reintegros de la venta nunca supera su total; con la
+   * última unidad se reintegra exactamente lo que faltaba, así los centavos
+   * del prorrateo no quedan colgados.
+   */
+  private computeSaleReturn(tx: Tx, input: { saleId: string; lines: ReturnLineDraft[] }) {
+    const sale = tx.select().from(sales).where(eq(sales.id, input.saleId)).get();
+    if (!sale) throw new NotFoundError('Venta', input.saleId);
+    if (sale.status !== 'completed') {
+      throw new ConstraintError('SALE_NOT_COMPLETED', 'Sólo se pueden devolver ventas completadas (no anuladas)');
+    }
+    const cmpRow = tx.select({ priceMode: companies.priceMode }).from(companies).limit(1).get();
+    const priceMode: PriceMode = cmpRow?.priceMode === 'net' ? 'net' : 'gross';
+
+    const slRows = tx.select().from(saleLines).where(eq(saleLines.saleId, input.saleId)).all();
+    const slById = new Map(slRows.map((l) => [l.id, l]));
+
+    // Cantidades ya devueltas por línea (devoluciones anteriores).
+    const prevRows = tx
+      .select({
+        saleLineId: returnLines.saleLineId,
+        qty: sql<string>`COALESCE(SUM(CAST(${returnLines.quantity} AS REAL)), 0)`,
+      })
+      .from(returnLines)
+      .where(inArray(returnLines.saleLineId, slRows.map((l) => l.id)))
+      .groupBy(returnLines.saleLineId)
+      .all();
+    const prevByLine = new Map(prevRows.map((r) => [r.saleLineId, Number(r.qty)]));
+    // Plata ya reintegrada por esta venta (cualquier medio): el tope es el total cobrado.
+    const yaReintegrado = sumDecimals(
+      tx.select({ total: returns.total }).from(returns).where(eq(returns.saleId, sale.id)).all().map((r) => r.total),
+    );
+
+    // Validar y computar líneas.
+    if (input.lines.length === 0) {
+      throw new ConstraintError('RETURN_EMPTY', 'Elegí al menos un artículo a devolver');
+    }
+    const prorratea = Number(sale.discount) !== 0 && Number(sale.subtotal) !== 0;
+    const pedidoPorLinea = new Map<string, number>();
+    const computed = input.lines.map((l) => {
+      const sl = slById.get(l.saleLineId);
+      if (!sl) throw new NotFoundError('Línea de venta', l.saleLineId);
+      const qty = Number(l.quantity);
+      if (!(qty > 0)) throw new ConstraintError('RETURN_QTY', 'La cantidad a devolver debe ser mayor a cero');
+      const remaining = Number(sl.quantity) - (prevByLine.get(sl.id) ?? 0);
+      if (qty > remaining + 0.0005) {
+        throw new ConstraintError(
+          'RETURN_QTY_EXCEEDS',
+          `No se puede devolver ${l.quantity}: de esa línea quedan ${remaining.toFixed(3)} sin devolver`,
+        );
+      }
+      pedidoPorLinea.set(sl.id, (pedidoPorLinea.get(sl.id) ?? 0) + qty);
+      // Lo que el cliente pagó por la línea: con su parte del descuento global
+      // y, en modo 'net', con el IVA (en 'gross' el lineTotal ya lo incluye).
+      const lineDiscount = prorratea
+        ? mulDecimal(sale.discount, (Number(sl.lineTotal) / Number(sale.subtotal)).toFixed(8), 4)
+        : '0.0000';
+      const linePaid = vatBreakdown(subDecimal(sl.lineTotal, lineDiscount, 4), sl.vatRate, priceMode).gross;
+      const lineTotal = (effectiveUnit(linePaid, sl.quantity) * qty).toFixed(4);
+      return {
+        saleLineId: sl.id,
+        articleId: sl.articleId,
+        quantity: qty.toFixed(3),
+        unitPrice: sl.unitPrice,
+        lineTotal,
+      };
+    });
+    let total = sumDecimals(computed.map((c) => c.lineTotal));
+    if (!(Number(total) > 0)) {
+      throw new ConstraintError('RETURN_TOTAL', 'El total de la devolución debe ser mayor a cero');
+    }
+    const restante = subDecimal(sale.total, yaReintegrado, 4);
+    if (cmpDecimal(restante, '0') <= 0) {
+      throw new ConstraintError(
+        'RETURN_TOTAL_REFUNDED',
+        `Ya se reintegró el total de la venta (${sale.total}): no queda nada por devolver`,
+      );
+    }
+    const devuelveTodo = slRows.every(
+      (sl) => Number(sl.quantity) - (prevByLine.get(sl.id) ?? 0) - (pedidoPorLinea.get(sl.id) ?? 0) <= 0.0005,
+    );
+    if (devuelveTodo || cmpDecimal(total, restante) > 0) total = restante;
+
+    return { sale, computed, total };
+  }
+
+  /**
+   * Cuánto reintegraría esta devolución, sin escribir nada. Lo usa el servicio
+   * para comprobar que el cajón tenga ese efectivo antes de registrarla.
+   */
+  async previewSaleReturn(input: { saleId: string; lines: ReturnLineDraft[] }): Promise<string> {
+    try {
+      return this.db.transaction((tx) => this.computeSaleReturn(tx, input).total);
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async createSaleReturn(input: CreateSaleReturnInput): Promise<SaleReturnResult> {
     try {
       return this.db.transaction((tx) => {
         const now = Date.now();
 
-        const sale = tx.select().from(sales).where(eq(sales.id, input.saleId)).get();
-        if (!sale) throw new NotFoundError('Venta', input.saleId);
-        if (sale.status !== 'completed') {
-          throw new ConstraintError('SALE_NOT_COMPLETED', 'Sólo se pueden devolver ventas completadas (no anuladas)');
-        }
-
-        const slRows = tx.select().from(saleLines).where(eq(saleLines.saleId, input.saleId)).all();
-        const slById = new Map(slRows.map((l) => [l.id, l]));
-
-        // Cantidades ya devueltas por línea (devoluciones anteriores).
-        const prevRows = tx
-          .select({
-            saleLineId: returnLines.saleLineId,
-            qty: sql<string>`COALESCE(SUM(CAST(${returnLines.quantity} AS REAL)), 0)`,
-          })
-          .from(returnLines)
-          .where(inArray(returnLines.saleLineId, slRows.map((l) => l.id)))
-          .groupBy(returnLines.saleLineId)
-          .all();
-        const prevByLine = new Map(prevRows.map((r) => [r.saleLineId, Number(r.qty)]));
-
-        // Validar y computar líneas.
-        if (input.lines.length === 0) {
-          throw new ConstraintError('RETURN_EMPTY', 'Elegí al menos un artículo a devolver');
-        }
-        const computed = input.lines.map((l) => {
-          const sl = slById.get(l.saleLineId);
-          if (!sl) throw new NotFoundError('Línea de venta', l.saleLineId);
-          const qty = Number(l.quantity);
-          if (!(qty > 0)) throw new ConstraintError('RETURN_QTY', 'La cantidad a devolver debe ser mayor a cero');
-          const remaining = Number(sl.quantity) - (prevByLine.get(sl.id) ?? 0);
-          if (qty > remaining + 0.0005) {
-            throw new ConstraintError(
-              'RETURN_QTY_EXCEEDS',
-              `No se puede devolver ${l.quantity}: de esa línea quedan ${remaining.toFixed(3)} sin devolver`,
-            );
-          }
-          const lineTotal = (effectiveUnit(sl.lineTotal, sl.quantity) * qty).toFixed(4);
-          return {
-            saleLineId: sl.id,
-            articleId: sl.articleId,
-            quantity: qty.toFixed(3),
-            unitPrice: sl.unitPrice,
-            lineTotal,
-          };
-        });
-        const total = sumDecimals(computed.map((c) => c.lineTotal));
-        if (!(Number(total) > 0)) {
-          throw new ConstraintError('RETURN_TOTAL', 'El total de la devolución debe ser mayor a cero');
-        }
+        const { sale, computed, total } = this.computeSaleReturn(tx, input);
 
         // Stock: VUELVE. Si la línea es un artículo espejo de promo → componentes.
         // Los artículos rápidos no tienen artículo: no pueden ser espejo de

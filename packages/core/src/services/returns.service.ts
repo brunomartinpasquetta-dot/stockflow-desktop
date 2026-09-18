@@ -18,6 +18,7 @@ import type {
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
 import { BusinessRuleError } from '../errors';
+import { assertPhysicalCashAvailable } from './cash.service';
 
 export interface SaleReturnDraft {
   saleId: string;
@@ -56,11 +57,19 @@ export class ReturnsService {
     requirePermission(currentUser, 'void_sale');
     if (!currentUser) throw new BusinessRuleError('no_session', 'Sesión requerida');
     const currentCashRegister = await this.cajaAbierta();
-    if (input.refundMethod === 'cash' && !currentCashRegister) {
-      throw new BusinessRuleError(
-        'no_open_cash',
-        'Para reintegrar en efectivo tiene que haber una caja abierta',
-      );
+    if (input.refundMethod === 'cash') {
+      if (!currentCashRegister) {
+        throw new BusinessRuleError(
+          'no_open_cash',
+          'Para reintegrar en efectivo tiene que haber una caja abierta',
+        );
+      }
+      // El reintegro sale del cajón, así que no puede sacar más efectivo del
+      // que hay: una venta cobrada con débito y devuelta en efectivo dejaba
+      // el arqueo en negativo (auditoría sep-2026). Misma regla que los
+      // egresos manuales y las compras contado.
+      const total = await repos.returns.previewSaleReturn({ saleId: input.saleId, lines: input.lines });
+      await assertPhysicalCashAvailable(repos, currentCashRegister.id, total);
     }
     const payload: CreateSaleReturnInput = {
       saleId: input.saleId,

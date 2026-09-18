@@ -8,17 +8,20 @@ a la vez va antes).
 Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
 
 ## Tanda 1 — Plata y stock que se duplican (críticos)
-- [ ] **Anular venta con devolución previa** (`sale.repository.ts:452`): dentro de la
+- [x] **Anular venta con devolución previa** (`sale.repository.ts:452`): dentro de la
   misma transacción leer `return_lines`; reponer sólo (cantidad − devuelto) y revertir
-  en caja sólo (total − Σ devoluciones). Si ya se devolvió todo, rechazar con mensaje.
-- [ ] **Anular compra con devolución al proveedor previa** (`purchase.repository.ts:357`):
-  espejo exacto de lo anterior.
-- [ ] **Devolución** (`return.repository.ts:135`, `ReturnDialogs.tsx:61`): unitario
+  en caja sólo (total − Σ devoluciones). Si ya se devolvió todo, rechazar con mensaje. — `packages/db/src/repositories/sale.repository.ts`
+- [x] **Anular compra con devolución al proveedor previa** (`purchase.repository.ts:357`):
+  espejo exacto de lo anterior. — `packages/db/src/repositories/purchase.repository.ts`
+- [x] **Devolución** (`return.repository.ts:135`, `ReturnDialogs.tsx:61`): unitario
   efectivo = importe de línea × (total/subtotal) para prorratear el descuento global;
   en modo `net` sobre el bruto con IVA; tope Σ reintegros ≤ total de la venta; el
-  reintegro en efectivo exige efectivo disponible en caja.
-- [ ] Smoke nuevo `devoluciones.smoke.ts`: venta → devolución parcial → anular;
-  descuento global; modo net; efectivo insuficiente; compra → devolución → anular.
+  reintegro en efectivo exige efectivo disponible en caja. — `packages/db/src/repositories/return.repository.ts` (+ `returns.service.ts`, `ReturnDialogs.tsx`)
+- [x] Smoke nuevo `devoluciones.smoke.ts`: venta → devolución parcial → anular;
+  descuento global; modo net; efectivo insuficiente; compra → devolución → anular. — `apps/desktop/electron/__tests__/devoluciones.smoke.ts`
+- [ ] Pendiente (fuera de tanda): devolución de COMPRA con descuento global / modo net
+  (`createPurchaseReturn`) → se espeja en tanda 7 junto con 'IVA de compras con descuento global';
+  venta a cuenta corriente con DEV en efectivo y luego anulada deja el egreso sin contrapartida (decidir).
 
 ## Tanda 2 — Backup que no sirve
 - [ ] **Copia con WAL abierto** (`BackupService.ts:69`): usar `db.$client.backup()` (o

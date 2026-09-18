@@ -24,6 +24,8 @@ import {
   paymentMethods,
   promotionItems,
   promotions,
+  returnLines,
+  returns,
   saleLines,
   salePayments,
   sales,
@@ -405,7 +407,8 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
   /**
    * Anula una venta: marca `status = 'voided'`, restaura el stock de cada línea,
    * genera un movimiento de caja de egreso por la parte que entró en efectivo
-   * físico y elimina sus `sale_payments`. Atómico.
+   * físico y elimina sus `sale_payments`. Atómico. Si la venta ya tuvo
+   * devoluciones, sólo se repone y se reintegra lo que quedaba sin devolver.
    */
   async voidSale(id: string): Promise<Sale> {
     try {
@@ -417,6 +420,44 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         }
 
         const lines = tx.select().from(saleLines).where(eq(saleLines.saleId, id)).all();
+
+        // DEVOLUCIONES PREVIAS (auditoría sep-2026, C1): lo que ya se devolvió
+        // ya volvió al stock y ya salió de la caja. Anular la venta entera lo
+        // reponía y lo reintegraba por segunda vez (2u vendidas, 1 devuelta,
+        // anular → stock +3 y $3000 devueltos sobre $2000 cobrados). Se anula
+        // sólo lo que queda sin devolver; si no queda nada, no hay qué anular.
+        const devueltoPorLinea = new Map(
+          tx
+            .select({
+              saleLineId: returnLines.saleLineId,
+              qty: sql<number>`COALESCE(SUM(CAST(${returnLines.quantity} AS REAL)), 0)`,
+            })
+            .from(returnLines)
+            .innerJoin(returns, eq(returns.id, returnLines.returnId))
+            .where(eq(returns.saleId, id))
+            .groupBy(returnLines.saleLineId)
+            .all()
+            .map((r) => [r.saleLineId, r.qty] as const),
+        );
+        const yaReintegrado = sumDecimals(
+          tx
+            .select({ total: returns.total })
+            .from(returns)
+            .where(and(eq(returns.saleId, id), eq(returns.refundMethod, 'cash')))
+            .all()
+            .map((r) => r.total),
+        );
+        const pendientes = lines.map((line) => ({
+          line,
+          quantity: subDecimal(line.quantity, devueltoPorLinea.get(line.id) ?? 0, 3),
+        }));
+        if (lines.length > 0 && pendientes.every((p) => cmpDecimal(p.quantity, '0') <= 0)) {
+          throw new ConstraintError(
+            'SALE_FULLY_RETURNED',
+            `La venta ${sale.type} #${sale.number} ya fue devuelta por completo: no hay nada que anular`,
+          );
+        }
+
         // PROMOS: las líneas cuyo artículo es un espejo de promoción restauran
         // el stock de sus COMPONENTES (espejo intacto), igual que al vender.
         const voidArticleIds = [
@@ -449,16 +490,18 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             .where(eq(articles.id, articleId))
             .run();
         };
-        for (const line of lines) {
+        for (const { line, quantity } of pendientes) {
+          // Lo ya devuelto de esta línea ya está en el stock.
+          if (cmpDecimal(quantity, '0') <= 0) continue;
           // Artículo rápido: al vender no descontó stock, así que al anular no
           // hay nada que devolver. Restaurarlo inventaría mercadería.
           const comps = line.articleId ? voidComponentsByMirror.get(line.articleId) : undefined;
           if (comps && comps.length > 0) {
             for (const comp of comps) {
-              restoreStock(comp.componentId, mulDecimal(line.quantity, comp.componentQty, 3));
+              restoreStock(comp.componentId, mulDecimal(quantity, comp.componentQty, 3));
             }
           } else if (line.articleId) {
-            restoreStock(line.articleId, line.quantity);
+            restoreStock(line.articleId, quantity);
           }
         }
 
@@ -482,7 +525,18 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .where(eq(salePayments.saleId, id))
           .all();
         if (!sale.isAccountSale) {
-          const physicalPayments = sps.filter((s) => s.isCash !== false);
+          // Lo que las devoluciones ya reintegraron en efectivo salió del
+          // cajón: se descuenta de los reversos físicos (en orden) y se
+          // revierte sólo lo que falta. El cajón nunca devuelve más efectivo
+          // del que recibió por esta venta.
+          let aDescontar = yaReintegrado;
+          const physicalPayments = sps
+            .filter((s) => s.isCash !== false)
+            .map((s) => {
+              const usa = cmpDecimal(aDescontar, s.amount) < 0 ? aDescontar : s.amount;
+              aDescontar = subDecimal(aDescontar, usa, 4);
+              return { ...s, amount: subDecimal(s.amount, usa, 4) };
+            });
           const hasPhysicalReverse = physicalPayments.some((s) => Number(s.amount) > 0);
           // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
           //   (el arqueo histórico recalcula el esperado en vivo y dejaría de

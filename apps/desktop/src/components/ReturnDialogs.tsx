@@ -16,6 +16,7 @@ import { Loader2, Undo2 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useArticles, useCompany, useCurrentCash } from '@/lib/hooks'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { type PriceMode, vatBreakdown } from '@/lib/pricing'
 import { printNode } from '@/lib/printService'
 import { FormalDocA4, type FormalDocData } from '@/print/FormalDocA4'
 import { Button } from '@/components/ui/button'
@@ -42,13 +43,27 @@ function buildLineStates(
     description?: string | null
     quantity: string
     lineTotal: string
+    vatRate?: string
   }>,
   returnedByLine: Map<string, number>,
   descByArticle: Map<string, string>,
+  /**
+   * Cabecera de la venta: el reintegro por unidad es lo que el cliente PAGÓ
+   * (su parte del descuento global y, en modo 'net', el IVA), igual que lo
+   * calcula el servidor. Sin cabecera (compras) se usa el importe de línea.
+   */
+  pagado?: { subtotal: string; discount: string; priceMode: PriceMode },
 ): LineState[] {
+  const subtotal = Number(pagado?.subtotal ?? 0)
+  const discount = Number(pagado?.discount ?? 0)
   return lines.map((l) => {
     const sold = Number(l.quantity)
     const returned = returnedByLine.get(l.id) ?? 0
+    let linePaid = Number(l.lineTotal)
+    if (pagado) {
+      const base = subtotal !== 0 && discount !== 0 ? linePaid - (discount * linePaid) / subtotal : linePaid
+      linePaid = vatBreakdown(base, l.vatRate ?? '21.00', pagado.priceMode).gross
+    }
     return {
       lineId: l.id,
       articleId: l.articleId,
@@ -58,7 +73,7 @@ function buildLineStates(
         : (l.description ?? 'Artículo rápido'),
       sold,
       returned,
-      unitEff: sold > 0 ? Number(l.lineTotal) / sold : 0,
+      unitEff: sold > 0 ? linePaid / sold : 0,
       toReturn: '0',
     }
   })
@@ -141,15 +156,21 @@ export function ReturnSaleDialog({
     [articlesQ.data],
   )
 
-  // sembrar líneas cuando llegan venta + devoluciones previas
-  if (open && !seeded && saleQ.data && returnsQ.data && articlesQ.data) {
+  // sembrar líneas cuando llegan venta + devoluciones previas + empresa (modo de precios)
+  if (open && !seeded && saleQ.data && returnsQ.data && articlesQ.data && companyQ.data) {
     const returnedByLine = new Map<string, number>()
     for (const r of returnsQ.data) {
       for (const rl of r.lines) {
         returnedByLine.set(rl.saleLineId, (returnedByLine.get(rl.saleLineId) ?? 0) + Number(rl.quantity))
       }
     }
-    setLines(buildLineStates(saleQ.data.lines, returnedByLine, descByArticle))
+    setLines(
+      buildLineStates(saleQ.data.lines, returnedByLine, descByArticle, {
+        subtotal: saleQ.data.sale.subtotal,
+        discount: saleQ.data.sale.discount,
+        priceMode: companyQ.data.priceMode,
+      }),
+    )
     setMethod(saleQ.data.sale.isAccountSale ? 'account' : 'cash')
     setSeeded(true)
   }

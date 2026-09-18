@@ -24,6 +24,8 @@ import {
   companies,
   paymentMethods,
   purchaseLines,
+  purchaseReturnLines,
+  purchaseReturns,
   purchases,
   supplierAccountsPayable,
   type NewPurchaseLine,
@@ -343,6 +345,8 @@ export class PurchaseRepository extends BaseRepository<
    * Anula una compra: marca `status = 'voided'`, descuenta el stock que había
    * sumado y genera un ingreso de caja por la parte que se había pagado en
    * efectivo físico. (No revierte los cambios de precios de `updatedPricesOnSave`.)
+   * Si la compra ya tuvo devoluciones al proveedor, sólo se descuenta y se
+   * recupera lo que quedaba sin devolver.
    */
   async voidPurchase(id: string): Promise<Purchase> {
     try {
@@ -354,15 +358,58 @@ export class PurchaseRepository extends BaseRepository<
         }
 
         const lines = tx.select().from(purchaseLines).where(eq(purchaseLines.purchaseId, id)).all();
-        for (const line of lines) {
+
+        // DEVOLUCIONES AL PROVEEDOR PREVIAS (auditoría sep-2026, espejo de C1):
+        // lo que ya se devolvió ya bajó del stock y esa plata ya volvió a la
+        // caja. Anular la compra entera lo descontaba y lo cobraba dos veces.
+        // Se anula sólo lo que queda sin devolver; si no queda nada, no hay
+        // qué anular.
+        const devueltoPorLinea = new Map(
+          tx
+            .select({
+              purchaseLineId: purchaseReturnLines.purchaseLineId,
+              qty: sql<number>`COALESCE(SUM(CAST(${purchaseReturnLines.quantity} AS REAL)), 0)`,
+            })
+            .from(purchaseReturnLines)
+            .innerJoin(purchaseReturns, eq(purchaseReturns.id, purchaseReturnLines.returnId))
+            .where(eq(purchaseReturns.purchaseId, id))
+            .groupBy(purchaseReturnLines.purchaseLineId)
+            .all()
+            .map((r) => [r.purchaseLineId, r.qty] as const),
+        );
+        const yaReintegrado = sumDecimals(
+          tx
+            .select({ total: purchaseReturns.total })
+            .from(purchaseReturns)
+            .where(and(eq(purchaseReturns.purchaseId, id), eq(purchaseReturns.refundMethod, 'cash')))
+            .all()
+            .map((r) => r.total),
+        );
+        const pendientes = lines.map((line) => ({
+          line,
+          quantity: subDecimal(line.quantity, devueltoPorLinea.get(line.id) ?? 0, 3),
+        }));
+        if (lines.length > 0 && pendientes.every((p) => cmpDecimal(p.quantity, '0') <= 0)) {
+          throw new ConstraintError(
+            'PURCHASE_FULLY_RETURNED',
+            `La compra ${purchase.type} #${purchase.number} ya fue devuelta por completo: no hay nada que anular`,
+          );
+        }
+        for (const { line, quantity } of pendientes) {
+          // Lo ya devuelto de esta línea ya bajó del stock.
+          if (cmpDecimal(quantity, '0') <= 0) continue;
           tx
             .update(articles)
             .set({
-              stock: sql`printf('%.3f', CAST(${articles.stock} AS REAL) - CAST(${line.quantity} AS REAL))`,
+              stock: sql`printf('%.3f', CAST(${articles.stock} AS REAL) - CAST(${quantity} AS REAL))`,
             })
             .where(eq(articles.id, line.articleId))
             .run();
         }
+        // Lo que el proveedor ya reintegró en efectivo se descuenta de los
+        // reversos (primero caja diaria, después Caja General): la casa nunca
+        // recupera más de lo que pagó por esta compra.
+        let aDescontar = yaReintegrado;
 
         // Reverso de caja: sólo la parte que salió en efectivo físico.
         // BUG-S05: se emite UN ingreso reverso por CADA egreso físico original,
@@ -384,9 +431,14 @@ export class PurchaseRepository extends BaseRepository<
           .where(and(eq(cashMovements.relatedPurchaseId, id), eq(cashMovements.type, 'expense')))
           .all();
         if (purchase.paymentType === 'cash') {
-          const physical = movs.filter(
-            (m) => (m.pmId == null || m.isCash === true) && Number(m.amount) > 0,
-          );
+          const physical = movs
+            .filter((m) => (m.pmId == null || m.isCash === true) && Number(m.amount) > 0)
+            .map((m) => {
+              const usa = cmpDecimal(aDescontar, m.amount) < 0 ? aDescontar : m.amount;
+              aDescontar = subDecimal(aDescontar, usa, 4);
+              return { ...m, amount: subDecimal(m.amount, usa, 4) };
+            })
+            .filter((m) => Number(m.amount) > 0);
           // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
           //   (el arqueo histórico recalcula el esperado en vivo y dejaría de
           //   cuadrar). Resolvemos la caja DESTINO dentro de la transacción para
@@ -460,6 +512,12 @@ export class PurchaseRepository extends BaseRepository<
           .where(and(eq(cashGeneralMovements.referenceId, id), eq(cashGeneralMovements.type, 'expense')))
           .all();
         for (const m of cgExpenses) {
+          // Si la DPC ya devolvió parte en efectivo (a la caja diaria), a Caja
+          // General vuelve sólo el resto.
+          const usa = cmpDecimal(aDescontar, m.amount) < 0 ? aDescontar : m.amount;
+          aDescontar = subDecimal(aDescontar, usa, 4);
+          const monto = subDecimal(m.amount, usa, 2);
+          if (cmpDecimal(monto, '0') <= 0) continue;
           const prev = tx
             .select()
             .from(cashGeneralMovements)
@@ -469,21 +527,21 @@ export class PurchaseRepository extends BaseRepository<
             .get();
           const prevCash = prev?.balanceAfterCash ?? '0';
           let cashPart = subDecimal(prevCash, m.balanceAfterCash ?? '0', 2);
-          if (cmpDecimal(cashPart, '0') < 0 || cmpDecimal(cashPart, m.amount) > 0) {
-            cashPart = m.isCash ? m.amount : '0';
+          if (cmpDecimal(cashPart, '0') < 0 || cmpDecimal(cashPart, monto) > 0) {
+            cashPart = m.isCash ? monto : '0';
           }
-          const elecPart = subDecimal(m.amount, cashPart, 2);
+          const elecPart = subDecimal(monto, cashPart, 2);
           const cgCur = tx.select().from(cashGeneral).where(eq(cashGeneral.id, 'singleton')).get();
           if (!cgCur) continue; // sin singleton no hay de dónde revertir (no debería pasar)
           const now = Date.now();
-          const balanceAfter = addDecimal(cgCur.currentBalance, m.amount, 2);
+          const balanceAfter = addDecimal(cgCur.currentBalance, monto, 2);
           const balanceAfterCash = addDecimal(cgCur.cashBalance, cashPart, 2);
           const balanceAfterElec = addDecimal(cgCur.electronicBalance, elecPart, 2);
           tx.insert(cashGeneralMovements)
             .values({
               id: uuidv7(),
               type: 'income',
-              amount: m.amount,
+              amount: monto,
               description: `Anulación compra ${purchase.type} #${purchase.number}`,
               category: 'other',
               createdBy: m.createdBy,
