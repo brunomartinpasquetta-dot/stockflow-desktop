@@ -123,10 +123,13 @@ Por cada artículo, buscar el producto por `codigo_sistema == codigo`:
 **Idempotente**: mandar dos veces la misma tanda deja el mismo resultado. StockFlow
 reintenta cuando se corta la conexión y no avanza su cursor hasta recibir 200.
 
-> El `precio` es el de la lista que el comercio publica (por defecto la 1) y el `stock`
-> es el físico del sistema. El catálogo descuenta su propio stock en el checkout mientras
-> el pedido está pendiente; cuando StockFlow lo convierte en venta, el stock del sistema
-> baja y la siguiente publicación lo deja igual en los dos lados.
+> El `precio` es el de la lista que el comercio publica (por defecto la 1). El `stock`
+> **ya viene descontado de los pedidos web pendientes**: es el físico del sistema menos lo
+> que compraron pedidos bajados y todavía no convertidos ni rechazados — *lo que se puede
+> vender por web ahora*. El catálogo lo publica tal cual, sin restarle nada. Así la
+> publicación que sigue a un checkout no le devuelve a la tienda las unidades que ese
+> checkout acaba de descontar; convertido el pedido, la venta baja el físico y el pedido
+> deja de restar, sin contar dos veces.
 
 ### 3.4 `GET /api/stockflow/pedidos` — los pedidos nuevos
 

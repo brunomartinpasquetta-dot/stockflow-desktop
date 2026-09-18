@@ -31,10 +31,13 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { useQuery } from '@tanstack/react-query'
+
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
 import { useWhatsAppPanel } from '@/contexts/WhatsAppPanelContext'
 import { WhatsAppGlyph } from '@/components/WhatsAppGlyph'
+import { api } from '@/lib/api'
 import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
 import type { Role } from '@/types/api'
 import { WINDOWS } from '@/windows/registry'
@@ -68,6 +71,15 @@ export function QuickAccessToolbar() {
   const wm = useWindowManager()
   const wa = useWhatsAppPanel()
   const focusedKey = wm.windows.find((w) => w.id === wm.focusedId)?.pageKey ?? null
+  // Pedidos web esperando confirmación. Se consulta LOCAL (no al catálogo): es
+  // instantáneo y no depende de que haya internet en este momento.
+  const pedidosPendientes = useQuery({
+    queryKey: ['catalogo', 'pedidosContarPendientes'],
+    queryFn: () => api.catalogo.pedidosContarPendientes(),
+    refetchInterval: 20_000,
+    staleTime: 10_000,
+  })
+  const cantidadPendiente = pedidosPendientes.data?.pendientes ?? 0
 
   function isEnabled(pageKey: string): boolean {
     const def = WINDOWS[pageKey]
@@ -139,23 +151,32 @@ export function QuickAccessToolbar() {
         <span aria-hidden className="invisible rounded px-1 text-[10px] font-medium">F</span>
       </button>
 
-      {/* Catálogo web: vive dentro de "Mi Empresa" (espejo + vinculación) */}
+      {/* Catálogo web: las ventas hechas en el catálogo (Pedidos web), con el
+          aviso de las que esperan confirmación. La configuración del espejo
+          sigue en Mi Empresa; acá va lo que se usa todos los días. */}
       <button
         type="button"
-        disabled={!isEnabled('empresa')}
+        disabled={!isEnabled('pedidos-web')}
         onClick={() => {
-          if (!isEnabled('empresa')) return
-          wm.openWindow({ pageKey: 'empresa' })
+          if (!isEnabled('pedidos-web')) return
+          wm.openWindow({ pageKey: 'pedidos-web' })
         }}
-        title="Catálogo web"
+        title={cantidadPendiente > 0 ? `Catálogo web — ${cantidadPendiente} pedido(s) por confirmar` : 'Catálogo web'}
         className={cn(
-          'group flex h-full min-w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-2 py-1 transition-colors',
+          'group relative flex h-full min-w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-2 py-1 transition-colors',
           'hover:bg-accent focus:outline-none focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-primary/30',
-          focusedKey === 'empresa' && 'bg-accent text-accent-foreground ring-2 ring-primary/30 [&_.rounded.bg-muted]:bg-white/25 [&_.rounded.bg-muted]:text-inherit',
-          !isEnabled('empresa') && 'cursor-not-allowed opacity-50 hover:bg-transparent',
+          focusedKey === 'pedidos-web' && 'bg-accent text-accent-foreground ring-2 ring-primary/30 [&_.rounded.bg-muted]:bg-white/25 [&_.rounded.bg-muted]:text-inherit',
+          !isEnabled('pedidos-web') && 'cursor-not-allowed opacity-50 hover:bg-transparent',
         )}
       >
-        <Store className="h-7 w-7 text-foreground/80 group-hover:text-foreground" strokeWidth={1.75} />
+        <span className="relative">
+          <Store className="h-7 w-7 text-foreground/80 group-hover:text-foreground" strokeWidth={1.75} />
+          {cantidadPendiente > 0 && (
+            <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">
+              {cantidadPendiente > 9 ? '9+' : cantidadPendiente}
+            </span>
+          )}
+        </span>
         <span className="whitespace-nowrap text-center text-[11px] leading-tight text-foreground/90 [@media(max-width:899px)]:hidden">
           Catálogo web
         </span>

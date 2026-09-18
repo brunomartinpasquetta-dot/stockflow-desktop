@@ -269,12 +269,6 @@ export function MenuBar() {
               >
                 {g.name}
                 <ChevronDown className="h-3 w-3 opacity-60" />
-                {/* Aviso de pedidos web sin resolver, visible sin abrir el menú. */}
-                {g.name === 'Cobros y Pagos' && cantidadPendiente > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">
-                    {cantidadPendiente > 9 ? '9+' : cantidadPendiente}
-                  </span>
-                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[240px]">

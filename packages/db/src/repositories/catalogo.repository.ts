@@ -162,19 +162,52 @@ export class CatalogoRepository {
         for (const e of empatados) if (!yaTraidos.has(e.codigo)) rows.push(e);
       }
 
-      const articulos = rows.map((r) => ({
-        codigo: r.codigo,
-        nombre: r.nombre,
-        precio: redondearExacto(r.precio ?? '0', 2),
-        stock: redondearExacto(r.stock ?? '0', 3),
-        activo: Boolean(r.activo),
-        unidad: r.unidad ?? 'UN',
-      }));
+      // Lo que se publica es lo que se puede vender por web AHORA: el stock
+      // físico menos lo que ya compraron pedidos web que todavía no se
+      // convirtieron en venta. La tienda descontó esas unidades en su checkout;
+      // si acá se mandara el físico, la publicación siguiente se las devolvería
+      // y el mismo rollo se vendería dos veces. Convertido el pedido, la venta
+      // baja el físico y el pedido deja de restar: no se cuenta dos veces.
+      const reservado = this.reservadoPorPedidosPendientes();
+      const articulos = rows.map((r) => {
+        const fisico = Number(r.stock ?? 0);
+        const res = reservado.get(r.codigo) ?? 0;
+        return {
+          codigo: r.codigo,
+          nombre: r.nombre,
+          precio: redondearExacto(r.precio ?? '0', 2),
+          stock: redondearExacto(String(Math.max(0, fisico - res)), 3),
+          activo: Boolean(r.activo),
+          unidad: r.unidad ?? 'UN',
+        };
+      });
 
       // El cursor avanza hasta el último publicado, no hasta "ahora": si algo
       // cambió mientras se armaba la tanda, entra en la vuelta siguiente.
       const cursorFinal = rows.length > 0 ? Math.max(...rows.map((r) => r.updatedAt ?? input.desde)) : input.desde;
       return { articulos, cursorFinal };
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Unidades por código reservadas por pedidos web PENDIENTES (bajados y
+   * todavía no convertidos ni rechazados). Las líneas viven en el JSON del
+   * pedido; `json_each` las abre sin traer todo a memoria.
+   */
+  reservadoPorPedidosPendientes(): Map<string, number> {
+    try {
+      const rows = this.db.all(sql`
+        SELECT json_extract(i.value, '$.codigo_sistema') AS codigo,
+               SUM(CAST(json_extract(i.value, '$.cant') AS REAL)) AS cant
+        FROM ${catalogoPedidos} p, json_each(p.items) i
+        WHERE p.estado = 'pendiente'
+          AND json_extract(i.value, '$.codigo_sistema') IS NOT NULL
+          AND json_extract(i.value, '$.codigo_sistema') != ''
+        GROUP BY 1
+      `) as { codigo: string; cant: number }[];
+      return new Map(rows.map((r) => [String(r.codigo), Number(r.cant) || 0]));
     } catch (err) {
       return rethrowDbError(err);
     }

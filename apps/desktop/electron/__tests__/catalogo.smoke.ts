@@ -179,6 +179,25 @@ const main = async () => {
   check('pagado:true queda pagado=true', guardadoPagado?.pagado === true, JSON.stringify(guardadoPagado?.pagado));
   check('pagado:false queda pagado=false', guardadoNoPagado?.pagado === false, JSON.stringify(guardadoNoPagado?.pagado));
 
+  console.log('\n[se publica el stock físico MENOS lo reservado por pedidos pendientes]');
+  const fisico = Number((await repos.articles.findById(art.id))!.stock);
+  repos.catalogoPedidos.guardar({
+    ...pedido, pedidoId: 'pb-reserva-1', numero: 902,
+    items: [{ sku: 'X', codigo_sistema: '7790000000001', nombre: 'Resma A4', cant: 3, precio: 9900, subtotal: 29700, servicio: false }],
+  });
+  await repos.articles.update(art.id, { notes: 'toco para republicar' });
+  recibido.length = 0;
+  await sync.correr();
+  const publicadoConReserva = (recibido[0]?.body?.articulos ?? []).find((a: any) => a.codigo === '7790000000001');
+  check(`con 3 unidades en un pedido pendiente publica ${fisico} - 3`, publicadoConReserva?.stock === fisico - 3, `físico ${fisico}, publicado ${publicadoConReserva?.stock}`);
+  const pedReserva = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-reserva-1')!;
+  repos.catalogoPedidos.marcar(pedReserva.id, 'rechazado');
+  await repos.articles.update(art.id, { notes: 'toco de nuevo' });
+  recibido.length = 0;
+  await sync.correr();
+  const publicadoSinReserva = (recibido[0]?.body?.articulos ?? []).find((a: any) => a.codigo === '7790000000001');
+  check('rechazado el pedido, vuelve a publicar el físico completo', publicadoSinReserva?.stock === fisico, `publicado ${publicadoSinReserva?.stock}`);
+
   console.log('\n[anular la venta cancela el pedido en el catálogo]');
   const precioActual = (await repos.articles.findById(art.id))!.listPrice1;
   const ventaPedido = await svc.sales.createSale({
