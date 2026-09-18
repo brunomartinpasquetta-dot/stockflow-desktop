@@ -76,17 +76,28 @@ function cartLineLabel(l: CartLine): string {
 // defecto, no qué se puede emitir. El comercio que trabaja con remito y factura
 // una venta cada tanto tiene que poder elegirla en el momento, sin ir a
 // cambiar una configuración general y volver a dejarla como estaba.
-function voucherOptions(fiscalDisponible: boolean): { value: VoucherType; label: string }[] {
+function voucherOptions(
+  fiscalDisponible: boolean,
+  emisor: 'RI' | 'MT',
+): { value: VoucherType; label: string }[] {
   // Sin facturación electrónica configurada sólo se puede emitir Remito X.
   // Antes se ofrecían A/B/C igual y la venta salía impresa como "FACTURA A" SIN
   // CAE: un papel que parece fiscal y no lo es. Le pasó a Leo Citzia — creyó
   // que estaba facturando y no había ni un comprobante emitido.
   if (!fiscalDisponible) return [{ value: 'X', label: 'Remito X (no fiscal)' }]
+  // Sólo las letras que ESTE emisor puede emitir: el monotributista emite C y
+  // el responsable inscripto A o B. Ofrecer las tres dejaba elegir una que
+  // ARCA rechaza, con la venta ya registrada y el reintento repitiendo lo mismo.
+  if (emisor === 'MT') {
+    return [
+      { value: 'X', label: 'Remito X (no fiscal)' },
+      { value: 'C', label: 'Factura C (con CAE)' },
+    ]
+  }
   return [
     { value: 'X', label: 'Remito X (no fiscal)' },
     { value: 'A', label: 'Factura A (con CAE)' },
     { value: 'B', label: 'Factura B (con CAE)' },
-    { value: 'C', label: 'Factura C (con CAE)' },
   ]
 }
 
@@ -1057,6 +1068,18 @@ function PDV() {
   const overCredit = accountSale && creditLimitNum > 0 && Number(customerDebt) + totalNum > creditLimitNum
   const noMethods = !accountSale && activeMethods.length === 0
 
+  /**
+   * Venta EN CURSO: desde que se manda `createSale` hasta que se limpia el
+   * carrito, incluida la espera del CAE. `createSale.isPending` se apagaba al
+   * volver la venta y, mientras ARCA tardaba, F2 volvía a confirmar el mismo
+   * carrito: dos ventas iguales. El ref es la guarda sincrónica (dos teclas
+   * seguidas antes del re-render); el estado, lo que deshabilita los botones.
+   */
+  const [procesando, setProcesando] = useState(false)
+  const procesandoRef = useRef(false)
+  /** Orden de QR cuya venta está en curso: para no avisar dos veces por la misma. */
+  const qrOrdenEnCursoRef = useRef<string | null>(null)
+
   // --- MercadoPago QR ---
   const mpConfigured = mpConfigQuery.data?.configured === true
   const mpPosDeviceForCurrentCash = useMemo(() => {
@@ -1081,6 +1104,11 @@ function PDV() {
     totalNum > 0 &&
     !accountSale &&
     !createSale.isPending &&
+    !procesando &&
+    // El botón de QR abre el modal sin pasar por `confirmar()`: la Factura A
+    // sin CUIT hay que frenarla acá también, o el cliente paga y la venta
+    // queda registrada como A sin CAE.
+    !(fiscalEnabled && faltaCuitParaFacturaA) &&
     effectiveCustomerId != null
   const [qrModalOpen, setQrModalOpen] = useState(false)
 
@@ -1116,6 +1144,10 @@ function PDV() {
     totalNum > 0 &&
     effectiveCustomerId != null &&
     !createSale.isPending &&
+    !procesando &&
+    // Una Factura A sin CUIT no sale: se frena acá, con el cliente adelante,
+    // y no después de cobrar con la venta ya registrada y sin CAE.
+    !(fiscalEnabled && faltaCuitParaFacturaA) &&
     (accountSale
       ? accountEligible && !overCredit
       : mixedMode
@@ -1174,7 +1206,14 @@ function PDV() {
           : !cf && customer?.docNumber
             ? `${customer.docType ?? ''} ${customer.docNumber}`.trim()
             : null,
-      customerVatCondition: cf || !customer ? null : VAT_CONDITION_LABELS[customer.category] ?? null,
+      // Factura A "de mostrador" (ficha Consumidor Final + CUIT tipeado): a
+      // ARCA se le informa Responsable Inscripto, y el papel dice lo mismo.
+      customerVatCondition:
+        voucherType === 'A' && docReceptor.tipo === 'CUIT' && (cf || customer?.category === 'CF')
+          ? VAT_CONDITION_LABELS.RI
+          : cf || !customer
+            ? null
+            : (VAT_CONDITION_LABELS[customer.category] ?? null),
       sellerName: currentUser?.fullName ?? null,
       isAccountSale: result.sale.isAccountSale,
       payments: ticketPayments,
@@ -1204,6 +1243,63 @@ function PDV() {
     await printSaleTicketSilent(ticketData, printerCfg)
   }
 
+  /**
+   * Pide el CAE de una venta YA registrada. Un fallo acá no la pierde: se avisa
+   * y queda para reintentar desde el Historial. Se ESPERA antes de imprimir:
+   * antes se pedía en paralelo y el ticket salía sin CAE ni QR —un comprobante
+   * fiscal así no es válido— porque la respuesta de ARCA todavía no había
+   * llegado. Es una sola función para el cobro común y para el QR de
+   * MercadoPago: ese camino nunca pedía el CAE y la venta quedaba tipo B sin
+   * comprobante, con el ticket rotulado "FACTURA B".
+   */
+  async function emitirCae(result: CreateSaleResultDTO): Promise<SaleTicketData['fiscal']> {
+    // Comprobante fiscal sin poder emitirlo: se avisa fuerte. Imprimir una
+    // "FACTURA A" sin CAE es entregar un documento inválido.
+    if (voucherType !== 'X' && (!fiscalEnabled || effectiveSalePoint == null)) {
+      toast.error(
+        !fiscalEnabled
+          ? 'La facturación electrónica está DESACTIVADA: la venta quedó como comprobante interno, sin CAE. Activala en Contabilidad → Facturación Electrónica.'
+          : 'Falta elegir el punto de venta: la venta quedó sin CAE.',
+        { duration: 15_000 },
+      )
+    }
+    if (!fiscalEnabled || voucherType === 'X' || effectiveSalePoint == null) return null
+    try {
+      const v = await api.fiscal.issueInvoice({
+        saleId: result.sale.id,
+        salePoint: effectiveSalePoint,
+        letter: voucherType,
+        // El documento cargado en la venta manda sobre el de la ficha.
+        receiverDoc: { docType: docReceptor.tipo, docNumber: docReceptor.nro },
+      })
+      toast.success(
+        `${v.label} ${String(v.salePoint).padStart(5, '0')}-${String(v.number).padStart(8, '0')} — CAE ${v.cae}`,
+        { duration: 10_000 },
+      )
+      if (v.observations.length > 0) {
+        toast.warning(`ARCA observó: ${v.observations.join(' · ')}`, { duration: 12_000 })
+      }
+      return {
+        cae: v.cae,
+        caeExpiry: v.caeExpiry,
+        qrDataUrl: v.qrUrl ? await qrComoImagen(v.qrUrl) : null,
+        qrUrl: v.qrUrl,
+        letter: v.letter,
+        // El papel lleva la numeración de ARCA, no la interna de la venta.
+        salePoint: v.salePoint,
+        number: v.number,
+      }
+    } catch (err: unknown) {
+      toast.error(
+        `La venta quedó registrada pero ARCA no la autorizó: ${
+          err instanceof Error ? err.message : 'error desconocido'
+        }. Podés reintentar desde el Historial de Ventas.`,
+        { duration: 15_000 },
+      )
+      return null
+    }
+  }
+
   async function confirmar(): Promise<void> {
     if (!effectiveCustomerId || !canConfirm) return
     // Si el modo mono-medio elige MercadoPago QR, derivar al modal de cobro QR.
@@ -1211,6 +1307,10 @@ function PDV() {
       setQrModalOpen(true)
       return
     }
+    // Dos F2 seguidos antes del re-render: la segunda vuelta no pasa de acá.
+    if (procesandoRef.current) return
+    procesandoRef.current = true
+    setProcesando(true)
     const monoPayments =
       !accountSale && !mixedMode && selectedMethod
         ? [{ paymentMethodId: selectedMethod.id, amount: totalNum.toFixed(4) }]
@@ -1251,55 +1351,8 @@ function PDV() {
       }
 
       // Facturación electrónica: si está activa y el comprobante es fiscal, se
-      // pide el CAE a ARCA. La VENTA ya está registrada, así que un fallo acá no
-      // la pierde: se avisa y queda para reintentar desde el Historial.
-      // Se ESPERA el CAE antes de imprimir. Antes se pedía en paralelo y el
-      // ticket salía sin CAE ni QR —un comprobante fiscal así no es válido—
-      // porque cuando se imprimía la respuesta de ARCA todavía no había
-      // llegado. Si ARCA falla, la venta YA está registrada: se avisa y se
-      // imprime igual, para reintentar después desde el Historial.
-      let fiscal: SaleTicketData['fiscal'] = null
-      // Comprobante fiscal sin poder emitirlo: se avisa fuerte. Imprimir una
-      // "FACTURA A" sin CAE es entregar un documento inválido.
-      if (voucherType !== 'X' && (!fiscalEnabled || effectiveSalePoint == null)) {
-        toast.error(
-          !fiscalEnabled
-            ? 'La facturación electrónica está DESACTIVADA: la venta quedó como comprobante interno, sin CAE. Activala en Contabilidad → Facturación Electrónica.'
-            : 'Falta elegir el punto de venta: la venta quedó sin CAE.',
-          { duration: 15_000 },
-        )
-      }
-      if (fiscalEnabled && voucherType !== 'X' && effectiveSalePoint != null) {
-        try {
-          const v = await api.fiscal.issueInvoice({
-            saleId: result.sale.id,
-            salePoint: effectiveSalePoint,
-            letter: voucherType,
-            // El documento cargado en la venta manda sobre el de la ficha.
-            receiverDoc: { docType: docReceptor.tipo, docNumber: docReceptor.nro },
-          })
-          fiscal = {
-            cae: v.cae,
-            caeExpiry: v.caeExpiry,
-            qrDataUrl: v.qrUrl ? await qrComoImagen(v.qrUrl) : null,
-            letter: v.letter,
-          }
-          toast.success(
-            `${v.label} ${String(v.salePoint).padStart(5, '0')}-${String(v.number).padStart(8, '0')} — CAE ${v.cae}`,
-            { duration: 10_000 },
-          )
-          if (v.observations.length > 0) {
-            toast.warning(`ARCA observó: ${v.observations.join(' · ')}`, { duration: 12_000 })
-          }
-        } catch (err: unknown) {
-          toast.error(
-            `La venta quedó registrada pero ARCA no la autorizó: ${
-              err instanceof Error ? err.message : 'error desconocido'
-            }. Podés reintentar desde el Historial de Ventas.`,
-            { duration: 15_000 },
-          )
-        }
-      }
+      // pide el CAE a ARCA y se espera antes de imprimir (ver `emitirCae`).
+      const fiscal = await emitirCae(result)
 
       clearSale()
       void numberQuery.refetch()
@@ -1327,6 +1380,9 @@ function PDV() {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
+    } finally {
+      procesandoRef.current = false
+      setProcesando(false)
     }
   }
 
@@ -1345,6 +1401,22 @@ function PDV() {
       setQrModalOpen(false)
       return
     }
+    if (procesandoRef.current) {
+      // El modal vuelve a avisar la misma orden mientras se procesa: silencio.
+      // Pero si lo que está en curso es OTRA venta (un F2 con el modal abierto),
+      // el pago quedó aprobado en Mercado Pago sin venta y alguien tiene que
+      // enterarse.
+      if (qrOrdenEnCursoRef.current !== orderId) {
+        toast.warning(
+          'Hay otra venta en curso: el pago con QR quedó aprobado en Mercado Pago sin registrar la venta. Verificar el cobro antes de volver a cobrar.',
+          { duration: 15_000 },
+        )
+      }
+      return
+    }
+    procesandoRef.current = true
+    qrOrdenEnCursoRef.current = orderId
+    setProcesando(true)
     try {
       const result = await createSale.mutateAsync({
         type: voucherType,
@@ -1369,11 +1441,15 @@ function PDV() {
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} cobrada con MercadoPago QR — ${formatCurrency(result.sale.total)}`,
       )
+      // El cobro con QR pide el CAE igual que el cobro común: antes no lo pedía
+      // y la venta quedaba tipo B sin comprobante, con el ticket rotulado
+      // "FACTURA B".
+      const fiscal = await emitirCae(result)
       // Reset ANTES de imprimir (mismo criterio que confirmar): el ticket no
       // bloquea. La venta ya quedó registrada y avisada arriba.
       clearSale()
       void numberQuery.refetch()
-      const ticketData = buildTicket(result)
+      const ticketData = { ...buildTicket(result), fiscal }
       const printerCfg = printerConfigQuery.data ?? null
       setLastSaleResult({ ticketData, printerCfg })
       if (autoPrintOnSale) {
@@ -1385,6 +1461,9 @@ function PDV() {
       toast.error(err instanceof Error ? err.message : 'No se pudo registrar la venta')
     } finally {
       setQrModalOpen(false)
+      procesandoRef.current = false
+      qrOrdenEnCursoRef.current = null
+      setProcesando(false)
     }
   }
 
@@ -1467,7 +1546,7 @@ function PDV() {
               setTipoForzado(true)
             }}
           >
-            {voucherOptions(fiscalEnabled).map((o) => (
+            {voucherOptions(fiscalEnabled, fiscalConfigQuery.data?.vatCondition ?? 'RI').map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -1970,7 +2049,7 @@ function PDV() {
             disabled={!canConfirm}
             onClick={() => void confirmar()}
           >
-            {createSale.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
+            {createSale.isPending || procesando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
             Confirmar venta (F2) — {formatCurrency(totals.total)}
           </Button>
           <Button
@@ -1984,7 +2063,7 @@ function PDV() {
             Imprimir último ticket
           </Button>
           {cart.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearSale} disabled={createSale.isPending}>
+            <Button variant="ghost" size="sm" onClick={clearSale} disabled={createSale.isPending || procesando}>
               <X className="h-4 w-4" />
               Vaciar venta
             </Button>

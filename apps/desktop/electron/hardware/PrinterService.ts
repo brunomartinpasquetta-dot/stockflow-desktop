@@ -25,6 +25,8 @@
 import { appendFile, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 
+import { subDecimal } from '@stockflow/shared';
+
 import type {
   CashCloseReportData,
   PaymentReceiptData,
@@ -49,6 +51,25 @@ const CUT = Buffer.from([GS, 0x56, 0x42, 0x00]); // partial cut
 const DRAWER_KICK = Buffer.from([ESC, 0x70, 0x00, 0x19, 0xfa]); // pin 2, 25ms, 250ms
 
 const CODEPAGE_PC858 = Buffer.from([ESC, 0x74, 0x13]); // page 19 = PC858 Euro
+
+/**
+ * QR nativo ESC/POS (`GS ( k`, modelo 2). Es lo que usa cualquier térmica de
+ * mostrador para el QR de ARCA; la URL de la RG 4892 (~200 caracteres) entra
+ * sin problema. Si el firmware no conoce el comando lo ignora y queda el
+ * hueco: por eso debajo va siempre el texto de verificación.
+ */
+function qrCodeBytes(data: string, moduleSize: number): Buffer {
+  const payload = Buffer.from(data, 'latin1');
+  const len = payload.length + 3;
+  return Buffer.concat([
+    Buffer.from([GS, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]), // modelo 2
+    Buffer.from([GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, moduleSize]), // tamaño de módulo
+    Buffer.from([GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31]), // corrección M
+    Buffer.from([GS, 0x28, 0x6b, len & 0xff, (len >> 8) & 0xff, 0x31, 0x50, 0x30]), // guardar datos
+    payload,
+    Buffer.from([GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]), // imprimir
+  ]);
+}
 
 // La POS-58 imprime en PC858 (la seteamos con `ESC t 19`). El texto venía
 // codificado como latin1, cuyos bytes NO coinciden con PC858 para los acentos
@@ -476,7 +497,14 @@ export class PrinterService {
 
     parts.push(BOLD_ON);
     const docLabel = sale.voucherType === 'X' ? 'REMITO X' : `FACTURA ${sale.voucherType}`;
-    push(`${center(`${docLabel}  N° ${sale.number}`, cols)}\n`);
+    // Con CAE el número impreso es el de ARCA (PPPPP-NNNNNNNN): el interno de
+    // la venta no es el del comprobante y en una base migrada ni se le parece.
+    const conCae = Boolean(sale.fiscalCae);
+    const numero =
+      conCae && sale.fiscalSalePoint != null && sale.fiscalNumber != null
+        ? `${String(sale.fiscalSalePoint).padStart(5, '0')}-${String(sale.fiscalNumber).padStart(8, '0')}`
+        : String(sale.number);
+    push(`${center(`${docLabel}  N° ${numero}`, cols)}\n`);
     parts.push(BOLD_OFF);
     // Remito X = no fiscal: dejarlo explícito en el ticket.
     if (sale.voucherType === 'X') {
@@ -485,9 +513,16 @@ export class PrinterService {
     parts.push(ALIGN_LEFT);
     push(`${formatDateTime(sale.createdAt)}\n`);
     if (sale.customer) {
-      push(`Cliente: ${sale.customer.name}\n`);
+      // Sin nombre (documento tipeado en el mostrador) van sólo el documento y
+      // la condición IVA: inventar "Consumidor Final" contradecía a esta última.
+      if (sale.customer.name) push(`Cliente: ${sale.customer.name}\n`);
       if (sale.customer.docNumber) push(`Doc: ${sale.customer.docNumber}\n`);
+    } else if (conCae) {
+      push('Cliente: Consumidor Final\n');
     }
+    // La condición frente al IVA del receptor es un dato obligatorio del
+    // comprobante electrónico (RG 5616); sin ella el ticket no es válido.
+    if (conCae) push(`Cond. IVA: ${sale.customer?.vatCondition ?? 'Consumidor Final'}\n`);
     push(`${'-'.repeat(cols)}\n`);
 
     for (const l of sale.lines) {
@@ -497,8 +532,23 @@ export class PrinterService {
     }
 
     push(`${'-'.repeat(cols)}\n`);
-    push(`${leftRight('Subtotal', sale.subtotal, cols)}\n`);
-    push(`${leftRight('IVA', sale.vatTotal, cols)}\n`);
+    // El IVA se discrimina SÓLO en la Factura A, y ahí el renglón de arriba es
+    // el NETO GRAVADO (total − IVA): con precios con IVA el subtotal ya lo
+    // incluía y "Subtotal + IVA" no daba el TOTAL. En B y C el IVA va dentro
+    // del precio y mostrarlo aparte es un error fiscal; con precios netos
+    // (`vatIncluded` en false) la línea hace falta para que cierre con el total.
+    const esBoC = sale.voucherType === 'B' || sale.voucherType === 'C';
+    if (sale.voucherType === 'A') {
+      push(`${leftRight('Neto gravado', subDecimal(sale.total, sale.vatTotal, 4), cols)}\n`);
+      push(`${leftRight('IVA', sale.vatTotal, cols)}\n`);
+    } else {
+      push(`${leftRight('Subtotal', sale.subtotal, cols)}\n`);
+      if (sale.vatIncluded === false) {
+        push(`${leftRight('IVA', sale.vatTotal, cols)}\n`);
+      } else if (!esBoC) {
+        push(`${leftRight('IVA incluido', sale.vatTotal, cols)}\n`);
+      }
+    }
     parts.push(BOLD_ON, DOUBLE_ON);
     push(`${leftRight('TOTAL', sale.total, Math.floor(cols / 2))}\n`);
     parts.push(DOUBLE_OFF, BOLD_OFF);
@@ -518,6 +568,12 @@ export class PrinterService {
       push(`CAE N: ${sale.fiscalCae}\n`);
       if (sale.fiscalCaeExpiry) {
         push(`Vto. CAE: ${new Date(sale.fiscalCaeExpiry).toLocaleDateString('es-AR')}\n`);
+      }
+      // QR obligatorio (RG 4892). Lo dibuja la impresora; si su firmware no
+      // sabe, queda el texto de verificación con el CAE y el número de arriba.
+      if (sale.fiscalQrUrl) {
+        parts.push(LF, qrCodeBytes(sale.fiscalQrUrl, this.cfg.width === 80 ? 4 : 3), LF);
+        push('Verificar en www.afip.gob.ar/fe/qr\n');
       }
       parts.push(ALIGN_LEFT);
     }

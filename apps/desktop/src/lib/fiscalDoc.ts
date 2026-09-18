@@ -27,7 +27,7 @@ export const VAT_CONDITION_LABELS: Record<FiscalCategory, string> = {
  * (código `CondicionIVAReceptorId`, RG 5616), tal como quedó congelada en el
  * comprobante. Misma tabla que `RECEIVER_VAT_CONDITION_LABELS` en shared.
  */
-const RECEIVER_VAT_CONDITION_BY_ID: Record<number, string> = {
+export const RECEIVER_VAT_CONDITION_BY_ID: Record<number, string> = {
   1: 'IVA Responsable Inscripto',
   4: 'IVA Sujeto Exento',
   5: 'Consumidor Final',

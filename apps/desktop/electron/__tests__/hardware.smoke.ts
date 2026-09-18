@@ -75,6 +75,33 @@ async function testPrinter(): Promise<void> {
   check('printSaleTicket() contiene total', bufSale.includes(Buffer.from('TOTAL', 'latin1')));
   check('printSaleTicket() contiene company name', bufSale.includes(Buffer.from('Test Empresa', 'latin1')));
 
+  // Comprobante electrónico: número de ARCA, condición IVA, QR (GS ( k) y sin
+  // IVA discriminado en la B.
+  await printerSale.resetFile();
+  await printerSale.printSaleTicket({
+    number: 8015,
+    voucherType: 'B',
+    createdAt: Date.now(),
+    company: { name: 'Test Empresa', cuit: '30-12345678-3', address: null, phone: null, ingBrutos: null },
+    customer: null,
+    lines: [{ description: 'Coca Cola 1.5L', quantity: '1', unitPrice: '1210.00', total: '1210.00' }],
+    subtotal: '1210.00',
+    vatTotal: '210.00',
+    total: '1210.00',
+    payments: [{ method: 'Efectivo', amount: '1210.00' }],
+    vatIncluded: true,
+    fiscalCae: '75000000000001',
+    fiscalCaeExpiry: Date.now(),
+    fiscalSalePoint: 4,
+    fiscalNumber: 1,
+    fiscalQrUrl: 'https://www.afip.gob.ar/fe/qr/?p=eyJ2ZXIiOjF9',
+  });
+  const bufFiscal = readFileSync(fileSale);
+  check('ticket fiscal: imprime el número de ARCA (00004-00000001), no el interno', bufFiscal.includes(Buffer.from('00004-00000001', 'latin1')) && !bufFiscal.includes(Buffer.from('8015', 'latin1')));
+  check('ticket fiscal: imprime la condición IVA del receptor', bufFiscal.includes(Buffer.from('Cond. IVA: Consumidor Final', 'latin1')));
+  check('ticket fiscal: QR nativo ESC/POS (GS ( k … 1 Q 0) con la URL', bufFiscal.includes(Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30])) && bufFiscal.includes(Buffer.from('afip.gob.ar/fe/qr/?p=', 'latin1')));
+  check('ticket fiscal B: no discrimina el IVA', !bufFiscal.includes(Buffer.from('IVA incluido', 'latin1')) && !bufFiscal.includes(Buffer.from(' 210.00\n', 'latin1')));
+
   // Cajón monedero
   const fileDrawer = join(tmpDir, 'printer-drawer.bin');
   const printerDrawer = new PrinterService({

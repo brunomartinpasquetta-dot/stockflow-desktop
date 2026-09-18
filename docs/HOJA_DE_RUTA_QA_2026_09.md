@@ -35,26 +35,30 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
 - [x] Smoke: backup con la base abierta y 300 filas sin checkpoint → el zip las tiene. — `backup.smoke.ts`
 
 ## Tanda 3 — ARCA: lo que viaja y lo que se imprime
-- [ ] **Importes** (`fiscal.service.ts:244`, `:216`, `:238`, `:378`): IVA redondeado y
+- [x] **Importes** (`fiscal.service.ts:244`, `:216`, `:238`, `:378`): IVA redondeado y
   neto = total − IVA; `AlicIva` sobre líneas ya prorrateadas por el descuento global;
-  con dos alícuotas, neto = Σ bases redondeadas; lo mismo en notas de crédito.
-- [ ] **WSFE** (`WsfeClient.ts:145`): timeout 30 s; antes de reintentar,
-  `FECompConsultar(N+1)` para no emitir dos comprobantes por la misma venta.
-- [ ] **Papel** (`printSaleTicket.ts:70`, `PrinterService.ts:458-531`): PV-número de ARCA
+  con dos alícuotas, neto = Σ bases redondeadas; lo mismo en notas de crédito. — `packages/shared/src/fiscal/importes.ts` (`arcaAmounts`, usada en factura y nota)
+- [x] **WSFE** (`WsfeClient.ts:145`): timeout 30 s; antes de reintentar,
+  `FECompConsultar(N+1)` para no emitir dos comprobantes por la misma venta. — `WsfeClient.ts`, `fiscal.service.ts` (se consulta el número que pidió el intento sin respuesta, no N+1: cubre otra venta facturada entre medio y no adopta tras un rechazo explícito)
+- [x] **Papel** (`printSaleTicket.ts:70`, `PrinterService.ts:458-531`): PV-número de ARCA
   en ticket/A4/ESC-POS, QR RG 4892 y condición IVA en el ESC-POS, sin discriminar IVA
-  en B/C.
-- [ ] **PDF archivado** (`fiscal.handlers.ts:239`, `:204`): totales, fecha, alícuotas y
-  documento desde el comprobante persistido.
-- [ ] **TA por entorno** (`WsaaClient.ts:151`): cache por entorno + hash del cert; borrar
-  al guardar la config.
-- [ ] **Reintento desde Historial** (`HistorialVentas.tsx:290`, `:506`): letra por
-  `resolveVoucherLetter`, pedir documento del receptor como en Ventas.
-- [ ] **Ventas** (`Ventas.tsx:1272`, `:1349`, `:665`, `:86`): flag `procesando` (doble
+  en B/C. — `printSaleTicket.ts`, `SaleTicket.tsx`, `PrinterService.ts` (probar el QR `GS ( k` en la POS-58 de los clientes antes de liberar)
+- [x] **PDF archivado** (`fiscal.handlers.ts:239`, `:204`): totales, fecha, alícuotas y
+  documento desde el comprobante persistido. — `fiscal.handlers.ts`
+- [x] **TA por entorno** (`WsaaClient.ts:151`): cache por entorno + hash del cert; borrar
+  al guardar la config. — `WsaaClient.ts`, `fiscal.handlers.ts`
+- [x] **Reintento desde Historial** (`HistorialVentas.tsx:290`, `:506`): letra por
+  `resolveVoucherLetter`, pedir documento del receptor como en Ventas. — `HistorialVentas.tsx` (la regla de la letra replicada como en Ventas: el renderer no importa shared; el servicio la resuelve igual)
+- [x] **Ventas** (`Ventas.tsx:1272`, `:1349`, `:665`, `:86`): flag `procesando` (doble
   venta esperando el CAE); el cobro con QR de MP pide CAE; Factura A con CUIT tipeado
   usa ese documento para la condición IVA y `canConfirm` la bloquea si falta; el
-  desplegable sólo ofrece letras que el emisor puede emitir.
-- [ ] Smoke: grilla de importes (enteros 1..10.000, con descuento, dos alícuotas) →
-  neto + IVA = total y Σ BaseImp = neto, siempre.
+  desplegable sólo ofrece letras que el emisor puede emitir. — `Ventas.tsx`, `fiscal.service.ts` (`canCobrarQr` también bloquea la A sin CUIT)
+- [x] Smoke: grilla de importes (enteros 1..10.000, con descuento, dos alícuotas) →
+  neto + IVA = total y Σ BaseImp = neto, siempre. — `fiscal-importes.smoke.ts` (+ reintento con `FECompConsultar` simulado: timeout, otra venta entre medio, rechazo explícito)
+- [ ] Pendiente (fuera de tanda): prefill del CUIT tipeado en el Historial cuando el
+  intento de Ventas falló (hoy hay que volver a tipearlo); match del reintento si el
+  timeout cruza medianoche (hoy no adopta y emite otro); B/C en modo `net` siguen
+  mostrando IVA aparte en el ESC/POS (ningún cliente trabaja en net).
 
 ## Tanda 4 — Seguridad en red
 - [ ] **JWT LAN** (`LanServer.ts:346`): secreto aleatorio de 32 bytes en safeStorage; el

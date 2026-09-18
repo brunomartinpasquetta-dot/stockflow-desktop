@@ -121,16 +121,23 @@ export interface SaleTicketData {
     phone?: string | null;
     ingBrutos?: string | null;
   };
-  customer?: { name: string; docNumber?: string | null } | null;
+  customer?: { name: string; docNumber?: string | null; vatCondition?: string | null } | null;
   lines: SaleTicketLineData[];
   subtotal: string;
   vatTotal: string;
   total: string;
   payments: SaleTicketPaymentData[];
   accountSale?: boolean;
+  /** Precios con IVA incluido (`priceMode: 'gross'`): en B/C el IVA no se discrimina. */
+  vatIncluded?: boolean;
   /** CAE del comprobante autorizado por ARCA: sin él la factura no es válida. */
   fiscalCae?: string | null;
   fiscalCaeExpiry?: number | null;
+  /** Numeración de ARCA: es la que va impresa, no el número interno de la venta. */
+  fiscalSalePoint?: number | null;
+  fiscalNumber?: number | null;
+  /** URL del QR (RG 4892); la impresora lo dibuja con `GS ( k`. */
+  fiscalQrUrl?: string | null;
 }
 
 export interface CashCloseReportData {

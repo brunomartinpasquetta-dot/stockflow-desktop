@@ -80,14 +80,40 @@ export interface SaleTicketData {
     cae: string
     caeExpiry?: number | null
     qrDataUrl?: string | null
+    /** URL del QR (RG 4892) sin renderizar: la térmica ESC/POS lo dibuja ella. */
+    qrUrl?: string | null
     letter?: 'A' | 'B' | 'C'
+    /**
+     * Numeración de ARCA. El papel tiene que decir el número AUTORIZADO
+     * (PPPPP-NNNNNNNN), no el interno de la venta: en una base migrada ARCA
+     * autorizaba 00004-00000001 y el ticket decía "N° 00008015".
+     */
+    salePoint?: number | null
+    number?: number | null
   } | null
 }
 
+/** Numeración impresa: la de ARCA si el comprobante tiene CAE, si no la interna. */
+function ticketNumber(data: Pick<SaleTicketData, 'sale' | 'fiscal'>): string {
+  const f = data.fiscal
+  if (f?.cae && f.salePoint != null && f.number != null) {
+    return `${String(f.salePoint).padStart(5, '0')}-${String(f.number).padStart(8, '0')}`
+  }
+  return String(data.sale.number).padStart(8, '0')
+}
+
+/** Letra impresa: la del comprobante autorizado si lo hay (puede diferir de la venta). */
+function ticketVoucherType(data: Pick<SaleTicketData, 'sale' | 'fiscal'>): VoucherType {
+  return data.fiscal?.cae && data.fiscal.letter ? data.fiscal.letter : data.sale.type
+}
+
 export function SaleTicket({ data }: { data: SaleTicketData }) {
-  const { company, sale, priceMode, lines, customerName, customerDoc, sellerName, isAccountSale, payments, fiscal } = data
+  const { company, sale, priceMode, lines, customerName, customerDoc, customerVatCondition, sellerName, isAccountSale, payments, fiscal } = data
   const discountNum = Number(sale.discount)
   const vatNum = Number(sale.vatAmount)
+  // La letra IMPRESA (con CAE, la del comprobante): decide si el IVA va
+  // discriminado o "incluido", igual que en el A4 y en la térmica ESC/POS.
+  const tipo = ticketVoucherType(data)
 
   return (
     <div className="ticket-root">
@@ -101,13 +127,19 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
 
       {/* ── Datos del comprobante ───────────────────────────── */}
       <div className="ticket-row">
-        <span className="ticket-bold">{VOUCHER_LABELS[sale.type]}</span>
-        <span className="ticket-bold">N° {String(sale.number).padStart(8, '0')}</span>
+        <span className="ticket-bold">{VOUCHER_LABELS[ticketVoucherType(data)]}</span>
+        <span className="ticket-bold">N° {ticketNumber(data)}</span>
       </div>
       <div>Fecha: {formatDateTime(sale.date)}</div>
       {sellerName && <div>Vendedor: {sellerName}</div>}
-      <div>Cliente: {customerName ?? 'Consumidor Final'}</div>
+      {/* Sin nombre pero con documento tipeado (Factura A de mostrador) van sólo
+          el documento y la condición IVA: "Consumidor Final" contradecía la
+          condición impresa debajo. Misma regla que la térmica ESC/POS. */}
+      {(customerName || !customerDoc) && <div>Cliente: {customerName ?? 'Consumidor Final'}</div>}
       {customerDoc && <div>{customerDoc}</div>}
+      {/* Condición frente al IVA del receptor: obligatoria en el comprobante
+          electrónico (RG 5616). */}
+      {fiscal?.cae && <div>Cond. IVA: {customerVatCondition ?? 'Consumidor Final'}</div>}
 
       <div className="ticket-sep">{SEP_EQ}</div>
 
@@ -146,7 +178,7 @@ export function SaleTicket({ data }: { data: SaleTicketData }) {
       )}
       {vatNum > 0 && (
         <div className="ticket-row">
-          <span>IVA{priceMode === 'gross' && sale.type !== 'A' ? ' (incluido)' : ''}:</span>
+          <span>IVA{priceMode === 'gross' && tipo !== 'A' ? ' (incluido)' : ''}:</span>
           <span>{formatCurrency(sale.vatAmount)}</span>
         </div>
       )}

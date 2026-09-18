@@ -68,3 +68,4 @@ export type {
   NewMpOrder,
 } from '@stockflow/db';
 export * from './fiscal/arca';
+export * from './fiscal/importes';

@@ -12,7 +12,9 @@
  */
 import {
   DOC_TYPES,
-  VAT_IDS,
+  RECEIVER_VAT_CONDITION_IDS,
+  VAT_RATE_BY_ID,
+  arcaAmounts,
   defaultReceiverVatConditionForLetter,
   isReceiverVatConditionAllowed,
   resolveCustomerDoc,
@@ -26,7 +28,6 @@ import {
   type VoucherKind,
   type VoucherLetter,
 } from '@stockflow/shared';
-import { addDecimal, proratedVatBreakdown, vatBreakdown } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -66,6 +67,23 @@ export interface ArcaGateway {
     codAut: string;
     fecha: string;
   }): string;
+  /**
+   * Comprobante ya emitido según ARCA (`FECompConsultar`), o `null` si no
+   * existe. Sirve para recuperar un CAE cuya respuesta se perdió en la red.
+   */
+  findVoucher?(
+    salePoint: number,
+    voucherCode: number,
+    number: number,
+  ): Promise<{
+    cae: string;
+    caeExpiry: string;
+    total: number;
+    /** YYYYMMDD */
+    date: string;
+    docType: number;
+    docNumber: string;
+  } | null>;
 }
 
 export interface IssueInvoiceInput {
@@ -106,6 +124,17 @@ export interface IssuedVoucher {
 /** Formatea "1234" → número con 2 decimales para ARCA. */
 function n2(v: string | number): number {
   return Math.round(Number(v) * 100) / 100;
+}
+
+/**
+ * Si el error deja abierta la posibilidad de que ARCA haya autorizado igual:
+ * el pedido salió pero la respuesta no volvió (timeout o corte de red, los
+ * códigos que pone `WsfeClient`). Un rechazo de ARCA o un error local (WSAA,
+ * certificado) no entran: ahí el comprobante seguro no se emitió.
+ */
+function respuestaPerdida(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === 'TIMEOUT' || code === 'NETWORK';
 }
 
 /**
@@ -177,21 +206,40 @@ export class FiscalService {
     const customer = await repos.customers.findById(sale.customerId);
     if (!customer) throw new NotFoundError('Cliente', sale.customerId);
 
+    const issuer = cfg.vatCondition as IssuerVatCondition;
     const letter =
-      input.letter ??
-      resolveVoucherLetter(
-        cfg.vatCondition as IssuerVatCondition,
-        customer.category as CustomerVatCategory,
+      input.letter ?? resolveVoucherLetter(issuer, customer.category as CustomerVatCategory);
+    // La letra tiene que ser una que ESTE emisor pueda emitir: un monotributista
+    // sólo emite C y un responsable inscripto A o B. El desplegable de Ventas
+    // ofrecía las tres a cualquiera; ARCA rechazaba y el reintento repetía.
+    if (issuer === 'MT' ? letter !== 'C' : letter === 'C') {
+      throw new ValidationError(
+        'letter',
+        issuer === 'MT'
+          ? 'Un emisor Monotributista sólo puede emitir Factura C.'
+          : 'Un emisor Responsable Inscripto emite Factura A o B, no C.',
       );
+    }
     const doc = resolveCustomerDoc(
       (input.receiverDoc?.docType ?? customer.docType) as Parameters<typeof resolveCustomerDoc>[0],
       input.receiverDoc?.docNumber ?? customer.docNumber,
     );
     // Condición IVA del receptor: sale de la categoría fiscal del cliente y es
     // obligatoria en todo comprobante (RG 5616), consumidor final incluido.
-    const receiverVatConditionId = resolveReceiverVatConditionId(
+    let receiverVatConditionId = resolveReceiverVatConditionId(
       customer.category as CustomerVatCategory,
     );
+    // Factura A "de mostrador": la ficha es Consumidor Final pero se cargó un
+    // CUIT en la venta. Ese CUIT identifica a un responsable inscripto; si se
+    // informara la condición de la ficha (5) la validación rechazaría la A y la
+    // venta quedaría sin CAE, irrecuperable desde el Historial.
+    if (
+      letter === 'A' &&
+      doc.docType === DOC_TYPES.CUIT &&
+      !isReceiverVatConditionAllowed(receiverVatConditionId, 'A')
+    ) {
+      receiverVatConditionId = RECEIVER_VAT_CONDITION_IDS.RI;
+    }
     const check = validateForLetter(letter, doc, receiverVatConditionId);
     if (!check.ok) throw new ValidationError('customer', check.reason);
 
@@ -210,66 +258,31 @@ export class FiscalService {
     const company = await repos.company.getOrCreate();
     const priceMode = company?.priceMode === 'net' ? 'net' : 'gross';
 
-    const byRate = new Map<string, { base: string; vat: string }>();
-    for (const l of lines) {
-      const rate = l.vatRate ?? '21.00';
-      const br = vatBreakdown(l.lineTotal, rate, priceMode);
-      const acc = byRate.get(rate) ?? { base: '0.0000', vat: '0.0000' };
-      byRate.set(rate, {
-        base: addDecimal(acc.base, br.net, 4),
-        // `vatBreakdown` devuelve `vat`, no `vatAmount`: el IVA por alícuota se
-        // sumaba con `undefined` y el desglose que se le manda a ARCA salía en
-        // cero. En Factura A eso es el dato que mira el fisco.
-        vat: addDecimal(acc.vat, br.vat, 4),
-      });
-    }
-
-    const totals = proratedVatBreakdown(
+    // Importes al centavo con las identidades que ARCA valida (neto + IVA =
+    // total, Σ bases = neto), con el descuento global ya prorrateado.
+    const amounts = arcaAmounts(
       lines.map((l) => ({ lineTotal: l.lineTotal, vatRate: l.vatRate ?? '21.00' })),
       sale.discount ?? '0',
-      sale.subtotal,
       priceMode,
     );
-
-    const vatDetails = [...byRate.entries()]
-      .filter(([, v]) => Number(v.base) > 0)
-      .map(([rate, v]) => ({
-        id: VAT_IDS[rate as keyof typeof VAT_IDS] ?? VAT_IDS['21.00'],
-        baseAmount: n2(v.base),
-        amount: n2(v.vat),
-      }));
+    const total = amounts.total;
 
     // Factura C (monotributo): no se discrimina IVA — todo va como neto.
     const isC = letter === 'C';
-    const netAmount = isC ? n2(sale.total) : n2(totals.net);
-    const vatAmount = isC ? 0 : n2(totals.vatAmount);
+    const netAmount = isC ? total : amounts.netAmount;
+    const vatAmount = isC ? 0 : amounts.vatAmount;
+    const vatDetails = isC ? [] : amounts.vatDetails;
 
-    const nextNumber = (await this.gateway.lastAuthorized(input.salePoint, voucherCode)) + 1;
-    const date = Date.now();
-
-    try {
-      const res = await this.gateway.requestCae({
-        salePoint: input.salePoint,
-        voucherCode,
-        number: nextNumber,
-        date,
-        docType: doc.docType,
-        docNumber: doc.docNumber,
-        receiverVatConditionId,
-        netAmount,
-        vatAmount,
-        exemptAmount: 0,
-        untaxedAmount: 0,
-        total: n2(sale.total),
-        vatDetails: isC ? [] : vatDetails,
-      });
-
+    const persistir = (
+      res: { cae: string; caeExpiry: string; number: number; observations: string[] },
+      date: number,
+    ): IssuedVoucher => {
       const qrUrl = this.gateway.buildQrUrl({
         cuit: cfg.cuit,
         ptoVta: input.salePoint,
         tipoCmp: voucherCode,
         nroCmp: res.number,
-        importe: n2(sale.total),
+        importe: total,
         tipoDocRec: doc.docType,
         nroDocRec: doc.docNumber,
         codAut: res.cae,
@@ -296,7 +309,7 @@ export class FiscalService {
           vatAmount: String(vatAmount),
           total: sale.total,
           userId: currentUser.id,
-          vatDetails: (isC ? [] : vatDetails).map((v) => ({
+          vatDetails: vatDetails.map((v) => ({
             vatId: v.id,
             baseAmount: String(v.baseAmount),
             vatAmount: String(v.amount),
@@ -322,8 +335,66 @@ export class FiscalService {
         qrUrl,
         observations: res.observations,
       };
+    };
+
+    const last = await this.gateway.lastAuthorized(input.salePoint, voucherCode);
+
+    // REINTENTO: si un intento anterior de ESTA venta se quedó sin respuesta
+    // (timeout o corte de red después de mandar el pedido), ARCA pudo haberlo
+    // autorizado igual. Antes de emitir otro —y facturar dos veces la misma
+    // venta— se consulta el número que ESE intento pidió: si existe y coincide
+    // en importe, fecha y documento, se adopta. Se mira el número pedido y no
+    // el último autorizado porque entre el corte y el reintento otra terminal
+    // (o el mismo cajero, que sigue vendiendo) pudo emitir los siguientes. Un
+    // rechazo explícito de ARCA no entra: ahí el comprobante seguro no existe,
+    // y consultar "el último" podía adoptar uno ajeno del mismo importe (base
+    // migrada con comprobantes que no están acá, consumidor final).
+    if (this.gateway.findVoucher) {
+      for (const intento of repos.fiscal.findFailuresBySale(sale.id)) {
+        const nro = intento.requestedNumber;
+        if (intento.status !== 'error' || nro == null || nro > last) continue;
+        // Si ese número ya es de otra venta en esta base, no hay nada que adoptar.
+        if (repos.fiscal.findVoucherByNumber(voucherCode, input.salePoint, nro)) continue;
+        const emitido = await this.gateway.findVoucher(input.salePoint, voucherCode, nro);
+        if (
+          emitido &&
+          emitido.cae &&
+          n2(emitido.total) === total &&
+          emitido.date === fechaArcaLocal(intento.date) &&
+          emitido.docType === doc.docType &&
+          emitido.docNumber.replace(/\D/g, '') === doc.docNumber.replace(/\D/g, '')
+        ) {
+          return persistir(
+            { cae: emitido.cae, caeExpiry: emitido.caeExpiry, number: nro, observations: [] },
+            intento.date,
+          );
+        }
+      }
+    }
+
+    const nextNumber = last + 1;
+    const date = Date.now();
+
+    try {
+      const res = await this.gateway.requestCae({
+        salePoint: input.salePoint,
+        voucherCode,
+        number: nextNumber,
+        date,
+        docType: doc.docType,
+        docNumber: doc.docNumber,
+        receiverVatConditionId,
+        netAmount,
+        vatAmount,
+        exemptAmount: 0,
+        untaxedAmount: 0,
+        total,
+        vatDetails,
+      });
+      return persistir(res, date);
     } catch (err) {
-      // Deja constancia del rechazo para diagnóstico, sin consumir numeración.
+      // Deja constancia del intento para diagnóstico y para el reintento (qué
+      // número se pidió y si ARCA llegó a contestar), sin consumir numeración.
       repos.fiscal.recordFailure({
         voucherCode,
         letter,
@@ -339,6 +410,7 @@ export class FiscalService {
         userId: currentUser.id,
         errors: [err instanceof Error ? err.message : String(err)],
         saleId: sale.id,
+        responseLost: respuestaPerdida(err),
       });
       throw err;
     }
@@ -367,16 +439,34 @@ export class FiscalService {
     const voucherCode = resolveVoucherCode(letter, kind);
     const total = input.total ?? related.total;
 
-    // La nota hereda la proporción de IVA del comprobante original.
+    // La nota hereda la proporción de IVA del comprobante original: cada
+    // alícuota se escala al importe de la nota y se vuelve a cerrar al centavo
+    // con la misma regla que la factura (neto + IVA = total, Σ bases = neto).
+    // Escalar y redondear cada parte por separado dejaba sumas que no cerraban.
     const originalVat = repos.fiscal.vatDetailsFor(related.id);
-    const ratio = Number(related.total) !== 0 ? Number(total) / Number(related.total) : 1;
-    const vatDetails = originalVat.map((v) => ({
-      id: v.vatId,
-      baseAmount: n2(Number(v.baseAmount) * ratio),
-      amount: n2(Number(v.vatAmount) * ratio),
-    }));
-    const netAmount = n2(Number(related.netAmount) * ratio);
-    const vatAmount = n2(Number(related.vatAmount) * ratio);
+    // La proporción se toma contra la suma de las alícuotas guardadas y no
+    // contra el total del comprobante: en los emitidos con el cálculo viejo
+    // esa suma podía diferir un centavo del total, y la nota heredaba el desvío.
+    const sumaOriginal = originalVat.reduce(
+      (acc, v) => acc + Number(v.baseAmount) + Number(v.vatAmount),
+      0,
+    );
+    const ratio = sumaOriginal !== 0 ? Number(total) / sumaOriginal : 1;
+    const amounts = arcaAmounts(
+      originalVat.map((v) => ({
+        lineTotal: ((Number(v.baseAmount) + Number(v.vatAmount)) * ratio).toFixed(4),
+        vatRate: VAT_RATE_BY_ID[v.vatId] ?? '21.00',
+      })),
+      '0',
+      'gross',
+    );
+    // Sin detalle de alícuotas (Factura C, o comprobante sin desglose): todo
+    // neto, como en la factura.
+    const sinDetalle = originalVat.length === 0;
+    const totalArca = sinDetalle ? n2(total) : amounts.total;
+    const vatDetails = sinDetalle ? [] : amounts.vatDetails;
+    const netAmount = sinDetalle ? totalArca : amounts.netAmount;
+    const vatAmount = sinDetalle ? 0 : amounts.vatAmount;
 
     // La nota repite la condición IVA del receptor del comprobante que ajusta.
     const receiverVatConditionId =
@@ -397,7 +487,7 @@ export class FiscalService {
       vatAmount,
       exemptAmount: 0,
       untaxedAmount: 0,
-      total: n2(total),
+      total: totalArca,
       vatDetails,
       associated: [
         {
@@ -413,7 +503,7 @@ export class FiscalService {
       ptoVta: related.salePoint,
       tipoCmp: voucherCode,
       nroCmp: res.number,
-      importe: n2(total),
+      importe: totalArca,
       tipoDocRec: related.customerDocType,
       nroDocRec: related.customerDocNumber,
       codAut: res.cae,

@@ -40,6 +40,7 @@ export class ArcaGatewayImpl implements ArcaGateway {
       service: 'wsfe',
       cacheDir: this.cfg.cacheDir,
       cuit: this.cfg.cuit,
+      environment: this.cfg.environment,
     });
     const ta = await wsaa.getAccessTicket();
     return WsfeClient.fromTicket(this.endpoints().wsfe, ta, this.cfg.cuit);
@@ -74,6 +75,15 @@ export class ArcaGatewayImpl implements ArcaGateway {
 
   buildQrUrl(data: Parameters<ArcaGateway['buildQrUrl']>[0]): string {
     return buildQrUrl(data);
+  }
+
+  async findVoucher(
+    salePoint: number,
+    voucherCode: number,
+    number: number,
+  ): ReturnType<NonNullable<ArcaGateway['findVoucher']>> {
+    const c = await this.client();
+    return c.getVoucher(salePoint, voucherCode, number);
   }
 
   /* --------- Operaciones de diagnóstico (para la pantalla de config) -------- */

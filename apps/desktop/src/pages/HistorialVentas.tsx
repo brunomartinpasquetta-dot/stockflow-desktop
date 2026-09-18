@@ -20,9 +20,9 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { SaleDTO, VoucherType } from '@/types/api'
+import type { DocType, SaleDTO, VoucherType } from '@/types/api'
 import type { SaleTicketData } from '@/print/SaleTicket'
-import { VAT_CONDITION_LABELS } from '@/lib/fiscalDoc'
+import { RECEIVER_VAT_CONDITION_BY_ID, VAT_CONDITION_LABELS } from '@/lib/fiscalDoc'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 
 function todayIso(): string {
@@ -285,12 +285,48 @@ function SaleDetailDialog({
       }),
   })
 
+  /**
+   * Documento del receptor para emitir DESDE ACÁ, como en Ventas: arranca con
+   * el de la ficha y se puede completar en el momento. Sin esto, la venta a un
+   * consumidor final con DNI tipeado en el mostrador no se podía reintentar.
+   */
+  const clienteVenta = useMemo(
+    () => (customersQuery.data ?? []).find((c) => c.id === detailQuery.data?.sale.customerId) ?? null,
+    [customersQuery.data, detailQuery.data],
+  )
+  const [docManual, setDocManual] = useState<{ tipo: DocType; nro: string } | null>(null)
+  const docReceptor = docManual ?? {
+    tipo: (clienteVenta?.docType ?? 'CF') as DocType,
+    nro: clienteVenta?.docNumber ?? '',
+  }
+  // La letra NO se fuerza con la de la venta: la decide el emisor y el cliente
+  // (misma regla que `resolveVoucherLetter` en el servicio, que es quien la
+  // aplica cuando no se manda `letter`). Forzarla mandaba "Factura B" a un
+  // responsable inscripto y una B a un emisor monotributista: rechazo seguro.
+  // La única excepción es la Factura A "de mostrador" (ficha Consumidor Final
+  // con CUIT tipeado), que la venta registró como A y hay que respetar.
+  const emisor = fiscalCfgQuery.data?.vatCondition ?? 'RI'
+  const letraCliente: 'A' | 'B' | 'C' =
+    emisor === 'MT' ? 'C' : clienteVenta?.category === 'RI' || clienteVenta?.category === 'MT' ? 'A' : 'B'
+  const aDeMostrador =
+    emisor === 'RI' && detailQuery.data?.sale.type === 'A' && docReceptor.tipo === 'CUIT'
+  const letraAEmitir: 'A' | 'B' | 'C' = aDeMostrador ? 'A' : letraCliente
+  const faltaCuitParaFacturaA =
+    letraAEmitir === 'A' && (docReceptor.tipo !== 'CUIT' || docReceptor.nro.trim() === '')
+
   const issueMutation = useMutation({
-    mutationFn: (letter: 'A' | 'B' | 'C') =>
+    mutationFn: () =>
       api.fiscal.issueInvoice({
         saleId,
         salePoint: issuePoint ?? activePoints[0]?.number ?? 1,
-        letter,
+        letter: aDeMostrador ? 'A' : undefined,
+        // Si la ficha no está en la lista (todavía no cargó, o el cliente está
+        // inactivo) `docReceptor` cae a Consumidor Final sin documento; mandarlo
+        // igual pisaba el CUIT de la ficha que el servicio sí conoce.
+        receiverDoc:
+          docManual || clienteVenta
+            ? { docType: docReceptor.tipo, docNumber: docReceptor.nro }
+            : undefined,
       }),
     onSuccess: (v) => {
       void qc.invalidateQueries({ queryKey: ['fiscal', 'voucher', saleId] })
@@ -337,6 +373,17 @@ function SaleDetailDialog({
     const d = detailQuery.data
     const company = companyQuery.data
     if (!d || !company) return
+    // El documento y la condición IVA del receptor se toman del comprobante
+    // autorizado, que es lo que se le informó a ARCA; la ficha de hoy sirve
+    // sólo si no hay comprobante. La Factura A de mostrador (ficha Consumidor
+    // Final + CUIT tipeado) se reimprimía sin el CUIT y como Consumidor Final.
+    const v = voucherQuery.data?.cae ? voucherQuery.data : null
+    const docVoucher =
+      v && v.customerDocType !== 99
+        ? `${v.customerDocType === 80 ? 'CUIT' : v.customerDocType === 96 ? 'DNI' : 'Doc'} ${v.customerDocNumber}`
+        : null
+    const condVoucher =
+      v?.customerVatConditionId != null ? (RECEIVER_VAT_CONDITION_BY_ID[v.customerVatConditionId] ?? null) : null
     const ticketData: SaleTicketData = {
       company,
       sale: d.sale,
@@ -354,11 +401,13 @@ function SaleDetailDialog({
         discount: l.discount,
       })),
       customerName: customerName || null,
-      customerDoc: null,
-      customerVatCondition: (() => {
-        const c = (customersQuery.data ?? []).find((x) => x.id === d.sale.customerId)
-        return c ? (VAT_CONDITION_LABELS[c.category] ?? null) : null
-      })(),
+      customerDoc: docVoucher,
+      customerVatCondition:
+        condVoucher ??
+        (() => {
+          const c = (customersQuery.data ?? []).find((x) => x.id === d.sale.customerId)
+          return c ? (VAT_CONDITION_LABELS[c.category] ?? null) : null
+        })(),
       sellerName: null,
       isAccountSale: d.sale.isAccountSale,
       payments: d.payments.map((p) => ({
@@ -373,7 +422,11 @@ function SaleDetailDialog({
             cae: voucherQuery.data.cae,
             caeExpiry: voucherQuery.data.caeExpiry,
             qrDataUrl: voucherQuery.data.qrUrl ? await qrComoImagen(voucherQuery.data.qrUrl) : null,
+            qrUrl: voucherQuery.data.qrUrl,
             letter: voucherQuery.data.letter,
+            // El papel lleva la numeración de ARCA, no la interna de la venta.
+            salePoint: voucherQuery.data.salePoint,
+            number: voucherQuery.data.number,
           }
         : null,
     }
@@ -482,38 +535,71 @@ function SaleDetailDialog({
                     </div>
                   </div>
                 ) : fiscalCfgQuery.data?.enabled ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground">
-                      Esta venta todavía no tiene comprobante fiscal.
-                    </span>
-                    {activePoints.length > 1 && (
-                      <select
-                        className="rounded border bg-background px-1 py-0.5 text-xs"
-                        value={String(issuePoint ?? activePoints[0]?.number ?? '')}
-                        onChange={(e) => setIssuePoint(Number(e.target.value))}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-muted-foreground">
+                        Esta venta todavía no tiene comprobante fiscal.
+                      </span>
+                      {activePoints.length > 1 && (
+                        <select
+                          className="rounded border bg-background px-1 py-0.5 text-xs"
+                          value={String(issuePoint ?? activePoints[0]?.number ?? '')}
+                          onChange={(e) => setIssuePoint(Number(e.target.value))}
+                        >
+                          {activePoints.map((p) => (
+                            <option key={p.id} value={p.number}>
+                              Pto. {String(p.number).padStart(5, '0')}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    {/* Documento del receptor, como en Ventas: el de la ficha o
+                        el tipeado acá. */}
+                    <div className="flex items-end gap-2">
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs">Documento del cliente</Label>
+                        <Select
+                          className="w-28"
+                          value={docReceptor.tipo}
+                          onChange={(e) =>
+                            setDocManual({ tipo: e.target.value as DocType, nro: docReceptor.nro })
+                          }
+                        >
+                          <option value="CF">Sin identificar</option>
+                          <option value="DNI">DNI</option>
+                          <option value="CUIT">CUIT</option>
+                          <option value="CUIL">CUIL</option>
+                          <option value="PASS">Pasaporte</option>
+                        </Select>
+                      </div>
+                      <Input
+                        className="flex-1 tabular-nums"
+                        value={docReceptor.nro}
+                        disabled={docReceptor.tipo === 'CF'}
+                        placeholder={docReceptor.tipo === 'CF' ? 'Consumidor final' : 'Número, sin puntos ni guiones'}
+                        inputMode="numeric"
+                        onChange={(e) =>
+                          setDocManual({ tipo: docReceptor.tipo, nro: e.target.value.replace(/\D/g, '') })
+                        }
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={issueMutation.isPending || faltaCuitParaFacturaA}
+                        onClick={() => issueMutation.mutate()}
                       >
-                        {activePoints.map((p) => (
-                          <option key={p.id} value={p.number}>
-                            Pto. {String(p.number).padStart(5, '0')}
-                          </option>
-                        ))}
-                      </select>
+                        {issueMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Emitir Factura {letraAEmitir}
+                      </Button>
+                    </div>
+                    {faltaCuitParaFacturaA && (
+                      <span className="text-destructive">
+                        {clienteVenta?.category === 'MT'
+                          ? 'Al cliente Monotributista corresponde emitirle Factura A, que requiere su CUIT.'
+                          : 'La Factura A requiere el CUIT del cliente.'}
+                      </span>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={issueMutation.isPending}
-                      onClick={() =>
-                        issueMutation.mutate(
-                          sale.type === 'A' || sale.type === 'B' || sale.type === 'C'
-                            ? sale.type
-                            : 'B',
-                        )
-                      }
-                    >
-                      {issueMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      {sale.type === 'X' ? 'Facturar (Factura B)' : `Emitir Factura ${sale.type}`}
-                    </Button>
                   </div>
                 ) : (
                   <span className="text-muted-foreground">
@@ -885,6 +971,9 @@ export function HistorialVentas() {
 
       {detailId && (
         <SaleDetailDialog
+          // Estado propio por venta: el documento tipeado para una no puede
+          // quedar pegado a la siguiente.
+          key={detailId}
           saleId={detailId}
           customerName={customerName.get((salesQuery.data ?? []).find((s) => s.id === detailId)?.customerId ?? '') ?? '—'}
           canVoid={canVoid}

@@ -2391,21 +2391,26 @@ export interface SaleTicketDataDTO {
     phone?: string | null;
     ingBrutos?: string | null;
   };
-  customer?: { name: string; docNumber?: string | null } | null;
+  customer?: { name: string; docNumber?: string | null; vatCondition?: string | null } | null;
   lines: SaleTicketLineDataDTO[];
   subtotal: string;
   vatTotal: string;
   total: string;
   payments: SaleTicketPaymentDataDTO[];
   accountSale?: boolean;
+  /** Precios con IVA incluido (`priceMode: 'gross'`): en B/C el IVA no se discrimina. */
+  vatIncluded?: boolean;
   /**
    * Comprobante autorizado por ARCA. En la impresión DIRECTA a la térmica el
-   * CAE también tiene que salir: sin él el comprobante no es válido. El QR no
-   * se manda por acá — la térmica por ESC/POS no imprime imágenes de forma
-   * confiable en todos los modelos; para el QR está la impresión por diálogo.
+   * CAE también tiene que salir: sin él el comprobante no es válido. El QR
+   * (RG 4892) lo dibuja la propia impresora con `GS ( k` a partir de la URL.
    */
   fiscalCae?: string | null;
   fiscalCaeExpiry?: number | null;
+  /** Numeración de ARCA: es la que va impresa, no el número interno de la venta. */
+  fiscalSalePoint?: number | null;
+  fiscalNumber?: number | null;
+  fiscalQrUrl?: string | null;
 }
 
 /** Recibo de cobranza de cuenta corriente (importe entregado + saldos). */

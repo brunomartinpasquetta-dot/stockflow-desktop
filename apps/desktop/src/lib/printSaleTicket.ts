@@ -25,25 +25,49 @@ const VOUCHER_LABELS: Record<VoucherType, string> = {
   X: 'Remito X',
 }
 
+/**
+ * Numeración y letra IMPRESAS: con CAE mandan las del comprobante autorizado
+ * (PPPPP-NNNNNNNN y su letra), no las internas de la venta. En una base
+ * migrada ARCA autorizaba 00004-00000001 y el papel decía "N° 00008015".
+ * (Misma regla que en `SaleTicket`, que no puede exportarla por el fast refresh.)
+ */
+function ticketNumber(data: Pick<SaleTicketData, 'sale' | 'fiscal'>): string {
+  const f = data.fiscal
+  if (f?.cae && f.salePoint != null && f.number != null) {
+    return `${String(f.salePoint).padStart(5, '0')}-${String(f.number).padStart(8, '0')}`
+  }
+  return String(data.sale.number).padStart(8, '0')
+}
+function ticketVoucherType(data: Pick<SaleTicketData, 'sale' | 'fiscal'>): VoucherType {
+  return data.fiscal?.cae && data.fiscal.letter ? data.fiscal.letter : data.sale.type
+}
+
 /** Mapea el ticket de venta al documento formal A4 (cuando el formato es A4). */
 function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
   const meta: FormalDocData['meta'] = [{ label: 'Fecha', value: formatDateTime(data.sale.date) }]
   if (data.sellerName) meta.push({ label: 'Vendedor', value: data.sellerName })
   const single = data.payments.length === 1 ? data.payments[0]!.methodName : null
-  const esFacturaA = data.sale.type === 'A'
+  // Con CAE manda la letra del comprobante autorizado (puede no ser la de la
+  // venta si se facturó después desde el Historial).
+  const tipo = ticketVoucherType(data)
+  const esFacturaA = tipo === 'A'
 
   // DETALLE DE ALÍCUOTAS: se arma agrupando los renglones por tasa. Sólo en la
   // Factura A, que es donde el IVA se discrimina. El neto de cada renglón sale
   // de sacarle el impuesto al importe cuando los precios se cargan CON IVA
   // (`priceMode: 'gross'`, que es como trabaja el comercio); si se cargan netos,
-  // el importe YA es el neto.
+  // el importe YA es el neto. El descuento global se prorratea sobre los
+  // renglones (misma regla que la venta y que el CAE): con $1210 y $110 de
+  // descuento el papel decía base 1000 / IVA 210 y ARCA autorizó 909,09 / 190,91.
+  const subtotalNum = Number(data.sale.subtotal)
+  const factorDescuento = subtotalNum > 0 ? 1 - Number(data.sale.discount) / subtotalNum : 1
   const vatBreakdown = esFacturaA
     ? [
         ...data.lines
           .reduce((acc, l) => {
             const rate = Number(l.vatRate ?? 0)
             if (!Number.isFinite(rate)) return acc
-            const importe = Number(l.lineTotal)
+            const importe = Number(l.lineTotal) * factorDescuento
             const base = data.priceMode === 'gross' ? importe / (1 + rate / 100) : importe
             const prev = acc.get(rate) ?? { base: 0, amount: 0 }
             acc.set(rate, { base: prev.base + base, amount: prev.amount + base * (rate / 100) })
@@ -64,16 +88,30 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
     // Un comprobante fiscal SIN CAE no es una factura válida: el título lo
     // dice, para que nadie entregue un papel que aparenta serlo.
     title:
-      data.sale.type !== 'X' && !data.fiscal?.cae
-        ? `${VOUCHER_LABELS[data.sale.type].toUpperCase()} — SIN AUTORIZAR (documento no válido)`
-        : VOUCHER_LABELS[data.sale.type].toUpperCase(),
-    number: String(data.sale.number).padStart(8, '0'),
+      tipo !== 'X' && !data.fiscal?.cae
+        ? `${VOUCHER_LABELS[tipo].toUpperCase()} — SIN AUTORIZAR (documento no válido)`
+        : VOUCHER_LABELS[tipo].toUpperCase(),
+    // Con CAE va la numeración de ARCA (PPPPP-NNNNNNNN); el número interno de
+    // la venta no es el del comprobante.
+    number: ticketNumber(data),
     meta,
-    customer: data.customerName
-      ? { name: data.customerName, doc: data.customerDoc, vatCondition: data.customerVatCondition }
-      : null,
+    // Con nombre O documento: en la Factura A de mostrador (ficha Consumidor
+    // Final + CUIT tipeado) no hay nombre pero el CUIT y la condición que se le
+    // informaron a ARCA tienen que salir en el papel, que es lo que el receptor
+    // usa para el crédito fiscal. Mirando sólo el nombre salía "Consumidor
+    // Final / Consumidor Final" sin el CUIT.
+    customer:
+      data.customerName || data.customerDoc
+        ? {
+            name: data.customerName ?? 'Consumidor Final',
+            doc: data.customerDoc,
+            vatCondition: data.customerVatCondition,
+          }
+        : null,
     // ORIGINAL sólo en comprobantes fiscales: en un remito X no significa nada.
-    copyLabel: data.sale.type !== 'X' ? 'Original' : null,
+    // Se mira la letra IMPRESA (`tipo`), no la de la venta: una venta X
+    // facturada después desde el Historial salía titulada FACTURA sin esto.
+    copyLabel: tipo !== 'X' ? 'Original' : null,
     saleCondition: data.isAccountSale ? 'Cuenta corriente' : (single ?? 'Contado'),
     vatBreakdown,
     lines: data.lines,
@@ -81,7 +119,7 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
       subtotal: data.sale.subtotal,
       discount: data.sale.discount,
       vatAmount: data.sale.vatAmount,
-      vatLabel: data.priceMode === 'gross' && data.sale.type !== 'A' ? 'IVA (incluido)' : 'IVA',
+      vatLabel: data.priceMode === 'gross' && !esFacturaA ? 'IVA (incluido)' : 'IVA',
       total: data.sale.total,
     },
     payments: data.isAccountSale || data.payments.length <= 1 ? undefined : data.payments,
@@ -100,7 +138,7 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
       : null,
     // Leyendas al pie. Sólo en comprobantes fiscales: un remito X no las lleva.
     legalNotes:
-      data.sale.type !== 'X'
+      tipo !== 'X'
         ? [
             'Los importes consignados en este comprobante incluyen los impuestos correspondientes según la condición fiscal del emisor.',
             'Reclamos por diferencias o faltantes dentro de las 48 horas de recibida la mercadería.',
@@ -117,7 +155,7 @@ function toFormalDocFromSale(data: SaleTicketData): FormalDocData {
 export function toEscPosTicketDTO(data: SaleTicketData): SaleTicketDataDTO {
   return {
     number: data.sale.number,
-    voucherType: data.sale.type,
+    voucherType: ticketVoucherType(data),
     createdAt: data.sale.date,
     company: {
       name: data.company.name,
@@ -126,7 +164,20 @@ export function toEscPosTicketDTO(data: SaleTicketData): SaleTicketDataDTO {
       phone: data.company.phone,
       ingBrutos: data.company.ingBrutos,
     },
-    customer: data.customerName ? { name: data.customerName, docNumber: data.customerDoc } : null,
+    // Consumidor final con documento tipeado en el mostrador: el documento y la
+    // condición informados a ARCA van al ticket igual que en el A4. Sin nombre
+    // se manda vacío y la térmica omite la línea "Cliente": en la Factura A de
+    // mostrador "Cliente: Consumidor Final" contradecía la condición IVA
+    // (Responsable Inscripto) impresa debajo.
+    customer:
+      data.customerName || data.customerDoc
+        ? {
+            name: data.customerName ?? '',
+            docNumber: data.customerDoc,
+            vatCondition: data.customerVatCondition ?? null,
+          }
+        : null,
+    vatIncluded: data.priceMode === 'gross',
     lines: data.lines.map((l) => ({
       description: l.description,
       quantity: l.quantity,
@@ -140,6 +191,9 @@ export function toEscPosTicketDTO(data: SaleTicketData): SaleTicketDataDTO {
     accountSale: data.isAccountSale,
     fiscalCae: data.fiscal?.cae ?? null,
     fiscalCaeExpiry: data.fiscal?.caeExpiry ?? null,
+    fiscalSalePoint: data.fiscal?.salePoint ?? null,
+    fiscalNumber: data.fiscal?.number ?? null,
+    fiscalQrUrl: data.fiscal?.qrUrl ?? null,
   }
 }
 

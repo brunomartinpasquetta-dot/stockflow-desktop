@@ -7,7 +7,7 @@
  * índice único en la tabla: si dos terminales facturan al mismo tiempo, la
  * segunda falla en vez de duplicar el número.
  */
-import { and, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 
 import { rethrowDbError } from '../errors';
@@ -24,6 +24,14 @@ import {
 } from '../schema/local';
 
 const CONFIG_ID = 'singleton';
+
+/**
+ * Prefijo con el que un intento fallido guarda, en `observations`, el número
+ * que le pidió a ARCA. `number` no puede llevarlo (ver `recordFailure`) y el
+ * reintento lo necesita para consultar ESE comprobante y no "el último": entre
+ * el corte y el reintento otra terminal pudo seguir facturando.
+ */
+const NUMERO_SOLICITADO = 'Número solicitado: ';
 
 export interface SaveFiscalConfigInput {
   environment: 'homologacion' | 'produccion';
@@ -264,12 +272,20 @@ export class FiscalRepository {
     }
   }
 
-  /** Deja constancia de un intento fallido, para diagnóstico. */
+  /**
+   * Deja constancia de un intento fallido, para diagnóstico y para el reintento.
+   *
+   * `responseLost` distingue el intento que se quedó SIN respuesta (timeout o
+   * corte de red: ARCA pudo haber autorizado igual, queda como `error`) del
+   * rechazo explícito de ARCA (`rejected`, el comprobante seguro no existe).
+   * Sólo el primero habilita a adoptar un comprobante ya emitido al reintentar.
+   */
   recordFailure(input: {
     voucherCode: number;
     letter: 'A' | 'B' | 'C';
     kind: 'invoice' | 'credit_note' | 'debit_note';
     salePoint: number;
+    /** Número que se le pidió a ARCA (`CbteDesde`). */
     number: number;
     customerId: string;
     customerDocType: number;
@@ -280,6 +296,7 @@ export class FiscalRepository {
     userId: string;
     errors: string[];
     saleId?: string | null;
+    responseLost?: boolean;
   }): void {
     try {
       const now = Date.now();
@@ -291,9 +308,13 @@ export class FiscalRepository {
           letter: input.letter,
           kind: input.kind,
           salePoint: input.salePoint,
-          // Un rechazo NO consume numeración en ARCA; se guarda con número 0
-          // para no bloquear el índice único del número real.
-          number: 0,
+          // Un rechazo NO consume numeración en ARCA, así que no puede ocupar
+          // un número real. Se guardaba con 0, pero el índice único (tipo +
+          // punto de venta + número) admitía UN solo rechazo por tipo: el
+          // segundo chocaba y se perdía en silencio, y el reintento de una
+          // venta no podía saber que ya había fallado. Negativo y distinto
+          // cada vez, nunca choca ni con un número real ni con otro rechazo.
+          number: -now,
           date: now,
           saleId: input.saleId ?? null,
           relatedVoucherId: null,
@@ -309,8 +330,8 @@ export class FiscalRepository {
           total: input.total,
           cae: null,
           caeExpiry: null,
-          status: 'rejected',
-          observations: null,
+          status: input.responseLost ? 'error' : 'rejected',
+          observations: `${NUMERO_SOLICITADO}${input.number}`,
           errors: input.errors.join(' | '),
           qrUrl: null,
           userId: input.userId,
@@ -342,6 +363,61 @@ export class FiscalRepository {
           .where(and(eq(fiscalVouchers.saleId, saleId), eq(fiscalVouchers.status, 'approved')))
           .get() ?? null
       );
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Comprobante local por numeración de ARCA (tipo + punto de venta + número).
+   * El reintento lo usa para descartar un número que ya es de otra venta de
+   * esta base antes de consultarlo en ARCA.
+   */
+  findVoucherByNumber(voucherCode: number, salePoint: number, number: number): FiscalVoucher | null {
+    try {
+      return (
+        this.db
+          .select()
+          .from(fiscalVouchers)
+          .where(
+            and(
+              eq(fiscalVouchers.voucherCode, voucherCode),
+              eq(fiscalVouchers.salePoint, salePoint),
+              eq(fiscalVouchers.number, number),
+              eq(fiscalVouchers.status, 'approved'),
+            ),
+          )
+          .get() ?? null
+      );
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Intentos fallidos de facturar una venta, el más reciente primero: los que
+   * ARCA rechazó (`rejected`) y los que se quedaron sin respuesta (`error`).
+   * `requestedNumber` es el número que ese intento le pidió a ARCA.
+   */
+  findFailuresBySale(saleId: string): (FiscalVoucher & { requestedNumber: number | null })[] {
+    try {
+      return this.db
+        .select()
+        .from(fiscalVouchers)
+        .where(
+          and(
+            eq(fiscalVouchers.saleId, saleId),
+            inArray(fiscalVouchers.status, ['rejected', 'error']),
+          ),
+        )
+        .orderBy(desc(fiscalVouchers.date))
+        .all()
+        .map((row) => {
+          const n = row.observations?.startsWith(NUMERO_SOLICITADO)
+            ? Number(row.observations.slice(NUMERO_SOLICITADO.length))
+            : NaN;
+          return { ...row, requestedNumber: Number.isInteger(n) && n > 0 ? n : null };
+        });
     } catch (err) {
       return rethrowDbError(err);
     }

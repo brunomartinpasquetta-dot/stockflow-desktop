@@ -220,7 +220,7 @@ export function validateForLetter(
     return {
       ok: false,
       reason:
-        'Una Factura A requiere el CUIT del cliente. Debe cargarse en la ficha del cliente antes de facturar.',
+        'Una Factura A requiere el CUIT del cliente. Puede cargarse en la ficha del cliente o tipearse en la venta antes de facturar.',
     };
   }
   if (receiverVatConditionId != null) {

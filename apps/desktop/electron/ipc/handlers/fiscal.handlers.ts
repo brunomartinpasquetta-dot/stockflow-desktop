@@ -4,15 +4,17 @@
  * La configuración (CUIT, certificado, entorno) es de administrador. La emisión
  * la puede hacer quien vende, porque facturar es parte de la venta.
  */
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 
 import { FiscalService, type ArcaGateway } from '@stockflow/core';
 import { PermissionDeniedError, ValidationError } from '@stockflow/core';
 import {
+  DOC_TYPES,
   MONOTRIBUTO_CLASS_A_LEGEND,
   RECEIVER_VAT_CONDITION_IDS,
   RECEIVER_VAT_CONDITION_LABELS,
+  VAT_RATE_BY_ID,
 } from '@stockflow/shared';
 
 import { ArcaGatewayImpl } from '../../fiscal/ArcaGatewayImpl';
@@ -176,11 +178,22 @@ async function archivar(
       if (a) articulos.set(l.articleId, { descripcion: a.description, codigo: a.barcode ?? null });
     }
 
-    // DETALLE DE ALÍCUOTAS: se agrupan los renglones por tasa. Sólo en la A. El
-    // neto sale de sacarle el impuesto al importe cuando los precios se cargan
-    // CON IVA (`priceMode: 'gross'`); si se cargan netos, el importe ya es neto.
+    // DETALLE DE ALÍCUOTAS Y TOTALES: salen del comprobante PERSISTIDO, que es
+    // exactamente lo que se le informó a ARCA. Recalcularlos desde la venta
+    // ponía como "Neto gravado" el subtotal CON IVA ("Neto $1.210 · IVA $210 ·
+    // TOTAL $1.210") en el archivo que va al contador. Sólo las ventas
+    // migradas (CAE en la venta, sin `fiscal_vouchers`) caen al cálculo viejo.
     const porTasa = new Map<number, { base: number; importe: number }>();
-    if (v.letter === 'A') {
+    if (v.letter === 'A' && emitido) {
+      for (const d of deps.repos.fiscal.vatDetailsFor(emitido.id)) {
+        const tasa = Number(VAT_RATE_BY_ID[d.vatId] ?? '21.00');
+        const prev = porTasa.get(tasa) ?? { base: 0, importe: 0 };
+        porTasa.set(tasa, {
+          base: prev.base + Number(d.baseAmount),
+          importe: prev.importe + Number(d.vatAmount),
+        });
+      }
+    } else if (v.letter === 'A') {
       for (const l of lines) {
         const tasa = Number(l.vatRate ?? 0);
         if (!Number.isFinite(tasa)) continue;
@@ -190,6 +203,12 @@ async function archivar(
         porTasa.set(tasa, { base: prev.base + base, importe: prev.importe + base * (tasa / 100) });
       }
     }
+    // El documento del receptor también es el informado a ARCA: el de la ficha
+    // puede ser otro (CUIT tipeado en el mostrador) o haber cambiado después.
+    const docEmitido =
+      emitido && emitido.customerDocType !== DOC_TYPES.CONSUMIDOR_FINAL
+        ? `${emitido.customerDocType === DOC_TYPES.CUIT ? 'CUIT' : emitido.customerDocType === DOC_TYPES.CUIL ? 'CUIL' : emitido.customerDocType === DOC_TYPES.DNI ? 'DNI' : 'Doc'}: ${emitido.customerDocNumber}`
+        : null;
 
     const datos: DatosFactura = {
       comercio: {
@@ -204,8 +223,11 @@ async function archivar(
       cliente: cliente
         ? {
             nombre: `${cliente.lastName}${cliente.firstName ? ' ' + cliente.firstName : ''}`.trim(),
-            documento:
-              cliente.docNumber ? `${cliente.docType ?? 'Doc'}: ${cliente.docNumber}` : null,
+            documento: emitido
+              ? docEmitido
+              : cliente.docNumber
+                ? `${cliente.docType ?? 'Doc'}: ${cliente.docNumber}`
+                : null,
             condicionIva:
               (condicionIvaId != null ? RECEIVER_VAT_CONDITION_LABELS[condicionIvaId] : null) ??
               CONDICION_IVA_CLIENTE[cliente.category] ??
@@ -221,7 +243,10 @@ async function archivar(
         letra: v.letter,
         puntoVenta: v.salePoint,
         numero: v.number,
-        fecha: sale.date,
+        // La fecha del comprobante es la de la emisión (CbteFch), no la de la
+        // venta: una venta facturada días después desde el Historial lleva la
+        // fecha en que ARCA la autorizó.
+        fecha: emitido?.date ?? sale.date,
         cae: v.cae,
         vencimientoCae: v.caeExpiry,
       },
@@ -235,11 +260,9 @@ async function archivar(
         alicuota: l.vatRate,
         descuento: l.discount,
       })),
-      totales: {
-        neto: sale.subtotal,
-        iva: sale.vatAmount,
-        total: sale.total,
-      },
+      totales: emitido
+        ? { neto: emitido.netAmount, iva: emitido.vatAmount, total: emitido.total }
+        : { neto: sale.subtotal, iva: sale.vatAmount, total: sale.total },
       condicionVenta: sale.isAccountSale ? 'Cuenta corriente' : 'Contado',
       alicuotas: [...porTasa.entries()]
         .sort((a, b) => a[0] - b[0])
@@ -300,6 +323,17 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
           const resguardo = resguardarCertificado(deps.userDataDir, payload.certPath);
           const enInstalacion = /program files|archivos de programa/i.test(payload.certPath);
           if (resguardo && enInstalacion) payload = { ...payload, certPath: resguardo };
+        }
+        // Los tickets de acceso cacheados se tiran: un cambio de entorno, CUIT
+        // o certificado los vuelve inválidos y el viejo seguía usándose hasta
+        // 12 horas.
+        try {
+          const cacheDir = ArcaGatewayImpl.defaultCacheDir(deps.userDataDir);
+          for (const f of readdirSync(cacheDir)) {
+            if (/^ta-.*\.json$/.test(f)) unlinkSync(path.join(cacheDir, f));
+          }
+        } catch {
+          /* sin carpeta de cache todavía: nada que borrar */
         }
         return deps.repos.fiscal.saveConfig(payload) as FiscalConfigDTO;
       },

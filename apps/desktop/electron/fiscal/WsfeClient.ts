@@ -5,6 +5,8 @@
  *  - `FECompUltimoAutorizado`: último número autorizado por punto de venta y
  *    tipo. Se consulta ANTES de emitir para no dejar huecos ni pisar números.
  *  - `FECAESolicitar`: envía el comprobante y devuelve el CAE.
+ *  - `FECompConsultar`: datos de un comprobante ya emitido (para recuperar un
+ *    CAE cuya respuesta se perdió antes de emitir otro).
  *  - `FEParamGetPtosVenta`: puntos de venta habilitados (para la config).
  *  - `FEDummy`: chequeo de estado de los servidores de ARCA.
  *
@@ -142,14 +144,35 @@ export class WsfeClient {
       '</soapenv:Envelope>',
     ].join('');
 
-    const res = await fetch(this.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/xml; charset=utf-8',
-        SOAPAction: `http://ar.gov.afip.dif.FEV1/${action}`,
-      },
-      body: soap,
-    });
+    let res: Response;
+    try {
+      res = await fetch(this.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          SOAPAction: `http://ar.gov.afip.dif.FEV1/${action}`,
+        },
+        body: soap,
+        // Sin tope, una respuesta que no llega dejaba al cajero esperando el
+        // CAE sin límite, con el cliente en el mostrador y la venta ya hecha.
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      // Los códigos TIMEOUT y NETWORK los lee el servicio fiscal: son los
+      // errores tras los cuales ARCA pudo haber autorizado igual (el pedido
+      // salió, la respuesta no volvió), y el reintento consulta ese número
+      // antes de emitir otro. Un rechazo de ARCA nunca lleva estos códigos.
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        throw new WsfeApiError(
+          'ARCA no respondió en 30 segundos. Si llegó a autorizar el comprobante, el reintento desde el Historial lo recupera antes de emitir otro.',
+          'TIMEOUT',
+        );
+      }
+      // El `TypeError: fetch failed` crudo llegaba al cajero como "Error interno".
+      const causa = (err as { cause?: { code?: string; message?: string } } | null)?.cause;
+      const detalle = causa?.code ?? causa?.message ?? (err instanceof Error ? err.message : String(err));
+      throw new WsfeApiError(`No se pudo conectar con ARCA (${detalle}).`, 'NETWORK');
+    }
     const text = await res.text();
     const fault = extractTag(text, 'faultstring');
     if (fault) throw new WsfeApiError(fault, 'SOAP_FAULT');
@@ -183,6 +206,53 @@ export class WsfeClient {
       throw new WsfeApiError(errors.join(' | '), 'ARCA_ERROR', errors);
     }
     return Number(extractTag(xml, 'CbteNro') ?? '0');
+  }
+
+  /**
+   * Comprobante ya emitido (`FECompConsultar`), o `null` si ARCA no lo tiene
+   * (error 602). Se usa antes de reintentar una venta cuya respuesta se
+   * perdió: si ARCA lo autorizó, se adopta en vez de emitir otro.
+   */
+  async getVoucher(
+    salePoint: number,
+    voucherCode: number,
+    number: number,
+  ): Promise<{
+    cae: string;
+    caeExpiry: string;
+    total: number;
+    date: string;
+    docType: number;
+    docNumber: string;
+  } | null> {
+    const xml = await this.call(
+      'FECompConsultar',
+      [
+        '<ar:FECompConsultar>',
+        this.authXml(),
+        '<ar:FeCompConsReq>',
+        `<ar:CbteTipo>${voucherCode}</ar:CbteTipo>`,
+        `<ar:CbteNro>${number}</ar:CbteNro>`,
+        `<ar:PtoVta>${salePoint}</ar:PtoVta>`,
+        '</ar:FeCompConsReq>',
+        '</ar:FECompConsultar>',
+      ].join(''),
+    );
+    const errors = parseErrors(xml);
+    if (errors.length > 0) {
+      if (errors.some((e) => e.startsWith('602:'))) return null;
+      throw new WsfeApiError(errors.join(' | '), 'ARCA_ERROR', errors);
+    }
+    const result = extractTag(xml, 'ResultGet');
+    if (!result) return null;
+    return {
+      cae: extractTag(result, 'CodAutorizacion') ?? '',
+      caeExpiry: extractTag(result, 'FchVto') ?? '',
+      total: Number(extractTag(result, 'ImpTotal') ?? '0'),
+      date: extractTag(result, 'CbteFch') ?? '',
+      docType: Number(extractTag(result, 'DocTipo') ?? '99'),
+      docNumber: extractTag(result, 'DocNro') ?? '0',
+    };
   }
 
   /** Puntos de venta habilitados para facturación electrónica. */

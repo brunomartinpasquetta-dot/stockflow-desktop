@@ -21,6 +21,7 @@
  * "spawn openssl ENOENT", justo el sistema operativo de todos los clientes.
  * Apareció en Leo Citzia el 13-ago-2026, con la primera factura por emitir.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import forge from 'node-forge';
@@ -57,6 +58,8 @@ export interface WsaaOptions {
   cacheDir: string;
   /** CUIT emisor, solo para nombrar el archivo de cache. */
   cuit: string;
+  /** Entorno, solo para nombrar el archivo de cache. Si falta, se deduce de la URL. */
+  environment?: 'homologacion' | 'produccion';
 }
 
 /** Escapa texto para insertarlo en un XML. */
@@ -146,9 +149,26 @@ export class WsaaClient {
     return this.opts.service ?? 'wsfe';
   }
 
+  /**
+   * El nombre del cache lleva el ENTORNO y un hash del certificado. Antes era
+   * sólo servicio + CUIT: al pasar de homologación a producción se le mandaba a
+   * servicios1 el TA de homologación hasta 12 horas, y lo mismo al cambiar de
+   * certificado (uno viejo ya revocado seguía "andando" con su TA cacheado).
+   */
   private get cacheFile(): string {
     const cuit = this.opts.cuit.replace(/\D/g, '');
-    return path.join(this.opts.cacheDir, `ta-${this.service}-${cuit}.json`);
+    const env =
+      this.opts.environment ?? (/homo/i.test(this.opts.wsaaUrl) ? 'homologacion' : 'produccion');
+    let certHash = 'sincert';
+    try {
+      certHash = createHash('sha256')
+        .update(readFileSync(this.opts.certPath))
+        .digest('hex')
+        .slice(0, 12);
+    } catch {
+      /* sin certificado legible no habrá TA que cachear; el login lo dirá claro */
+    }
+    return path.join(this.opts.cacheDir, `ta-${this.service}-${cuit}-${env}-${certHash}.json`);
   }
 
   /** TA cacheado si todavía es válido (con 5 min de margen). */
