@@ -36,24 +36,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import type { PedidoWebDTO } from '@/types/api'
 
-function EstadoBadge({ p }: { p: PedidoWebDTO }) {
-  if (p.ventaAnulada) return <Badge variant="destructive">Venta anulada — pedido cancelado</Badge>
-  if (p.estado === 'convertido') return <Badge variant="success">Convertido en venta</Badge>
-  if (p.estado === 'rechazado') return <Badge variant="outline">Rechazado</Badge>
-  return <Badge variant="warning">Pendiente</Badge>
-}
-
 /**
- * El estado del PAGO, siempre visible: es lo primero que el comerciante
- * necesita saber para decidir qué hacer con el pedido. Pagado en el catálogo
- * (Mercado Pago) → se registra; sin pagar → se cobra en el local al cargarlo
- * en Ventas.
+ * Un solo estado por pedido, en una palabra. Mientras está por resolver, el
+ * estado ES el del pago: Pendiente (se cobra al cargarlo en Ventas) o Pagado
+ * (ya cobrado en el catálogo). Resuelto: Vendido, Rechazado o Anulado.
  */
-function PagoBadge({ p }: { p: PedidoWebDTO }) {
-  if (p.pagado) return <Badge variant="success">Pagado con Mercado Pago</Badge>
-  if (p.estado === 'convertido' && !p.ventaAnulada) return <Badge variant="outline">Cobrado en el local</Badge>
-  if (p.estado === 'pendiente') return <Badge variant="destructive">Pago pendiente — se cobra en el local</Badge>
-  return null
+function EstadoBadge({ p }: { p: PedidoWebDTO }) {
+  if (p.ventaAnulada) return <Badge variant="destructive">Anulado</Badge>
+  if (p.estado === 'convertido') return <Badge variant="success">Vendido</Badge>
+  if (p.estado === 'rechazado') return <Badge variant="outline">Rechazado</Badge>
+  if (p.pagado) return <Badge variant="success">Pagado</Badge>
+  return <Badge variant="warning">Pendiente</Badge>
 }
 
 /**
@@ -153,8 +146,9 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold">Pedido N° {p.numero}</span>
-              <EstadoBadge p={p} />
-              <PagoBadge p={p} />
+              <span className="ml-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                Estado: <EstadoBadge p={p} />
+              </span>
             </div>
             <span className="text-sm font-medium">{p.clienteNombre}</span>
           </div>
@@ -215,27 +209,8 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
 
         <div className="flex items-center justify-between border-t pt-2.5">
           <span className="text-sm text-muted-foreground">Total del pedido</span>
-          <span className="flex items-baseline gap-2">
-            {esPendiente && (
-              <span className={'text-xs font-medium ' + (p.pagado ? 'text-emerald-700' : 'text-destructive')}>
-                {p.pagado ? 'ya pagado' : 'a cobrar'}
-              </span>
-            )}
-            <span className="text-lg font-semibold tabular-nums">{formatCurrency(p.total)}</span>
-          </span>
+          <span className="text-lg font-semibold tabular-nums">{formatCurrency(p.total)}</span>
         </div>
-
-        {p.ventaAnulada ? (
-          <p className="text-xs text-muted-foreground">
-            La venta se anuló: el stock volvió al sistema y el pedido quedó cancelado en el catálogo.
-          </p>
-        ) : (
-          p.estado === 'convertido' && (
-            <p className="text-xs text-muted-foreground">
-              Registrado como venta{p.saleId ? '' : ' (ver Historial de Ventas)'}.
-            </p>
-          )
-        )}
 
         {esPendiente && (
           <>
@@ -297,14 +272,15 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
 
 export function PedidosWeb() {
   const qc = useQueryClient()
-  const [verTodos, setVerTodos] = useState(false)
 
   const config = useQuery({ queryKey: ['catalogo', 'syncEstado'], queryFn: () => api.catalogo.syncEstado() })
   const catalogoConfigurado = config.data != null
 
+  // Una sola consulta con todo: la pestaña Pedidos web muestra los pendientes
+  // y el Historial los ya resueltos (vendidos, rechazados, anulados).
   const pedidos = useQuery({
-    queryKey: ['catalogo', 'pedidos', verTodos],
-    queryFn: () => api.catalogo.pedidosListar(verTodos ? undefined : 'pendiente'),
+    queryKey: ['catalogo', 'pedidos'],
+    queryFn: () => api.catalogo.pedidosListar(),
     refetchInterval: 30_000,
   })
 
@@ -324,166 +300,170 @@ export function PedidosWeb() {
     void qc.invalidateQueries({ queryKey: ['catalogo', 'pedidosContarPendientes'] })
   }
 
-  const lista = pedidos.data ?? []
-
-  // Los pendientes siempre arriba: son los que requieren una decisión.
-  const ordenados = useMemo(
-    () =>
-      [...lista].sort((a, b) => {
-        if (a.estado === 'pendiente' && b.estado !== 'pendiente') return -1
-        if (a.estado !== 'pendiente' && b.estado === 'pendiente') return 1
-        return b.fecha - a.fecha
-      }),
+  const lista = useMemo(() => pedidos.data ?? [], [pedidos.data])
+  const pendientes = useMemo(
+    () => lista.filter((p) => p.estado === 'pendiente').sort((a, b) => a.fecha - b.fecha),
     [lista],
   )
-
-  const pendientesHoy = lista.filter((p) => p.estado === 'pendiente')
-  const totalPendiente = pendientesHoy.reduce((acc, p) => acc + Number(p.total || 0), 0)
-  const convertidosVisibles = verTodos ? lista.filter((p) => p.estado === 'convertido').length : null
+  const historial = useMemo(
+    () => lista.filter((p) => p.estado !== 'pendiente').sort((a, b) => b.fecha - a.fecha),
+    [lista],
+  )
+  const totalPendiente = pendientes.reduce((acc, p) => acc + Number(p.total || 0), 0)
+  const vendidos = historial.filter((p) => p.estado === 'convertido' && !p.ventaAnulada).length
 
   // La tienda tal como la ve el cliente: la dirección pública si se cargó una
   // distinta, si no la misma del catálogo (en producción son el mismo dominio).
   const company = useCompany()
   const tiendaUrl = (company.data?.catalogoWebUrl || company.data?.catalogoUrl || '').trim().replace(/\/$/, '')
-  const [pestana, setPestana] = useState<'pedidos' | 'tienda'>('pedidos')
+  const [pestana, setPestana] = useState<'pedidos' | 'historial' | 'tienda'>('pedidos')
   // La tienda se carga recién la primera vez que se abre la pestaña y después
   // queda viva: cambiar de pestaña no la recarga.
   const [tiendaVista, setTiendaVista] = useState(false)
   const webviewRef = useRef<HTMLElement | null>(null)
 
   return (
-    <Tabs
-      value={pestana}
-      onValueChange={(v) => {
-        setPestana(v as 'pedidos' | 'tienda')
-        if (v === 'tienda') setTiendaVista(true)
-      }}
-      className="flex h-full flex-col gap-3 overflow-hidden p-4"
-    >
+    <div className="flex h-full flex-col gap-3 overflow-hidden p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold">Catálogo web</h1>
           <p className="text-sm text-muted-foreground">
             {pestana === 'tienda'
               ? 'La tienda del comercio, tal como la ve el cliente.'
-              : 'Lo que se compró en el catálogo, a la espera de convertirse en venta.'}
+              : pestana === 'historial'
+                ? 'Pedidos ya vendidos, rechazados o anulados.'
+                : 'Pedidos del catálogo a la espera de convertirse en venta.'}
           </p>
         </div>
-        <TabsList>
-          <TabsTrigger value="pedidos">
-            Pedidos web
-            {pendientesHoy.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
-                {pendientesHoy.length}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="tienda">
-            <Globe className="mr-1.5 h-3.5 w-3.5" />
-            Ver catálogo
-          </TabsTrigger>
-        </TabsList>
-      </div>
-
-      <TabsContent value="pedidos" className="mt-0 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <div className="flex items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-primary"
-              checked={verTodos}
-              onChange={(e) => setVerTodos(e.target.checked)}
-            />
-            Ver también los ya resueltos
-          </label>
+        {pestana !== 'tienda' && (
           <Button size="sm" variant="outline" disabled={buscar.isPending} onClick={() => buscar.mutate()}>
             {buscar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Buscar pedidos nuevos
           </Button>
-        </div>
+        )}
       </div>
 
       {!config.isLoading && !catalogoConfigurado && (
         <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <WifiOff className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            El catálogo web todavía no está configurado. Cargá la dirección y la clave en{' '}
+            El catálogo web todavía no está configurado. Cargue la dirección y la clave en{' '}
             <span className="font-medium">Mi Empresa → Catálogo web</span> para empezar a recibir pedidos.
           </span>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        <Resumen icon={Clock} label="Pedidos pendientes" value={String(pendientesHoy.length)} tone={pendientesHoy.length > 0 ? 'warning' : 'default'} />
-        <Resumen icon={ShoppingBag} label="Monto por confirmar" value={formatCurrency(String(totalPendiente))} tone={totalPendiente > 0 ? 'warning' : 'default'} />
-        {verTodos && convertidosVisibles != null && (
-          <Resumen icon={CheckCircle2} label="Convertidos en venta" value={String(convertidosVisibles)} tone="success" />
-        )}
-      </div>
+      <Tabs
+        value={pestana}
+        onValueChange={(v) => {
+          setPestana(v as 'pedidos' | 'historial' | 'tienda')
+          if (v === 'tienda') setTiendaVista(true)
+        }}
+        className="flex min-h-0 flex-1 flex-col gap-3"
+      >
+        <TabsList>
+          <TabsTrigger value="pedidos">
+            Pedidos web
+            {pendientes.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+                {pendientes.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="historial">Historial de pedidos</TabsTrigger>
+          <TabsTrigger value="tienda">
+            <Globe className="mr-1.5 h-3.5 w-3.5" />
+            Ver catálogo
+          </TabsTrigger>
+        </TabsList>
 
-      {pedidos.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
-
-      {!pedidos.isLoading && lista.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-10 text-center text-muted-foreground">
-          <Inbox className="h-8 w-8 opacity-50" />
-          <p className="text-sm">
-            {verTodos ? 'Todavía no entró ningún pedido por el catálogo.' : 'No hay pedidos pendientes.'}
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        {ordenados.map((p) => (
-          <Pedido key={p.id} p={p} onCambio={recargar} />
-        ))}
-      </div>
-      </TabsContent>
-
-      {/* forceMount: la tienda no se destruye al volver a Pedidos (el global
-          data-[state=inactive]:hidden de Tabs la esconde). */}
-      <TabsContent value="tienda" forceMount className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
-        {!tiendaUrl ? (
-          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-10 text-center text-muted-foreground">
-            <Globe className="h-8 w-8 opacity-50" />
-            <p className="text-sm">
-              Falta la dirección del catálogo. Cargala en <span className="font-medium">Mi Empresa → Catálogo web</span>.
-            </p>
+        <TabsContent value="pedidos" className="mt-0 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            <Resumen icon={Clock} label="Pedidos pendientes" value={String(pendientes.length)} tone={pendientes.length > 0 ? 'warning' : 'default'} />
+            <Resumen icon={ShoppingBag} label="Monto por confirmar" value={formatCurrency(String(totalPendiente))} tone={totalPendiente > 0 ? 'warning' : 'default'} />
           </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="truncate font-mono">{tiendaUrl}</span>
-              <span className="flex-1" />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const wv = webviewRef.current as (HTMLElement & { reload?: () => void }) | null
-                  wv?.reload?.()
-                }}
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Recargar
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => void api.system.openExternal(tiendaUrl)}>
-                <ExternalLink className="h-3.5 w-3.5" />
-                Abrir en el navegador
-              </Button>
+
+          {pedidos.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+
+          {!pedidos.isLoading && pendientes.length === 0 && (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-10 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 opacity-50" />
+              <p className="text-sm">No hay pedidos pendientes.</p>
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden rounded-md border bg-white">
-              {tiendaVista && (
-                <webview
-                  ref={webviewRef}
-                  src={tiendaUrl}
-                  partition="persist:catalogo"
-                  style={{ width: '100%', height: '100%' }}
-                />
-              )}
+          )}
+
+          <div className="flex flex-col gap-3">
+            {pendientes.map((p) => (
+              <Pedido key={p.id} p={p} onCambio={recargar} />
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="historial" className="mt-0 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            <Resumen icon={CheckCircle2} label="Vendidos" value={String(vendidos)} tone={vendidos > 0 ? 'success' : 'default'} />
+            <Resumen icon={PackageX} label="Rechazados o anulados" value={String(historial.length - vendidos)} />
+          </div>
+
+          {!pedidos.isLoading && historial.length === 0 && (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-10 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 opacity-50" />
+              <p className="text-sm">Todavía no hay pedidos resueltos.</p>
             </div>
-          </>
-        )}
-      </TabsContent>
-    </Tabs>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {historial.map((p) => (
+              <Pedido key={p.id} p={p} onCambio={recargar} />
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* forceMount: la tienda no se destruye al cambiar de pestaña (el global
+            data-[state=inactive]:hidden de Tabs la esconde). */}
+        <TabsContent value="tienda" forceMount className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
+          {!tiendaUrl ? (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-10 text-center text-muted-foreground">
+              <Globe className="h-8 w-8 opacity-50" />
+              <p className="text-sm">
+                Falta la dirección del catálogo. Cárguela en <span className="font-medium">Mi Empresa → Catálogo web</span>.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="truncate font-mono">{tiendaUrl}</span>
+                <span className="flex-1" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const wv = webviewRef.current as (HTMLElement & { reload?: () => void }) | null
+                    wv?.reload?.()
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Recargar
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => void api.system.openExternal(tiendaUrl)}>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Abrir en el navegador
+                </Button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden rounded-md border bg-white">
+                {tiendaVista && (
+                  <webview
+                    ref={webviewRef}
+                    src={tiendaUrl}
+                    partition="persist:catalogo"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                )}
+              </div>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
