@@ -38,7 +38,8 @@
     "test:fiscal-xml": "tsx electron/__tests__/fiscal-xml.smoke.ts",
     "test:arca": "tsx scripts/verificar-arca.ts",
     "test:catalogo": "tsx electron/__tests__/catalogo.smoke.ts",
-    "test:devoluciones": "tsx electron/__tests__/devoluciones.smoke.ts"
+    "test:devoluciones": "tsx electron/__tests__/devoluciones.smoke.ts",
+    "test:backup": "tsx electron/__tests__/backup.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

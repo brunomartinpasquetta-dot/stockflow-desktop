@@ -46,9 +46,14 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
         if (deps.hardware.getConfig().backup.autoOnCashClose) {
           const dest = deps.hardware.getConfig().backup.destination;
           deps.backup.setBackupDir(dest);
-          void deps.backup.createBackup().catch((err) => {
-            console.error('[cash:close] backup automático falló:', err);
-          });
+          // La retención corre también acá: sólo en el manual, un cierre por
+          // día acumulaba ~10 GB al año en la carpeta del cliente.
+          void deps.backup
+            .createBackup()
+            .then(() => deps.backup.cleanupOldBackups())
+            .catch((err) => {
+              console.error('[cash:close] backup automático falló:', err);
+            });
         }
         return result;
       },

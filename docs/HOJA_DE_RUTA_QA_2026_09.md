@@ -24,15 +24,15 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
   venta a cuenta corriente con DEV en efectivo y luego anulada deja el egreso sin contrapartida (decidir).
 
 ## Tanda 2 — Backup que no sirve
-- [ ] **Copia con WAL abierto** (`BackupService.ts:69`): usar `db.$client.backup()` (o
-  `VACUUM INTO`); mínimo `wal_checkpoint(TRUNCATE)` antes de copiar.
-- [ ] **Pre-quit** (`main.ts:529`): cerrar la base antes, `setBackupDir` con la carpeta
-  configurada, y sin cortar a los 8 s con el `.tmp` a mitad.
-- [ ] **Limpieza** (`BackupService.ts:192`): borrar sólo `stockflow-AAAA-MM-DD-HHMMSS.zip`,
-  conservar todos los de los últimos N días, retención también en cierre de caja y salida.
-- [ ] **Restore** (`BackupService.ts:129`): copia `.pre-restore-<ts>` + cabecera SQLite +
-  `quick_check` antes de pisar.
-- [ ] Smoke: backup con la base abierta y 300 filas sin checkpoint → el zip las tiene.
+- [x] **Copia con WAL abierto** (`BackupService.ts:69`): usar `db.$client.backup()` (o
+  `VACUUM INTO`); mínimo `wal_checkpoint(TRUNCATE)` antes de copiar. — `BackupService.ts` (API de backup de SQLite, copia en tmp local)
+- [x] **Pre-quit** (`main.ts:529`): cerrar la base antes, `setBackupDir` con la carpeta
+  configurada, y sin cortar a los 8 s con el `.tmp` a mitad. — `main.ts` (+ `window-all-closed` ya no mata el backup en Windows; verificar en la PC Windows con un backup grande)
+- [x] **Limpieza** (`BackupService.ts:192`): borrar sólo `stockflow-AAAA-MM-DD-HHMMSS.zip`,
+  conservar todos los de los últimos N días, retención también en cierre de caja y salida. — `BackupService.ts`, `cash.handlers.ts`, `main.ts`
+- [x] **Restore** (`BackupService.ts:129`): copia `.pre-restore-<ts>` + cabecera SQLite +
+  `quick_check` antes de pisar. — `BackupService.ts`
+- [x] Smoke: backup con la base abierta y 300 filas sin checkpoint → el zip las tiene. — `backup.smoke.ts`
 
 ## Tanda 3 — ARCA: lo que viaja y lo que se imprime
 - [ ] **Importes** (`fiscal.service.ts:244`, `:216`, `:238`, `:378`): IVA redondeado y

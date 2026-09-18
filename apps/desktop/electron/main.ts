@@ -237,6 +237,7 @@ function bootstrap(): { lanArgs: string[] } {
     dbPath,
     backupDir: hardwareManager.getConfig().backup.destination,
     appVersion: app.getVersion(),
+    getDb: () => dbHandle?.db.$client,
   });
   const importService = new ExcelImportService();
   const mpTokenStore = new MpTokenStore(machineId);
@@ -482,6 +483,13 @@ if (!app.requestSingleInstanceLock()) {
     });
 
   app.on('window-all-closed', () => {
+    // En Windows/Linux cerrar la ventana dispara app.quit() → before-quit arranca
+    // el backup de salida y PREVIENE el quit; como la lista de ventanas ya quedó
+    // vacía, Electron emite este evento igual. Si acá cerráramos la base y
+    // volviéramos a llamar a quit, el backup moriría debajo sin dejar rastro en
+    // el log (nunca llegaba a correr en Windows). El finally del backup ya hace
+    // shutdown + app.exit(0).
+    if (quittingForBackup) return;
     if (process.platform !== 'darwin') {
       shutdown(dbHandle);
       app.quit();
@@ -521,13 +529,22 @@ if (!app.requestSingleInstanceLock()) {
     ) {
       event.preventDefault();
       quittingForBackup = true;
+      // Último recurso, por encima del tiempo máximo del propio backup: si ni el
+      // aborto responde (pendrive desconectado a mitad de copia), salir igual.
       const forceExit = setTimeout(() => {
         console.warn('[lifecycle] backup pre-quit tardó demasiado — salgo igual');
         shutdown(dbHandle);
         app.exit(0);
-      }, 8000);
+      }, 15000);
+      // La carpeta puede haber cambiado en Configuración durante la sesión: se
+      // toma la actual, como hacen los handlers, no la del arranque.
+      backupService.setBackupDir(hardwareManager.getConfig().backup.destination);
+      // La base sigue abierta a propósito: el backup se hace por la API de
+      // SQLite (incluye el WAL) y recién después se cierra. A los 8 s el propio
+      // servicio aborta, borra su .tmp y lo deja en el log.
       void backupService
-        .createBackup()
+        .createBackup(undefined, { timeoutMs: 8000 })
+        .then(() => backupService?.cleanupOldBackups())
         .catch((err) => console.error('[main] backup pre-quit falló:', err))
         .finally(() => {
           clearTimeout(forceExit);
