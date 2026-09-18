@@ -151,6 +151,9 @@ export class DesktopWindowsManager {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        // Igual que la ventana principal (WhatsApp): la pestaña "Ver catálogo"
+        // de Catálogo web muestra la tienda del comercio embebida.
+        webviewTag: true,
         additionalArguments: this.config.extraArgs,
       },
     });

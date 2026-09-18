@@ -7,12 +7,14 @@
  * porque un pedido de la madrugada no puede caer en una caja cerrada ni
  * adivinar cómo pagaron.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   CheckCircle2,
   Clock,
+  ExternalLink,
+  Globe,
   Inbox,
   Loader2,
   PackageX,
@@ -25,10 +27,12 @@ import {
 
 import { api, ApiError } from '@/lib/api'
 import { formatCurrency, formatRelativeTime } from '@/lib/format'
+import { useCompany } from '@/lib/hooks'
 import { useWindowNav } from '@/lib/useWindowNav'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import type { PedidoWebDTO } from '@/types/api'
 
@@ -317,15 +321,52 @@ export function PedidosWeb() {
   const totalPendiente = pendientesHoy.reduce((acc, p) => acc + Number(p.total || 0), 0)
   const convertidosVisibles = verTodos ? lista.filter((p) => p.estado === 'convertido').length : null
 
+  // La tienda tal como la ve el cliente: la dirección pública si se cargó una
+  // distinta, si no la misma del catálogo (en producción son el mismo dominio).
+  const company = useCompany()
+  const tiendaUrl = (company.data?.catalogoWebUrl || company.data?.catalogoUrl || '').trim().replace(/\/$/, '')
+  const [pestana, setPestana] = useState<'pedidos' | 'tienda'>('pedidos')
+  // La tienda se carga recién la primera vez que se abre la pestaña y después
+  // queda viva: cambiar de pestaña no la recarga.
+  const [tiendaVista, setTiendaVista] = useState(false)
+  const webviewRef = useRef<HTMLElement | null>(null)
+
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
+    <Tabs
+      value={pestana}
+      onValueChange={(v) => {
+        setPestana(v as 'pedidos' | 'tienda')
+        if (v === 'tienda') setTiendaVista(true)
+      }}
+      className="flex h-full flex-col gap-3 overflow-hidden p-4"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-semibold">Pedidos web</h1>
+          <h1 className="text-lg font-semibold">Catálogo web</h1>
           <p className="text-sm text-muted-foreground">
-            Lo que se compró en el catálogo, a la espera de convertirse en venta.
+            {pestana === 'tienda'
+              ? 'La tienda del comercio, tal como la ve el cliente.'
+              : 'Lo que se compró en el catálogo, a la espera de convertirse en venta.'}
           </p>
         </div>
+        <TabsList>
+          <TabsTrigger value="pedidos">
+            Pedidos web
+            {pendientesHoy.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">
+                {pendientesHoy.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="tienda">
+            <Globe className="mr-1.5 h-3.5 w-3.5" />
+            Ver catálogo
+          </TabsTrigger>
+        </TabsList>
+      </div>
+
+      <TabsContent value="pedidos" className="mt-0 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex items-center gap-2">
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <input
@@ -377,6 +418,52 @@ export function PedidosWeb() {
           <Pedido key={p.id} p={p} onCambio={recargar} />
         ))}
       </div>
-    </div>
+      </TabsContent>
+
+      {/* forceMount: la tienda no se destruye al volver a Pedidos (el global
+          data-[state=inactive]:hidden de Tabs la esconde). */}
+      <TabsContent value="tienda" forceMount className="mt-0 flex min-h-0 flex-1 flex-col gap-2">
+        {!tiendaUrl ? (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-10 text-center text-muted-foreground">
+            <Globe className="h-8 w-8 opacity-50" />
+            <p className="text-sm">
+              Falta la dirección del catálogo. Cargala en <span className="font-medium">Mi Empresa → Catálogo web</span>.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="truncate font-mono">{tiendaUrl}</span>
+              <span className="flex-1" />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const wv = webviewRef.current as (HTMLElement & { reload?: () => void }) | null
+                  wv?.reload?.()
+                }}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Recargar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => void api.system.openExternal(tiendaUrl)}>
+                <ExternalLink className="h-3.5 w-3.5" />
+                Abrir en el navegador
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden rounded-md border bg-white">
+              {tiendaVista && (
+                <webview
+                  ref={webviewRef}
+                  src={tiendaUrl}
+                  partition="persist:catalogo"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </TabsContent>
+    </Tabs>
   )
 }

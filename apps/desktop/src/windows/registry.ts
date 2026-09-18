@@ -212,8 +212,8 @@ export const WINDOWS: Record<string, WindowDef> = {
   },
   'pedidos-web': {
     pageKey: 'pedidos-web',
-    title: 'Pedidos web',
-    iconName: 'ShoppingBag',
+    title: 'Catálogo web',
+    iconName: 'Store',
     component: lazy(() => import('@/pages/PedidosWeb').then((m) => ({ default: m.PedidosWeb }))),
   },
   empresa: {

@@ -28,6 +28,8 @@ interface FormState {
   /** Integración con el catálogo web (vacío = sin catálogo). */
   catalogoUrl: string
   catalogoToken: string
+  /** Dirección pública de la tienda, si no es la misma que la del catálogo. */
+  catalogoWebUrl: string
 }
 
 function fromCompany(c: CompanyDTO): FormState {
@@ -43,6 +45,7 @@ function fromCompany(c: CompanyDTO): FormState {
     logoDataUrl: c.logoDataUrl ?? null,
     catalogoUrl: c.catalogoUrl ?? '',
     catalogoToken: c.catalogoToken ?? '',
+    catalogoWebUrl: c.catalogoWebUrl ?? '',
   }
 }
 
@@ -129,6 +132,7 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
         ingBrutos: form.ingBrutos.trim() || null,
         catalogoUrl: form.catalogoUrl.trim() || null,
         catalogoToken: form.catalogoToken.trim() || null,
+        catalogoWebUrl: form.catalogoWebUrl.trim() || null,
         priceMode: form.priceMode,
         allowNegativeStock: form.allowNegativeStock,
       }),
@@ -191,6 +195,18 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
               <div className="flex flex-col gap-1">
                 <Label htmlFor="emp-cat-token">Clave de acceso</Label>
                 <Input id="emp-cat-token" value={form.catalogoToken} onChange={(e) => set('catalogoToken', e.target.value)} />
+              </div>
+              <div className="col-span-2 flex flex-col gap-1">
+                <Label htmlFor="emp-cat-web">Dirección pública de la tienda (sólo si es distinta)</Label>
+                <Input
+                  id="emp-cat-web"
+                  placeholder="Vacío = la misma dirección del catálogo"
+                  value={form.catalogoWebUrl}
+                  onChange={(e) => set('catalogoWebUrl', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Es la que se muestra en Catálogo web → Ver catálogo, tal como la ve el cliente.
+                </p>
               </div>
             </div>
             <EspejoCatalogo />

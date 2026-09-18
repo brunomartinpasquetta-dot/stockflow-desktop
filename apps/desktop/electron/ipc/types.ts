@@ -221,6 +221,8 @@ export interface CompanyDTO {
   logoDataUrl?: string | null;
   catalogoUrl?: string | null;
   catalogoToken?: string | null;
+  /** Dirección pública de la tienda si difiere de `catalogoUrl`. */
+  catalogoWebUrl?: string | null;
   createdAt: number;
   updatedAt: number;
 }

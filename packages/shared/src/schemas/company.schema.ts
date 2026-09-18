@@ -22,6 +22,7 @@ export const CompanySchema = z.object({
   logoDataUrl: z.string().nullable(),
   catalogoUrl: z.string().nullable(),
   catalogoToken: z.string().nullable(),
+  catalogoWebUrl: z.string().nullable(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -43,6 +44,7 @@ const companyBase = z.object({
   logoDataUrl: z.string().nullable().optional(),
   catalogoUrl: z.string().url('Dirección inválida').nullable().optional().or(z.literal('').transform(() => null)),
   catalogoToken: z.string().nullable().optional(),
+  catalogoWebUrl: z.string().url('Dirección inválida').nullable().optional().or(z.literal('').transform(() => null)),
 });
 
 export const CreateCompanySchema = companyBase;

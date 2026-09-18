@@ -72,6 +72,8 @@ export const companies = sqliteTable(
      *  NULL = sin catálogo: Estadísticas oculta la pestaña "Catálogo web". */
     catalogoUrl: text('catalogo_url'),
     catalogoToken: text('catalogo_token'),
+    /** Dirección pública de la tienda si difiere de `catalogoUrl` (vacía = la misma). */
+    catalogoWebUrl: text('catalogo_web_url'),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },

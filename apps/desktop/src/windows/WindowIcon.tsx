@@ -22,6 +22,7 @@ import {
   Settings,
   ShieldCheck,
   ShoppingCart,
+  Store,
   Tag,
   Tags,
   Truck,
@@ -51,6 +52,7 @@ export function WindowIcon({ name, className }: { name: string | undefined; clas
     case 'Settings': return <Settings className={className} />
     case 'ShieldCheck': return <ShieldCheck className={className} />
     case 'ShoppingCart': return <ShoppingCart className={className} />
+    case 'Store': return <Store className={className} />
     case 'Tag': return <Tag className={className} />
     case 'Tags': return <Tags className={className} />
     case 'Banknote': return <Banknote className={className} />

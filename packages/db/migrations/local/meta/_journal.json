@@ -211,6 +211,13 @@
       "when": 1786725682782,
       "tag": "0030_catalogo_pedido_pagado",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1786725682783,
+      "tag": "0031_company_catalogo_web_url",
+      "breakpoints": true
     }
   ]
 }
