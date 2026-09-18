@@ -684,6 +684,7 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     # son historia, y StockFlow espera una sola caja abierta a la vez. La caja
     # del día la abre el comercio desde el sistema.
     caja_map: dict[int, str] = {}
+    caja_fecha: dict[int, int] = {}
     aperturas: dict[int, Decimal] = {}
     for r in leer(con, "LINEACAJA", ["CAJA", "MOTIVO", "INGRESO"]) if "LINEACAJA" in hay else []:
         if txt(r["MOTIVO"]).upper().startswith("INICIO"):
@@ -702,6 +703,7 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
              None if txt(r["ESTADO"]).upper() == "CERRADO"
              else "Quedó abierta en StockFácil; se cierra al migrar", abre))
         caja_map[idc] = cid
+        caja_fecha[idc] = abre
         rep.suma("Cajas diarias", 1)
 
     # Caja de respaldo para lo que no tenga IDCAJA válido.
@@ -717,10 +719,26 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
     cf_id = cf[0] if cf else (next(iter(cli_id.values()), None))
 
     # ---- VENTAS ----
+    punto_venta_viejo = None
+    if "MIEMPRESA" in hay:
+        for r in leer(con, "MIEMPRESA", ["PUNTO"]):
+            try:
+                punto_venta_viejo = int(r["PUNTO"]) if r["PUNTO"] else None
+            except (TypeError, ValueError):
+                punto_venta_viejo = None
+            break
     venta_map: dict[int, str] = {}
     campos_v = ["IDVENTA", "FECHA", "HORA", "NUMERO", "LETRA", "TOTAL", "IVA", "DESCUENTO",
-                "IDPERSONA", "IDCLIENTE", "ESTADO", "CAE", "CODIGOCAE", "ESTADOFE",
-                "IDCAJA", "FORMAPAGO", "USUARIO"]
+                "IDPERSONA", "IDCLIENTE", "CLIENTE", "ESTADO", "CAE", "CODIGOCAE", "ESTADOFE",
+                "IDCAJA", "FORMAPAGO", "USUARIO", "NROCOMP", "VENCCAE", "SUBTOTAL"]
+    venta_fecha: dict[int, int] = {}
+    # Datos del comprobante ARCA que StockFácil guarda en la venta. CODIGOCAE es
+    # el código de barras: CUIT(11) + tipo(2) + punto de venta(4) + CAE(14) +
+    # vencimiento(8) + dígito. De ahí salen el PV real y el tipo; NROCOMP es el
+    # número que autorizó ARCA (NUMERO es el correlativo interno del sistema
+    # viejo y NO coincide: en Denver la Factura B 1246 era la venta 61639).
+    CODIGO_POR_LETRA = {"A": 1, "B": 6, "C": 11}
+    cliente_de_venta: dict[str, str] = {}
     omitidas: dict[str, list] = {}
 
     def vendedor_de(v) -> str:
@@ -747,7 +765,11 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
                 f"N° {r['NUMERO']} del {r['FECHA'].date() if r['FECHA'] else '?'} por ${total}"
                 + (" (CON CAE)" if txt(r["CAE"]) else ""))
             continue
-        cliente = (cli_id.get(r["IDCLIENTE"]) if r["IDCLIENTE"] is not None else None) \
+        # En las bases reales el cliente de la venta está en CLIENTE (id de
+        # CLIENTES); IDCLIENTE/IDPERSONA no existen o vienen vacíos. Sin esto,
+        # el 100% de las ventas quedaba a Consumidor Final.
+        cliente = (cli_id.get(r["CLIENTE"]) if r["CLIENTE"] is not None else None) \
+            or (cli_id.get(r["IDCLIENTE"]) if r["IDCLIENTE"] is not None else None) \
             or (cli_por_persona.get(r["IDPERSONA"]) if r["IDPERSONA"] is not None else None) \
             or cf_id
         if not cliente:
@@ -781,10 +803,45 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
              dec(neto), dec(r["DESCUENTO"]), dec(iva), dec(total),
              "voided" if anulada else "completed", cae, nota, fecha, fecha))
         venta_map[r["IDVENTA"]] = vid
+        venta_fecha[r["IDVENTA"]] = fecha
+        cliente_de_venta[vid] = cliente
         rep.suma("Ventas", 1)
 
         if cae:
             rep.suma("Facturas con CAE", 1)
+            # El comprobante fiscal, como lo registra StockFlow cuando emite:
+            # así el Historial muestra "Factura B 00004-00001246", la
+            # reimpresión y el archivo PDF usan el número de ARCA y no el
+            # interno, y "archivar pendientes" no inventa punto de venta.
+            codbar = re.sub(r"\D", "", txt(r["CODIGOCAE"]))
+            pv = int(codbar[13:17]) if len(codbar) >= 17 and codbar[13:17].isdigit() else None
+            vcode = int(codbar[11:13]) if len(codbar) >= 13 and codbar[11:13].isdigit() else None
+            if pv is None:
+                pv = punto_venta_viejo or 1
+            if not vcode:
+                vcode = CODIGO_POR_LETRA.get(tipo, 6)
+            nro = r["NROCOMP"] if r["NROCOMP"] not in (None, "", 0) else r["NUMERO"]
+            venc = None
+            v8 = re.sub(r"\D", "", txt(r["VENCCAE"]))
+            if len(v8) == 8:
+                venc = ms(datetime(int(v8[:4]), int(v8[4:6]), int(v8[6:8])))
+            iva_d = Decimal(str(iva))
+            total_d = Decimal(str(total))
+            cli = sq.execute("SELECT doc_type, doc_number, last_name, first_name FROM customers WHERE id = ?", (cliente,)).fetchone()
+            doc_tipo = 80 if (cli and cli[0] == "CUIT") else (96 if (cli and cli[0] == "DNI" and cli[1]) else 99)
+            doc_nro = (cli[1] if cli and cli[1] and doc_tipo != 99 else "0")
+            nombre_cli = " ".join(x for x in ((cli[2] if cli else None), (cli[3] if cli else None)) if x) or "CONSUMIDOR FINAL"
+            try:
+                sq.execute(
+                    "INSERT INTO fiscal_vouchers (id,voucher_code,letter,kind,sale_point,number,date,sale_id,"
+                    "customer_id,customer_doc_type,customer_doc_number,customer_name,net_amount,vat_amount,"
+                    "total,cae,cae_expiry,status,user_id,created_at,updated_at) "
+                    "VALUES (?,?,?,'invoice',?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',?,?,?)",
+                    (uuid7(), vcode, tipo, pv, int(nro or 0), fecha, vid, cliente, doc_tipo, str(doc_nro),
+                     nombre_cli[:120], dec(total_d - iva_d), dec(iva_d), dec(total_d), cae, venc, uid, fecha, fecha))
+                rep.suma("  …con su comprobante fiscal (PV/número de ARCA)", 1)
+            except sqlite3.IntegrityError as e:
+                rep.aviso(f"comprobante {tipo} {pv}-{nro} de la venta {r['NUMERO']} no se pudo registrar: {e}")
     for letra_sf, lista in omitidas.items():
         rep.aviso(f"{len(lista)} {letra_sf} NO migradas (no son ventas; cargar a mano si hace falta): "
                   + "; ".join(lista[:4]) + (" …" if len(lista) > 4 else ""))
@@ -1038,7 +1095,11 @@ def migrar(destino: str, precio_venta: str = "PRECIO1", iva_incluido: bool = Tru
             "user_id,related_sale_id,related_purchase_id,payment_method_id,created_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (uuid7(), cid, tipo, txt(r["MOTIVO"])[:80] or "Movimiento", dec(monto),
-             ahora, uid, venta, compra, pm_para(r["DETALLE"]), ahora))
+             # La fecha real del movimiento: la de la venta si la hay, si no la
+             # apertura de esa caja. Con `ahora`, 62.596 movimientos históricos
+             # de Denver quedaban fechados el día de la migración.
+             venta_fecha.get(r["IDVENTA"]) or caja_fecha.get(r["CAJA"]) or ahora,
+             uid, venta, compra, pm_para(r["DETALLE"]), ahora))
         rep.suma("Movimientos de caja", 1)
 
     # El comercio vende sin haber cargado la compra: sin esto el sistema le
