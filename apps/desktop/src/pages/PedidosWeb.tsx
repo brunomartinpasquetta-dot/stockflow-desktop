@@ -44,6 +44,19 @@ function EstadoBadge({ p }: { p: PedidoWebDTO }) {
 }
 
 /**
+ * El estado del PAGO, siempre visible: es lo primero que el comerciante
+ * necesita saber para decidir qué hacer con el pedido. Pagado en el catálogo
+ * (Mercado Pago) → se registra; sin pagar → se cobra en el local al cargarlo
+ * en Ventas.
+ */
+function PagoBadge({ p }: { p: PedidoWebDTO }) {
+  if (p.pagado) return <Badge variant="success">Pagado con Mercado Pago</Badge>
+  if (p.estado === 'convertido' && !p.ventaAnulada) return <Badge variant="outline">Cobrado en el local</Badge>
+  if (p.estado === 'pendiente') return <Badge variant="destructive">Pago pendiente — se cobra en el local</Badge>
+  return null
+}
+
+/**
  * Tarjeta compacta de resumen, mismo lenguaje visual que el resto del sistema
  * (Estadísticas): un dato grande, un rótulo chico, sin adorno de más.
  */
@@ -141,7 +154,7 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold">Pedido N° {p.numero}</span>
               <EstadoBadge p={p} />
-              {p.pagado && <Badge variant="success">Pagado con Mercado Pago</Badge>}
+              <PagoBadge p={p} />
             </div>
             <span className="text-sm font-medium">{p.clienteNombre}</span>
           </div>
@@ -202,7 +215,14 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
 
         <div className="flex items-center justify-between border-t pt-2.5">
           <span className="text-sm text-muted-foreground">Total del pedido</span>
-          <span className="text-lg font-semibold tabular-nums">{formatCurrency(p.total)}</span>
+          <span className="flex items-baseline gap-2">
+            {esPendiente && (
+              <span className={'text-xs font-medium ' + (p.pagado ? 'text-emerald-700' : 'text-destructive')}>
+                {p.pagado ? 'ya pagado' : 'a cobrar'}
+              </span>
+            )}
+            <span className="text-lg font-semibold tabular-nums">{formatCurrency(p.total)}</span>
+          </span>
         </div>
 
         {p.ventaAnulada ? (
