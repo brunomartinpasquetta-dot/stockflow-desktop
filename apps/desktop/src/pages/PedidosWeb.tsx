@@ -37,15 +37,13 @@ import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
 import type { PedidoWebDTO } from '@/types/api'
 
 /**
- * Un solo estado por pedido, en una palabra. Mientras está por resolver, el
- * estado ES el del pago: Pendiente (se cobra al cargarlo en Ventas) o Pagado
- * (ya cobrado en el catálogo). Resuelto: Vendido, Rechazado o Anulado.
+ * El estado es el del pago, y son dos: Pendiente (falta cobrarlo) o Pagado
+ * (cobrado en el catálogo o en el local). El pedido que se cancela —rechazado
+ * o con la venta anulada— es Cancelado.
  */
 function EstadoBadge({ p }: { p: PedidoWebDTO }) {
-  if (p.ventaAnulada) return <Badge variant="destructive">Anulado</Badge>
-  if (p.estado === 'convertido') return <Badge variant="success">Vendido</Badge>
-  if (p.estado === 'rechazado') return <Badge variant="outline">Rechazado</Badge>
-  if (p.pagado) return <Badge variant="success">Pagado</Badge>
+  if (p.ventaAnulada || p.estado === 'rechazado') return <Badge variant="outline">Cancelado</Badge>
+  if (p.pagado || p.estado === 'convertido') return <Badge variant="success">Pagado</Badge>
   return <Badge variant="warning">Pendiente</Badge>
 }
 
@@ -277,7 +275,7 @@ export function PedidosWeb() {
   const catalogoConfigurado = config.data != null
 
   // Una sola consulta con todo: la pestaña Pedidos web muestra los pendientes
-  // y el Historial los ya resueltos (vendidos, rechazados, anulados).
+  // y el Historial los ya resueltos (pagados o cancelados).
   const pedidos = useQuery({
     queryKey: ['catalogo', 'pedidos'],
     queryFn: () => api.catalogo.pedidosListar(),
@@ -310,7 +308,7 @@ export function PedidosWeb() {
     [lista],
   )
   const totalPendiente = pendientes.reduce((acc, p) => acc + Number(p.total || 0), 0)
-  const vendidos = historial.filter((p) => p.estado === 'convertido' && !p.ventaAnulada).length
+  const pagados = historial.filter((p) => p.estado === 'convertido' && !p.ventaAnulada).length
 
   // La tienda tal como la ve el cliente: la dirección pública si se cargó una
   // distinta, si no la misma del catálogo (en producción son el mismo dominio).
@@ -331,7 +329,7 @@ export function PedidosWeb() {
             {pestana === 'tienda'
               ? 'La tienda del comercio, tal como la ve el cliente.'
               : pestana === 'historial'
-                ? 'Pedidos ya vendidos, rechazados o anulados.'
+                ? 'Pedidos ya pagados o cancelados.'
                 : 'Pedidos del catálogo a la espera de convertirse en venta.'}
           </p>
         </div>
@@ -401,8 +399,8 @@ export function PedidosWeb() {
 
         <TabsContent value="historial" className="mt-0 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            <Resumen icon={CheckCircle2} label="Vendidos" value={String(vendidos)} tone={vendidos > 0 ? 'success' : 'default'} />
-            <Resumen icon={PackageX} label="Rechazados o anulados" value={String(historial.length - vendidos)} />
+            <Resumen icon={CheckCircle2} label="Pagados" value={String(pagados)} tone={pagados > 0 ? 'success' : 'default'} />
+            <Resumen icon={PackageX} label="Cancelados" value={String(historial.length - pagados)} />
           </div>
 
           {!pedidos.isLoading && historial.length === 0 && (
