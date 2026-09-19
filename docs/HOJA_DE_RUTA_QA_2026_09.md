@@ -129,7 +129,7 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
   `mp_pos_devices` de las cajas que se van.
 - Smoke: `test:catalogo` ampliado (50 checks, secciones B1–B6).
 
-## Tanda 7 — Migración y el resto ✅ (18-sep-2026, con dos pendientes explícitos)
+## Tanda 7 — Migración y el resto ✅ (18-sep-2026)
 - [x] `migrar.py`: cuentas corrientes sin duplicar (VENTA.IDCUENTA → `is_account_sale`,
   LINEACUENTA.IDLV salteadas, venta sintética sólo con el arrastre), `sale_payments` por
   venta, `COMPRA.NUMERO` alfanumérico con try/except por compra, UNA transacción con
@@ -144,10 +144,8 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
 - [x] `synchronous=FULL`, índice `idx_sales_cash_register` (migración 0035),
   `foreign_key_check` al terminar de migrar en `init.ts`, `local.smoke` y
   `repositories.smoke` en verde.
-- [ ] **Drift schema/DB** (índice terminal, FK related_voucher_id, CHECKs): requiere
-  recrear tablas en bases de clientes; se deja para una versión con ventana de prueba.
-- [ ] **Clave maestra: JWT firmado por el cloud**: toca el servidor de licencias del VPS;
-  se hace junto con Bruno, no en una tanda local.
+- [—] Drift schema/DB: **descartado por decisión de Bruno (19-sep-2026)**; no se hace.
+- [—] Clave maestra con JWT del cloud: **descartado por decisión de Bruno (19-sep-2026)**; la clave maestra queda como está.
 - [x] Tono de UI: ~110 cadenas que tuteaban pasaron a trato formal (pantallas, toasts,
   mensajes del servidor). El asistente Flowy conserva su tono conversacional a propósito.
 - Smokes: `test:pdv-caja` sección [6] (9 checks nuevos).
