@@ -372,6 +372,12 @@ function EspejoCatalogo(): React.ReactElement {
     onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo cambiar'),
   })
 
+  const configurar = useMutation({
+    mutationFn: (crearFaltantes: boolean) => api.catalogo.syncConfigurar(crearFaltantes),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['catalogo', 'syncEstado'] }),
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo cambiar'),
+  })
+
   const publicar = useMutation({
     mutationFn: (todo: boolean) => api.catalogo.syncAhora(todo),
     onSuccess: (r) => {
@@ -384,7 +390,7 @@ function EspejoCatalogo(): React.ReactElement {
   })
 
   const e = estado.data
-  const trabajando = publicar.isPending || activar.isPending
+  const trabajando = publicar.isPending || activar.isPending || configurar.isPending
 
   return (
     <div className="mt-3 flex flex-col gap-2 rounded-md border p-3">
@@ -402,6 +408,24 @@ function EspejoCatalogo(): React.ReactElement {
         El sistema mantiene actualizados en el catálogo el código, el nombre, el precio y el stock.
         Las fotos, las categorías y las descripciones se siguen manejando desde el catálogo.
       </p>
+
+      {e?.activo && (
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={e.crearFaltantes}
+            disabled={trabajando}
+            onChange={(ev) => configurar.mutate(ev.target.checked)}
+          />
+          <span>
+            Crear en el catálogo los artículos activos que todavía no existen allá
+            <span className="block text-xs text-muted-foreground">
+              Quedan ocultos hasta que se completen en el panel del catálogo. Los artículos dados de baja nunca se crean.
+            </span>
+          </span>
+        </label>
+      )}
 
       {e?.activo && (
         <div className="flex flex-wrap items-center gap-3 text-xs">

@@ -25,10 +25,20 @@ const repos = createRepositories(db);
 // Catálogo simulado: guarda lo que recibe.
 const recibido: any[] = [];
 let responder = 200;
+/** Lo que el catálogo falso devuelve en GET /api/stockflow/pedidos. */
+let pedidosDelCatalogo: unknown[] = [];
 const fetchFalso = (async (url: any, init: any) => {
-  recibido.push({ url: String(url), body: JSON.parse(init.body) });
-  return { ok: responder === 200, status: responder, json: async () => ({ actualizados: 1 }) } as any;
+  const u = String(url);
+  recibido.push({ url: u, body: init?.body ? JSON.parse(init.body) : null });
+  const esListaPedidos = u.endsWith('/api/stockflow/pedidos') && (!init?.method || init.method === 'GET');
+  return {
+    ok: responder === 200,
+    status: responder,
+    json: async () => (esListaPedidos ? { pedidos: pedidosDelCatalogo } : { actualizados: 1 }),
+  } as any;
 }) as typeof fetch;
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const main = async () => {
   const admin = await repos.users.findByUsername('admin');
@@ -233,6 +243,130 @@ const main = async () => {
   recibido.length = 0;
   const segundoBarrido = await sync.cancelarPedidosDeVentasAnuladas();
   check('el barrido es idempotente: no vuelve a avisar', segundoBarrido.cancelados === 0 && recibido.length === 0);
+
+  /* ============ Auditoría sep-2026, tanda 6 ============ */
+  console.log('\n[B1] marcar() es compare-and-set');
+  repos.catalogoPedidos.guardar({ ...pedido, pedidoId: 'pb-cas-1', numero: 910 });
+  const pedCas = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-cas-1')!;
+  const cas1 = repos.catalogoPedidos.marcar(pedCas.id, 'convertido', ventaPedido.sale.id);
+  const cas2 = repos.catalogoPedidos.marcar(pedCas.id, 'rechazado');
+  check('la primera resolución gana', cas1 === true);
+  check('la segunda (otra terminal) no pisa y devuelve false', cas2 === false && repos.catalogoPedidos.buscar(pedCas.id)!.estado === 'convertido');
+  check('resolverlo deja el aviso al catálogo como pendiente', repos.catalogoPedidos.buscar(pedCas.id)!.avisoPendiente === 'confirmado');
+
+  console.log('\n[B4] el aviso al catálogo se reintenta hasta que acuse');
+  responder = 503;
+  recibido.length = 0;
+  const intento1 = await sync.reintentarAvisosPendientes();
+  check('catálogo caído: el aviso sigue pendiente', intento1.entregados === 0 && intento1.pendientes >= 1 && repos.catalogoPedidos.buscar(pedCas.id)!.avisoPendiente === 'confirmado', JSON.stringify(intento1));
+  responder = 200;
+  recibido.length = 0;
+  const intento2 = await sync.reintentarAvisosPendientes();
+  const avisoCas = recibido.find((r) => r.url.endsWith('/api/stockflow/pedidos/pb-cas-1/estado'));
+  check('catálogo de vuelta: se entrega "confirmado" con el número de venta', intento2.entregados >= 1 && avisoCas?.body?.estado === 'confirmado' && /^X-\d+$/.test(avisoCas?.body?.venta_sistema ?? ''), JSON.stringify(avisoCas?.body));
+  check('y ya no se debe nada', repos.catalogoPedidos.buscar(pedCas.id)!.avisoPendiente == null);
+  recibido.length = 0;
+  const intento3 = await sync.reintentarAvisosPendientes();
+  check('sin deudas no llama al catálogo', intento3.entregados === 0 && recibido.length === 0);
+
+  console.log('\n[B3] un pedido inválido no bloquea la cola');
+  pedidosDelCatalogo = [
+    { id: 'pb-malo-1', numero: 'no-es-numero', total: 'abc', cliente_nombre: 'Roto', items: 'no-es-array' },
+    { id: 'pb-bueno-1', numero: 920, total: 9500, created: '2026-09-18T10:00:00Z', cliente_nombre: 'Sano', items: [{ sku: 'X', codigo_sistema: '7790000000001', nombre: 'Resma A4', cant: 1, precio: 9500, subtotal: 9500, servicio: false }, null, 'basura'] },
+    null,
+  ];
+  recibido.length = 0;
+  const bajada = await sync.traerPedidos();
+  check('la bajada termina bien y trae el pedido sano', bajada.ok && bajada.nuevos === 1, JSON.stringify(bajada));
+  const sano = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-bueno-1');
+  check('el sano quedó guardado con sus líneas válidas solamente', !!sano && (JSON.parse(sano.items) as unknown[]).length === 1, sano?.items);
+  check('el roto no se guardó', !repos.catalogoPedidos.listar().some((p) => p.pedidoId === 'pb-malo-1'));
+  check('acusa "tomado" sólo el sano', recibido.some((r) => r.url.endsWith('/pedidos/pb-bueno-1/estado')) && !recibido.some((r) => r.url.endsWith('/pedidos/pb-malo-1/estado')));
+  const reservas = repos.catalogo.reservadoPorPedidosPendientes();
+  check('json_each ignora las líneas que no son objetos', reservas.get('7790000000001') === 1, JSON.stringify([...reservas]));
+  pedidosDelCatalogo = [];
+  repos.catalogoPedidos.marcar(sano!.id, 'rechazado');
+  repos.catalogoPedidos.avisoHecho(sano!.id);
+
+  console.log('\n[B2] en modo net se publica el precio FINAL');
+  await repos.company.upsert({ priceMode: 'net' } as never);
+  await repos.articles.update(art.id, { listPrice1: '1000.0000', vatRate: '21.00' });
+  recibido.length = 0;
+  await sync.correr();
+  const publicadoNeto = recibido.flatMap((r) => r.body?.articulos ?? []).find((a: any) => a.codigo === '7790000000001');
+  check('lista 1000 neto + 21% → publica 1210', publicadoNeto?.precio === 1210, JSON.stringify(publicadoNeto?.precio));
+  await repos.company.upsert({ priceMode: 'gross' } as never);
+  await esperar(5);
+  await repos.articles.update(art.id, { listPrice1: '9500.0000' });
+  recibido.length = 0;
+  await sync.correr();
+  const publicadoBruto = recibido.flatMap((r) => r.body?.articulos ?? []).find((a: any) => a.codigo === '7790000000001');
+  check('en modo gross publica la lista tal cual', publicadoBruto?.precio === 9500, JSON.stringify(publicadoBruto?.precio));
+
+  console.log('\n[B5] crear_faltantes: configurable y sólo para activos');
+  const artBaja = await repos.articles.create({ barcode: '7790000000099', description: 'Discontinuado', listPrice1: '10.0000', stock: '0.000' });
+  await esperar(5);
+  await repos.articles.update(artBaja.id, { active: false });
+  // (la sección "baja de artículo" lo había desactivado)
+  await repos.articles.update(art.id, { active: true, notes: 'toco para republicar junto al de baja' });
+  recibido.length = 0;
+  await sync.correr();
+  const postsActivos = recibido.filter((r) => r.url.endsWith('/api/stockflow/articulos') && r.body.crear_faltantes === true);
+  const postsInactivos = recibido.filter((r) => r.url.endsWith('/api/stockflow/articulos') && r.body.crear_faltantes === false);
+  check('los activos van con crear_faltantes=true', postsActivos.length === 1 && postsActivos[0].body.articulos.some((a: any) => a.codigo === '7790000000001') && !postsActivos[0].body.articulos.some((a: any) => a.codigo === '7790000000099'));
+  check('los de baja van aparte con crear_faltantes=false', postsInactivos.length === 1 && postsInactivos[0].body.articulos.every((a: any) => a.codigo === '7790000000099' && a.activo === false));
+  repos.catalogo.saveState({ crearFaltantes: false });
+  await esperar(5);
+  await repos.articles.update(art.id, { notes: 'toco otra vez' });
+  recibido.length = 0;
+  await sync.correr();
+  check('apagado: una sola tanda y nunca crea', recibido.length === 1 && recibido[0].body.crear_faltantes === false);
+  repos.catalogo.saveState({ crearFaltantes: true });
+
+  console.log('\n[B6] el reinicio de operativa no revienta con pedidos web ni comprobantes');
+  const raw0 = db.$client;
+  const ventaConCae = await svc.sales.createSale({
+    type: 'B', customerId: cf!.id,
+    payments: [{ paymentMethodId: 'pm-efectivo', amount: '9500.0000' }],
+    lines: [{ articleId: art.id, quantity: '1.000' }],
+  });
+  repos.fiscal.createVoucher(
+    {
+      voucherCode: 6, letter: 'B', kind: 'invoice', salePoint: 1, number: 1, date: Date.now(),
+      saleId: ventaConCae.sale.id, customerId: cf!.id, customerDocType: 99, customerDocNumber: '0', customerName: 'Consumidor Final',
+      netAmount: '7851.2400', vatAmount: '1648.7600', total: '9500.0000', userId: safe.id,
+      vatDetails: [{ vatId: 5, baseAmount: '7851.2400', vatAmount: '1648.7600' }],
+    } as never,
+    { cae: '12345678901234', caeExpiry: Date.now() + 864e5 },
+  );
+  const ventaComun = await svc.sales.createSale({
+    type: 'X', customerId: cf!.id,
+    payments: [{ paymentMethodId: 'pm-efectivo', amount: '9500.0000' }],
+    lines: [{ articleId: art.id, quantity: '1.000' }],
+  });
+  repos.catalogoPedidos.guardar({ ...pedido, pedidoId: 'pb-reset-1', numero: 930 });
+  const pedReset = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-reset-1')!;
+  repos.catalogoPedidos.marcar(pedReset.id, 'convertido', ventaComun.sale.id);
+  // El POS va en una caja SIN ventas conservadas (la que se va a borrar).
+  const cajaConCae = (await repos.cashRegisters.getCurrentOpen())!;
+  await svc.cash.closeCashRegister(cajaConCae.id, '0.0000');
+  const cajaNueva = await svc.cash.openCashRegister('0.0000');
+  raw0
+    .prepare("INSERT INTO mp_pos_devices (id, cash_register_id, external_pos_id, mp_pos_id, qr_url, active, created_at, updated_at) VALUES ('pos-1', ?, 'EXT-1', 'MP-1', 'https://mp/qr', 1, 0, 0)")
+    .run(cajaNueva.id);
+  let errReset: string | null = null;
+  try {
+    repos.maintenance.resetOperationalData();
+  } catch (e) {
+    errReset = e instanceof Error ? e.message : String(e);
+  }
+  check('el reinicio completa sin error de FK', errReset == null, errReset ?? '');
+  check('la venta con CAE se conserva', (await repos.sales.findById(ventaConCae.sale.id)) != null);
+  check('la venta común se borró', (await repos.sales.findById(ventaComun.sale.id)) == null);
+  const pedTrasReset = repos.catalogoPedidos.buscar(pedReset.id)!;
+  check('el pedido web queda, sin la venta borrada', pedTrasReset != null && pedTrasReset.saleId == null && pedTrasReset.estado === 'convertido');
+  check('el POS de MP de la caja borrada se desasoció', (raw0.prepare('SELECT COUNT(*) AS n FROM mp_pos_devices').get() as { n: number }).n === 0);
+  check('la caja de la venta con CAE sigue existiendo', (await repos.cashRegisters.findById(ventaConCae.sale.cashRegisterId)) != null);
 
   console.log('\n[integridad de catalogo_pedidos: FK y CHECK vigentes]');
   const raw = db.$client;

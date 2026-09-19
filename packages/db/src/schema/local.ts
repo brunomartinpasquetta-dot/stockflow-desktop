@@ -950,6 +950,11 @@ export const catalogoSync = sqliteTable('catalogo_sync', {
   lastOkAt: integer('last_ok_at'),
   lastError: text('last_error'),
   pushedTotal: integer('pushed_total').notNull().default(0),
+  /**
+   * Si el catálogo debe CREAR (ocultos) los artículos ACTIVOS que todavía no
+   * tiene. Los inactivos nunca se crean: sólo se actualizan si ya existen.
+   */
+  crearFaltantes: integer('crear_faltantes', { mode: 'boolean' }).notNull().default(true),
   createdAt: createdAtCol(),
   updatedAt: updatedAtCol(),
 });
@@ -988,6 +993,11 @@ export const catalogoPedidos = sqliteTable(
       .default('pendiente'),
     /** La venta en la que se convirtió, si ya se confirmó. */
     saleId: text('sale_id').references(() => sales.id),
+    /**
+     * Aviso al catálogo que todavía no se pudo entregar ('confirmado' |
+     * 'cancelado'); null cuando el catálogo ya acusó. Lo reintenta el barrido.
+     */
+    avisoPendiente: text('aviso_pendiente', { enum: ['confirmado', 'cancelado'] }),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },

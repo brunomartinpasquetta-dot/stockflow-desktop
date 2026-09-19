@@ -93,16 +93,33 @@ export class CatalogoSync {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
       try {
-        const res = await this.fetch(`${url}/api/stockflow/articulos`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({ articulos, crear_faltantes: this.opts.crearFaltantes ?? true }),
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          const motivo = `el catálogo respondió ${res.status}`;
-          repos.catalogo.saveState({ lastError: motivo });
-          return { ok: false, publicados: 0, pendientes: repos.catalogo.pendientes(desde), motivo };
+        // AUDITORÍA sep-2026 (B5): `crear_faltantes` es configurable y sólo
+        // vale para los ACTIVOS. Un artículo dado de baja que el catálogo no
+        // conoce no tiene por qué nacer allá (oculto o no): se publica aparte
+        // con crear_faltantes=false, así el catálogo sólo lo toca si ya lo
+        // tenía (y lo desactiva).
+        const crearFaltantes = this.opts.crearFaltantes ?? estado.crearFaltantes ?? true;
+        const activos = articulos.filter((a) => a.activo);
+        const inactivos = articulos.filter((a) => !a.activo);
+        const tandas: { articulos: typeof articulos; crear: boolean }[] = [];
+        if (crearFaltantes) {
+          if (activos.length > 0) tandas.push({ articulos: activos, crear: true });
+          if (inactivos.length > 0) tandas.push({ articulos: inactivos, crear: false });
+        } else {
+          tandas.push({ articulos, crear: false });
+        }
+        for (const t of tandas) {
+          const res = await this.fetch(`${url}/api/stockflow/articulos`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+            body: JSON.stringify({ articulos: t.articulos, crear_faltantes: t.crear }),
+            signal: controller.signal,
+          });
+          if (!res.ok) {
+            const motivo = `el catálogo respondió ${res.status}`;
+            repos.catalogo.saveState({ lastError: motivo });
+            return { ok: false, publicados: 0, pendientes: repos.catalogo.pendientes(desde), motivo };
+          }
         }
         // El cursor avanza SOLO con respuesta buena. Si esto falla a mitad de
         // camino, la tanda entera se vuelve a mandar: como se publica estado y
@@ -167,28 +184,52 @@ export class CatalogoSync {
       const lista = Array.isArray(data.pedidos) ? data.pedidos : [];
 
       let nuevos = 0;
+      let invalidos = 0;
       for (const crudo of lista) {
-        const p = crudo as Record<string, unknown>;
-        const pedidoId = String(p.id ?? '');
-        if (!pedidoId) continue;
-        const entrante: PedidoWebEntrante = {
-          pedidoId,
-          numero: Number(p.numero ?? 0),
-          fecha: p.created ? new Date(String(p.created)).getTime() : Date.now(),
-          clienteNombre: String(p.cliente_nombre ?? 'Sin nombre'),
-          clienteTelefono: p.cliente_telefono ? String(p.cliente_telefono) : null,
-          clienteEmail: p.cliente_email ? String(p.cliente_email) : null,
-          entrega: p.entrega === 'envio' ? 'envio' : 'retiro',
-          direccion: p.direccion ? String(p.direccion) : null,
-          notas: p.notas ? String(p.notas) : null,
-          total: Number(p.total ?? 0).toFixed(4),
-          // Ausente o cualquier valor que no sea `true`: se trata como no
-          // pagado. Sin esa cautela, un catálogo viejo (sin este campo) haría
-          // que TODO se registre solo, sin que nadie confirme el cobro.
-          pagado: p.pagado === true,
-          items: Array.isArray(p.items) ? (p.items as PedidoWebEntrante['items']) : [],
-        };
-        if (repos.catalogoPedidos.guardar(entrante)) nuevos += 1;
+        // AUDITORÍA sep-2026 (B3): un pedido malformado (fecha inválida, total
+        // no numérico, items que no son objetos) reventaba el bucle entero y
+        // los pedidos sanos que venían detrás no se bajaban nunca. Cada pedido
+        // se valida y se guarda por separado; el que no sirve se anota y se
+        // sigue con el siguiente.
+        let pedidoId = '';
+        try {
+          const p = (crudo && typeof crudo === 'object' ? crudo : {}) as Record<string, unknown>;
+          pedidoId = String(p.id ?? '');
+          if (!pedidoId) continue;
+          const fecha = p.created ? new Date(String(p.created)).getTime() : Date.now();
+          const total = Number(p.total ?? 0);
+          const numero = Number(p.numero ?? 0);
+          const items = (Array.isArray(p.items) ? p.items : []).filter(
+            (i): i is PedidoWebEntrante['items'][number] => i != null && typeof i === 'object',
+          );
+          if (!Number.isFinite(total) || !Number.isFinite(numero)) {
+            throw new Error(`total o número no numérico (${String(p.total)} / ${String(p.numero)})`);
+          }
+          const entrante: PedidoWebEntrante = {
+            pedidoId,
+            numero,
+            fecha: Number.isFinite(fecha) ? fecha : Date.now(),
+            clienteNombre: String(p.cliente_nombre ?? 'Sin nombre'),
+            clienteTelefono: p.cliente_telefono ? String(p.cliente_telefono) : null,
+            clienteEmail: p.cliente_email ? String(p.cliente_email) : null,
+            entrega: p.entrega === 'envio' ? 'envio' : 'retiro',
+            direccion: p.direccion ? String(p.direccion) : null,
+            notas: p.notas ? String(p.notas) : null,
+            total: total.toFixed(4),
+            // Ausente o cualquier valor que no sea `true`: se trata como no
+            // pagado. Sin esa cautela, un catálogo viejo (sin este campo) haría
+            // que TODO se registre solo, sin que nadie confirme el cobro.
+            pagado: p.pagado === true,
+            items,
+          };
+          if (repos.catalogoPedidos.guardar(entrante)) nuevos += 1;
+        } catch (e) {
+          invalidos += 1;
+          console.warn(`[catalogo] pedido ${pedidoId || '(sin id)'} descartado: ${e instanceof Error ? e.message : String(e)}`);
+          // Sin acuse: el catálogo lo vuelve a mandar y, si lo corrigen allá,
+          // entra en la vuelta siguiente.
+          continue;
+        }
 
         // Acuse: que no vuelva a venir. Un fallo acá no pierde el pedido —ya
         // está guardado— y el reintento lo descarta por duplicado.
@@ -202,12 +243,48 @@ export class CatalogoSync {
           /* se reintenta solo en la vuelta siguiente */
         }
       }
-      return { ok: true, nuevos };
+      return { ok: true, nuevos, ...(invalidos > 0 ? { motivo: `${invalidos} pedido(s) inválido(s) descartado(s)` } : {}) };
     } catch (err) {
       return { ok: false, nuevos: 0, motivo: err instanceof Error ? err.message : String(err) };
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Avisa al catálogo en qué quedó un pedido recién resuelto y, si acusa,
+   * deja de deberse. Si no acusa, el pedido queda con `avisoPendiente` y el
+   * barrido `reintentarAvisosPendientes()` insiste en la vuelta siguiente.
+   */
+  async avisarResolucion(pedido: { id: string; pedidoId: string; saleId: string | null }, estado: 'confirmado' | 'cancelado'): Promise<boolean> {
+    const ventaSistema = await this.ventaSistemaDe(pedido.saleId);
+    const ok = await this.avisarEstado(pedido.pedidoId, estado, ventaSistema);
+    if (ok) this.opts.repos.catalogoPedidos.avisoHecho(pedido.id);
+    return ok;
+  }
+
+  /** Rótulo "X-123" de la venta enlazada, para que el catálogo lo muestre. */
+  private async ventaSistemaDe(saleId: string | null): Promise<string | undefined> {
+    if (!saleId) return undefined;
+    const venta = await this.opts.repos.sales.findById(saleId);
+    return venta ? `${venta.type}-${venta.number}` : undefined;
+  }
+
+  /**
+   * Reintenta los avisos que el catálogo no acusó (estaba caído, se cortó la
+   * red, expiró el tiempo). Corre en cada vuelta del temporizador y al abrir
+   * la pantalla de pedidos (auditoría sep-2026, B4).
+   */
+  async reintentarAvisosPendientes(): Promise<{ entregados: number; pendientes: number }> {
+    const { repos } = this.opts;
+    let entregados = 0;
+    let pendientes = 0;
+    for (const p of repos.catalogoPedidos.conAvisoPendiente()) {
+      if (!p.avisoPendiente) continue;
+      if (await this.avisarResolucion(p, p.avisoPendiente)) entregados += 1;
+      else pendientes += 1;
+    }
+    return { entregados, pendientes };
   }
 
   /**
@@ -266,7 +343,9 @@ export class CatalogoSync {
     let sinAviso = 0;
     for (const p of repos.catalogoPedidos.convertidosConVentaAnulada()) {
       if (await this.avisarEstado(p.pedidoId, 'cancelado')) {
-        repos.catalogoPedidos.marcar(p.id, 'rechazado', p.saleId);
+        if (repos.catalogoPedidos.marcar(p.id, 'rechazado', p.saleId, 'convertido')) {
+          repos.catalogoPedidos.avisoHecho(p.id);
+        }
         cancelados += 1;
       } else {
         sinAviso += 1;

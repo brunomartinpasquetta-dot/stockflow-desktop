@@ -225,6 +225,20 @@
       "when": 1786725682784,
       "tag": "0032_cash_general_desglose_por_movimiento",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1786725682785,
+      "tag": "0033_catalogo_pedido_aviso_pendiente",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1786725682786,
+      "tag": "0034_catalogo_sync_crear_faltantes",
+      "breakpoints": true
     }
   ]
 }

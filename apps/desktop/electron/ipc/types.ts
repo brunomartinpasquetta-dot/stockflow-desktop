@@ -1611,6 +1611,8 @@ export interface CatalogoSyncEstadoDTO {
   ultimaCorrida: number | null;
   ultimoExito: number | null;
   ultimoError: string | null;
+  /** Si el catálogo crea (ocultos) los artículos activos que no tiene. */
+  crearFaltantes: boolean;
 }
 
 export interface CatalogoSyncResultadoDTO {
@@ -1896,6 +1898,7 @@ export interface ApiSurface {
     estadisticas(payload: DateRangeDTO): Res<CatalogoEstadisticasDTO>;
     syncEstado(): Res<CatalogoSyncEstadoDTO>;
     syncActivar(payload: { activo: boolean }): Res<{ ok: true }>;
+    syncConfigurar(payload: { crearFaltantes: boolean }): Res<{ ok: true }>;
     syncAhora(payload?: { todo?: boolean }): Res<CatalogoSyncResultadoDTO>;
     sugerirVinculacion(): Res<CatalogoSugerenciaVinculacionDTO>;
     vincularLote(payload: { vinculos: { sku: string; codigoSistema: string }[] }): Res<CatalogoVincularLoteResultadoDTO>;

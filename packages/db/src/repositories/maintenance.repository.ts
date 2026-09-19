@@ -21,6 +21,10 @@
  *       payments, supplier_accounts_payable, supplier_payments) — pagadas o no
  *     - Las ventas/compras REFERENCIADAS por esas cuentas corrientes, por
  *       presupuestos convertidos o por órdenes MercadoPago (para no romper FKs)
+ *     - Las ventas con comprobante electrónico AUTORIZADO (CAE): son documentos
+ *       legales y se quedan con su caja (auditoría sep-2026, B6)
+ *     - Los pedidos web y los intentos fiscales sin CAE, desenganchados de la
+ *       venta borrada (sale_id = NULL)
  *     - Medios de pago, Precios / lotes de precios, Promociones
  *     - Usuarios, Empresa, Licencia, Auditoría
  *
@@ -38,7 +42,10 @@ import {
   cashGeneralMovements,
   cashMovements,
   cashRegisters,
+  catalogoPedidos,
+  fiscalVouchers,
   mpOrders,
+  mpPosDevices,
   purchaseLines,
   purchaseReturnLines,
   purchaseReturns,
@@ -79,10 +86,22 @@ export class MaintenanceRepository {
 
         // Ventas/compras que hay que CONSERVAR: las referenciadas por cuentas
         // corrientes, presupuestos convertidos u órdenes MP (romperían FKs).
+        // AUDITORÍA sep-2026 (B6): una venta con comprobante electrónico
+        // autorizado por ARCA es un documento legal; borrarla del historial
+        // dejaría un CAE emitido del que el sistema ya no sabe nada. Se
+        // conservan (con su caja) igual que las de cuenta corriente.
         const keptSaleIds = new Set<string>([
           ...tx.select({ id: accountsReceivable.saleId }).from(accountsReceivable).all().map((r) => r.id),
           ...tx.select({ id: quotes.saleId }).from(quotes).all().map((r) => r.id).filter((x): x is string => !!x),
           ...tx.select({ id: mpOrders.saleId }).from(mpOrders).all().map((r) => r.id).filter((x): x is string => !!x),
+          ...tx.select({ id: sales.id }).from(sales).where(sql`${sales.afipCAE} IS NOT NULL AND ${sales.afipCAE} != ''`).all().map((r) => r.id),
+          ...tx
+            .select({ id: fiscalVouchers.saleId })
+            .from(fiscalVouchers)
+            .where(sql`${fiscalVouchers.saleId} IS NOT NULL AND ${fiscalVouchers.status} = 'approved'`)
+            .all()
+            .map((r) => r.id)
+            .filter((x): x is string => !!x),
         ]);
         const keptPurchaseIds = new Set<string>(
           tx.select({ id: supplierAccountsPayable.purchaseId }).from(supplierAccountsPayable).all().map((r) => r.id),
@@ -184,6 +203,15 @@ export class MaintenanceRepository {
         // ── Presupuestos: soltar la traza saleId de ventas a borrar (no borro presupuestos) ──
         tx.run(sql`UPDATE quotes SET sale_id = NULL WHERE sale_id IS NOT NULL${keptSaleIds.size > 0 ? sql` AND sale_id NOT IN (${sql.join([...keptSaleIds].map((x) => sql`${x}`), sql`, `)})` : sql``}`);
 
+        // ── Pedidos web: el pedido queda (es historial del catálogo) pero sin
+        //    la venta que se borra. Antes esta FK hacía fallar el reinicio entero
+        //    en cuanto había un pedido convertido (B6).
+        tx.run(sql`UPDATE catalogo_pedidos SET sale_id = NULL WHERE sale_id IS NOT NULL${keptSaleIds.size > 0 ? sql` AND sale_id NOT IN (${inList(keptSaleList)})` : sql``}`);
+
+        // ── Intentos fiscales sin CAE (rechazados / sin respuesta) de ventas a
+        //    borrar: se conserva el registro del intento, sin la venta.
+        tx.run(sql`UPDATE fiscal_vouchers SET sale_id = NULL WHERE sale_id IS NOT NULL${keptSaleIds.size > 0 ? sql` AND sale_id NOT IN (${inList(keptSaleList)})` : sql``}`);
+
         // Movimientos de caja SUPERVIVIENTES (en cajas conservadas) que apuntan
         // a ventas/compras que SÍ se borran → soltar la referencia para no romper
         // la FK al eliminar esas ventas/compras.
@@ -224,9 +252,13 @@ export class MaintenanceRepository {
 
         // ── Cajas diarias: ahora que ya no quedan ventas apuntando a ellas
         //    (salvo las de CC en cajas conservadas), se borran las no conservadas.
+        //    El POS de Mercado Pago asociado a una caja borrada se desasocia
+        //    (FK NOT NULL): se vuelve a vincular desde Configuración (B6).
         if (keptRegList.length) {
+          tx.run(sql`DELETE FROM mp_pos_devices WHERE cash_register_id NOT IN (${inList(keptRegList)})`);
           tx.run(sql`DELETE FROM cash_registers WHERE id NOT IN (${inList(keptRegList)})`);
         } else {
+          tx.delete(mpPosDevices).run();
           tx.delete(cashRegisters).run();
         }
 

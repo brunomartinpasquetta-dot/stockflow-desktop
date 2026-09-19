@@ -326,6 +326,7 @@ export function createApiBridge(
       estadisticas: (p) => c<CatalogoEstadisticasDTO>('catalogo:estadisticas', p),
       syncEstado: () => c<CatalogoSyncEstadoDTO>('catalogo:syncEstado'),
       syncActivar: (p) => c<{ ok: true }>('catalogo:syncActivar', p),
+      syncConfigurar: (p) => c<{ ok: true }>('catalogo:syncConfigurar', p),
       syncAhora: (p) => c<CatalogoSyncResultadoDTO>('catalogo:syncAhora', p),
       sugerirVinculacion: () => c<CatalogoSugerenciaVinculacionDTO>('catalogo:sugerirVinculacion'),
       vincularLote: (p) => c<CatalogoVincularLoteResultadoDTO>('catalogo:vincularLote', p),

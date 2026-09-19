@@ -174,6 +174,8 @@ export const api = {
     syncEstado: (): Promise<CatalogoSyncEstadoDTO> => unwrap(sf().catalogo.syncEstado()),
     syncActivar: (activo: boolean): Promise<{ ok: true }> =>
       unwrap(sf().catalogo.syncActivar({ activo })),
+    syncConfigurar: (crearFaltantes: boolean): Promise<{ ok: true }> =>
+      unwrap(sf().catalogo.syncConfigurar({ crearFaltantes })),
     syncAhora: (todo = false): Promise<CatalogoSyncResultadoDTO> =>
       unwrap(sf().catalogo.syncAhora({ todo })),
     sugerirVinculacion: (): Promise<CatalogoSugerenciaVinculacionDTO> => unwrap(sf().catalogo.sugerirVinculacion()),

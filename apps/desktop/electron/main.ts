@@ -346,6 +346,18 @@ function bootstrap(): { lanArgs: string[] } {
           // unidades que el checkout acababa de descontar.
           const p = await sync.traerPedidos();
           if (p.nuevos > 0) console.info(`[catalogo] ${p.nuevos} pedidos nuevos`);
+          // Avisos que el catálogo no acusó (confirmado/cancelado) y pedidos
+          // de ventas anuladas: se reintentan en cada vuelta.
+          await sync.cancelarPedidosDeVentasAnuladas();
+          await sync.reintentarAvisosPendientes();
+          // AUDITORÍA sep-2026 (B3): si la bajada falló, NO se publica. Si el
+          // catálogo tomó pedidos que todavía no llegaron acá, publicar el
+          // stock físico le devolvería a la tienda las unidades que su
+          // checkout acaba de descontar y las vendería dos veces.
+          if (!p.ok) {
+            console.warn(`[catalogo] no se bajaron pedidos (${p.motivo ?? 'sin motivo'}); se posterga la publicación`);
+            return;
+          }
           const r = await sync.correr();
           if (r.publicados > 0) {
             console.info(`[catalogo] publicados ${r.publicados}, quedan ${r.pendientes}`);

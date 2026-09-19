@@ -15,6 +15,7 @@ import { rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import {
   articles,
+  companies,
   catalogoPedidos,
   catalogoSync,
   sales,
@@ -77,6 +78,7 @@ export class CatalogoRepository {
         lastOkAt: null,
         lastError: null,
         pushedTotal: 0,
+        crearFaltantes: true,
         createdAt: now,
         updatedAt: now,
       } satisfies CatalogoSync;
@@ -138,11 +140,17 @@ export class CatalogoRepository {
         codigo: articles.barcode,
         nombre: articles.description,
         precio: col,
+        vatRate: articles.vatRate,
         stock: articles.stock,
         activo: articles.active,
         unidad: articles.unit,
         updatedAt: articles.updatedAt,
       };
+      // AUDITORÍA sep-2026 (B2): en modo 'net' las listas guardan precios SIN
+      // IVA. La tienda muestra precios finales al consumidor, así que se
+      // publica precio × (1 + IVA); en modo 'gross' la lista ya es final.
+      const empresa = this.db.select({ priceMode: companies.priceMode }).from(companies).limit(1).get();
+      const modoNeto = empresa?.priceMode === 'net';
       // Un código en blanco no sirve de clave hacia el catálogo — colisionaría
       // con cualquier otro artículo también en blanco. `barcode` es NOT NULL
       // en el esquema, pero datos migrados por fuera del alta normal pueden
@@ -175,7 +183,9 @@ export class CatalogoRepository {
         return {
           codigo: r.codigo,
           nombre: r.nombre,
-          precio: redondearExacto(r.precio ?? '0', 2),
+          precio: modoNeto
+            ? redondearExacto(String(Number(r.precio ?? '0') * (1 + Number(r.vatRate ?? '21') / 100)), 2)
+            : redondearExacto(r.precio ?? '0', 2),
           stock: redondearExacto(String(Math.max(0, fisico - res)), 3),
           activo: Boolean(r.activo),
           unidad: r.unidad ?? 'UN',
@@ -203,6 +213,7 @@ export class CatalogoRepository {
                SUM(CAST(json_extract(i.value, '$.cant') AS REAL)) AS cant
         FROM ${catalogoPedidos} p, json_each(p.items) i
         WHERE p.estado = 'pendiente'
+          AND json_type(i.value) = 'object'
           AND json_extract(i.value, '$.codigo_sistema') IS NOT NULL
           AND json_extract(i.value, '$.codigo_sistema') != ''
         GROUP BY 1
@@ -328,15 +339,57 @@ export class CatalogoPedidoRepository {
     }
   }
 
-  marcar(id: string, estado: 'convertido' | 'rechazado', saleId?: string | null): void {
+  /**
+   * Resuelve un pedido PENDIENTE. Compare-and-set: sólo cambia de estado si
+   * todavía está pendiente y devuelve si lo logró. Dos terminales que
+   * convierten el mismo pedido a la vez ya no lo pisan: la segunda recibe
+   * `false` y no genera otra venta ni otro aviso (auditoría sep-2026, B1).
+   */
+  marcar(
+    id: string,
+    estado: 'convertido' | 'rechazado',
+    saleId?: string | null,
+    desde: 'pendiente' | 'convertido' = 'pendiente',
+  ): boolean {
     try {
-      this.db
+      const r = this.db
         .update(catalogoPedidos)
-        .set({ estado, saleId: saleId ?? null, updatedAt: Date.now() })
-        .where(eq(catalogoPedidos.id, id))
+        .set({
+          estado,
+          saleId: saleId ?? null,
+          // El catálogo tiene que enterarse; hasta que acuse, queda debiendo.
+          avisoPendiente: estado === 'convertido' ? 'confirmado' : 'cancelado',
+          updatedAt: Date.now(),
+        })
+        .where(and(eq(catalogoPedidos.id, id), eq(catalogoPedidos.estado, desde)))
         .run();
+      return r.changes > 0;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /** El catálogo acusó el aviso: ya no se debe nada. */
+  avisoHecho(id: string): void {
+    try {
+      this.db.update(catalogoPedidos).set({ avisoPendiente: null }).where(eq(catalogoPedidos.id, id)).run();
     } catch (err) {
       rethrowDbError(err);
+    }
+  }
+
+  /** Pedidos resueltos cuyo aviso al catálogo todavía no fue acusado. */
+  conAvisoPendiente(): CatalogoPedido[] {
+    try {
+      return this.db
+        .select()
+        .from(catalogoPedidos)
+        .where(sql`${catalogoPedidos.avisoPendiente} IS NOT NULL`)
+        .orderBy(catalogoPedidos.updatedAt)
+        .limit(50)
+        .all();
+    } catch (err) {
+      return rethrowDbError(err);
     }
   }
 

@@ -109,19 +109,25 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
   de saldos); el diálogo usa el desglose real.
 - Smoke: `pnpm --filter @stockflow/desktop test:pdv-caja` (27 checks).
 
-## Tanda 6 — Catálogo web y reinicio de operativa
-- [ ] `marcar()` con compare-and-set `WHERE estado='pendiente'`; `pedidoRechazar` chequea
-  estado; `pedidoVincularVenta` valida que la venta exista (`catalogo.handlers.ts`).
-- [ ] Pago del pedido con `calculateSaleTotals` (net y fraccionados) y `pedido.total`
-  (`catalogo.handlers.ts:202`); precio publicado final en modo net (`catalogo.repository.ts:178`).
-- [ ] Un pedido inválido no bloquea la cola (try/catch por pedido, `Number.isFinite`);
-  `json_type(i.value)='object'`; el timer no publica si falló la bajada
-  (`CatalogoSync.ts:191`, `main.ts:346`).
-- [ ] Aviso `confirmado`/`cancelado` del rechazo con reintento (columna `aviso_pendiente`).
-- [ ] `crear_faltantes` sólo con artículos activos, configurable.
-- [ ] **Reinicio de operativa** (`maintenance.repository.ts:206`): conservar ventas con
-  comprobante, `catalogo_pedidos.sale_id = NULL`, borrar `mp_pos_devices` de cajas no
-  conservadas.
+## Tanda 6 — Catálogo web y reinicio de operativa ✅ (18-sep-2026)
+- [x] `marcar()` es compare-and-set (`WHERE estado = 'pendiente'`, devuelve si ganó);
+  `pedidoRechazar` y `pedidoConvertir` respetan el resultado; `pedidoVincularVenta` exige que la
+  venta exista y no esté anulada (`catalogo.handlers.ts`).
+- [x] Pago del pedido calculado como el servidor (`totalComoElServidor`: líneas a 4 decimales,
+  IVA prorrateado en modo net, cantidades fraccionadas) y contrastado con `pedido.total`;
+  en modo net el catálogo publica el precio FINAL (lista × (1 + IVA)).
+- [x] Un pedido inválido no bloquea la cola (validación y try/catch por pedido, sin acuse para
+  el roto); `json_type(i.value) = 'object'` en la reserva; ni el temporizador ni "Publicar ahora"
+  publican si falló la bajada de pedidos.
+- [x] Aviso `confirmado`/`cancelado` con reintento: columna `aviso_pendiente` (migración 0033),
+  `avisarResolucion()` + barrido `reintentarAvisosPendientes()` en el temporizador, al listar
+  pedidos y en "Publicar ahora".
+- [x] `crear_faltantes` configurable (`catalogo_sync.crear_faltantes`, migración 0034, casilla
+  en Mi Empresa) y sólo para artículos ACTIVOS: los de baja se publican aparte con `false`.
+- [x] **Reinicio de operativa**: conserva las ventas con comprobante autorizado (y su caja),
+  desengancha `catalogo_pedidos.sale_id` y los intentos fiscales sin CAE, borra los
+  `mp_pos_devices` de las cajas que se van.
+- Smoke: `test:catalogo` ampliado (50 checks, secciones B1–B6).
 
 ## Tanda 7 — Migración y el resto
 - [ ] `migrar.py`: cuentas corrientes sin duplicar renglones (`:953`), `sale_payments` por
