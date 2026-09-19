@@ -218,6 +218,25 @@ const main = async () => {
   );
   check('el depósito correcto del cierre entra', okCierre == null, okCierre ?? '');
 
+  /* ------------------------------------------------------------------ */
+  console.log('\n[7] Venta con débito, devuelta en efectivo y anulada: no se reintegra dos veces');
+  const { ReturnsService } = await import('@stockflow/core');
+  const returns = new ReturnsService(ctx);
+  const reg5 = await svc.cash.openCashRegister('0.0000');
+  await svc.cash.addMovement({ type: 'income', description: 'Fondeo', amount: '5000.0000', paymentMethodId: PM_CASH, cashRegisterId: reg5.id });
+  const vd = await svc.sales.createSale({
+    type: 'X', customerId: cf!.id,
+    payments: [{ paymentMethodId: 'pm-tarjeta-debito', amount: '2000.0000' }],
+    lines: [{ articleId: art.id, quantity: '2.000' }],
+  });
+  await returns.createSaleReturn({ saleId: vd.sale.id, refundMethod: 'cash', lines: [{ saleLineId: vd.lines[0]!.id, quantity: '1.000' }] });
+  await svc.sales.voidSale(vd.sale.id);
+  const movsVd = (await repos.cashMovements.findByRegister(reg5.id)).filter((m) => m.relatedSaleId === vd.sale.id && m.type === 'expense');
+  const egresosVd = movsVd.reduce((a, m) => a + Number(m.amount), 0);
+  const revDebito = movsVd.find((m) => m.paymentMethodId === 'pm-tarjeta-debito');
+  check('egresos totales = 2000 (1000 DEV efectivo + 1000 reverso débito), no 3000', egresosVd === 2000, `egresos=${egresosVd}`);
+  check('el reverso del débito es por lo que faltaba (1000)', revDebito?.amount === '1000.0000', revDebito?.amount);
+
   closeLocalDb(db);
   rmSync(dir, { recursive: true, force: true });
   console.log(fallas === 0 ? '\n✅ TODO OK\n' : `\n❌ ${fallas} FALLAS\n`);

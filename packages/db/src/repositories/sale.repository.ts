@@ -554,14 +554,19 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           // cajón: se descuenta de los reversos físicos (en orden) y se
           // revierte sólo lo que falta. El cajón nunca devuelve más efectivo
           // del que recibió por esta venta.
+          // Lo que las devoluciones ya reintegraron se descuenta PRIMERO de los
+          // pagos físicos (salió del cajón) y, si no alcanzan, de los demás:
+          // una venta con débito devuelta en efectivo y después anulada no
+          // puede revertir el débito completo (reintegraría dos veces).
           let aDescontar = yaReintegrado;
-          const reversos = sps.map((s) => {
-            // Lo reintegrado en efectivo sólo descuenta de los pagos físicos.
-            if (s.isCash === false) return { ...s };
+          const descontar = (s: (typeof sps)[number]) => {
             const usa = cmpDecimal(aDescontar, s.amount) < 0 ? aDescontar : s.amount;
             aDescontar = subDecimal(aDescontar, usa, 4);
             return { ...s, amount: subDecimal(s.amount, usa, 4) };
-          });
+          };
+          const fisicos = sps.filter((s) => s.isCash !== false).map(descontar);
+          const electronicos = sps.filter((s) => s.isCash === false).map(descontar);
+          const reversos = [...fisicos, ...electronicos];
           const hasReverse = reversos.some((s) => Number(s.amount) > 0);
           // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
           //   (el arqueo histórico recalcula el esperado en vivo y dejaría de

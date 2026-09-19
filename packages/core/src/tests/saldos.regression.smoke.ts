@@ -151,23 +151,22 @@ async function main(): Promise<void> {
     `balance=${compra.accountPayable?.balance}`,
   );
 
-  // Anular venta B. El reverso de caja sólo afecta el efectivo físico: se emite
-  // un cash_movements expense de $300 con paymentMethodId efectivo. La parte en
-  // transferencia ($200) no toca el cajón, por lo que no genera reverso de caja
-  // (el sale_payment se elimina igual). El reverso lleva el PM original.
+  // Anular venta B. Se emite UN reverso por cada pago, con su PM original:
+  // $300 efectivo (toca el cajón) y $200 transferencia (no toca el arqueo de
+  // efectivo, pero deja el neto de ese medio en cero — auditoría sep-2026, A1).
   await admin.sales.voidSale(ventaB.sale.id);
   const movsB = (await repos.cashMovements.findByRegister(reg.id)).filter(
     (m) => m.relatedSaleId === ventaB.sale.id && m.type === 'expense',
   );
   const reversoEfectivoB = movsB.find((m) => m.paymentMethodId === PM_CASH);
   check(
-    'anular Venta B: reverso de caja sólo por la parte efectivo (300), con su PM',
-    movsB.length === 1 && reversoEfectivoB?.amount === '300.0000',
+    'anular Venta B: reverso en efectivo por 300, con su PM',
+    movsB.length === 2 && reversoEfectivoB?.amount === '300.0000',
     `movs=${movsB.length} efectivo=${reversoEfectivoB?.amount}`,
   );
   check(
-    'anular Venta B: la parte en transferencia NO genera reverso de caja',
-    movsB.find((m) => m.paymentMethodId === PM_TRANSFER) === undefined,
+    'anular Venta B: la parte en transferencia también se revierte (200), con su PM',
+    movsB.find((m) => m.paymentMethodId === PM_TRANSFER)?.amount === '200.0000',
   );
   check(
     'anular Venta B: sale_payments eliminados',
@@ -348,7 +347,7 @@ async function main(): Promise<void> {
       payments: [
         { paymentMethodId: PM_CASH, amount: '150.0000' },
         { paymentMethodId: efectivoChica.id, amount: '250.0000' },
-        { paymentMethodId: PM_TRANSFER, amount: '100.0000' }, // NO físico → no se revierte en caja
+        { paymentMethodId: PM_TRANSFER, amount: '100.0000' }, // NO físico → se revierte, pero no toca el arqueo
       ],
       lines: [{ articleId: arts[2]!.id, quantity: '5.000', unitPrice: '100.0000' }],
     });
@@ -357,15 +356,15 @@ async function main(): Promise<void> {
       (m) => m.relatedSaleId === vs4.sale.id && m.type === 'expense',
     );
     check(
-      'S04: 2 reversos (uno por pago en efectivo físico), cada uno con su paymentMethodId',
-      rev.length === 2 &&
+      'S04: 3 reversos (uno por pago), cada uno con su paymentMethodId',
+      rev.length === 3 &&
         rev.find((m) => m.paymentMethodId === PM_CASH)?.amount === '150.0000' &&
         rev.find((m) => m.paymentMethodId === efectivoChica.id)?.amount === '250.0000',
       `reversos=${rev.length}`,
     );
     check(
-      'S04: la transferencia (no físico) NO genera reverso de caja',
-      rev.find((m) => m.paymentMethodId === PM_TRANSFER) === undefined,
+      'S04: la transferencia (no físico) también se revierte, con su PM',
+      rev.find((m) => m.paymentMethodId === PM_TRANSFER)?.amount === '100.0000',
     );
     await admin.cash.closeCashRegister(regS4.id, '0.0000');
   }
