@@ -285,7 +285,7 @@ export class LicenseManager {
           tenantId: payload.tid ?? null,
           trial: true,
           lastError: trialOver
-            ? 'Tu prueba gratis de 30 días terminó. Escribinos por WhatsApp para activar tu licencia — tus datos están intactos.'
+            ? 'La prueba gratis de 30 días terminó. Escríbanos por WhatsApp para activar la licencia — los datos están intactos.'
             : 'No se pudo renovar la prueba (sin conexión). Conectate a internet para seguir operando.',
         };
       }
@@ -297,7 +297,7 @@ export class LicenseManager {
         tenantName: this.tenantName,
         fullName: this.clientName,
         tenantId: payload?.tid ?? null,
-        lastError: expired ? 'La licencia expiró. Volvé a conectarte para renovarla.' : 'No hay licencia válida',
+        lastError: expired ? 'La licencia expiró. Vuelva a conectarse para renovarla.' : 'No hay licencia válida',
       };
     }
     // PRUEBA GRATIS vigente o vencida: el fin de la prueba viaja en `texp`
@@ -316,7 +316,7 @@ export class LicenseManager {
         tenantId: payload.tid,
         trial: true,
         lastError: trialOver
-          ? 'Tu prueba gratis de 30 días terminó. Escribinos por WhatsApp para activar tu licencia — tus datos están intactos.'
+          ? 'La prueba gratis de 30 días terminó. Escríbanos por WhatsApp para activar la licencia — los datos están intactos.'
           : null,
       };
     }
@@ -337,9 +337,9 @@ export class LicenseManager {
   /* ------------------------------------------------------------------ */
 
   private translateActivateError(status: number, serverMsg: string | undefined): string {
-    if (status === 409) return 'Licencia ya activada en otra PC. Contactá soporte.';
+    if (status === 409) return 'Licencia ya activada en otra PC. Contacte a soporte.';
     if (serverMsg && serverMsg.trim().length > 0) return serverMsg;
-    if (status === 404) return 'Licencia no encontrada. Revisá la clave.';
+    if (status === 404) return 'Licencia no encontrada. Revise la clave.';
     if (status === 403) return 'La licencia no está habilitada (revocada, suspendida o pendiente).';
     return 'No se pudo activar la licencia.';
   }
@@ -379,7 +379,7 @@ export class LicenseManager {
     } catch {
       // Sin licencia previa válida en este flujo: reportamos el error de red.
       const base = this.getState();
-      return { ...base, lastError: 'No se pudo conectar con el servidor de licencias. Probá más tarde.' };
+      return { ...base, lastError: 'No se pudo conectar con el servidor de licencias. Intente más tarde.' };
     }
 
     if (!res.ok) {
@@ -447,7 +447,7 @@ export class LicenseManager {
       });
     } catch {
       const base = this.getState();
-      return { ...base, lastError: 'No se pudo conectar con el servidor. Revisá tu internet y probá de nuevo.' };
+      return { ...base, lastError: 'No se pudo conectar con el servidor. Revise la conexión a internet e intente de nuevo.' };
     }
 
     if (!res.ok) {
@@ -460,7 +460,7 @@ export class LicenseManager {
       const base = this.getState();
       return {
         ...base,
-        lastError: serverMsg && serverMsg.trim().length > 0 ? serverMsg : 'No se pudo crear la prueba gratis. Probá de nuevo en un rato.',
+        lastError: serverMsg && serverMsg.trim().length > 0 ? serverMsg : 'No se pudo crear la prueba gratis. Intente de nuevo en unos minutos.',
       };
     }
 

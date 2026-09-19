@@ -233,7 +233,7 @@ function AjustarDesgloseDialog({
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Indicá cuánto tenés realmente en <b>efectivo</b> en la caja fuerte. El resto se toma
+            Indique cuánto hay realmente en <b>efectivo</b> en la caja fuerte. El resto se toma
             como electrónico. El saldo total y los movimientos no se modifican.
           </p>
           <div className="flex flex-col gap-1">

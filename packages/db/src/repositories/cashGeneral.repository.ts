@@ -60,6 +60,9 @@ export interface TransferFromDailyRepoInput {
    * un depósito parcial sin permitir depositar de más.
    */
   maxDepositable?: string;
+  /** Topes por naturaleza: efectivo contado y neto electrónico del cierre. */
+  maxCashDepositable?: string;
+  maxElectronicDepositable?: string;
 }
 
 /** Lo ya ingresado a Caja General por el cierre de una caja, desglosado. */
@@ -401,7 +404,47 @@ export class CashGeneralRepository {
           )
           .all();
         let yaDepositado = '0';
-        for (const p of previos) yaDepositado = addDecimal(yaDepositado, p.amount, 2);
+        let yaCash = '0';
+        let yaElec = '0';
+        for (const p of previos) {
+          yaDepositado = addDecimal(yaDepositado, p.amount, 2);
+          // Filas anteriores a 0032 sin desglose: se asumen efectivo (lo más
+          // conservador para el tope de efectivo).
+          yaCash = addDecimal(yaCash, p.cashAmount ?? p.amount, 2);
+          yaElec = addDecimal(yaElec, p.electronicAmount ?? '0', 2);
+        }
+        // AUDITORÍA sep-2026 (C3): el desglose no se validaba. Un importe
+        // negativo o un desglose que no sumaba el total inflaba (o vaciaba) el
+        // saldo de efectivo o el electrónico de Caja General sin que nadie lo
+        // note hasta el próximo arqueo.
+        const cashIn = input.cashAmount ?? input.amount;
+        const elecIn = input.electronicAmount ?? '0';
+        const nAmount = Number(input.amount);
+        const nCash = Number(cashIn);
+        const nElec = Number(elecIn);
+        if (![nAmount, nCash, nElec].every(Number.isFinite) || nAmount <= 0 || nCash < 0 || nElec < 0) {
+          throw new ConstraintError('DEPOSIT_INVALID', 'El importe a ingresar no es válido');
+        }
+        if (Math.abs(nCash + nElec - nAmount) > 0.005) {
+          throw new ConstraintError(
+            'DEPOSIT_BREAKDOWN_MISMATCH',
+            `El desglose (efectivo ${nCash.toFixed(2)} + electrónico ${nElec.toFixed(2)}) no suma el total ${nAmount.toFixed(2)}`,
+          );
+        }
+        if (input.maxCashDepositable != null && nCash > Number(input.maxCashDepositable) - Number(yaCash) + 0.005) {
+          const resta = Math.max(0, Number(input.maxCashDepositable) - Number(yaCash));
+          throw new ConstraintError(
+            'DEPOSIT_OVER_CASH',
+            `Del efectivo del cierre de la caja #${reg.number} queda por ingresar ${resta.toFixed(2)}`,
+          );
+        }
+        if (input.maxElectronicDepositable != null && nElec > Number(input.maxElectronicDepositable) - Number(yaElec) + 0.005) {
+          const resta = Math.max(0, Number(input.maxElectronicDepositable) - Number(yaElec));
+          throw new ConstraintError(
+            'DEPOSIT_OVER_ELECTRONIC',
+            `De lo electrónico del cierre de la caja #${reg.number} queda por ingresar ${resta.toFixed(2)}`,
+          );
+        }
         if (input.maxDepositable != null) {
           const tope = Number(input.maxDepositable);
           if (Number(yaDepositado) + Number(input.amount) > tope + 0.005) {
@@ -475,6 +518,35 @@ export class CashGeneralRepository {
           throw new ConstraintError(
             'NO_CASH_PAYMENT_METHOD',
             'No hay un medio de pago de efectivo físico configurado',
+          );
+        }
+
+        // 2b) AUDITORÍA sep-2026 (C3): no se puede sacar del cajón más efectivo
+        //     del que hay. Se calcula DENTRO de la transacción con la misma
+        //     regla que el arqueo (apertura + ingresos físicos − egresos físicos).
+        if (!(Number(input.amount) > 0) || !Number.isFinite(Number(input.amount))) {
+          throw new ConstraintError('TRANSFER_INVALID', 'El importe a transferir no es válido');
+        }
+        const movs = tx
+          .select({
+            type: cashMovements.type,
+            amount: cashMovements.amount,
+            pmId: cashMovements.paymentMethodId,
+            isCash: paymentMethods.isPhysicalCash,
+          })
+          .from(cashMovements)
+          .leftJoin(paymentMethods, eq(cashMovements.paymentMethodId, paymentMethods.id))
+          .where(eq(cashMovements.cashRegisterId, input.cashRegisterId))
+          .all();
+        let disponible = Number(reg.openingAmount);
+        for (const mv of movs) {
+          if (!(mv.pmId == null || mv.isCash === true)) continue;
+          disponible += mv.type === 'income' ? Number(mv.amount) : -Number(mv.amount);
+        }
+        if (Number(input.amount) > disponible + 0.005) {
+          throw new ConstraintError(
+            'INSUFFICIENT_CASH',
+            `La caja tiene ${disponible.toFixed(2)} en efectivo: no se pueden transferir ${Number(input.amount).toFixed(2)}`,
           );
         }
 

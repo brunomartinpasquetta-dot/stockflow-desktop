@@ -89,7 +89,7 @@ function CajaCerrada() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Para registrar ventas hay que abrir la caja. Ingresá el monto inicial en efectivo del cajón.
+            Para registrar ventas hay que abrir la caja. Ingrese el monto inicial en efectivo del cajón.
           </p>
           <div className="flex flex-col gap-1">
             <Label htmlFor="apertura">Monto inicial</Label>
@@ -272,7 +272,7 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
           await printCashClose(reportData)
           printed = true
         } catch {
-          toast.warning('No se pudo imprimir el reporte — usá "Imprimir reporte" para reintentar')
+          toast.warning('No se pudo imprimir el reporte — use "Imprimir reporte" para reintentar')
         }
       }
 
@@ -632,7 +632,7 @@ export function Caja() {
       return
     }
     if (Number(cashAmount) > Number(depositInfo.counted) + 0.005) {
-      toast.error(`No podés ingresar más efectivo del que contaste (${formatCurrency(depositInfo.counted)})`)
+      toast.error(`No se puede ingresar más efectivo del contado (${formatCurrency(depositInfo.counted)})`)
       return
     }
     if (Number(amt) <= 0) {
@@ -705,7 +705,7 @@ export function Caja() {
                       </div>
                     ))}
                   <span className="mt-0.5 text-[11px] text-muted-foreground">
-                    Ya está en tu cuenta: entra completo, no se puede modificar.
+                    Ya está en la cuenta: entra completo, no se puede modificar.
                   </span>
                 </div>
 

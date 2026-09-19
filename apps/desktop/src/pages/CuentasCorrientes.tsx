@@ -89,7 +89,7 @@ function CobranzaDialog({
             {overBalance ? (
               <span className="text-xs text-destructive">No puede superar el saldo del comprobante.</span>
             ) : (
-              <span className="text-xs text-muted-foreground">Podés cobrar una parte: el resto queda pendiente en la cuenta.</span>
+              <span className="text-xs text-muted-foreground">Se puede cobrar una parte: el resto queda pendiente en la cuenta.</span>
             )}
           </div>
           <div className="border-t pt-2">
@@ -199,7 +199,7 @@ function CobranzaCuentaDialog({
             {overBalance ? (
               <span className="text-xs text-destructive">No puede superar el saldo total del cliente.</span>
             ) : (
-              <span className="text-xs text-muted-foreground">Podés cobrar una parte: se aplica a los comprobantes más viejos y el resto queda pendiente.</span>
+              <span className="text-xs text-muted-foreground">Se puede cobrar una parte: se aplica a los comprobantes más viejos y el resto queda pendiente.</span>
             )}
           </div>
           <div className="border-t pt-2">

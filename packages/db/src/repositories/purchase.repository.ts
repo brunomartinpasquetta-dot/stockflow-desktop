@@ -8,9 +8,9 @@ import {
   addDecimal,
   cmpDecimal,
   mulDecimal,
+  proratedVatBreakdown,
   subDecimal,
   sumDecimals,
-  vatBreakdown,
 } from '@stockflow/shared';
 
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
@@ -92,7 +92,6 @@ export class PurchaseRepository extends BaseRepository<
 
         const computedLines = data.lines.map((line, idx) => {
           const lineTotal = mulDecimal(line.quantity, line.costPrice, 4);
-          const { vat } = vatBreakdown(lineTotal, line.vatRate ?? '21.00', priceMode);
           return {
             articleId: line.articleId,
             lineNumber: idx + 1,
@@ -104,13 +103,21 @@ export class PurchaseRepository extends BaseRepository<
             newListPrice3: line.newListPrice3,
             vatRate: line.vatRate ?? '21.00',
             lineTotal,
-            vat,
           };
         });
 
         const lineSum = sumDecimals(computedLines.map((l) => l.lineTotal));
-        const vatAmount = sumDecimals(computedLines.map((l) => l.vat));
         const subtotal = lineSum;
+        // AUDITORÍA sep-2026 (C2): el IVA se calculaba sobre las líneas SIN
+        // descontar el descuento global, así el crédito fiscal del Libro IVA
+        // Compras quedaba inflado. Mismo prorrateo que en ventas
+        // (`proratedVatBreakdown`): Neto + IVA == Total.
+        const { vatAmount } = proratedVatBreakdown(
+          computedLines.map((l) => ({ lineTotal: l.lineTotal, vatRate: l.vatRate })),
+          purchaseDiscount,
+          subtotal,
+          priceMode,
+        );
         const total =
           priceMode === 'gross'
             ? subDecimal(lineSum, purchaseDiscount, 4)
@@ -462,7 +469,7 @@ export class PurchaseRepository extends BaseRepository<
             if (!openRegisterId) {
               throw new ConstraintError(
                 'NO_OPEN_CASH_REGISTER',
-                'Abrí una caja para poder anular esta operación (la caja original ya está cerrada)',
+                'Abra una caja para poder anular esta operación (la caja original ya está cerrada)',
               );
             }
             return openRegisterId;

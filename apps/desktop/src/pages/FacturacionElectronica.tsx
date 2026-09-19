@@ -111,7 +111,7 @@ function FacturacionInner() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Configurá los datos fiscales para emitir facturas con CAE. Mientras esté desactivada, las
+            Configure los datos fiscales para emitir facturas con CAE. Mientras esté desactivada, las
             ventas siguen saliendo como remito X (no fiscal).
           </p>
 
@@ -213,7 +213,7 @@ function FacturacionInner() {
             Activar facturación electrónica
             {!canEnable && (
               <span className="text-xs text-muted-foreground">
-                (cargá el CUIT y el certificado primero)
+                (cargue el CUIT y el certificado primero)
               </span>
             )}
           </label>
@@ -227,7 +227,7 @@ function FacturacionInner() {
               variant="outline"
               onClick={() => testMut.mutate()}
               disabled={testMut.isPending || !cfgQuery.data?.certPath}
-              title={cfgQuery.data?.certPath ? undefined : 'Guardá el certificado antes de probar'}
+              title={cfgQuery.data?.certPath ? undefined : 'Guarde el certificado antes de probar'}
             >
               {testMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
               Probar conexión con ARCA

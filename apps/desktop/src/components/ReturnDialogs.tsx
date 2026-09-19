@@ -182,7 +182,7 @@ export function ReturnSaleDialog({
   async function confirm(): Promise<void> {
     const chosen = lines.filter((l) => Number(l.toReturn || '0') > 0)
     if (chosen.length === 0) {
-      toast.error('Indicá qué cantidad devolver en al menos un artículo')
+      toast.error('Indique qué cantidad devolver en al menos un artículo')
       return
     }
     const bad = chosen.find((l) => Number(l.toReturn) > l.sold - l.returned + 0.0005)
@@ -354,7 +354,7 @@ export function ReturnPurchaseDialog({
   async function confirm(): Promise<void> {
     const chosen = lines.filter((l) => Number(l.toReturn || '0') > 0)
     if (chosen.length === 0) {
-      toast.error('Indicá qué cantidad devolver en al menos un artículo')
+      toast.error('Indique qué cantidad devolver en al menos un artículo')
       return
     }
     if (method === 'cash' && !cashQ.data) {

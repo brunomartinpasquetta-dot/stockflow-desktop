@@ -75,7 +75,7 @@ export function Activacion() {
     setErrorMsg(null)
     const key = licenseKey.trim()
     if (!key) {
-      setErrorMsg('Ingresá tu clave de licencia.')
+      setErrorMsg('Ingrese la clave de licencia.')
       return
     }
     mutation.mutate(key)
@@ -87,7 +87,7 @@ export function Activacion() {
     const companyName = tCompany.trim()
     const phone = tPhone.trim()
     if (!fullName || !companyName || !phone) {
-      setTrialError('Completá tu nombre, el comercio y tu WhatsApp.')
+      setTrialError('Complete el nombre, el comercio y el WhatsApp.')
       return
     }
     trialMutation.mutate({ fullName, companyName, phone })
@@ -109,7 +109,7 @@ export function Activacion() {
         <CardContent className="flex flex-col gap-3">
           {status === 'revoked' && (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              Tu licencia fue revocada (suscripción cancelada). Contactá soporte para regularizar.
+              La licencia fue revocada (suscripción cancelada). Contacte a soporte para regularizar.
             </div>
           )}
 
@@ -117,13 +117,13 @@ export function Activacion() {
           <div className="flex flex-col gap-2 rounded-md border border-primary/25 bg-primary/5 p-3">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Gift className="h-4 w-4 text-primary" />
-              Probá GRATIS por 30 días
+              Prueba GRATIS por 30 días
             </div>
             <p className="text-xs text-muted-foreground">
               Sistema completo, sin tarjeta y sin costo. Se activa al instante en esta PC (una prueba por computadora).
             </p>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="trial-name">Tu nombre y apellido</Label>
+              <Label htmlFor="trial-name">Nombre y apellido</Label>
               <Input id="trial-name" autoFocus placeholder="Ej: Juan Pérez" value={tFullName} onChange={(e) => setTFullName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1">
@@ -131,7 +131,7 @@ export function Activacion() {
               <Input id="trial-company" placeholder="Ej: Ferretería El Tornillo" value={tCompany} onChange={(e) => setTCompany(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="trial-phone">Tu WhatsApp</Label>
+              <Label htmlFor="trial-phone">WhatsApp</Label>
               <Input
                 id="trial-phone"
                 placeholder="Ej: 342 5847340"
@@ -152,7 +152,7 @@ export function Activacion() {
           {/* ── Ya tengo licencia ── */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
-            ¿Ya tenés una clave de licencia?
+            ¿Ya tiene una clave de licencia?
             <span className="h-px flex-1 bg-border" />
           </div>
           <div className="flex flex-col gap-1">

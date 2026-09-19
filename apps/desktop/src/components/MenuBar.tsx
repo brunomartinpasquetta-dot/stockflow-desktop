@@ -200,7 +200,7 @@ export function MenuBar() {
    */
   function avisarSinPermiso(label: string): void {
     const rol = currentUser ? (ROLE_LABELS[currentUser.role] ?? currentUser.role) : '—'
-    toast.warning(`"${label}" no está habilitado para tu usuario`, {
+    toast.warning(`"${label}" no está habilitado para este usuario`, {
       description:
         `Entraste como ${currentUser?.fullName || currentUser?.username} con rol ${rol}. ` +
         'Un Administrador puede cambiarlo en Configuración → Usuarios, o habilitar el área ' +

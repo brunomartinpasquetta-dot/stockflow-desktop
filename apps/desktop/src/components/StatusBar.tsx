@@ -79,8 +79,8 @@ export function StatusBar() {
           }`}
           title={
             trialDaysLeft > 0
-              ? `Tu prueba gratis vence en ${trialDaysLeft} día(s). Para seguir después, escribinos por WhatsApp.`
-              : 'Tu prueba gratis terminó. Escribinos por WhatsApp para activar tu licencia.'
+              ? `La prueba gratis vence en ${trialDaysLeft} día(s). Para continuar después, escríbanos por WhatsApp.`
+              : 'La prueba gratis terminó. Escríbanos por WhatsApp para activar la licencia.'
           }
         >
           {trialDaysLeft > 0 ? `Prueba: ${trialDaysLeft} día(s)` : 'Prueba vencida'}

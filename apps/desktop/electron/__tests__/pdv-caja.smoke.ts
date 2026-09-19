@@ -173,6 +173,51 @@ const main = async () => {
     Number(saldo.cash) === 1000 && Number(saldo.electronic) === 500,
     `${saldo.cash} / ${saldo.electronic}`);
 
+  /* ------------------------------------------------------------------ */
+  console.log('\n[6] Tanda 7: IVA de compras con descuento, transferencias validadas');
+  const reg4 = await svc.cash.openCashRegister('0.0000');
+  await svc.cash.addMovement({ type: 'income', description: 'Fondeo', amount: '5000.0000', paymentMethodId: PM_CASH, cashRegisterId: reg4.id });
+  const prov = await repos.suppliers.create({ code: 'P-1', name: 'Proveedor Prueba' });
+  // gross: 2 × 1000 = 2000, descuento global 200 → total 1800; IVA 21% incluido
+  // sobre la base CON descuento: 1800 × 21/121 = 312.3967 (antes: 347.1074).
+  const cp = await svc.purchases.createPurchase({
+    type: 'X', supplierId: prov.id, isAccountPurchase: false, fundingSource: 'daily', updatePrices: false,
+    discount: '200.0000',
+    payments: [{ paymentMethodId: PM_CASH, amount: '1800.0000' }],
+    lines: [{ articleId: art.id, quantity: '2.000', costPrice: '1000.0000' }],
+  } as never);
+  check('compra con descuento global: total 1800', cp.purchase.total === '1800.0000', cp.purchase.total);
+  check('el IVA se calcula sobre la base descontada (312.3967, no 347.1074)', cp.purchase.vatAmount === '312.3967', cp.purchase.vatAmount);
+
+  const errTransfDeMas = await falla(() =>
+    svc.cashGeneral.transferFromDaily({ cashRegisterId: reg4.id, amount: '99999.00' }),
+  );
+  check('transferir más efectivo del que hay en la caja se rechaza', errTransfDeMas != null && /efectivo/i.test(errTransfDeMas), errTransfDeMas ?? 'dejó');
+  const errTransfNeg = await falla(() =>
+    svc.cashGeneral.transferFromDaily({ cashRegisterId: reg4.id, amount: '-10.00' }),
+  );
+  check('un importe negativo se rechaza', errTransfNeg != null, errTransfNeg ?? 'dejó');
+  const okTransf = await falla(() => svc.cashGeneral.transferFromDaily({ cashRegisterId: reg4.id, amount: '1000.00' }));
+  check('una transferencia dentro del disponible entra', okTransf == null, okTransf ?? '');
+
+  await svc.cash.closeCashRegister(reg4.id, '2200.0000');
+  const errDesglose = await falla(() =>
+    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2200.00', cashAmount: '2000.00', electronicAmount: '100.00' }),
+  );
+  check('un desglose que no suma el total se rechaza', errDesglose != null && /desglose/i.test(errDesglose), errDesglose ?? 'dejó');
+  const errMasEfectivo = await falla(() =>
+    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2500.00', cashAmount: '2500.00', electronicAmount: '0.00' }),
+  );
+  check('ingresar más efectivo del contado se rechaza', errMasEfectivo != null, errMasEfectivo ?? 'dejó');
+  const errElecInventado = await falla(() =>
+    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2300.00', cashAmount: '2200.00', electronicAmount: '100.00' }),
+  );
+  check('ingresar electrónico que el cierre no tuvo se rechaza', errElecInventado != null, errElecInventado ?? 'dejó');
+  const okCierre = await falla(() =>
+    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2200.00', cashAmount: '2200.00', electronicAmount: '0.00' }),
+  );
+  check('el depósito correcto del cierre entra', okCierre == null, okCierre ?? '');
+
   closeLocalDb(db);
   rmSync(dir, { recursive: true, force: true });
   console.log(fallas === 0 ? '\n✅ TODO OK\n' : `\n❌ ${fallas} FALLAS\n`);

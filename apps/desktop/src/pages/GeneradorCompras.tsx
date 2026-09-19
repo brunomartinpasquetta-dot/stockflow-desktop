@@ -200,7 +200,7 @@ export function GeneradorCompras() {
                 ) : !enabled ? (
                   <TableRow>
                     <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
-                      Elegí filtros y presioná "Calcular" para listar los artículos a reponer.
+                      Seleccione filtros y presione "Calcular" para listar los artículos a reponer.
                     </TableCell>
                   </TableRow>
                 ) : computed.length === 0 ? (

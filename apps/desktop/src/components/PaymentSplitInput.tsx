@@ -17,7 +17,7 @@ export function PaymentSplitInput({
   split: PaymentSplit
 }) {
   if (methods.length === 0) {
-    return <p className="text-xs text-destructive">No hay medios de pago activos. Configurá al menos uno en “Medios de pago”.</p>
+    return <p className="text-xs text-destructive">No hay medios de pago activos. Configure al menos uno en “Medios de pago”.</p>
   }
   return (
     <div className="flex flex-col gap-1.5 text-sm">

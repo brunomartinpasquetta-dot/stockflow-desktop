@@ -164,7 +164,7 @@ function PurchaseDetailDialog({
             )}
             {canVoid && purchase.status === 'completed' && confirming && (
               <div className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2">
-                <p className="text-xs text-destructive">Anular esta compra revierte stock y caja. Indicá el motivo:</p>
+                <p className="text-xs text-destructive">Anular esta compra revierte stock y caja. Indique el motivo:</p>
                 <textarea
                   rows={2}
                   value={reason}

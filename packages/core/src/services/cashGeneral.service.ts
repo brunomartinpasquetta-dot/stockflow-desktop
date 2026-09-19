@@ -177,11 +177,10 @@ export class CashGeneralService {
           ? addDecimal(noFisico, mv.amount, 2)
           : subDecimal(noFisico, mv.amount, 2);
     }
-    const maxDepositable = addDecimal(
-      reg.closingAmount ?? '0',
-      Number(noFisico) > 0 ? noFisico : '0',
-      2,
-    );
+    assertPositive(input.amount);
+    const maxElectronic = Number(noFisico) > 0 ? noFisico : '0';
+    const maxCash = reg.closingAmount ?? '0';
+    const maxDepositable = addDecimal(maxCash, maxElectronic, 2);
     const m = await repos.cashGeneral.transferFromClosed({
       cashRegisterId: input.cashRegisterId,
       amount: input.amount,
@@ -189,6 +188,8 @@ export class CashGeneralService {
       cashAmount: input.cashAmount,
       electronicAmount: input.electronicAmount,
       maxDepositable,
+      maxCashDepositable: maxCash,
+      maxElectronicDepositable: maxElectronic,
     });
     return this.toDTO(m);
   }

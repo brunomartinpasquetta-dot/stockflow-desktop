@@ -315,7 +315,7 @@ export class PriceUpdateService {
     if (input.rule.fields.length === 0) {
       throw new BusinessRuleError(
         'NO_FIELDS',
-        'Seleccioná al menos un campo a actualizar',
+        'Seleccione al menos un campo a actualizar',
       );
     }
     const articles = await this.filterArticles(input.filter);

@@ -111,8 +111,8 @@ export function OutdatedBanner() {
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="flex-1">
         Hay una versión más nueva disponible (<span className="font-mono">v{info.latestVersion}</span>
-        ). Esta PC sigue en <span className="font-mono">v{info.currentVersion}</span>. Bajá el
-        instalador de tu sistema.
+        ). Esta PC sigue en <span className="font-mono">v{info.currentVersion}</span>. Descargue el
+        instalador para su sistema.
       </span>
       <button
         type="button"

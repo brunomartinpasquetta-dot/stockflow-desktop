@@ -136,7 +136,7 @@ export function Promociones() {
         }}
         onDelete={(p) => removePromo.mutate(p.id)}
         deleteTitle={(p) => `¿Eliminar la promo "${p.name}"? Si ya tuvo ventas no se puede: en ese caso desactivala.`}
-        emptyMessage="Todavía no hay promociones. Creá la primera con el botón Nueva promo."
+        emptyMessage="Todavía no hay promociones. Se crea la primera con el botón Nueva promo."
       />
       <PromoFormDialog
         key={editing?.id ?? 'new'}
@@ -211,20 +211,20 @@ function PromoFormDialog(props: {
   async function save(): Promise<void> {
     const nameTrim = name.trim()
     if (nameTrim.length < 2) {
-      toast.error('Poné un nombre para la promo (mínimo 2 letras)')
+      toast.error('Ingrese un nombre para la promo (mínimo 2 letras)')
       return
     }
     if (items.length === 0) {
-      toast.error('Agregá al menos un artículo a la promo')
+      toast.error('Agregue al menos un artículo a la promo')
       return
     }
     if (!(priceNum > 0)) {
-      toast.error('Poné el precio de venta de la promo')
+      toast.error('Ingrese el precio de venta de la promo')
       return
     }
     const badQty = items.find((i) => !(Number(i.quantity) > 0))
     if (badQty) {
-      toast.error(`Revisá la cantidad de "${badQty.description}"`)
+      toast.error(`Revise la cantidad de "${badQty.description}"`)
       return
     }
     setSaving(true)
@@ -279,7 +279,7 @@ function PromoFormDialog(props: {
               <Input
                 id="promo-search"
                 className="pl-8"
-                placeholder="Buscá por nombre, código o marca…"
+                placeholder="Buscar por nombre, código o marca…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -367,7 +367,7 @@ function PromoFormDialog(props: {
             </span>
           </div>
           {margin < 0 && priceNum > 0 && (
-            <p className="text-xs text-destructive">⚠ El precio está por DEBAJO del costo: vas a perder plata con cada promo vendida.</p>
+            <p className="text-xs text-destructive">⚠ El precio está por DEBAJO del costo: se pierde dinero con cada promo vendida.</p>
           )}
 
           <div className="flex justify-end gap-2 pt-1">

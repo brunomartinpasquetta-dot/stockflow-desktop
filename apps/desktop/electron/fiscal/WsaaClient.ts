@@ -238,7 +238,7 @@ export class WsaaClient {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new WsaaApiError(
-        'No se pudo firmar con el certificado. Revisá que el .crt y la clave ' +
+        'No se pudo firmar con el certificado. Revise que el .crt y la clave ' +
           `se correspondan y que el certificado no esté vencido. Detalle: ${msg}`,
         { cause: err },
       );

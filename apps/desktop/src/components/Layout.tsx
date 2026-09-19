@@ -90,7 +90,7 @@ function LayoutInner() {
       {licenseStatus === 'readOnly' && (
         <div data-chrome="readonly-banner" className="shrink-0 bg-destructive px-4 py-1.5 text-center text-xs font-medium text-destructive-foreground">
           {isTrial
-            ? '⏳ Tu prueba gratis de 30 días terminó — tus datos están intactos, pero el sistema quedó en sólo lectura. Escribinos por WhatsApp al +54 342 584 7340 y lo activamos en el día.'
+            ? '⏳ La prueba gratis de 30 días terminó — los datos están intactos, pero el sistema quedó en sólo lectura. Escríbanos por WhatsApp al +54 342 584 7340 y lo activamos en el día.'
             : '⚠ Suscripción suspendida — regularizá el pago para volver a operar. Sólo lectura.'}
         </div>
       )}

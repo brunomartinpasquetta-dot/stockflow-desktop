@@ -44,7 +44,7 @@ export function QuickCreateSupplierDialog({ open, onClose, onCreated }: Props) {
 
   async function handleSave(): Promise<void> {
     if (!name.trim()) {
-      toast.error('Ingresá la razón social')
+      toast.error('Ingrese la razón social')
       return
     }
     setSaving(true)

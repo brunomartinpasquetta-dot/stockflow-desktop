@@ -616,11 +616,11 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
 
   async function onSave(): Promise<void> {
     if (cart.length === 0) {
-      toast.error('Agregá al menos un producto')
+      toast.error('Agregue al menos un producto')
       return
     }
     if (!customerId) {
-      toast.error('Elegí un cliente')
+      toast.error('Seleccione un cliente')
       return
     }
     setSaving(true)
@@ -695,7 +695,7 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
         <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="h-11 pl-10"
-          placeholder="Buscá un producto por nombre, código o marca…"
+          placeholder="Buscar un producto por nombre, código o marca…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -928,7 +928,7 @@ function QuickCustomerDialog({
 
   async function onSave(): Promise<void> {
     if (lastName.trim() === '') {
-      toast.error('Ingresá el nombre o razón social')
+      toast.error('Ingrese el nombre o razón social')
       return
     }
     setSaving(true)

@@ -132,7 +132,7 @@ function AnularVentasDeHoyDialog({ onClose }: { onClose: () => void }): React.JS
             )}
 
             <div className="flex flex-col gap-1">
-              <Label>Para confirmar, escribí ANULAR</Label>
+              <Label>Para confirmar, escriba ANULAR</Label>
               <Input
                 value={confirmacion}
                 onChange={(e) => setConfirmacion(e.target.value)}

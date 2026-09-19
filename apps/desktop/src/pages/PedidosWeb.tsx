@@ -225,7 +225,7 @@ function Pedido({ p, onCambio }: { p: PedidoWebDTO; onCambio: () => void }) {
             {p.pagado && !metodoMp && (
               <p className="text-xs text-amber-600">
                 Ya está pagado con Mercado Pago, pero no hay un medio de pago "Mercado Pago"
-                cargado en Medios de pago. Elegí uno para poder registrarlo.
+                cargado en Medios de pago. Seleccione uno para poder registrarlo.
               </p>
             )}
             <div className="flex flex-wrap items-end gap-2">

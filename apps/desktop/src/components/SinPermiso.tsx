@@ -26,7 +26,7 @@ export function SinPermiso({ area }: { area: string }) {
         <CardContent className="flex flex-col gap-3 pt-5">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-amber-500" />
-            <h1 className="text-lg font-semibold">{area} no está habilitado para tu usuario</h1>
+            <h1 className="text-lg font-semibold">{area} no está habilitado para este usuario</h1>
           </div>
 
           {currentUser && (

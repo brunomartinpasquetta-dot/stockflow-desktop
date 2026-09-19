@@ -405,6 +405,7 @@ export const sales = sqliteTable(
     customerIdx: index('idx_sales_customer').on(t.customerId),
     sellerIdx: index('idx_sales_seller').on(t.sellerId),
     numberIdx: uniqueIndex('idx_sales_number').on(t.type, t.number),
+    cashRegisterIdx: index('idx_sales_cash_register').on(t.cashRegisterId),
     typeCheck: check('sales_type_check', sql`${t.type} in ('A', 'B', 'C', 'X')`),
     statusCheck: check(
       'sales_status_check',

@@ -129,7 +129,7 @@ export class SalesService {
     ) {
       throw new BusinessRuleError(
         'account_sale_consumer_final',
-        'El CONSUMIDOR FINAL no puede comprar a cuenta corriente. Elegí un cliente con ficha.',
+        'El CONSUMIDOR FINAL no puede comprar a cuenta corriente. Seleccione un cliente con ficha.',
       );
     }
 

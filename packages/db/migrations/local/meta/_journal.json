@@ -239,6 +239,13 @@
       "when": 1786725682786,
       "tag": "0034_catalogo_sync_crear_faltantes",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1786725682787,
+      "tag": "0035_sales_cash_register_idx",
+      "breakpoints": true
     }
   ]
 }

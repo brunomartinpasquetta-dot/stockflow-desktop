@@ -34,9 +34,9 @@ export interface OnboardingHardware {
 
 export function computeSteps(c: OnboardingCounts, hw: OnboardingHardware): OnboardingStep[] {
   return [
-    { id: 'empresa', label: 'Cargar los datos de tu comercio', screen: 'empresa', done: c.companies > 0 },
-    { id: 'articulos', label: 'Cargar tu primer artículo (o importar tu Excel)', screen: 'articulos', done: c.articles > 0 },
-    { id: 'venta', label: 'Hacer tu primera venta', screen: 'ventas', done: c.sales > 0 },
+    { id: 'empresa', label: 'Cargar los datos del comercio', screen: 'empresa', done: c.companies > 0 },
+    { id: 'articulos', label: 'Cargar el primer artículo (o importar el Excel)', screen: 'articulos', done: c.articles > 0 },
+    { id: 'venta', label: 'Hacer la primera venta', screen: 'ventas', done: c.sales > 0 },
     { id: 'impresora', label: 'Configurar la impresora de tickets', screen: 'configuracion', done: hw.printer != null },
     {
       id: 'backup',

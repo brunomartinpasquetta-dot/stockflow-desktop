@@ -45,6 +45,22 @@ Vistas útiles para exportar (ya vienen con los datos resueltos):
 4. **`FACTURA` guarda TOKEN y SIGN de ARCA**: son credenciales de sesión, no el
    certificado. El `.crt`/`.key` está en el disco del servidor.
 
+5. **Ventas a cuenta corriente (auditoría sep-2026).** `VENTA.IDCUENTA` marca las
+   ventas que fueron a la cuenta del cliente: entran como `is_account_sale = 1` y
+   NO se repiten en la venta de "saldo anterior" de esa cuenta. `LINEACUENTA.IDLV`
+   apunta a `LINEAVENTA`: los renglones que ya viajaron con su venta se saltean. La
+   venta sintética sólo lleva lo que las ventas reales no explican (arrastre); si
+   todo el total está explicado, la cuenta cuelga de la última venta real.
+
+6. **Cada venta de contado lleva su `sale_payments`** con la forma de pago de
+   `VENTA.FORMAPAGO` (`pm_para`), así "Ventas por forma de pago" tiene histórico.
+
+7. **Todo en UNA transacción** con `PRAGMA foreign_key_check` antes del commit:
+   si algo falla, la base destino queda vacía, nunca a medias. `COMPRA.NUMERO`
+   es texto ("0003-00012345"): se toman los dígitos finales; una compra
+   inválida se anota y no frena el resto. El "CONSUMIDOR FINAL" de StockFácil se
+   unifica con el de StockFlow. Los números de venta repetidos se renumeran.
+
 ## Extracción de la base
 
 StockFácil trae `gbak.exe` y `fbclient.dll` en su carpeta de instalación.

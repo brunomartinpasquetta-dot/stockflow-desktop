@@ -180,7 +180,7 @@ function PorDiaTab({
   )
 
   if (dias.length === 0) {
-    return <p className="text-sm text-muted-foreground">Elegí un rango de fechas para ver el calendario.</p>
+    return <p className="text-sm text-muted-foreground">Seleccione un rango de fechas para ver el calendario.</p>
   }
 
   return (

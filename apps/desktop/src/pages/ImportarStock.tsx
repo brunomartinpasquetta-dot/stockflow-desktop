@@ -154,7 +154,7 @@ export function ImportarStock() {
       if (r.created > 0) {
         toast.success(`Se importaron ${r.created} artículos${r.skipped ? ` (${r.skipped} saltados)` : ''}`)
       } else {
-        toast.error(`No se importó ningún artículo (${r.skipped} con error). Revisá el detalle.`)
+        toast.error(`No se importó ningún artículo (${r.skipped} con error). Revise el detalle.`)
       }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'La importación falló')
@@ -221,7 +221,7 @@ export function ImportarStock() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-              Indicá qué columna del Excel corresponde a cada campo del sistema. Total de filas detectadas:{' '}
+              Indique qué columna del Excel corresponde a cada campo del sistema. Total de filas detectadas:{' '}
               <span className="font-medium text-foreground">{parsed.totalRows}</span>.
             </p>
             <div className="grid grid-cols-2 gap-3">

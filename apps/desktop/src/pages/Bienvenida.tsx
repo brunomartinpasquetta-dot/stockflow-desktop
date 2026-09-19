@@ -109,7 +109,7 @@ export function Bienvenida() {
             className="mx-auto mb-4 h-auto w-[280px]"
           />
           <h1 className="text-2xl font-semibold">Bienvenido</h1>
-          <p className="text-sm text-muted-foreground">Configurá cómo vas a usar la aplicación.</p>
+          <p className="text-sm text-muted-foreground">Configure cómo se va a usar la aplicación.</p>
         </div>
 
         {step === 'pick' && (
@@ -149,10 +149,10 @@ export function Bienvenida() {
             <CardContent className="flex flex-col gap-3">
               <div className="rounded-md border bg-muted/30 p-3 text-sm">
                 <p>
-                  Tu PIN es: <span className="font-mono text-lg font-bold">{serverPin}</span>
+                  El PIN es: <span className="font-mono text-lg font-bold">{serverPin}</span>
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Anotalo: vas a necesitarlo para conectar las cajas adicionales.
+                  Anótelo: hará falta para conectar las cajas adicionales.
                 </p>
                 <Button variant="link" size="sm" className="px-0" onClick={() => setServerPin(generatePin())}>
                   Generar otro

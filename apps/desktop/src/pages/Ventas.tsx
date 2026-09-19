@@ -1691,7 +1691,7 @@ function PDV() {
             <Input
               ref={barcodeRef}
               className="h-11 pl-10 text-base"
-              placeholder="Código o nombre del producto — escaneá o escribí y Enter"
+              placeholder="Código o nombre del producto — escanear o escribir y Enter"
               value={barcode}
               onFocus={() => setListaAbierta(true)}
               onChange={(e) => {
@@ -1825,7 +1825,7 @@ function PDV() {
               {cart.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                    Carrito vacío — escaneá o buscá un producto para empezar.
+                    Carrito vacío — escanee o busque un producto para empezar.
                   </td>
                 </tr>
               ) : (

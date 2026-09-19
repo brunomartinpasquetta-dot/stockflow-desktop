@@ -129,15 +129,28 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
   `mp_pos_devices` de las cajas que se van.
 - Smoke: `test:catalogo` ampliado (50 checks, secciones B1–B6).
 
-## Tanda 7 — Migración y el resto
-- [ ] `migrar.py`: cuentas corrientes sin duplicar renglones (`:953`), `sale_payments` por
-  venta, `COMPRA.NUMERO` alfanumérico, una sola transacción, sin segundo Consumidor Final.
-- [ ] IVA de compras con descuento global (`purchase.repository.ts:110`).
-- [ ] `transferFromClosed`/`transferFromDaily` validan monto y efectivo.
-- [ ] `synchronous=FULL`, índice `sales.cash_register_id`, `foreign_key_check` post-migración,
-  `repositories.smoke` en verde, drift schema/DB.
-- [ ] Clave maestra: JWT firmado por el cloud para el dueño.
-- [ ] Tono de UI: las ~25 cadenas que tutean.
+## Tanda 7 — Migración y el resto ✅ (18-sep-2026, con dos pendientes explícitos)
+- [x] `migrar.py`: cuentas corrientes sin duplicar (VENTA.IDCUENTA → `is_account_sale`,
+  LINEACUENTA.IDLV salteadas, venta sintética sólo con el arrastre), `sale_payments` por
+  venta, `COMPRA.NUMERO` alfanumérico con try/except por compra, UNA transacción con
+  `foreign_key_check` antes del commit, sin segundo Consumidor Final, renumeración en
+  colisión, aviso honesto de claves. Probado de punta a punta con la base real de Denver
+  (61.627 ventas, 61.627 pagos, integridad y FK ok); la base regenerada quedó en
+  `~/Desktop/DENVER-migracion/PARA-EL-PENDRIVE/`.
+- [x] IVA de compras con descuento global prorrateado (`purchase.repository.ts`).
+- [x] `transferFromClosed` valida importe, desglose (suma = total) y topes por naturaleza
+  (efectivo ≤ contado, electrónico ≤ neto del cierre); `transferFromDaily` verifica el
+  efectivo disponible dentro de la transacción.
+- [x] `synchronous=FULL`, índice `idx_sales_cash_register` (migración 0035),
+  `foreign_key_check` al terminar de migrar en `init.ts`, `local.smoke` y
+  `repositories.smoke` en verde.
+- [ ] **Drift schema/DB** (índice terminal, FK related_voucher_id, CHECKs): requiere
+  recrear tablas en bases de clientes; se deja para una versión con ventana de prueba.
+- [ ] **Clave maestra: JWT firmado por el cloud**: toca el servidor de licencias del VPS;
+  se hace junto con Bruno, no en una tanda local.
+- [x] Tono de UI: ~110 cadenas que tuteaban pasaron a trato formal (pantallas, toasts,
+  mensajes del servidor). El asistente Flowy conserva su tono conversacional a propósito.
+- Smokes: `test:pdv-caja` sección [6] (9 checks nuevos).
 
 ## Cómo se cierra cada tanda
 1. Cambio + smoke que lo reproduce antes y lo prueba después.

@@ -302,7 +302,7 @@ export function EntityTable<T extends { id: string }>({
             <AlertDialogTitle>¿Borrar registro?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete && deleteTitle
-                ? `Vas a borrar “${deleteTitle(pendingDelete)}”. Esta acción no se puede deshacer.`
+                ? `Se va a borrar “${deleteTitle(pendingDelete)}”. Esta acción no se puede deshacer.`
                 : 'Esta acción no se puede deshacer.'}
             </AlertDialogDescription>
           </AlertDialogHeader>

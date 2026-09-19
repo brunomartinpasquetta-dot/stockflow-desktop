@@ -213,7 +213,7 @@ export class MpQrService {
     requirePermission(this.ctx.currentUser, 'manage_mp_qr');
     const cfg = await this.getConfigRow();
     if (!cfg || !cfg.storeId) {
-      throw new BusinessRuleError('mp_not_configured', 'Configurá MercadoPago antes de asignar QR a cajas.');
+      throw new BusinessRuleError('mp_not_configured', 'Configure MercadoPago antes de asignar QR a cajas.');
     }
     const existing = await this.getPosDeviceByCashRegister(input.cashRegisterId);
     if (existing) return existing;

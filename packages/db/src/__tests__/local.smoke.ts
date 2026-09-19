@@ -40,6 +40,22 @@ const EXPECTED_TABLES = [
   'mp_orders',
   'cash_general',
   'cash_general_movements',
+  'audit_log',
+  'catalogo_pedidos',
+  'catalogo_sync',
+  'fiscal_config',
+  'fiscal_voucher_vat',
+  'fiscal_vouchers',
+  'promotion_items',
+  'promotions',
+  'purchase_return_lines',
+  'purchase_returns',
+  'quote_lines',
+  'quotes',
+  'return_lines',
+  'returns',
+  'role_area_access',
+  'sale_points',
 ];
 
 let failures = 0;

@@ -223,6 +223,9 @@ async function main(): Promise<void> {
   const reversal = (await repos.cashMovements.findByRegister(reg.id)).find((m) => m.relatedSaleId === sale.id && m.type === 'expense');
   check('sales.voidSale reverso de caja sólo por efectivo (1500)', reversal?.amount === '1500.0000', `reversal=${reversal?.amount}`);
 
+  // La empresa nace con "vender sin stock" ACTIVADO (default de producción):
+  // para probar el bloqueo hay que apagarlo explícitamente.
+  await repos.company.upsert({ allowNegativeStock: false } as never);
   await expectThrows(
     'sales.createWithLines con stock insuficiente revierte y lanza ConstraintError',
     () =>
@@ -240,6 +243,7 @@ async function main(): Promise<void> {
   // el artículo no debe haber cambiado tras el rollback
   const stockAfterRollback = (await repos.articles.findById(art.id))!.stock;
   check('sales.createWithLines rollback no toca stock', stockAfterRollback === stockRestored);
+  await repos.company.upsert({ allowNegativeStock: true } as never);
 
   // cierre de caja
   const closed = await repos.cashRegisters.closeRegister(reg.id, { closingAmount: '1000.0000' });

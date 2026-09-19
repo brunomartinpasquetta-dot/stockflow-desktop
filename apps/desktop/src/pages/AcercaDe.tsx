@@ -31,10 +31,10 @@ export function AcercaDe() {
         toast.error(`No se pudo verificar (${r.version ?? 'error desconocido'})`)
       } else if (r.status === 'outdated') {
         toast.warning(
-          `Hay una nueva versión disponible${r.version ? ` (v${r.version})` : ''}. Mirá el aviso arriba en la ventana principal para descargarla.`,
+          `Hay una nueva versión disponible${r.version ? ` (v${r.version})` : ''}. El aviso para descargarla está arriba, en la ventana principal.`,
         )
       } else if (r.status === 'latest') {
-        toast.success(`Ya tenés la última versión${r.version ? ` (v${r.version})` : ''}.`)
+        toast.success(`Esta es la última versión${r.version ? ` (v${r.version})` : ''}.`)
       } else {
         toast.success(`Verificación iniciada${r.version ? `: v${r.version}` : ''}`)
       }
@@ -52,7 +52,7 @@ export function AcercaDe() {
     try {
       await api.license.deactivate()
       refresh()
-      toast.success('Licencia desactivada. Activá la nueva licencia.')
+      toast.success('Licencia desactivada. Active la nueva licencia.')
       navigate('/activacion')
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'No se pudo desactivar la licencia')
@@ -112,7 +112,7 @@ export function AcercaDe() {
             ) : (
               <div className="flex flex-col gap-2">
                 <p className="text-xs text-muted-foreground">
-                  Se quita la licencia de ESTA PC y vas a tener que activar otra. ¿Seguro?
+                  Se quita la licencia de ESTA PC y habrá que activar otra. ¿Continuar?
                 </p>
                 <div className="flex gap-2">
                   <Button

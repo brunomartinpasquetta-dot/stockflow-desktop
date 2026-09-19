@@ -144,7 +144,7 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
 
     // Validar y computar líneas.
     if (input.lines.length === 0) {
-      throw new ConstraintError('RETURN_EMPTY', 'Elegí al menos un artículo a devolver');
+      throw new ConstraintError('RETURN_EMPTY', 'Seleccione al menos un artículo a devolver');
     }
     const prorratea = Number(sale.discount) !== 0 && Number(sale.subtotal) !== 0;
     const pedidoPorLinea = new Map<string, number>();
@@ -394,7 +394,7 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
         const prevByLine = new Map(prevRows.map((r) => [r.purchaseLineId, Number(r.qty)]));
 
         if (input.lines.length === 0) {
-          throw new ConstraintError('RETURN_EMPTY', 'Elegí al menos un artículo a devolver');
+          throw new ConstraintError('RETURN_EMPTY', 'Seleccione al menos un artículo a devolver');
         }
         const computed = input.lines.map((l) => {
           const pl = plById.get(l.purchaseLineId);

@@ -296,7 +296,7 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
             <span className="flex flex-col gap-0.5">
               <span className="text-sm font-medium">Permitir vender sin stock</span>
               <span className="text-xs text-muted-foreground">
-                Si está activo, podés vender aunque no haya stock suficiente (el stock queda en
+                Si está activo, se puede vender aunque no haya stock suficiente (el stock queda en
                 negativo, como faltante). Si lo desactivás, la venta se bloquea cuando falta stock.
               </span>
             </span>
@@ -317,7 +317,7 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
             <DialogTitle>Cambiar el modo de precios</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Vas a cambiar el modo de precios a{' '}
+            Se va a cambiar el modo de precios a{' '}
             <span className="font-medium text-foreground">
               {form.priceMode === 'gross' ? 'precios con IVA incluido' : 'precios netos + IVA aparte'}
             </span>
@@ -552,7 +552,7 @@ function VincularArticulosDialog(): React.ReactElement {
 
           {sugerencia.isError && (
             <p className="py-4 text-sm text-destructive">
-              No se pudo consultar el catálogo. Verificá la dirección y la clave, o que esté levantado.
+              No se pudo consultar el catálogo. Verifique la dirección y la clave, o que esté en línea.
             </p>
           )}
 

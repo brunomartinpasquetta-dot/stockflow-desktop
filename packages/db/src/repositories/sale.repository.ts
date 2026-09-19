@@ -589,7 +589,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
               if (!openReg) {
                 throw new ConstraintError(
                   'NO_OPEN_CASH_REGISTER',
-                  'Abrí una caja para poder anular esta operación (la caja original ya está cerrada)',
+                  'Abra una caja para poder anular esta operación (la caja original ya está cerrada)',
                 );
               }
               targetRegisterId = openReg.id;

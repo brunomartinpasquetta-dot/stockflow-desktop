@@ -226,11 +226,11 @@ export function ActualizacionPrecios() {
 
   function buildPayload(): { filter: PriceUpdateFilterDTO; rule: PriceUpdateRuleDTO; description: string } | null {
     if (selected.size === 0) {
-      toast.error('Seleccioná al menos un artículo')
+      toast.error('Seleccione al menos un artículo')
       return null
     }
     if (fields.length === 0) {
-      toast.error('Elegí al menos un campo')
+      toast.error('Seleccione al menos un campo')
       return null
     }
     // Normalizar el valor: coma decimal argentina y formato moneda.
@@ -495,11 +495,11 @@ function RuleFooter(props: {
     <div className="flex w-full flex-col gap-2 px-1 py-1">
       {props.selectedCount === 0 ? (
         <div className="rounded-md border border-primary/25 bg-primary/5 px-3 py-1.5 text-sm">
-          <b>Paso 1:</b> marcá con el tilde (☑) los artículos de la lista que querés actualizar. Después definí acá abajo el cambio y tocá «Ver y aplicar».
+          <b>Paso 1:</b> marcar con el tilde (☑) los artículos de la lista a actualizar. Después definir aquí abajo el cambio y pulsar «Ver y aplicar».
         </div>
       ) : (
         <div className="text-xs font-medium text-muted-foreground">
-          Vas a actualizar <b className="text-foreground">{props.selectedCount} artículo(s)</b> — definí el cambio y tocá «Ver y aplicar».
+          Se van a actualizar <b className="text-foreground">{props.selectedCount} artículo(s)</b> — defina el cambio y pulse «Ver y aplicar».
           <span className="ml-2 font-normal">Las listas L2/L3 en $0 se calculan desde la Lista 1.</span>
         </div>
       )}
@@ -603,7 +603,7 @@ function PreviewDialog(props: {
     <Dialog open onOpenChange={(o) => { if (!o) props.onClose() }}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Revisá los cambios antes de aplicar ({props.entries.length})</DialogTitle>
+          <DialogTitle>Revisión de los cambios antes de aplicar ({props.entries.length})</DialogTitle>
         </DialogHeader>
         {props.loading ? (
           <div className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div>

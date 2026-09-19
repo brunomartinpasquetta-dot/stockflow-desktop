@@ -128,7 +128,7 @@ export function VentasPorVendedor() {
                 {!applied ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                      Elegí filtros y presioná "Calcular".
+                      Seleccione filtros y presione "Calcular".
                     </TableCell>
                   </TableRow>
                 ) : reportQuery.isLoading || !data ? (

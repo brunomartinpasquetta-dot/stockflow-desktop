@@ -61,6 +61,19 @@ export function initLocalDb(
   } finally {
     db.$client.pragma('foreign_keys = ON');
   }
+  // Con las FK apagadas, una migración que recrea tablas podría dejar
+  // referencias colgadas sin que nadie se entere hasta que algo falle en
+  // producción. Se verifica al terminar y se deja constancia; no se frena el
+  // arranque (la base ya está migrada) pero el problema queda a la vista.
+  try {
+    const rotas = db.$client.pragma('foreign_key_check') as { table: string; rowid: number; parent: string }[];
+    if (rotas.length > 0) {
+      const ejemplo = rotas.slice(0, 5).map((r) => `${r.table}#${r.rowid}→${r.parent}`).join(', ');
+      console.error(`[db] foreign_key_check: ${rotas.length} referencia(s) rota(s) tras migrar: ${ejemplo}`);
+    }
+  } catch (e) {
+    console.warn('[db] no se pudo correr foreign_key_check:', e);
+  }
 
   // 4) Seed.
   const seedResult: SeedResult = seed

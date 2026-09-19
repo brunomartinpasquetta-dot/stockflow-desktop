@@ -146,7 +146,7 @@ export function InventarioArticulos() {
           <div className="min-h-0 flex-1 overflow-auto p-3">
             {!applied ? (
               <div className="py-10 text-center text-muted-foreground">
-                Elegí filtros y presioná "Calcular" para ver el inventario valuado.
+                Seleccione filtros y presione "Calcular" para ver el inventario valuado.
               </div>
             ) : reportQuery.isLoading || !data ? (
               <div className="py-10 text-center text-muted-foreground">Cargando…</div>

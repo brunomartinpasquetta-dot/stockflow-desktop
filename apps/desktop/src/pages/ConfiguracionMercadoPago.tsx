@@ -114,7 +114,7 @@ export function ConfiguracionMercadoPago() {
                   </>
                 ) : (
                   <span className="text-amber-600">
-                    Activá tu licencia primero para obtener el endpoint del webhook.
+                    Active la licencia primero para obtener el endpoint del webhook.
                   </span>
                 )}
               </div>
@@ -202,7 +202,7 @@ export function ConfiguracionMercadoPago() {
                   ) : (
                     <tr>
                       <td colSpan={3} className="py-2 text-muted-foreground">
-                        Abrí una caja para poder asignarle un QR.
+                        Abra una caja para poder asignarle un QR.
                       </td>
                     </tr>
                   )}

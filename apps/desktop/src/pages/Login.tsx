@@ -16,8 +16,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Ingresá el usuario').max(50),
-  password: z.string().min(1, 'Ingresá la contraseña').max(100),
+  username: z.string().min(1, 'Ingrese el usuario').max(50),
+  password: z.string().min(1, 'Ingrese la contraseña').max(100),
 })
 type LoginValues = z.infer<typeof loginSchema>
 
@@ -90,7 +90,7 @@ export function Login() {
             </p>
           )}
           <p className="text-center text-xs text-muted-foreground">
-            Versión {versionQuery.data?.version ?? '—'} — Tu solución de gestión comercial
+            Versión {versionQuery.data?.version ?? '—'} — Gestión comercial
           </p>
         </CardContent>
       </Card>

@@ -17,7 +17,10 @@ export type LocalDatabase = BetterSQLite3Database<typeof localSchema> & {
 /** Aplica los PRAGMAs recomendados a una conexión better-sqlite3. */
 export function applyLocalPragmas(sqlite: Database.Database): void {
   sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('synchronous = NORMAL');
+  // FULL: cada commit llega al disco antes de responder. Con NORMAL en WAL, un
+  // corte de luz justo después de cobrar podía perder la última venta aunque el
+  // ticket ya estuviera impreso (auditoría sep-2026). Cuesta ~1 ms por commit.
+  sqlite.pragma('synchronous = FULL');
   sqlite.pragma('foreign_keys = ON');
   sqlite.pragma('busy_timeout = 5000');
 }

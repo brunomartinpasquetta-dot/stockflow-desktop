@@ -520,7 +520,7 @@ export function Compras() {
           <Input
             ref={barcodeRef}
             className="h-11 pl-10 text-base"
-            placeholder="Código o nombre del producto — escaneá o escribí y Enter"
+            placeholder="Código o nombre del producto — escanear o escribir y Enter"
             value={barcode}
             onChange={(e) => setBarcode(e.target.value)}
             onKeyDown={(e) => {
@@ -572,7 +572,7 @@ export function Compras() {
               {cart.length === 0 ? (
                 <tr>
                   <td colSpan={updatePrices ? 10 : 7} className="py-10 text-center text-sm text-muted-foreground">
-                    Sin líneas — escaneá o buscá un producto para empezar.
+                    Sin líneas — escanee o busque un producto para empezar.
                   </td>
                 </tr>
               ) : (
@@ -716,7 +716,7 @@ export function Compras() {
                   <option value="general">Caja General{cashGeneralBalance.data ? ` (saldo ${formatCurrency(cashGeneralBalance.data.balance)})` : ''}</option>
                 </Select>
               </div>
-              <p className="text-xs text-destructive">No hay caja diaria abierta. Abrí la caja (F7), pagá desde Caja General, o registrá la compra a cuenta del proveedor.</p>
+              <p className="text-xs text-destructive">No hay caja diaria abierta. Abra la caja (F7), pague desde Caja General o registre la compra a cuenta del proveedor.</p>
             </>
           ) : noMethods ? (
             <p className="text-xs text-destructive">No hay medios de pago configurados.</p>

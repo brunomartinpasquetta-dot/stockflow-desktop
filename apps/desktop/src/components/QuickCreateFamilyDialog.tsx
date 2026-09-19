@@ -30,7 +30,7 @@ export function QuickCreateFamilyDialog({ open, onClose, onCreated }: Props) {
 
   async function handleSave(): Promise<void> {
     if (!name.trim()) {
-      toast.error('Ingresá el nombre de la familia')
+      toast.error('Ingrese el nombre de la familia')
       return
     }
     setSaving(true)

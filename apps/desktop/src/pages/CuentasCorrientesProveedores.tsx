@@ -55,7 +55,7 @@ function FundingSourceField({
       {value === 'general' ? (
         <p className="text-xs text-muted-foreground">El egreso baja el saldo de Caja General, no la caja diaria.</p>
       ) : noCash ? (
-        <p className="text-xs text-destructive">No hay caja diaria abierta. Abrí la caja (F7) o pagá desde Caja General.</p>
+        <p className="text-xs text-destructive">No hay caja diaria abierta. Abra la caja (F7) o pague desde Caja General.</p>
       ) : null}
     </div>
   )

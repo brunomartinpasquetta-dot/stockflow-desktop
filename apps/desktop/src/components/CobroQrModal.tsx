@@ -224,7 +224,7 @@ export function CobroQrModal({
                 <span>Esperando pago…</span>
               </div>
               <p className="text-center text-xs text-muted-foreground">
-                Escaneá con tu app de MercadoPago, MODO o tu banco.
+                Escanear con la app de MercadoPago, MODO o del banco.
               </p>
             </>
           )}

@@ -33,7 +33,7 @@ const baseFields = {
 const createUserSchema = z.object({ ...baseFields, password: z.string().min(4, 'Mínimo 4 caracteres') })
 const editUserSchema = z.object({
   ...baseFields,
-  password: z.string().refine((v) => v === '' || v.length >= 4, { message: 'Mínimo 4 caracteres (o dejá vacío para no cambiarla)' }),
+  password: z.string().refine((v) => v === '' || v.length >= 4, { message: 'Mínimo 4 caracteres (o dejar vacío para no cambiarla)' }),
 })
 
 /* ----------------------------- Tab Usuarios ----------------------------- */

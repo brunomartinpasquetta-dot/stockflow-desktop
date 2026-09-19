@@ -865,7 +865,7 @@ export function Articulos() {
       <Card className="flex h-[36%] min-h-[240px] flex-shrink-0 flex-col overflow-hidden border-t-2">
         {mode === 'idle' ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Seleccioná un artículo de la lista o presioná <kbd className="mx-1 rounded border bg-muted px-1">Nuevo</kbd>.
+            Seleccione un artículo de la lista o presione <kbd className="mx-1 rounded border bg-muted px-1">Nuevo</kbd>.
           </div>
         ) : (
           <>

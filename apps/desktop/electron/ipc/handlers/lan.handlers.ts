@@ -264,7 +264,7 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
           label: 'Conexión con el servidor',
           ok: ping.ok,
           detail: ping.ok ? `Responde en ${ping.latencyMs} ms`
-            : `Sin respuesta (${ping.error ?? '—'}). Revisá que el servidor esté encendido y el firewall abierto.`,
+            : `Sin respuesta (${ping.error ?? '—'}). Revise que el servidor esté encendido y el firewall abierto.`,
         });
       }
 

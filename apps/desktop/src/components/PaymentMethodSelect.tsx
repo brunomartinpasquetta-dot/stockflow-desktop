@@ -28,7 +28,7 @@ export function PaymentMethodSelect({
   if (methods.length === 0) {
     return (
       <p className="text-xs text-destructive">
-        No hay medios de pago activos. Configurá al menos uno en “Medios de pago”.
+        No hay medios de pago activos. Configure al menos uno en “Medios de pago”.
       </p>
     )
   }

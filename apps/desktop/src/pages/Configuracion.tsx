@@ -217,7 +217,7 @@ function PrinterSection() {
     // único que se guarda es el ancho de papel de ESA terminal: exigir una
     // impresora dejaba el botón inservible y no se podía cambiar el ancho.
     if (!esWeb && !systemName.trim()) {
-      toast.error('Elegí una impresora del sistema')
+      toast.error('Seleccione una impresora del sistema')
       return
     }
     const width: 58 | 80 = paperFormat === '80mm' ? 80 : 58
@@ -286,7 +286,7 @@ function PrinterSection() {
             ))}
           </select>
           <p className="text-xs text-muted-foreground">
-            StockFlow imprime usando la cola del sistema operativo. Configurá la impresora desde
+            StockFlow imprime usando la cola del sistema operativo. Configure la impresora desde
             Preferencias del sistema → Impresoras y luego seleccionala acá.
           </p>
 
@@ -371,7 +371,7 @@ function PrinterSection() {
           <span className="flex flex-col">
             <span>Imprimir con diálogo del sistema</span>
             <span className="text-xs text-muted-foreground">
-              Si la impresión automática no funciona en tu equipo, activá esta opción: al confirmar
+              Si la impresión automática no funciona en este equipo, active esta opción: al confirmar
               una venta se abre el diálogo de impresión (como en "Probar impresión"). Es la opción
               más confiable.
             </span>
@@ -711,8 +711,8 @@ function BackupSection() {
           <AlertDialogHeader>
             <AlertDialogTitle>Restaurar backup</AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a reemplazar la base de datos actual por el contenido de{' '}
-              <span className="font-mono text-foreground">{confirmRestore?.filename}</span>. Después tenés que{' '}
+              Se va a reemplazar la base de datos actual por el contenido de{' '}
+              <span className="font-mono text-foreground">{confirmRestore?.filename}</span>. Después hay que{' '}
               <strong>cerrar y volver a abrir StockFlow</strong> para que el cambio tenga efecto. ¿Continuar?
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -780,7 +780,7 @@ function LanSection() {
         // es un bug de permisos. Le pasó a Leo Citzia.
         toast.error(
           'Windows pide permisos de administrador para tocar el firewall. ' +
-            'Cerrá StockFlow y abrilo con clic derecho → «Ejecutar como administrador».',
+            'Cierre StockFlow y ábralo con clic derecho → «Ejecutar como administrador».',
           { duration: 12_000 },
         )
       } else {
@@ -851,7 +851,7 @@ function LanSection() {
 
   async function onTest(): Promise<void> {
     if (!clientIp) {
-      toast.error('Ingresá la IP del servidor')
+      toast.error('Ingrese la IP del servidor')
       return
     }
     setTesting(true)
@@ -1409,7 +1409,7 @@ function DemoSection() {
               Al volver a abrir, la base queda exactamente como estaba antes de cargar la demo.
             </p>
             <div>
-              <Button onClick={() => void api.demo.restart().catch(() => toast.error('Cerrá y volvé a abrir StockFlow a mano'))}>
+              <Button onClick={() => void api.demo.restart().catch(() => toast.error('Cierre y vuelva a abrir StockFlow'))}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Reiniciar StockFlow ahora
               </Button>
@@ -1435,7 +1435,7 @@ function DemoSection() {
         ) : st?.canLoad ? (
           <>
             <p className="text-muted-foreground">
-              Cargá el comercio de ejemplo «Ferretería del Litoral» (44 artículos, clientes con cuenta corriente,
+              Carga el comercio de ejemplo «Ferretería del Litoral» (44 artículos, clientes con cuenta corriente,
               ventas de 15 días y la caja del día abierta) para recorrer el sistema con datos reales de práctica.
             </p>
             <p className="text-muted-foreground">
@@ -1484,7 +1484,7 @@ function DemoSection() {
             <AlertDialogTitle>Quitar los datos de ejemplo</AlertDialogTitle>
             <AlertDialogDescription>
               La base vuelve exactamente al estado anterior a cargar la demo. Todo lo cargado durante el modo demo se
-              descarta (queda una copia de seguridad por si hiciera falta recuperar algo con soporte). Confirmá con la
+              descarta (queda una copia de seguridad por si hiciera falta recuperar algo con soporte). Confirme con la
               contraseña de administrador.
             </AlertDialogDescription>
           </AlertDialogHeader>

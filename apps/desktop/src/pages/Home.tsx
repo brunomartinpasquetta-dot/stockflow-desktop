@@ -23,7 +23,7 @@ export function Home() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
       <div>
         <h1 className="text-xl font-semibold">{company.data?.name ?? 'StockFlow'}</h1>
-        <p className="text-sm text-muted-foreground">Hola, {currentUser?.fullName}. Usá los atajos F1–F12 o el menú lateral.</p>
+        <p className="text-sm text-muted-foreground">Hola, {currentUser?.fullName}. Atajos F1–F12 o menú lateral.</p>
       </div>
       <div className="grid grid-cols-3 gap-3">
         {cards.map((c) => {

@@ -115,7 +115,7 @@ export function EmbeddedWindow() {
   if (!roleOk || !permOk) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background px-8 text-center">
-        <p className="text-sm font-medium">No tenés permiso para ver «{def.title}»</p>
+        <p className="text-sm font-medium">Sin permiso para ver «{def.title}»</p>
         <p className="text-xs text-muted-foreground">
           Pedile a un administrador que te habilite el acceso.
         </p>
