@@ -373,7 +373,7 @@ export class CashService {
       if (fisico) await assertPhysicalCashAvailable(repos, registerId, input.amount);
     }
 
-    return repos.cashMovements.create({
+    return repos.cashMovements.createInOpenRegister({
       cashRegisterId: registerId,
       type: input.type,
       description: input.description,

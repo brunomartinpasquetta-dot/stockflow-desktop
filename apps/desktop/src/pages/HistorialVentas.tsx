@@ -656,7 +656,7 @@ function SaleDetailDialog({
                         autoFocus
                       />
                       <span className="text-xs text-muted-foreground">
-                        Dejalo vacío para usar el total de la factura
+                        Dejar vacío para usar el total de la factura
                         {' '}({formatCurrency(voucherQuery.data.total)}).
                       </span>
                     </div>

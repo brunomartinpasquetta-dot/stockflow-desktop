@@ -713,7 +713,7 @@ export function Caja() {
                   <Label htmlFor="deposit-cash">Efectivo que llevás a la caja fuerte</Label>
                   <CurrencyInput id="deposit-cash" value={depositCash} onChange={setDepositCash} />
                   <span className="text-xs text-muted-foreground">
-                    Contaste {formatCurrency(depositInfo.counted)} en el cajón.
+                    Efectivo contado en el cajón: {formatCurrency(depositInfo.counted)}.
                     {Number(parseCurrencyInput(depositCash)) < Number(depositInfo.counted) - 0.005 && (
                       <> Quedan <b>{formatCurrency((Number(depositInfo.counted) - Number(parseCurrencyInput(depositCash))).toFixed(2))}</b> como cambio para mañana.</>
                     )}

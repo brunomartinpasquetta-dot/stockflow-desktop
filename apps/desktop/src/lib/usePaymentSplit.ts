@@ -65,8 +65,11 @@ export function usePaymentSplit(activeMethods: PaymentMethodDTO[], total: number
 
   const totalPaid = useMemo(() => Object.values(numByPm).reduce((a, b) => a + b, 0), [numByPm])
   const remaining = Math.max(0, Number((total - totalPaid).toFixed(2)))
-  const isExcess = totalPaid - total > 0.005
-  const isComplete = total > 0 && Math.abs(totalPaid - total) < 0.005
+  // Misma regla (a 4 decimales, ≤ medio centavo) que el absorbente de abajo:
+  // si la pantalla dice "completo", lo que se manda cierra exacto.
+  const diff4 = Number((total - totalPaid).toFixed(4))
+  const isExcess = diff4 < -0.005
+  const isComplete = total > 0 && Math.abs(diff4) <= 0.005
 
   const payments = useMemo(() => {
     const list: Array<{ paymentMethodId: string; amount: number }> = []
@@ -83,7 +86,7 @@ export function usePaymentSplit(activeMethods: PaymentMethodDTO[], total: number
     const suma = list.reduce((a, p) => a + p.amount, 0)
     const diff = Number((total - suma).toFixed(4))
     const last = list[list.length - 1]
-    if (last && diff !== 0 && Math.abs(diff) < 0.005 && last.amount + diff > 0) last.amount += diff
+    if (last && diff !== 0 && Math.abs(diff) <= 0.005 && last.amount + diff > 0) last.amount += diff
     return list.map((p) => ({ paymentMethodId: p.paymentMethodId, amount: p.amount.toFixed(4) }))
   }, [activeMethods, numByPm, total])
 

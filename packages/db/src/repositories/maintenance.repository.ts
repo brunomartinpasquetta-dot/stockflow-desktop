@@ -194,11 +194,17 @@ export class MaintenanceRepository {
           tx.delete(purchaseReturns).where(delPurchReturns).run();
         }
 
-        // ── mp_orders de ventas a borrar ──
-        const delMpOrders = notKept(keptSaleIds, mpOrders.saleId);
-        // mp_orders.saleId es nullable; borrar las que apuntan a ventas a eliminar
-        tx.run(sql`DELETE FROM mp_orders WHERE sale_id IS NOT NULL${keptSaleIds.size > 0 ? sql` AND sale_id NOT IN (${sql.join([...keptSaleIds].map((x) => sql`${x}`), sql`, `)})` : sql``}`);
-        void delMpOrders;
+        // ── mp_orders ──
+        // Las de ventas conservadas se quedan (su venta las referencia). Las de
+        // ventas a borrar Y las que nunca llegaron a venta (QR expirado o
+        // cancelado) se van: `mp_orders.mp_pos_device_id` es NOT NULL y
+        // apunta al POS de una caja que se borra; una sola huérfana hacía
+        // fallar el reinicio entero por FK (auditoría sep-2026, A8).
+        if (keptSaleIds.size > 0) {
+          tx.run(sql`DELETE FROM mp_orders WHERE sale_id IS NULL OR sale_id NOT IN (${inList(keptSaleList)})`);
+        } else {
+          tx.delete(mpOrders).run();
+        }
 
         // ── Presupuestos: soltar la traza saleId de ventas a borrar (no borro presupuestos) ──
         tx.run(sql`UPDATE quotes SET sale_id = NULL WHERE sale_id IS NOT NULL${keptSaleIds.size > 0 ? sql` AND sale_id NOT IN (${sql.join([...keptSaleIds].map((x) => sql`${x}`), sql`, `)})` : sql``}`);

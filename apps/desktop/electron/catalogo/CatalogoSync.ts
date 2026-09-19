@@ -222,7 +222,14 @@ export class CatalogoSync {
             pagado: p.pagado === true,
             items,
           };
-          if (repos.catalogoPedidos.guardar(entrante)) nuevos += 1;
+          if (repos.catalogoPedidos.guardar(entrante)) {
+            nuevos += 1;
+            // El stock publicable de esos artículos acaba de bajar (reserva):
+            // se marcan para que la próxima publicación los mande, si no la
+            // tienda seguía ofreciendo unidades ya vendidas hasta que algo
+            // más los tocara.
+            repos.catalogo.tocarArticulos(items.map((i) => String(i.codigo_sistema ?? '')).filter(Boolean));
+          }
         } catch (e) {
           invalidos += 1;
           console.warn(`[catalogo] pedido ${pedidoId || '(sin id)'} descartado: ${e instanceof Error ? e.message : String(e)}`);
@@ -238,6 +245,7 @@ export class CatalogoSync {
             method: 'POST',
             headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
             body: JSON.stringify({ estado: 'tomado' }),
+            signal: AbortSignal.timeout(8_000),
           });
         } catch {
           /* se reintenta solo en la vuelta siguiente */
@@ -276,6 +284,16 @@ export class CatalogoSync {
    * la pantalla de pedidos (auditoría sep-2026, B4).
    */
   async reintentarAvisosPendientes(): Promise<{ entregados: number; pendientes: number }> {
+    if (this.reintentando) return this.reintentando;
+    this.reintentando = this.reintentarAvisosPendientesSinCandado().finally(() => {
+      this.reintentando = null;
+    });
+    return this.reintentando;
+  }
+
+  private reintentando: Promise<{ entregados: number; pendientes: number }> | null = null;
+
+  private async reintentarAvisosPendientesSinCandado(): Promise<{ entregados: number; pendientes: number }> {
     const { repos } = this.opts;
     let entregados = 0;
     let pendientes = 0;
@@ -338,6 +356,19 @@ export class CatalogoSync {
    * pantalla igual dice "venta anulada", porque eso lo lee de la venta.
    */
   async cancelarPedidosDeVentasAnuladas(): Promise<{ cancelados: number; sinAviso: number }> {
+    // Un barrido a la vez: el temporizador, cada terminal con Pedidos web
+    // abierta y cada anulación lo disparan, y dos a la vez mandaban el mismo
+    // 'cancelado' dos veces (doble reposición en la tienda).
+    if (this.barriendo) return this.barriendo;
+    this.barriendo = this.cancelarPedidosDeVentasAnuladasSinCandado().finally(() => {
+      this.barriendo = null;
+    });
+    return this.barriendo;
+  }
+
+  private barriendo: Promise<{ cancelados: number; sinAviso: number }> | null = null;
+
+  private async cancelarPedidosDeVentasAnuladasSinCandado(): Promise<{ cancelados: number; sinAviso: number }> {
     const { repos } = this.opts;
     let cancelados = 0;
     let sinAviso = 0;
@@ -380,6 +411,7 @@ export class CatalogoSync {
     for (let i = 0; i < 50; i++) {
       const res = await this.fetch(`${url}/api/stockflow/productos?pagina=${pagina}&por_pagina=500`, {
         headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`el catálogo respondió ${res.status}`);
       const data = (await res.json()) as { productos?: ProductoCatalogo[]; total?: number };
@@ -453,6 +485,7 @@ export class CatalogoSync {
         body: JSON.stringify({
           vinculos: vinculos.map((v) => ({ sku: v.sku, codigo_sistema: v.codigoSistema })),
         }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       // Un 409 en este endpoint es un CONFLICTO documentado (el código ya está
       // en otro producto), no un error de transporte: el catálogo devuelve un

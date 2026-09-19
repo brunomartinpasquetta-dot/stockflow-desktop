@@ -258,11 +258,61 @@ export class SalesService {
       }
     }
 
-    const voided = await repos.sales.voidSale(saleId, { reason, userName: currentUser.fullName });
-    if (account) {
-      await repos.accountsReceivable.delete(account.id);
-    }
+    // La cuenta corriente (si la hay) se cierra dentro de la misma transacción
+    // del repositorio.
+    const { reversoElectronico, ...voided } = await repos.sales.voidSale(saleId, {
+      reason,
+      userName: currentUser.fullName,
+    });
+    await this.reflejarReintegroElectronicoEnCajaGeneral(sale, reversoElectronico);
     return voided;
+  }
+
+  /**
+   * El reverso ELECTRÓNICO de una venta anulada entra a la caja ORIGINAL de la
+   * venta. Si esa caja ya cerró y su neto electrónico ya se había ingresado a
+   * Caja General, el reintegro sale de la cuenta del comercio: se registra la
+   * salida en Caja General (electrónico) por la parte que ya no está cubierta
+   * por lo no ingresado. Best-effort y fuera de la transacción de la venta: la
+   * anulación ya quedó hecha; si esto falla, queda en el log para corregirlo.
+   */
+  private async reflejarReintegroElectronicoEnCajaGeneral(sale: Sale, reversoElectronico: string): Promise<void> {
+    const { repos, currentUser } = this.ctx;
+    if (!(Number(reversoElectronico) > 0)) return;
+    try {
+      const origen = await repos.cashRegisters.findById(sale.cashRegisterId);
+      if (!origen || origen.status !== 'closed') return;
+      const dep = (await repos.cashGeneral.closeDepositRefIds([origen.id])).get(origen.id);
+      const depositadoElec = Number(dep?.electronic ?? 0);
+      if (!(depositadoElec > 0)) return;
+      const [movs, pmById] = await Promise.all([
+        repos.cashMovements.findByRegister(origen.id),
+        repos.paymentMethods.byId(),
+      ]);
+      let netoDespues = 0;
+      for (const mv of movs) {
+        const fisico = mv.paymentMethodId == null || pmById.get(mv.paymentMethodId)?.isPhysicalCash === true;
+        if (fisico) continue;
+        netoDespues += mv.type === 'income' ? Number(mv.amount) : -Number(mv.amount);
+      }
+      // Antes de este reverso, cuánto electrónico había en la caja SIN ingresar
+      // a Caja General: eso absorbe el reintegro; el resto ya estaba allá.
+      const netoAntes = netoDespues + Number(reversoElectronico);
+      const sinIngresar = Math.max(0, netoAntes - depositadoElec);
+      const exceso = Math.max(0, Number(reversoElectronico) - sinIngresar);
+      if (exceso < 0.005) return;
+      await repos.cashGeneral.addMovement({
+        type: 'expense',
+        amount: exceso.toFixed(2),
+        description: `Anulación venta ${sale.type} #${sale.number}: reintegro electrónico de un cierre ya ingresado (caja #${origen.number})`,
+        category: 'other',
+        createdBy: currentUser.id,
+        referenceId: sale.id,
+        isCash: false,
+      });
+    } catch (e) {
+      console.error(`[voidSale] no se pudo reflejar el reintegro electrónico en Caja General (venta ${sale.id}):`, e);
+    }
   }
 
   /**

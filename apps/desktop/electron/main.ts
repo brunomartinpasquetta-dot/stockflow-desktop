@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, screen, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -101,6 +101,24 @@ function setupAppMenu(): void {
  */
 function instalarMenuContextual(): void {
   app.on('web-contents-created', (_event, contents) => {
+    // AUDITORÍA sep-2026: ninguna página embebida (webview de WhatsApp, tienda
+    // del catálogo, manual) puede abrir ventanas nuevas de Electron con
+    // `window.open`/target=_blank: los enlaces externos van al navegador del
+    // sistema y todo lo demás se bloquea. Sin esto, `allowpopups` en el
+    // webview de WhatsApp dejaba abrir cualquier URL con acceso a Node.
+    if (contents.getType() === 'webview') {
+      contents.setWindowOpenHandler(({ url }) => {
+        if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+        return { action: 'deny' };
+      });
+    }
+    // El HOST del webview decide con qué privilegios se adjunta: nunca con
+    // Node ni con preload propio.
+    contents.on('will-attach-webview', (_e, prefs) => {
+      prefs.nodeIntegration = false;
+      prefs.contextIsolation = true;
+      delete (prefs as { preload?: string }).preload;
+    });
     contents.on('context-menu', (_e, params) => {
       const items: Electron.MenuItemConstructorOptions[] = [];
       if (params.isEditable) {
@@ -550,15 +568,16 @@ if (!app.requestSingleInstanceLock()) {
         console.warn('[lifecycle] backup pre-quit tardó demasiado — salgo igual');
         shutdown(dbHandle);
         app.exit(0);
-      }, 15000);
+      }, 40_000);
       // La carpeta puede haber cambiado en Configuración durante la sesión: se
       // toma la actual, como hacen los handlers, no la del arranque.
       backupService.setBackupDir(hardwareManager.getConfig().backup.destination);
       // La base sigue abierta a propósito: el backup se hace por la API de
-      // SQLite (incluye el WAL) y recién después se cierra. A los 8 s el propio
-      // servicio aborta, borra su .tmp y lo deja en el log.
+      // SQLite (incluye el WAL) y recién después se cierra. A los 25 s el propio
+      // servicio aborta, borra su .tmp y lo deja en el log (una base de 90 MB
+      // tarda ~3 s en una Mac; en una PC lenta hacia un pendrive, bastante más).
       void backupService
-        .createBackup(undefined, { timeoutMs: 8000 })
+        .createBackup(undefined, { timeoutMs: 25_000 })
         .then(() => backupService?.cleanupOldBackups())
         .catch((err) => console.error('[main] backup pre-quit falló:', err))
         .finally(() => {

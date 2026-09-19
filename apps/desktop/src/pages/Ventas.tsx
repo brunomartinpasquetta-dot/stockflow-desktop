@@ -419,7 +419,7 @@ function DevolucionPicker({
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Devolución — elegí la venta</DialogTitle>
+          <DialogTitle>Devolución — seleccione la venta</DialogTitle>
         </DialogHeader>
         <Input
           autoFocus
@@ -817,12 +817,17 @@ function PDV() {
         const byId = new Map(allArticles.map((a) => [a.id, a]))
         const lines: CartLine[] = lineas.map((p) => {
           const art = p.articleId ? byId.get(p.articleId) : undefined
+          const vatRate = art?.vatRate ?? '21.00'
+          // El catálogo manda el precio FINAL; en modo net la venta lleva
+          // precios netos (el sistema suma el IVA al cobrar).
+          const unitPrice =
+            priceMode === 'net' ? (Number(p.unitPrice) / (1 + Number(vatRate) / 100)).toFixed(4) : p.unitPrice
           return {
             article: art,
             description: art ? undefined : (p.description ?? 'Artículo del catálogo'),
-            vatRate: art?.vatRate ?? '21.00',
+            vatRate,
             quantity: String(Number(p.quantity)),
-            unitPrice: p.unitPrice,
+            unitPrice,
             discount: '0',
             priceManuallySet: true,
           }
@@ -832,7 +837,7 @@ function PDV() {
         setPedidoWebNotes(notas)
       })
       .catch(() => toast.error('No se pudo comprobar el estado del pedido web'))
-  }, [windowSelf?.extras, allArticles])
+  }, [windowSelf?.extras, allArticles, priceMode])
 
   // Inicializar / corregir el medio de pago mono-medio default (efectivo físico).
   // Pattern de "derivar estado de props" recomendado por React: setState durante render.

@@ -87,26 +87,37 @@ const main = async () => {
   check('notes contiene quién la anuló', (anulada.notes ?? '').includes(safe.fullName), anulada.notes ?? '');
 
   /* ------------------------------------------------------------------ */
-  console.log('\n[2] Reverso electrónico de una caja ya cerrada');
+  console.log('\n[2] Reverso de una caja ya cerrada: lo electrónico a la original, el efectivo a la abierta');
   const reg2 = await svc.cash.openCashRegister('0.0000');
   const vt2 = await svc.sales.createSale({
     type: 'X', customerId: cf!.id,
     payments: [{ paymentMethodId: PM_TRANSF, amount: '1000.0000' }],
     lines: [{ articleId: art.id, quantity: '1.000' }],
   });
-  await svc.cash.closeCashRegister(reg2.id, '0.0000');
-  const errSinCaja = await falla(() => svc.sales.voidSale(vt2.sale.id));
-  check('sin caja abierta: la anulación se rechaza', errSinCaja != null && /caja/i.test(errSinCaja), errSinCaja ?? 'anuló igual');
-  check('la venta sigue completed', (await repos.sales.findById(vt2.sale.id))!.status === 'completed');
+  const vef = await svc.sales.createSale({
+    type: 'X', customerId: cf!.id,
+    payments: [{ paymentMethodId: PM_CASH, amount: '1000.0000' }],
+    lines: [{ articleId: art.id, quantity: '1.000' }],
+  });
+  await svc.cash.closeCashRegister(reg2.id, '1000.0000');
+  const errSinCaja = await falla(() => svc.sales.voidSale(vef.sale.id));
+  check('efectivo sin caja abierta: la anulación se rechaza', errSinCaja != null && /caja/i.test(errSinCaja), errSinCaja ?? 'anuló igual');
+  check('la venta en efectivo sigue completed', (await repos.sales.findById(vef.sale.id))!.status === 'completed');
+  const okElec = await falla(() => svc.sales.voidSale(vt2.sale.id));
+  check('electrónica sin caja abierta: se anula igual (el reverso va a la caja original)', okElec == null, okElec ?? '');
+  const movsVt2orig = (await repos.cashMovements.findByRegister(reg2.id)).filter((m) => m.relatedSaleId === vt2.sale.id && m.type === 'expense');
+  check('el reverso electrónico quedó en la caja original, con su medio', movsVt2orig.length === 1 && movsVt2orig[0]!.paymentMethodId === PM_TRANSF && /caja cerrada/.test(movsVt2orig[0]!.description), JSON.stringify(movsVt2orig.map((m) => m.description)));
+  const rep2 = await svc.cash.getCashReport(reg2.id);
+  check('el arqueo de efectivo de esa caja no cambió (1000)', Number(rep2.expectedCash) === 1000, rep2.expectedCash);
   const reg3 = await svc.cash.openCashRegister('0.0000');
-  await svc.sales.voidSale(vt2.sale.id);
-  const movsVt2 = (await repos.cashMovements.findByRegister(reg3.id)).filter((m) => m.relatedSaleId === vt2.sale.id);
-  check('el reverso entró a la caja abierta actual, aclarando que la original estaba cerrada',
-    movsVt2.length === 1 && movsVt2[0]!.paymentMethodId === PM_TRANSF && /caja original cerrada/.test(movsVt2[0]!.description),
-    JSON.stringify(movsVt2.map((m) => m.description)));
-  check('la caja cerrada no recibió el reverso',
-    !(await repos.cashMovements.findByRegister(reg2.id)).some((m) => m.type === 'expense' && m.relatedSaleId === vt2.sale.id));
-  check('en la caja actual, Transferencia queda en −1000 (neto)', Number(await netoDe(reg3.id, PM_TRANSF)) === -1000, await netoDe(reg3.id, PM_TRANSF));
+  await svc.sales.voidSale(vef.sale.id);
+  const movsVef = (await repos.cashMovements.findByRegister(reg3.id)).filter((m) => m.relatedSaleId === vef.sale.id);
+  check('el reverso en EFECTIVO entró a la caja abierta actual, aclarando que la original estaba cerrada',
+    movsVef.length === 1 && movsVef[0]!.paymentMethodId === PM_CASH && /caja original cerrada/.test(movsVef[0]!.description),
+    JSON.stringify(movsVef.map((m) => m.description)));
+  check('la caja cerrada no recibió el reverso en efectivo',
+    !(await repos.cashMovements.findByRegister(reg2.id)).some((m) => m.type === 'expense' && m.relatedSaleId === vef.sale.id));
+  check('en la caja actual, Transferencia queda en 0 (nada negativo)', Number(await netoDe(reg3.id, PM_TRANSF)) === 0, await netoDe(reg3.id, PM_TRANSF));
 
   /* ------------------------------------------------------------------ */
   console.log('\n[3] Venta y cobranza contra una caja que se cerró en el medio');
@@ -119,7 +130,7 @@ const main = async () => {
   );
   check('venta contra caja cerrada: CASH_CLOSED', errVentaCerrada != null && /cerró|cerrada/i.test(errVentaCerrada), errVentaCerrada ?? 'entró igual');
   check('no quedó movimiento nuevo en la caja cerrada',
-    (await repos.cashMovements.findByRegister(reg2.id)).filter((m) => m.type === 'income').length === 1);
+    (await repos.cashMovements.findByRegister(reg2.id)).filter((m) => m.type === 'income').length === 2);
 
   const cliCta = await repos.customers.create({ lastName: 'CLIENTE CUENTA', category: 'CF', docType: 'DNI', docNumber: '30111222' });
   const vcc = await svc.sales.createSale({
@@ -145,32 +156,32 @@ const main = async () => {
 
   /* ------------------------------------------------------------------ */
   console.log('\n[5] Depósito parcial de un cierre con desglose real');
-  // reg3: apertura 0, +1000 efectivo (cobranza), −1000 transferencia (reverso).
+  // reg3: apertura 0, +1000 efectivo (cobranza), +1500 transferencia.
   await svc.cash.addMovement({ type: 'income', description: 'Venta transf', amount: '1500.0000', paymentMethodId: PM_TRANSF, cashRegisterId: reg3.id });
   await svc.cash.closeCashRegister(reg3.id, '1000.0000');
   const res3 = await resumenDe(reg3.id);
-  check('depositable = 1000 efectivo + 500 electrónico neto', Number(res3.depositableAmount) === 1500, res3.depositableAmount);
+  check('depositable = 1000 efectivo + 1500 electrónico neto', Number(res3.depositableAmount) === 2500, res3.depositableAmount);
   // Primero SÓLO la parte electrónica (el caso que antes se calculaba mal).
-  await svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '500.00', cashAmount: '0.00', electronicAmount: '500.00' });
+  await svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '1500.00', cashAmount: '0.00', electronicAmount: '1500.00' });
   const res3b = await resumenDe(reg3.id);
-  check('ya ingresado: 500 en total', Number(res3b.depositedAmount) === 500, res3b.depositedAmount);
-  check('desglose: 0 efectivo / 500 electrónico',
-    Number(res3b.depositedCashAmount) === 0 && Number(res3b.depositedElectronicAmount) === 500,
+  check('ya ingresado: 1500 en total', Number(res3b.depositedAmount) === 1500, res3b.depositedAmount);
+  check('desglose: 0 efectivo / 1500 electrónico',
+    Number(res3b.depositedCashAmount) === 0 && Number(res3b.depositedElectronicAmount) === 1500,
     `${res3b.depositedCashAmount} / ${res3b.depositedElectronicAmount}`);
   check('todavía no figura como ingresado completo', res3b.depositedToGeneral === false);
   // Completar con el efectivo.
   await svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '1000.00', cashAmount: '1000.00', electronicAmount: '0.00' });
   const res3c = await resumenDe(reg3.id);
-  check('completo: 1000 efectivo / 500 electrónico',
-    Number(res3c.depositedCashAmount) === 1000 && Number(res3c.depositedElectronicAmount) === 500 && res3c.depositedToGeneral,
+  check('completo: 1000 efectivo / 1500 electrónico',
+    Number(res3c.depositedCashAmount) === 1000 && Number(res3c.depositedElectronicAmount) === 1500 && res3c.depositedToGeneral,
     `${res3c.depositedCashAmount} / ${res3c.depositedElectronicAmount}`);
   const errDeMas = await falla(() =>
     svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '1.00', cashAmount: '1.00', electronicAmount: '0.00' }),
   );
   check('no se puede ingresar más de lo que recaudó', errDeMas != null, errDeMas ?? 'dejó');
   const saldo = await svc.cashGeneral.getBalanceBreakdown();
-  check('Caja General: efectivo 1000 / electrónico 500',
-    Number(saldo.cash) === 1000 && Number(saldo.electronic) === 500,
+  check('Caja General: efectivo 1000 / electrónico 1500',
+    Number(saldo.cash) === 1000 && Number(saldo.electronic) === 1500,
     `${saldo.cash} / ${saldo.electronic}`);
 
   /* ------------------------------------------------------------------ */
@@ -240,6 +251,91 @@ const main = async () => {
   const revDebito = movsVd.find((m) => m.paymentMethodId === 'pm-tarjeta-debito');
   check('egresos totales = 2000 (1000 DEV efectivo + 1000 reverso débito), no 3000', egresosVd === 2000, `egresos=${egresosVd}`);
   check('el reverso del débito es por lo que faltaba (1000)', revDebito?.amount === '1000.0000', revDebito?.amount);
+  await svc.cash.closeCashRegister(reg5.id, '0.0000');
+
+  /* ------------------------------------------------------------------ */
+  console.log('\n[8] Reverso electrónico de una caja cerrada YA ingresada a Caja General');
+  const reg6 = await svc.cash.openCashRegister('0.0000');
+  const vt6 = await svc.sales.createSale({
+    type: 'X', customerId: cf!.id,
+    payments: [{ paymentMethodId: PM_TRANSF, amount: '1000.0000' }],
+    lines: [{ articleId: art.id, quantity: '1.000' }],
+  });
+  await svc.cash.closeCashRegister(reg6.id, '0.0000');
+  // Se ingresa el cierre completo (electrónico 1000) a Caja General.
+  await svc.cashGeneral.transferFromClosed({ cashRegisterId: reg6.id, amount: '1000.00', cashAmount: '0.00', electronicAmount: '1000.00' });
+  const cgAntes = await svc.cashGeneral.getBalanceBreakdown();
+  const reg7 = await svc.cash.openCashRegister('0.0000');
+  await svc.sales.voidSale(vt6.sale.id, 'prueba reverso electrónico');
+  const movsReg6 = (await repos.cashMovements.findByRegister(reg6.id)).filter((m) => m.relatedSaleId === vt6.sale.id && m.type === 'expense');
+  const movsReg7 = (await repos.cashMovements.findByRegister(reg7.id)).filter((m) => m.relatedSaleId === vt6.sale.id);
+  check('el reverso electrónico entra a la caja ORIGINAL (cerrada), no a la de hoy', movsReg6.length === 1 && movsReg6[0]!.paymentMethodId === PM_TRANSF && movsReg7.length === 0, `orig=${movsReg6.length} hoy=${movsReg7.length}`);
+  const cgDespues = await svc.cashGeneral.getBalanceBreakdown();
+  check('Caja General electrónico bajó 1000 (el reintegro salió de la cuenta)', Number(cgAntes.electronic) - Number(cgDespues.electronic) === 1000, `${cgAntes.electronic} → ${cgDespues.electronic}`);
+  const res6 = await resumenDe(reg6.id);
+  check('el cierre original ya no tiene neto electrónico depositable', Number(res6.depositableAmount) === 0, res6.depositableAmount);
+  check('en la caja de hoy Transferencia no quedó en negativo', Number(await netoDe(reg7.id, PM_TRANSF)) === 0, await netoDe(reg7.id, PM_TRANSF));
+  // Caso sin depósito previo: no toca Caja General.
+  const vt7 = await svc.sales.createSale({
+    type: 'X', customerId: cf!.id,
+    payments: [{ paymentMethodId: PM_TRANSF, amount: '500.0000' }],
+    lines: [{ articleId: art.id, quantity: '1.000', unitPrice: '500.0000' }],
+  });
+  await svc.cash.closeCashRegister(reg7.id, '0.0000');
+  const reg8 = await svc.cash.openCashRegister('0.0000');
+  const cg2 = await svc.cashGeneral.getBalanceBreakdown();
+  await svc.sales.voidSale(vt7.sale.id);
+  const cg3 = await svc.cashGeneral.getBalanceBreakdown();
+  check('cierre NO ingresado: el reverso no toca Caja General', cg2.electronic === cg3.electronic, `${cg2.electronic} / ${cg3.electronic}`);
+  const res7 = await resumenDe(reg7.id);
+  check('…y ese cierre queda sin nada electrónico por ingresar', Number(res7.depositableAmount) === 0, res7.depositableAmount);
+
+  /* ------------------------------------------------------------------ */
+  console.log('\n[9] Caja cerrada: ingreso manual, compra contado y pago a proveedor');
+  await svc.cash.closeCashRegister(reg8.id, '0.0000');
+  const errManual = await falla(() =>
+    repos.cashMovements.createInOpenRegister({ cashRegisterId: reg8.id, type: 'income', description: 'x', amount: '10.0000', date: Date.now(), userId: safe.id, paymentMethodId: PM_CASH }),
+  );
+  check('movimiento manual contra caja cerrada: CASH_CLOSED', errManual != null && /cerró/i.test(errManual), errManual ?? 'entró');
+  const errCompra = await falla(() =>
+    repos.purchases.createWithLines({
+      type: 'X', supplierId: prov.id, paymentType: 'cash', cashRegisterId: reg8.id, userId: safe.id,
+      payments: [{ paymentMethodId: PM_CASH, amount: '1000.0000' }],
+      lines: [{ articleId: art.id, quantity: '1.000', costPrice: '1000.0000', salePrice: '1500.0000' }],
+    } as never),
+  );
+  check('compra contado contra caja cerrada: CASH_CLOSED', errCompra != null && /cerró/i.test(errCompra), errCompra ?? 'entró');
+  const reg9 = await svc.cash.openCashRegister('0.0000');
+  await svc.cash.addMovement({ type: 'income', description: 'Fondeo', amount: '5000.0000', paymentMethodId: PM_CASH, cashRegisterId: reg9.id });
+  const compraCta = await svc.purchases.createPurchase({
+    type: 'X', supplierId: prov.id, isAccountPurchase: true, updatePrices: false,
+    lines: [{ articleId: art.id, quantity: '1.000', costPrice: '1000.0000' }],
+  } as never);
+  await svc.cash.closeCashRegister(reg9.id, '5000.0000');
+  const errPagoProv = await falla(() =>
+    repos.supplierPayments.createPayment({
+      accountId: compraCta.accountPayable!.id, cashRegisterId: reg9.id, userId: safe.id, fundingSource: 'daily',
+      payments: [{ paymentMethodId: PM_CASH, amount: '1000.0000' }],
+    } as never),
+  );
+  check('pago a proveedor contra caja cerrada: CASH_CLOSED', errPagoProv != null && /cerró/i.test(errPagoProv), errPagoProv ?? 'entró');
+
+  /* ------------------------------------------------------------------ */
+  console.log('\n[10] Anular venta a cuenta corriente cierra la cuenta en la misma transacción');
+  const reg10 = await svc.cash.openCashRegister('0.0000');
+  const vcc2 = await svc.sales.createSale({
+    type: 'X', customerId: cliCta.id, isAccountSale: true,
+    lines: [{ articleId: art.id, quantity: '1.000' }],
+  });
+  const cta2 = (await repos.accountsReceivable.findOne({ saleId: vcc2.sale.id }))!;
+  await repos.payments.createPayment({ accountId: cta2.id, cashRegisterId: reg10.id, userId: safe.id, payments: [{ paymentMethodId: PM_CASH, amount: '100.0000' }] });
+  const errCcPagada = await falla(() => repos.sales.voidSale(vcc2.sale.id));
+  check('con cobranzas, el repositorio rechaza la anulación', errCcPagada != null && /cobr|pago/i.test(errCcPagada), errCcPagada ?? 'anuló');
+  check('la venta y la cuenta siguen', (await repos.sales.findById(vcc2.sale.id))!.status === 'completed' && (await repos.accountsReceivable.findById(cta2.id)) != null);
+  const vcc3 = await svc.sales.createSale({ type: 'X', customerId: cliCta.id, isAccountSale: true, lines: [{ articleId: art.id, quantity: '1.000' }] });
+  const cta3 = (await repos.accountsReceivable.findOne({ saleId: vcc3.sale.id }))!;
+  await repos.sales.voidSale(vcc3.sale.id);
+  check('sin cobranzas, la cuenta se borra junto con la anulación', (await repos.accountsReceivable.findById(cta3.id)) == null);
 
   closeLocalDb(db);
   rmSync(dir, { recursive: true, force: true });

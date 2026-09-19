@@ -269,20 +269,20 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Definí cómo se interpretan los precios que cargás en los artículos y cómo se calcula el IVA en los comprobantes.
+            Define cómo se interpretan los precios cargados en los artículos y cómo se calcula el IVA en los comprobantes.
           </p>
           <div className="flex flex-col gap-2">
             <PriceModeOption
               checked={form.priceMode === 'gross'}
               onSelect={() => set('priceMode', 'gross')}
               title="Precios con IVA incluido (recomendado para venta al consumidor final)"
-              subtitle="Los precios que cargás en artículos YA incluyen el IVA. Es lo más común en kioscos, despensas, ferreterías minoristas."
+              subtitle="Los precios cargados en artículos YA incluyen el IVA. Es lo más común en kioscos, despensas, ferreterías minoristas."
             />
             <PriceModeOption
               checked={form.priceMode === 'net'}
               onSelect={() => set('priceMode', 'net')}
               title="Precios netos + IVA aparte (para venta entre empresas)"
-              subtitle="Los precios que cargás son netos, el sistema agrega el IVA al vender. Para responsables inscriptos que facturan a otras empresas."
+              subtitle="Los precios cargados son netos; el sistema agrega el IVA al vender. Para responsables inscriptos que facturan a otras empresas."
             />
           </div>
 

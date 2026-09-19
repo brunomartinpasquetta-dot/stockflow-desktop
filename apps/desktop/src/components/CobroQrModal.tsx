@@ -178,6 +178,14 @@ export function CobroQrModal({
   }, [order])
 
   const handleClose = useCallback(() => {
+    // Pago YA aprobado y todavía no avisado (Escape o clic afuera durante el
+    // 1,5 s del beep): la venta tiene que registrarse igual, el cliente pagó.
+    const ord = orderRef.current
+    if (phaseRef.current === 'approved' && ord && avisadaRef.current !== ord.id) {
+      avisadaRef.current = ord.id
+      onApprovedRef.current(ord.id, ord.mpPaymentId ?? null)
+      return
+    }
     // Si está pending el cleanup del useEffect intentará cancelar.
     onClose()
   }, [onClose])

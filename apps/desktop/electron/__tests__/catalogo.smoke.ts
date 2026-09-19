@@ -369,6 +369,10 @@ const main = async () => {
   raw0
     .prepare("INSERT INTO mp_pos_devices (id, cash_register_id, external_pos_id, mp_pos_id, qr_url, active, created_at, updated_at) VALUES ('pos-1', ?, 'EXT-1', 'MP-1', 'https://mp/qr', 1, 0, 0)")
     .run(cajaNueva.id);
+  // Una orden QR que expiró sin venta (el caso que hacía fallar el reinicio por FK).
+  raw0
+    .prepare("INSERT INTO mp_orders (id, mp_pos_device_id, sale_id, external_reference, amount, description, status, expires_at, created_at, created_by) VALUES ('ord-huerfana', 'pos-1', NULL, 'EXT-REF-1', '100.0000', 'QR vencido', 'expired', 0, 0, ?)")
+    .run(safe.id);
   let errReset: string | null = null;
   try {
     repos.maintenance.resetOperationalData();
@@ -381,6 +385,7 @@ const main = async () => {
   const pedTrasReset = repos.catalogoPedidos.buscar(pedReset.id)!;
   check('el pedido web queda, sin la venta borrada', pedTrasReset != null && pedTrasReset.saleId == null && pedTrasReset.estado === 'convertido');
   check('el POS de MP de la caja borrada se desasoció', (raw0.prepare('SELECT COUNT(*) AS n FROM mp_pos_devices').get() as { n: number }).n === 0);
+  check('la orden QR huérfana se borró con su POS', (raw0.prepare('SELECT COUNT(*) AS n FROM mp_orders').get() as { n: number }).n === 0);
   check('la caja de la venta con CAE sigue existiendo', (await repos.cashRegisters.findById(ventaConCae.sale.cashRegisterId)) != null);
 
   console.log('\n[integridad de catalogo_pedidos: FK y CHECK vigentes]');

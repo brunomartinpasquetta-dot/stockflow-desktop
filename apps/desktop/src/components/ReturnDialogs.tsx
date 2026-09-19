@@ -140,6 +140,12 @@ export function ReturnSaleDialog({
 }) {
   const qc = useQueryClient()
   const companyQ = useCompany()
+  // Si la venta tiene comprobante con CAE, la devolución no lo ajusta en ARCA.
+  const voucherQ = useQuery({
+    queryKey: ['fiscal', 'voucher', saleId],
+    queryFn: () => api.fiscal.getVoucherForSale(saleId),
+    enabled: open,
+  })
   const cashQ = useCurrentCash()
   const articlesQ = useArticles()
   const saleQ = useQuery({ queryKey: ['sale', saleId], queryFn: () => api.sales.get(saleId), enabled: open })
@@ -260,6 +266,13 @@ export function ReturnSaleDialog({
               <div className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                 Esta venta ya tiene {prevReturns.length} devolución(es):{' '}
                 {prevReturns.map((r) => `DEV #${r.ret.number} (${formatCurrency(r.ret.total)})`).join(', ')}
+              </div>
+            )}
+            {voucherQ.data?.cae && (
+              <div className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Esta venta tiene Factura {voucherQ.data.letter} con CAE de ARCA. La devolución
+                registra el reintegro acá, pero no lo ajusta en ARCA: corresponde emitir la nota de
+                crédito desde el Historial de ventas.
               </div>
             )}
             <ReturnTable lines={lines} setLines={setLines} />

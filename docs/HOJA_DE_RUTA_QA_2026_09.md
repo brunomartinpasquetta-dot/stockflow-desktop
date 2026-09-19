@@ -172,3 +172,25 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
 - [x] Anular con devolución previa y pago electrónico: lo reintegrado se descuenta también de los
   pagos no físicos (`64fa00b`); `saldos.regression.smoke` en verde.
 
+## Tanda 9 — El resto de la reevaluación (parciales y riesgos nuevos) ✅ (19-sep-2026)
+- [x] A1 cross-caja: el reverso ELECTRÓNICO de una venta anulada va siempre a la caja original
+  (no deja negativos en la de hoy ni exige caja abierta); si ese cierre ya se había ingresado a
+  Caja General, el servicio registra allá la salida por lo no cubierto (`SalesService`).
+- [x] `voidSale` cierra la cuenta corriente dentro de la misma transacción (rechaza si hubo cobranzas).
+- [x] Caja cerrada dentro de la tx también para ingresos manuales, compras contado y pagos a
+  proveedor (`cajaAbierta.ts`, `createInOpenRegister`).
+- [x] Split: misma regla de redondeo en `isComplete` y en el absorbente; prefill en modo net a
+  precio neto; `CobroQrModal` avisa igual si se cierra durante la aprobación.
+- [x] Fiscal: candado por (PV, tipo) al emitir; el reintento sólo adopta un intento del mismo tipo
+  y PV; `issueNote` valida importe y acumulado; aviso de CAE en la devolución de venta.
+- [x] Seguridad: popups de webviews denegados (externos al navegador) y webviews sin Node;
+  `isLanRemote` con 169.254/16, 100.64/10, fc00::/7, fe80::/10; traversal por prefijo y `%`
+  inválido; licencia en sólo lectura por lista de LECTURA (todo verbo nuevo es escritura).
+- [x] Reinicio de operativa borra las órdenes QR huérfanas; backup de salida con 25 s.
+- [x] Resumen del día no resta devoluciones de ventas anuladas.
+- [x] Catálogo: candado en los barridos, timeouts en acuse/productos/vincular, bajar o rechazar un
+  pedido re-publica sus artículos, "Publicar ahora" cancela pedidos de ventas anuladas antes,
+  precio net sin punto flotante, tolerancia proporcional al pedido.
+- [x] Últimas 7 cadenas que tuteaban.
+- Smokes: `pdv-caja` (54 checks, secciones 8–10), `catalogo` (orden QR huérfana), suite completa en verde.
+

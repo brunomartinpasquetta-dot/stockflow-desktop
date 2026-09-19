@@ -46,6 +46,16 @@ async function avisarCatalogo(
  * el servidor sumaba el IVA y rechazaba el pago por no coincidir, y con
  * cantidades fraccionadas el redondeo tampoco cerraba (auditoría sep-2026, B2).
  */
+/** Códigos de sistema de las líneas de un pedido (JSON guardado). */
+function codigosDe(itemsJson: string): string[] {
+  try {
+    const items = JSON.parse(itemsJson) as { codigo_sistema?: string }[];
+    return items.map((i) => String(i?.codigo_sistema ?? '')).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 function totalComoElServidor(
   lineas: { quantity: string; unitPrice: string; vatRate: string }[],
   priceMode: PriceMode,
@@ -108,6 +118,7 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
       if (!p.ok) {
         return { ok: false, publicados: 0, pendientes: 0, motivo: `no se pudieron bajar los pedidos (${p.motivo ?? 'sin motivo'})` };
       }
+      await sync.cancelarPedidosDeVentasAnuladas();
       await sync.reintentarAvisosPendientes();
       return payload?.todo ? sync.republicarTodo() : sync.correr();
     }),
@@ -212,6 +223,8 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
       if (!deps.repos.catalogoPedidos.marcar(payload.id, 'rechazado')) {
         throw new ValidationError('id', 'Ese pedido ya fue procesado');
       }
+      // La reserva se libera: el stock publicable de esos artículos sube.
+      deps.repos.catalogo.tocarArticulos(codigosDe(pedido.items));
       // Avisarle al catálogo para que devuelva el stock reservado.
       void avisarCatalogo(deps, { id: pedido.id, pedidoId: pedido.pedidoId, saleId: null }, 'cancelado');
       return { ok: true as const };
@@ -285,7 +298,11 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
         // checkout: no se registra una venta por otro importe sin que alguien
         // lo mire.
         const totalPedido = Number(pedido.total);
-        if (Number.isFinite(totalPedido) && totalPedido > 0 && Math.abs(totalPedido - Number(total)) > 0.01) {
+        // Tolerancia: medio centavo por línea (redondeos del catálogo) con un
+        // piso de un centavo; un pedido de 40 renglones no puede rebotar por
+        // centavos acumulados.
+        const tolerancia = Math.max(0.01, 0.005 * items.length);
+        if (Number.isFinite(totalPedido) && totalPedido > 0 && Math.abs(totalPedido - Number(total)) > tolerancia) {
           throw new ValidationError(
             'total',
             `El total del pedido ($${totalPedido.toFixed(2)}) no coincide con la suma de sus líneas ($${Number(total).toFixed(2)}). Revíselo en el catálogo o cárguelo en Ventas.`,

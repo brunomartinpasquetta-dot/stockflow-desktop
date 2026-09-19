@@ -34,6 +34,7 @@ import {
   type SupplierAccountPayable,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
+import { exigirCajaAbiertaEnTx } from './cajaAbierta';
 
 export interface PurchaseWithLines {
   purchase: Purchase;
@@ -271,6 +272,7 @@ export class PurchaseRepository extends BaseRepository<
           }
         } else if (data.paymentType === 'cash' && data.cashRegisterId && data.userId) {
           // Egresos de la caja diaria (comportamiento histórico).
+          exigirCajaAbiertaEnTx(tx, data.cashRegisterId, 'la compra');
           if (paymentsIn.length > 0) {
             const pmIds = [...new Set(paymentsIn.map((p) => p.paymentMethodId))];
             const pmRows = tx.select().from(paymentMethods).where(inArray(paymentMethods.id, pmIds)).all();

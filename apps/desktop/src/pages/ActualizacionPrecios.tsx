@@ -580,7 +580,7 @@ function RuleFooter(props: {
         <Button
           onClick={props.onPreview}
           disabled={props.applying || props.selectedCount === 0}
-          title={props.selectedCount === 0 ? 'Primero marcá artículos en la lista' : 'Muestra los cambios antes de aplicar — nada se guarda todavía'}
+          title={props.selectedCount === 0 ? 'Primero marque artículos en la lista' : 'Muestra los cambios antes de aplicar — nada se guarda todavía'}
         >
           {props.applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Ver y aplicar cambios'}
         </Button>

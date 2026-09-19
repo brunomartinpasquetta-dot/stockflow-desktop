@@ -131,11 +131,27 @@ const MAX_FALLOS_LOGIN = 10;
  * navegador no puede hacer cumplir nada por sí sola. Las lecturas siguen
  * pasando: el comercio tiene que poder consultar lo suyo.
  */
-const METODOS_DE_ESCRITURA =
-  /^(create|update|delete|void|add|receive|pay|transfer|open|close|apply|adjust|register|reset|rollback|convert|upsert|issue|save|remove|upload|execute|link|cancel|setup|set|activate|deactivate|toggle|restore|load|restart|dismiss|archivar|vincular|syncActivar|syncAhora|pedido[A-Z])/;
+// Con licencia en sólo lectura pasa SÓLO lo que se reconoce como lectura;
+// cualquier verbo nuevo cae del lado de la escritura por defecto (antes era al
+// revés y `catalogo:syncConfigurar` o `mpQr:verifyPayment` seguían escribiendo).
+const METODOS_DE_LECTURA =
+  /^(get|list|find|search|count|preview|check|has|is|status|stats|report|summary|export|print|ping|dummy|test|whoami|me|read|show|calc|compute|resolve|suggest|validate|lookup|history|balance|breakdown|available|current|detail|movements|top|ranking|analytics|dashboard|logout|login|refresh|listar|contar|sugerir|estado|estadisticas|historial|pedidosListar|pedidosContarPendientes|syncEstado|sugerirVinculacion)(?=[A-Z_]|$)/;
+
+/** Grupos y canales que son consulta pura aunque su nombre no lo diga. */
+const GRUPOS_DE_LECTURA = new Set(['analytics', 'reports', 'search', 'assistant']);
+const CANALES_DE_LECTURA = new Set([
+  'guia:progreso',
+  'novedades:pendientes',
+  'import:progress',
+  'lan:diagnose',
+  'print:diagnose',
+]);
 
 function esEscritura(channel: string): boolean {
-  return METODOS_DE_ESCRITURA.test(channel.slice(channel.indexOf(':') + 1));
+  const sep = channel.indexOf(':');
+  const grupo = channel.slice(0, sep);
+  if (GRUPOS_DE_LECTURA.has(grupo) || CANALES_DE_LECTURA.has(channel)) return false;
+  return !METODOS_DE_LECTURA.test(channel.slice(sep + 1));
 }
 
 function mensajeSoloLectura(status: string): string {
@@ -196,6 +212,15 @@ function isLanRemote(addr: string | undefined): boolean {
     const second = Number(addr.split('.')[1] ?? '0');
     return second >= 16 && second <= 31;
   }
+  // Link-local (Windows sin DHCP: 169.254.x.x), CGNAT (100.64/10, típico de
+  // routers 4G) y ULA IPv6 (fd00::/8, fe80::/10): también son "la red local".
+  if (addr.startsWith('169.254.')) return true;
+  if (addr.startsWith('100.')) {
+    const second = Number(addr.split('.')[1] ?? '0');
+    if (second >= 64 && second <= 127) return true;
+  }
+  const low = addr.toLowerCase();
+  if (low.startsWith('fd') || low.startsWith('fc') || low.startsWith('fe80:')) return true;
   if (addr.startsWith('::ffff:')) return isLanRemote(addr.slice('::ffff:'.length));
   return false;
 }
@@ -346,13 +371,22 @@ export class LanServer {
   private async servirEstatico(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
     const raiz = this.opts.webRoot;
     if (!raiz) return false;
-    const pedido = decodeURIComponent((req.url ?? '/').split('?')[0] ?? '/');
+    let pedido: string;
+    try {
+      pedido = decodeURIComponent((req.url ?? '/').split('?')[0] ?? '/');
+    } catch {
+      // `%` suelto u otra secuencia inválida: no es un archivo, es basura.
+      sendJson(res, 400, { ok: false, code: 'VALIDATION_ERROR', message: 'Ruta inválida' });
+      return true;
+    }
     if (pedido.startsWith('/lan/')) return false;
 
     const candidato = pedido === '/' ? 'index.html' : pedido.replace(/^\/+/, '');
-    // Nunca salir de la carpeta servida.
-    const destino = path.resolve(raiz, candidato);
-    if (!destino.startsWith(path.resolve(raiz))) {
+    // Nunca salir de la carpeta servida: se compara con el separador puesto,
+    // porque "/web/../web-electron/x" también "empieza con" "/web".
+    const base = path.resolve(raiz);
+    const destino = path.resolve(base, candidato);
+    if (destino !== base && !destino.startsWith(base + path.sep)) {
       sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Ruta inválida' });
       return true;
     }

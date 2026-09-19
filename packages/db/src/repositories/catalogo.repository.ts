@@ -8,8 +8,9 @@
  * nunca "salieron 3". Por eso reenviar un artículo de más no rompe nada y la PC
  * puede estar apagada una semana sin que haya que reconstruir un historial.
  */
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
+import { addDecimal, mulDecimal } from '@stockflow/shared';
 
 import { rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
@@ -184,7 +185,7 @@ export class CatalogoRepository {
           codigo: r.codigo,
           nombre: r.nombre,
           precio: modoNeto
-            ? redondearExacto(String(Number(r.precio ?? '0') * (1 + Number(r.vatRate ?? '21') / 100)), 2)
+            ? redondearExacto(mulDecimal(r.precio ?? '0', addDecimal('1', String(Number(r.vatRate ?? '21') / 100), 4), 6), 2)
             : redondearExacto(r.precio ?? '0', 2),
           stock: redondearExacto(String(Math.max(0, fisico - res)), 3),
           activo: Boolean(r.activo),
@@ -221,6 +222,25 @@ export class CatalogoRepository {
       return new Map(rows.map((r) => [String(r.codigo), Number(r.cant) || 0]));
     } catch (err) {
       return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Marca artículos (por código) como cambiados para que la próxima
+   * publicación los mande: lo que se publica es stock físico − reservado, y la
+   * reserva cambia cuando entra, se convierte o se rechaza un pedido web.
+   */
+  tocarArticulos(codigos: string[]): void {
+    const lista = [...new Set(codigos.filter((c) => c && c.trim() !== ''))];
+    if (lista.length === 0) return;
+    try {
+      this.db
+        .update(articles)
+        .set({ updatedAt: Date.now() })
+        .where(inArray(articles.barcode, lista))
+        .run();
+    } catch (err) {
+      rethrowDbError(err);
     }
   }
 

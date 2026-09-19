@@ -27,6 +27,7 @@ import {
   type SupplierPayment,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
+import { exigirCajaAbiertaEnTx } from './cajaAbierta';
 
 /** Tipo del `tx` dentro de `db.transaction((tx) => …)`. */
 type Tx = Parameters<Parameters<LocalDatabase['transaction']>[0]>[0];
@@ -186,6 +187,7 @@ export class SupplierPaymentRepository extends BaseRepository<
             'Falta la caja diaria para registrar el egreso del pago',
           );
         }
+        if (!fromGeneral && data.cashRegisterId) exigirCajaAbiertaEnTx(tx, data.cashRegisterId, 'el pago al proveedor');
 
         const pmIds = [...new Set(data.payments.map((p) => p.paymentMethodId))];
         const pmRows = tx.select().from(paymentMethods).where(inArray(paymentMethods.id, pmIds)).all();
@@ -337,6 +339,7 @@ export class SupplierPaymentRepository extends BaseRepository<
             'Falta la caja diaria para registrar el egreso del pago',
           );
         }
+        if (!fromGeneral && data.cashRegisterId) exigirCajaAbiertaEnTx(tx, data.cashRegisterId, 'el pago al proveedor');
 
         const remaining = data.payments.map((p) => ({
           methodId: p.paymentMethodId,

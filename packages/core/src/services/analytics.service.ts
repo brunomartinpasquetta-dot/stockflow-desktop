@@ -565,7 +565,8 @@ export class AnalyticsService {
           0 AS cnt,
           -CAST(r.total AS REAL) AS total
         FROM returns r
-        WHERE r.date BETWEEN ? AND ?
+        JOIN sales sv ON sv.id = r.sale_id
+        WHERE r.date BETWEEN ? AND ? AND sv.status != 'voided'
       )
       GROUP BY bucket
       ORDER BY bucket ASC
@@ -733,7 +734,11 @@ export class AnalyticsService {
       .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t, COUNT(*) AS c FROM sales WHERE status != 'voided' AND date BETWEEN ? AND ?`)
       .get(range.from, range.to) as { t: number; c: number };
     const d = this.ctx.db.$client
-      .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t FROM returns WHERE date BETWEEN ? AND ?`)
+      // Las devoluciones de una venta ANULADA no restan: esa venta ya no suma
+      // (auditoría sep-2026: venta $2000 → DEV $1000 → anular dejaba −$1000).
+      .prepare(
+        `SELECT COALESCE(SUM(CAST(r.total AS REAL)), 0) AS t FROM returns r JOIN sales sv ON sv.id = r.sale_id WHERE r.date BETWEEN ? AND ? AND sv.status != 'voided'`,
+      )
       .get(range.from, range.to) as { t: number };
     return { total: (v.t || 0) - (d.t || 0), count: v.c || 0 };
   }

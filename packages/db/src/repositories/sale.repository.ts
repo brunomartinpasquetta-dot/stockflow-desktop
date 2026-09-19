@@ -22,6 +22,7 @@ import {
   cashRegisters,
   companies,
   paymentMethods,
+  payments,
   promotionItems,
   promotions,
   returnLines,
@@ -429,7 +430,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
   async voidSale(
     id: string,
     opts: { reason?: string | null; userName?: string | null } = {},
-  ): Promise<Sale> {
+  ): Promise<Sale & { reversoElectronico: string }> {
     try {
       return this.db.transaction((tx) => {
         const sale = tx.select().from(sales).where(eq(sales.id, id)).get();
@@ -549,11 +550,8 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .leftJoin(paymentMethods, eq(salePayments.paymentMethodId, paymentMethods.id))
           .where(eq(salePayments.saleId, id))
           .all();
+        let reversoElectronico = '0.0000';
         if (!sale.isAccountSale) {
-          // Lo que las devoluciones ya reintegraron en efectivo salió del
-          // cajón: se descuenta de los reversos físicos (en orden) y se
-          // revierte sólo lo que falta. El cajón nunca devuelve más efectivo
-          // del que recibió por esta venta.
           // Lo que las devoluciones ya reintegraron se descuenta PRIMERO de los
           // pagos físicos (salió del cajón) y, si no alcanzan, de los demás:
           // una venta con débito devuelta en efectivo y después anulada no
@@ -566,43 +564,43 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           };
           const fisicos = sps.filter((s) => s.isCash !== false).map(descontar);
           const electronicos = sps.filter((s) => s.isCash === false).map(descontar);
-          const reversos = [...fisicos, ...electronicos];
-          const hasReverse = reversos.some((s) => Number(s.amount) > 0);
-          // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
-          //   (el arqueo histórico recalcula el esperado en vivo y dejaría de
-          //   cuadrar; y lo electrónico ya pudo haberse depositado en Caja
-          //   General). Resolvemos la caja DESTINO dentro de la transacción:
-          //   - caja original 'open'  → usar esa (comportamiento actual);
-          //   - caja original 'closed' (o ya inexistente) → usar la caja ABIERTA
-          //     actual (a lo sumo una);
+          const hayFisico = fisicos.some((s) => Number(s.amount) > 0);
+          // BUG-CAJA: el reverso EN EFECTIVO no puede entrar a una caja ya
+          //   CERRADA y arqueada (el arqueo histórico recalcula el esperado en
+          //   vivo y dejaría de cuadrar). La caja DESTINO del efectivo se
+          //   resuelve dentro de la transacción:
+          //   - caja original 'open'  → usar esa;
+          //   - caja original 'closed' (o inexistente) → la caja ABIERTA actual;
           //   - sin caja abierta → abortar pidiendo abrir una.
+          //   Lo ELECTRÓNICO va siempre a la caja ORIGINAL (auditoría sep-2026,
+          //   A1 cross-caja): no toca el arqueo de efectivo y así el neto
+          //   electrónico de ese cierre —lo que podía ingresarse a Caja
+          //   General— baja donde corresponde, en vez de dejar un negativo en
+          //   la caja de hoy. Si ese cierre ya se había ingresado a Caja
+          //   General, el servicio registra allá la salida del reintegro.
+          const originReg = tx
+            .select({ status: cashRegisters.status })
+            .from(cashRegisters)
+            .where(eq(cashRegisters.id, sale.cashRegisterId))
+            .get();
+          const origenCerrada = originReg?.status !== 'open';
           let targetRegisterId = sale.cashRegisterId;
-          let fromClosedRegister = false;
-          if (hasReverse) {
-            const originReg = tx
-              .select({ status: cashRegisters.status })
+          if (hayFisico && origenCerrada) {
+            const openReg = tx
+              .select({ id: cashRegisters.id })
               .from(cashRegisters)
-              .where(eq(cashRegisters.id, sale.cashRegisterId))
+              .where(eq(cashRegisters.status, 'open'))
+              .limit(1)
               .get();
-            if (originReg?.status !== 'open') {
-              const openReg = tx
-                .select({ id: cashRegisters.id })
-                .from(cashRegisters)
-                .where(eq(cashRegisters.status, 'open'))
-                .limit(1)
-                .get();
-              if (!openReg) {
-                throw new ConstraintError(
-                  'NO_OPEN_CASH_REGISTER',
-                  'Abra una caja para poder anular esta operación (la caja original ya está cerrada)',
-                );
-              }
-              targetRegisterId = openReg.id;
-              fromClosedRegister = true;
+            if (!openReg) {
+              throw new ConstraintError(
+                'NO_OPEN_CASH_REGISTER',
+                'Abra una caja para poder anular esta operación (la caja original ya está cerrada)',
+              );
             }
+            targetRegisterId = openReg.id;
           }
-          for (const sp of reversos) {
-            if (!(Number(sp.amount) > 0)) continue;
+          const insertarReverso = (sp: (typeof sps)[number], cashRegisterId: string, desc: string) => {
             // BUG-S06: si el medio de pago ya no existe (isCash == null por el
             // LEFT JOIN), revertir con paymentMethodId NULL — la FK rechazaría
             // un id colgante, y NULL es el criterio legacy de efectivo físico
@@ -614,15 +612,10 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
               );
               reversePmId = null;
             }
-            // Si el reverso va a una caja distinta (la original estaba cerrada),
-            // aclararlo en la descripción incluyendo el número de comprobante.
-            const desc = fromClosedRegister
-              ? `Anulación venta ${sale.type} #${sale.number} (caja original cerrada)`
-              : `Anulación venta ${sale.type} #${sale.number}`;
             tx
               .insert(cashMovements)
               .values({
-                cashRegisterId: targetRegisterId,
+                cashRegisterId,
                 type: 'expense',
                 description: desc,
                 amount: sp.amount,
@@ -632,11 +625,52 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
                 paymentMethodId: reversePmId,
               })
               .run();
+          };
+          for (const sp of fisicos) {
+            if (!(Number(sp.amount) > 0)) continue;
+            insertarReverso(
+              sp,
+              targetRegisterId,
+              origenCerrada
+                ? `Anulación venta ${sale.type} #${sale.number} (caja original cerrada)`
+                : `Anulación venta ${sale.type} #${sale.number}`,
+            );
+          }
+          for (const sp of electronicos) {
+            if (!(Number(sp.amount) > 0)) continue;
+            insertarReverso(
+              sp,
+              sale.cashRegisterId,
+              origenCerrada
+                ? `Anulación venta ${sale.type} #${sale.number} (reintegro electrónico, caja cerrada)`
+                : `Anulación venta ${sale.type} #${sale.number}`,
+            );
+            reversoElectronico = addDecimal(reversoElectronico, sp.amount, 4);
           }
         }
 
         // Eliminar los pagos de la venta.
         tx.delete(salePayments).where(eq(salePayments.saleId, id)).run();
+
+        // Cuenta corriente abierta por esta venta: se cierra EN LA MISMA
+        // transacción (antes lo hacía el servicio después, y un corte entre
+        // medio dejaba la deuda viva de una venta anulada). Si ya recibió
+        // cobranzas no se puede anular.
+        const ar = tx.select().from(accountsReceivable).where(eq(accountsReceivable.saleId, id)).get();
+        if (ar) {
+          const cobranzas = tx
+            .select({ n: sql<number>`COUNT(*)` })
+            .from(payments)
+            .where(eq(payments.accountId, ar.id))
+            .get();
+          if (Number(cobranzas?.n ?? 0) > 0) {
+            throw new ConstraintError(
+              'ACCOUNT_SALE_WITH_PAYMENTS',
+              'No se puede anular una venta en cuenta corriente que ya recibió pagos',
+            );
+          }
+          tx.delete(accountsReceivable).where(eq(accountsReceivable.id, ar.id)).run();
+        }
 
         // AUDITORÍA sep-2026 (A7): el motivo que la pantalla pedía no se
         // guardaba en ningún lado. Queda en las notas de la venta, con quién y
@@ -652,7 +686,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .returning()
           .all()[0];
         if (!updated) throw new NotFoundError(this.entityName, id);
-        return updated;
+        return { ...updated, reversoElectronico };
       });
     } catch (err) {
       return rethrowDbError(err);
