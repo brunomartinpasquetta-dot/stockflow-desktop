@@ -795,24 +795,43 @@ function PDV() {
     if (pedidoWebPrefillRef.current === clave) return
     if (allArticles.length === 0) return
     pedidoWebPrefillRef.current = clave
-    const byId = new Map(allArticles.map((a) => [a.id, a]))
-    const lines: CartLine[] = extras.prefilledLines.map((p) => {
-      const art = p.articleId ? byId.get(p.articleId) : undefined
-      return {
-        article: art,
-        description: art ? undefined : (p.description ?? 'Artículo del catálogo'),
-        vatRate: art?.vatRate ?? '21.00',
-        quantity: String(Number(p.quantity)),
-        unitPrice: p.unitPrice,
-        discount: '0',
-        priceManuallySet: true,
-      }
-    })
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCart(lines)
-    setPedidoWebId(extras.pedidoWebId)
-    setPedidoWebNotes(extras.notes ?? null)
-    window.history.replaceState({}, '')
+    // El pedido viaja en el hash de la ventana: se saca de ahí en cuanto se
+    // aplica, así un reload o una reapertura no vuelven a cargar el carrito
+    // de un pedido que quizás ya se cobró (auditoría sep-2026).
+    const [ruta, qs = ''] = window.location.hash.slice(1).split('?')
+    const sp = new URLSearchParams(qs)
+    sp.delete('__extras')
+    window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#${ruta}${sp.size > 0 ? `?${sp.toString()}` : ''}`)
+    const pedidoId = extras.pedidoWebId
+    const lineas = extras.prefilledLines
+    const notas = extras.notes ?? null
+    // Y antes de precargar se confirma que el pedido siga PENDIENTE: si otra
+    // terminal ya lo cobró, acá no se arma un carrito para cobrarlo de nuevo.
+    void api.catalogo
+      .pedidosListar('pendiente')
+      .then((pendientes) => {
+        if (!pendientes.some((p) => p.id === pedidoId)) {
+          toast.warning('Ese pedido web ya no está pendiente: fue cobrado o cancelado en otra terminal.', { duration: 12_000 })
+          return
+        }
+        const byId = new Map(allArticles.map((a) => [a.id, a]))
+        const lines: CartLine[] = lineas.map((p) => {
+          const art = p.articleId ? byId.get(p.articleId) : undefined
+          return {
+            article: art,
+            description: art ? undefined : (p.description ?? 'Artículo del catálogo'),
+            vatRate: art?.vatRate ?? '21.00',
+            quantity: String(Number(p.quantity)),
+            unitPrice: p.unitPrice,
+            discount: '0',
+            priceManuallySet: true,
+          }
+        })
+        setCart(lines)
+        setPedidoWebId(pedidoId)
+        setPedidoWebNotes(notas)
+      })
+      .catch(() => toast.error('No se pudo comprobar el estado del pedido web'))
   }, [windowSelf?.extras, allArticles])
 
   // Inicializar / corregir el medio de pago mono-medio default (efectivo físico).
@@ -1355,10 +1374,14 @@ function PDV() {
       // Venía de un pedido web (no pagado): avisarle que ya se cobró. Best
       // effort — la venta ya está hecha, esto solo lo destacha de "Pedidos web".
       if (pedidoWebId) {
-        api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).catch(() => {})
-        toast.success(`${pedidoWebNotes?.split(' — ')[0] ?? 'Pedido web'} cobrado — ya no figura como pendiente`, {
-          duration: 8_000,
-        })
+        api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).then(
+          () =>
+            toast.success(`${pedidoWebNotes?.split(' — ')[0] ?? 'Pedido web'} cobrado — ya no figura como pendiente`, {
+              duration: 8_000,
+            }),
+          // Otra terminal cobró el mismo pedido antes: esta venta está duplicada.
+          (e: unknown) => toast.error(e instanceof Error ? e.message : 'No se pudo enlazar el pedido web', { duration: 20_000 }),
+        )
       }
 
       // Facturación electrónica: si está activa y el comprobante es fiscal, se
@@ -1447,7 +1470,9 @@ function PDV() {
       })
       await api.mpQr.linkOrderToSale(orderId, result.sale.id).catch(() => {})
       if (pedidoWebId) {
-        api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).catch(() => {})
+        api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).catch((e: unknown) =>
+          toast.error(e instanceof Error ? e.message : 'No se pudo enlazar el pedido web', { duration: 20_000 }),
+        )
       }
       toast.success(
         `Venta ${result.sale.type} #${result.sale.number} cobrada con MercadoPago QR — ${formatCurrency(result.sale.total)}`,

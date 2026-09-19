@@ -291,24 +291,27 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
             `El total del pedido ($${totalPedido.toFixed(2)}) no coincide con la suma de sus líneas ($${Number(total).toFixed(2)}). Revíselo en el catálogo o cárguelo en Ventas.`,
           );
         }
-        const svc = new SalesService(ctx);
-        const venta = await svc.createSale({
-          type: payload.type ?? 'X',
-          customerId,
-          payments: [{ paymentMethodId: payload.paymentMethodId, amount: total }],
-          notes: `Pedido web N° ${pedido.numero} — ${pedido.clienteNombre}`,
-          lines: lineas as never,
-        });
-
-        // Compare-and-set: si otra terminal convirtió el mismo pedido mientras
-        // se registraba esta venta, la venta queda (es real, se cobró) pero el
-        // pedido no se pisa y se avisa para que la anulen.
-        if (!deps.repos.catalogoPedidos.marcar(payload.id, 'convertido', venta.sale.id)) {
-          throw new ValidationError(
-            'id',
-            `El pedido ya había sido procesado por otra terminal. Se registró igual la venta ${venta.sale.type} #${venta.sale.number}: anúlela si está duplicada.`,
-          );
+        // Se RESERVA el pedido antes de registrar la venta (compare-and-set):
+        // dos terminales que aprietan "Registrar venta" a la vez ya no generan
+        // dos ventas; la segunda recibe el aviso sin haber cobrado nada. Si la
+        // venta falla, el pedido vuelve a pendiente.
+        if (!deps.repos.catalogoPedidos.reservar(payload.id)) {
+          throw new ValidationError('id', 'Ese pedido ya fue procesado por otra terminal');
         }
+        let venta;
+        try {
+          venta = await new SalesService(ctx).createSale({
+            type: payload.type ?? 'X',
+            customerId,
+            payments: [{ paymentMethodId: payload.paymentMethodId, amount: total }],
+            notes: `Pedido web N° ${pedido.numero} — ${pedido.clienteNombre}`,
+            lines: lineas as never,
+          });
+        } catch (e) {
+          deps.repos.catalogoPedidos.liberar(payload.id);
+          throw e;
+        }
+        deps.repos.catalogoPedidos.confirmarConversion(payload.id, venta.sale.id);
         void avisarCatalogo(deps, { id: pedido.id, pedidoId: pedido.pedidoId, saleId: venta.sale.id }, 'confirmado');
         return { ok: true as const, ventaNumero: venta.sale.number, ventaTipo: venta.sale.type };
       },
@@ -324,14 +327,26 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
       requirePermission(ctx.currentUser, 'create_sale');
       const pedido = deps.repos.catalogoPedidos.buscar(payload.id);
       if (!pedido) throw new ValidationError('id', 'El pedido no existe');
-      if (pedido.estado !== 'pendiente') return { ok: true as const };
       // La venta tiene que existir y estar viva: enlazar un id inventado o una
       // venta ya anulada dejaría el pedido "cobrado" sin plata detrás.
       const venta = await deps.repos.sales.findById(payload.saleId);
       if (!venta) throw new ValidationError('saleId', 'La venta no existe');
       if (venta.status === 'voided') throw new ValidationError('saleId', 'Esa venta está anulada');
+      const yaResuelto = async (): Promise<{ ok: true } | never> => {
+        const actual = deps.repos.catalogoPedidos.buscar(payload.id)!;
+        // Doble llamada con la MISMA venta: idempotente.
+        if (actual.saleId === payload.saleId) return { ok: true as const };
+        // Otra terminal ya cobró este pedido con OTRA venta: la que acaba de
+        // registrarse está duplicada y alguien tiene que enterarse.
+        const otra = actual.saleId ? await deps.repos.sales.findById(actual.saleId) : null;
+        throw new ValidationError(
+          'id',
+          `El pedido web N° ${pedido.numero} ya fue cobrado en otra terminal${otra ? ` (venta ${otra.type} #${otra.number})` : ''}. La venta ${venta.type} #${venta.number} está duplicada: anúlela.`,
+        );
+      };
+      if (pedido.estado !== 'pendiente') return yaResuelto();
       if (!deps.repos.catalogoPedidos.marcar(payload.id, 'convertido', payload.saleId)) {
-        return { ok: true as const };
+        return yaResuelto();
       }
       void avisarCatalogo(deps, { id: pedido.id, pedidoId: pedido.pedidoId, saleId: venta.id }, 'confirmado');
       return { ok: true as const };

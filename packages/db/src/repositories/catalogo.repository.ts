@@ -369,6 +369,51 @@ export class CatalogoPedidoRepository {
     }
   }
 
+  /**
+   * Reserva un pedido PENDIENTE para convertirlo: pasa a 'convertido' sin
+   * venta todavía y sin aviso pendiente (la venta se registra después; si
+   * falla, `liberar()` lo devuelve a pendiente). Compare-and-set: la terminal
+   * que llega segunda recibe `false` y no registra otra venta (B1 residual).
+   */
+  reservar(id: string): boolean {
+    try {
+      const r = this.db
+        .update(catalogoPedidos)
+        .set({ estado: 'convertido', saleId: null, avisoPendiente: null, updatedAt: Date.now() })
+        .where(and(eq(catalogoPedidos.id, id), eq(catalogoPedidos.estado, 'pendiente')))
+        .run();
+      return r.changes > 0;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /** Enlaza la venta a un pedido reservado y deja el aviso 'confirmado' pendiente. */
+  confirmarConversion(id: string, saleId: string): void {
+    try {
+      this.db
+        .update(catalogoPedidos)
+        .set({ saleId, avisoPendiente: 'confirmado', updatedAt: Date.now() })
+        .where(and(eq(catalogoPedidos.id, id), eq(catalogoPedidos.estado, 'convertido')))
+        .run();
+    } catch (err) {
+      rethrowDbError(err);
+    }
+  }
+
+  /** La venta no se pudo registrar: el pedido vuelve a pendiente. */
+  liberar(id: string): void {
+    try {
+      this.db
+        .update(catalogoPedidos)
+        .set({ estado: 'pendiente', saleId: null, avisoPendiente: null, updatedAt: Date.now() })
+        .where(and(eq(catalogoPedidos.id, id), eq(catalogoPedidos.estado, 'convertido'), sql`${catalogoPedidos.saleId} IS NULL`))
+        .run();
+    } catch (err) {
+      rethrowDbError(err);
+    }
+  }
+
   /** El catálogo acusó el aviso: ya no se debe nada. */
   avisoHecho(id: string): void {
     try {

@@ -382,8 +382,18 @@ export class AccountingService {
       let vat21 = '0.0000';
       let vat105 = '0.0000';
       let vat27 = '0.0000';
+      // El descuento global de la compra se prorratea ANTES del IVA, igual
+      // que en ventas y que el `vatAmount` persistido: sin esto el crédito
+      // fiscal que va al contador quedaba inflado (auditoría sep-2026).
+      const discountNum = Number(p.discount);
+      const subtotalNum = Number(p.subtotal);
+      const prorate =
+        Number.isFinite(discountNum) && discountNum !== 0 && Number.isFinite(subtotalNum) && subtotalNum !== 0;
       for (const l of lines) {
-        const br = vatBreakdown(l.lineTotal, l.vatRate, priceMode);
+        const lineDiscount = prorate
+          ? mulDecimal(p.discount, (Number(l.lineTotal) / subtotalNum).toFixed(8), 4)
+          : '0.0000';
+        const br = vatBreakdown(subDecimal(l.lineTotal, lineDiscount, 4), l.vatRate, priceMode);
         netAmount = sumDecimals([netAmount, br.net]);
         const key = vatBucketKey(l.vatRate);
         if (key === 'vat21') vat21 = sumDecimals([vat21, br.vat]);

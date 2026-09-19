@@ -50,7 +50,7 @@ function buildLineStates(
   /**
    * Cabecera de la venta: el reintegro por unidad es lo que el cliente PAGÓ
    * (su parte del descuento global y, en modo 'net', el IVA), igual que lo
-   * calcula el servidor. Sin cabecera (compras) se usa el importe de línea.
+   * calcula el servidor (ventas y compras).
    */
   pagado?: { subtotal: string; discount: string; priceMode: PriceMode },
 ): LineState[] {
@@ -317,6 +317,7 @@ export function ReturnPurchaseDialog({
   const qc = useQueryClient()
   const cashQ = useCurrentCash()
   const articlesQ = useArticles()
+  const companyQ = useCompany()
   const purchaseQ = useQuery({ queryKey: ['purchase', purchaseId], queryFn: () => api.purchases.get(purchaseId), enabled: open })
   const returnsQ = useQuery({
     queryKey: ['purchaseReturns', purchaseId],
@@ -335,14 +336,22 @@ export function ReturnPurchaseDialog({
     [articlesQ.data],
   )
 
-  if (open && !seeded && purchaseQ.data && returnsQ.data && articlesQ.data) {
+  if (open && !seeded && purchaseQ.data && returnsQ.data && articlesQ.data && companyQ.data) {
     const returnedByLine = new Map<string, number>()
     for (const r of returnsQ.data) {
       for (const rl of r.lines) {
         returnedByLine.set(rl.purchaseLineId, (returnedByLine.get(rl.purchaseLineId) ?? 0) + Number(rl.quantity))
       }
     }
-    setLines(buildLineStates(purchaseQ.data.lines, returnedByLine, descByArticle))
+    // Igual que en ventas: lo que se PAGÓ por la unidad (descuento global
+    // prorrateado y, en 'net', el IVA), como lo calcula el servidor.
+    setLines(
+      buildLineStates(purchaseQ.data.lines, returnedByLine, descByArticle, {
+        subtotal: purchaseQ.data.purchase.subtotal,
+        discount: purchaseQ.data.purchase.discount,
+        priceMode: companyQ.data.priceMode,
+      }),
+    )
     setMethod(purchaseQ.data.purchase.paymentType === 'credit' ? 'account' : 'cash')
     setSeeded(true)
   }

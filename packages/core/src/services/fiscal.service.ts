@@ -233,9 +233,13 @@ export class FiscalService {
     // CUIT en la venta. Ese CUIT identifica a un responsable inscripto; si se
     // informara la condición de la ficha (5) la validación rechazaría la A y la
     // venta quedaría sin CAE, irrecuperable desde el Historial.
+    // Sólo aplica a la ficha CONSUMIDOR FINAL: un Exento o un Monotributista
+    // con ficha propia no se convierten en RI por tener CUIT (la validación de
+    // abajo los frena, como corresponde: a un exento no se le emite A).
     if (
       letter === 'A' &&
       doc.docType === DOC_TYPES.CUIT &&
+      customer.category === 'CF' &&
       !isReceiverVatConditionAllowed(receiverVatConditionId, 'A')
     ) {
       receiverVatConditionId = RECEIVER_VAT_CONDITION_IDS.RI;

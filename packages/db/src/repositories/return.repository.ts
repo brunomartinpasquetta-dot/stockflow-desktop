@@ -396,6 +396,18 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
         if (input.lines.length === 0) {
           throw new ConstraintError('RETURN_EMPTY', 'Seleccione al menos un artículo a devolver');
         }
+        // Mismo criterio que la devolución de venta (auditoría sep-2026): se
+        // reintegra lo que se PAGÓ por esas unidades —con su parte del
+        // descuento global y, en modo 'net', con el IVA— y la suma de
+        // devoluciones de la compra nunca supera su total. Antes una compra
+        // 2u × $1000 con $200 de descuento devolvía $2000 sobre $1800 pagados.
+        const modoRow = tx.select({ priceMode: companies.priceMode }).from(companies).limit(1).get();
+        const priceMode: PriceMode = modoRow?.priceMode === 'net' ? 'net' : 'gross';
+        const prorratea = Number(purchase.discount) !== 0 && Number(purchase.subtotal) !== 0;
+        const yaReintegrado = sumDecimals(
+          tx.select({ total: purchaseReturns.total }).from(purchaseReturns).where(eq(purchaseReturns.purchaseId, purchase.id)).all().map((r) => r.total),
+        );
+        const pedidoPorLinea = new Map<string, number>();
         const computed = input.lines.map((l) => {
           const pl = plById.get(l.purchaseLineId);
           if (!pl) throw new NotFoundError('Línea de compra', l.purchaseLineId);
@@ -408,7 +420,12 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
               `No se puede devolver ${l.quantity}: de esa línea quedan ${remaining.toFixed(3)} sin devolver`,
             );
           }
-          const lineTotal = (effectiveUnit(pl.lineTotal, pl.quantity) * qty).toFixed(4);
+          pedidoPorLinea.set(pl.id, (pedidoPorLinea.get(pl.id) ?? 0) + qty);
+          const lineDiscount = prorratea
+            ? mulDecimal(purchase.discount, (Number(pl.lineTotal) / Number(purchase.subtotal)).toFixed(8), 4)
+            : '0.0000';
+          const linePaid = vatBreakdown(subDecimal(pl.lineTotal, lineDiscount, 4), pl.vatRate, priceMode).gross;
+          const lineTotal = (effectiveUnit(linePaid, pl.quantity) * qty).toFixed(4);
           return {
             purchaseLineId: pl.id,
             articleId: pl.articleId,
@@ -417,10 +434,21 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
             lineTotal,
           };
         });
-        const total = sumDecimals(computed.map((c) => c.lineTotal));
+        let total = sumDecimals(computed.map((c) => c.lineTotal));
         if (!(Number(total) > 0)) {
           throw new ConstraintError('RETURN_TOTAL', 'El total de la devolución debe ser mayor a cero');
         }
+        const restante = subDecimal(purchase.total, yaReintegrado, 4);
+        if (cmpDecimal(restante, '0') <= 0) {
+          throw new ConstraintError(
+            'RETURN_TOTAL_REFUNDED',
+            `Ya se reintegró el total de la compra (${purchase.total}): no queda nada por devolver`,
+          );
+        }
+        const devuelveTodo = plRows.every(
+          (pl) => Number(pl.quantity) - (prevByLine.get(pl.id) ?? 0) - (pedidoPorLinea.get(pl.id) ?? 0) <= 0.0005,
+        );
+        if (devuelveTodo || cmpDecimal(total, restante) > 0) total = restante;
 
         // Stock: BAJA (la mercadería vuelve al proveedor). Respeta "vender sin stock".
         const cmpRow = tx.select({ allowNegativeStock: companies.allowNegativeStock }).from(companies).limit(1).get();

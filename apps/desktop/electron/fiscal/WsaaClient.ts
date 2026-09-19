@@ -265,15 +265,30 @@ export class WsaaClient {
     const cms = await this.signTra(tra);
     const soap = buildLoginSoap(cms);
 
-    const res = await fetch(this.opts.wsaaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/xml; charset=utf-8',
-        SOAPAction: '',
-      },
-      body: soap,
-    });
-    const text = await res.text();
+    // Con tope: al vencer el ticket (cada 12 h) con ARCA colgado, el PDV
+    // quedaba congelado (flag `procesando`) hasta el timeout del sistema,
+    // varios minutos, sin que el cajero pudiera cobrar de otra forma.
+    let res: Response;
+    let text: string;
+    try {
+      res = await fetch(this.opts.wsaaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          SOAPAction: '',
+        },
+        body: soap,
+        signal: AbortSignal.timeout(20_000),
+      });
+      text = await res.text();
+    } catch (err) {
+      if (err instanceof Error && err.name === 'TimeoutError') {
+        throw new WsaaApiError('ARCA no respondió al autenticar en 20 segundos. Intente de nuevo en unos minutos.');
+      }
+      const causa = (err as { cause?: { code?: string; message?: string } } | null)?.cause;
+      const detalle = causa?.code ?? causa?.message ?? (err instanceof Error ? err.message : String(err));
+      throw new WsaaApiError(`No se pudo conectar con ARCA para autenticar (${detalle}).`);
+    }
     if (!res.ok && !text.includes('loginCmsReturn')) {
       const fault = extractTag(text, 'faultstring');
       throw new WsaaApiError(fault ?? `ARCA respondió ${res.status} al autenticar`);

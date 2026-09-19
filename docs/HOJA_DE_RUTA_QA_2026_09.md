@@ -155,3 +155,20 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
 2. `typecheck` (app y electron) + smokes existentes en verde.
 3. Commit en `main` sin tag, con el hallazgo citado.
 4. Build en la Mac de Bruno (`package:dry`) y prueba real de la pantalla tocada.
+
+## Tanda 8 — Lo que la reevaluación (7,5/10) dejó con plata reproducible ✅ (19-sep-2026)
+- [x] Devolución de COMPRA con descuento global prorrateado, IVA en modo net y tope Σ ≤ total
+  (`return.repository.ts`, diálogo con el mismo cálculo). Smoke `devoluciones` [5].
+- [x] `pedidoConvertir`: el pedido se RESERVA (compare-and-set) antes de registrar la venta y se
+  libera si la venta falla; `pedidoVincularVenta` avisa cuando otra terminal ya cobró el pedido con
+  otra venta, y Ventas muestra ese error; el prefill del pedido se saca del hash y verifica que el
+  pedido siga pendiente. Smoke `catalogo` (reservar/liberar/confirmarConversion).
+- [x] `fiscal:archivarPendientes` archiva desde `fiscal_vouchers` (PV y número de ARCA); las ventas
+  con CAE sin comprobante caen al camino viejo, avisado. El aviso de anulación con CAE mira también
+  el comprobante persistido.
+- [x] Factura A "de mostrador": el forzado a RI sólo aplica a la ficha Consumidor Final.
+- [x] Login WSAA con tope de 20 s; el tope de WSFE cubre también la lectura del cuerpo.
+- [x] Libro IVA Compras con el descuento global prorrateado. Smoke `pdv-caja` [6].
+- [x] Anular con devolución previa y pago electrónico: lo reintegrado se descuenta también de los
+  pagos no físicos (`64fa00b`); `saldos.regression.smoke` en verde.
+

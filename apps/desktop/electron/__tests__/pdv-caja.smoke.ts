@@ -188,6 +188,10 @@ const main = async () => {
   } as never);
   check('compra con descuento global: total 1800', cp.purchase.total === '1800.0000', cp.purchase.total);
   check('el IVA se calcula sobre la base descontada (312.3967, no 347.1074)', cp.purchase.vatAmount === '312.3967', cp.purchase.vatAmount);
+  const libro = await svc.accounting.getVatBookPurchases({ from: 0, to: Date.now() + 60_000 });
+  const filaCp = libro.find((r) => r.purchaseId === cp.purchase.id);
+  check('Libro IVA Compras: IVA 21% prorrateado por el descuento (312.3967)', filaCp?.vat21 === '312.3967', filaCp?.vat21);
+  check('Libro IVA Compras: neto + IVA = total (1800)', filaCp != null && Math.abs(Number(filaCp.netAmount) + Number(filaCp.vat21) - 1800) < 0.001, `${filaCp?.netAmount} + ${filaCp?.vat21}`);
 
   const errTransfDeMas = await falla(() =>
     svc.cashGeneral.transferFromDaily({ cashRegisterId: reg4.id, amount: '99999.00' }),

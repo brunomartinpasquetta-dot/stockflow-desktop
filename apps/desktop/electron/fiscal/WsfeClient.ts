@@ -144,9 +144,12 @@ export class WsfeClient {
       '</soapenv:Envelope>',
     ].join('');
 
-    let res: Response;
+    let text: string;
     try {
-      res = await fetch(this.url, {
+      // El mismo tope cubre la conexión Y la lectura del cuerpo: un corte a
+      // mitad de la respuesta también es "ARCA pudo haber autorizado".
+      const signal = AbortSignal.timeout(30_000);
+      const res = await fetch(this.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/xml; charset=utf-8',
@@ -155,8 +158,9 @@ export class WsfeClient {
         body: soap,
         // Sin tope, una respuesta que no llega dejaba al cajero esperando el
         // CAE sin límite, con el cliente en el mostrador y la venta ya hecha.
-        signal: AbortSignal.timeout(30_000),
+        signal,
       });
+      text = await res.text();
     } catch (err) {
       // Los códigos TIMEOUT y NETWORK los lee el servicio fiscal: son los
       // errores tras los cuales ARCA pudo haber autorizado igual (el pedido
@@ -173,7 +177,6 @@ export class WsfeClient {
       const detalle = causa?.code ?? causa?.message ?? (err instanceof Error ? err.message : String(err));
       throw new WsfeApiError(`No se pudo conectar con ARCA (${detalle}).`, 'NETWORK');
     }
-    const text = await res.text();
     const fault = extractTag(text, 'faultstring');
     if (fault) throw new WsfeApiError(fault, 'SOAP_FAULT');
     return text;

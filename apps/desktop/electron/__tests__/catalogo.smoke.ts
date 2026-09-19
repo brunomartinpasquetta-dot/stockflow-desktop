@@ -254,6 +254,21 @@ const main = async () => {
   check('la segunda (otra terminal) no pisa y devuelve false', cas2 === false && repos.catalogoPedidos.buscar(pedCas.id)!.estado === 'convertido');
   check('resolverlo deja el aviso al catálogo como pendiente', repos.catalogoPedidos.buscar(pedCas.id)!.avisoPendiente === 'confirmado');
 
+  repos.catalogoPedidos.guardar({ ...pedido, pedidoId: 'pb-res-1', numero: 911 });
+  const pedRes = repos.catalogoPedidos.listar().find((p) => p.pedidoId === 'pb-res-1')!;
+  const res1 = repos.catalogoPedidos.reservar(pedRes.id);
+  const res2 = repos.catalogoPedidos.reservar(pedRes.id);
+  check('reservar() gana una sola vez (la venta se registra DESPUÉS de reservar)', res1 === true && res2 === false);
+  check('reservado: convertido sin venta y sin aviso pendiente', (() => { const p = repos.catalogoPedidos.buscar(pedRes.id)!; return p.estado === 'convertido' && p.saleId == null && p.avisoPendiente == null; })());
+  repos.catalogoPedidos.liberar(pedRes.id);
+  check('si la venta falla, liberar() lo devuelve a pendiente', repos.catalogoPedidos.buscar(pedRes.id)!.estado === 'pendiente');
+  check('y vuelve a poder reservarse', repos.catalogoPedidos.reservar(pedRes.id) === true);
+  repos.catalogoPedidos.confirmarConversion(pedRes.id, ventaPedido.sale.id);
+  check('confirmarConversion enlaza la venta y deja el aviso pendiente', (() => { const p = repos.catalogoPedidos.buscar(pedRes.id)!; return p.saleId === ventaPedido.sale.id && p.avisoPendiente === 'confirmado'; })());
+  repos.catalogoPedidos.liberar(pedRes.id);
+  check('liberar() no toca un pedido que ya tiene venta', repos.catalogoPedidos.buscar(pedRes.id)!.estado === 'convertido');
+  repos.catalogoPedidos.avisoHecho(pedRes.id);
+
   console.log('\n[B4] el aviso al catálogo se reintenta hasta que acuse');
   responder = 503;
   recibido.length = 0;

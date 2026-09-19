@@ -169,6 +169,32 @@ const main = async () => {
   check('el efectivo esperado no quedó en negativo', despues === disponible && Number(despues) >= 0, `antes=${disponible} después=${despues}`);
   check('no se registró la devolución', (await returns.listBySale(v4.sale.id)).length === 0);
 
+  /* ------------------------------------------------------------------ */
+  console.log('\n[5] Devolución de COMPRA con descuento global y en modo net');
+  const artC = await repos.articles.create({ barcode: 'C-1', description: 'Art C', listPrice1: '1500.0000', stock: '10.000' });
+  const c5 = await svc.purchases.createPurchase({
+    type: 'X', supplierId: prov.id, isAccountPurchase: false, fundingSource: 'daily', updatePrices: false,
+    discount: '200.0000',
+    payments: [{ paymentMethodId: PM_CASH, amount: '1800.0000' }],
+    lines: [{ articleId: artC.id, quantity: '2.000', costPrice: '1000.0000' }],
+  } as never);
+  check('compra 2×1000 con $200 de descuento: total 1800', c5.purchase.total === '1800.0000', c5.purchase.total);
+  const dpc5a = await returns.createPurchaseReturn({ purchaseId: c5.purchase.id, refundMethod: 'cash', lines: [{ purchaseLineId: c5.lines[0]!.id, quantity: '1.000' }] });
+  check('DPC 1u reintegra 900 (con su parte del descuento), no 1000', dpc5a.ret.total === '900.0000', dpc5a.ret.total);
+  const dpc5b = await returns.createPurchaseReturn({ purchaseId: c5.purchase.id, refundMethod: 'cash', lines: [{ purchaseLineId: c5.lines[0]!.id, quantity: '1.000' }] });
+  check('la segunda DPC completa exactamente los 1800 pagados', dpc5b.ret.total === '900.0000' && Number(dpc5a.ret.total) + Number(dpc5b.ret.total) === 1800, dpc5b.ret.total);
+
+  await repos.company.upsert({ priceMode: 'net' } as never);
+  const c5n = await svc.purchases.createPurchase({
+    type: 'X', supplierId: prov.id, isAccountPurchase: false, fundingSource: 'daily', updatePrices: false,
+    payments: [{ paymentMethodId: PM_CASH, amount: '1210.0000' }],
+    lines: [{ articleId: artC.id, quantity: '1.000', costPrice: '1000.0000' }],
+  } as never);
+  check('modo net: compra 1×1000 neto paga 1210', c5n.purchase.total === '1210.0000', c5n.purchase.total);
+  const dpc5n = await returns.createPurchaseReturn({ purchaseId: c5n.purchase.id, refundMethod: 'cash', lines: [{ purchaseLineId: c5n.lines[0]!.id, quantity: '1.000' }] });
+  check('modo net: la DPC reintegra 1210 con IVA (no 1000)', dpc5n.ret.total === '1210.0000', dpc5n.ret.total);
+  await repos.company.upsert({ priceMode: 'gross' } as never);
+
   closeLocalDb(db);
   rmSync(dir, { recursive: true, force: true });
   console.log(fallas === 0 ? '\n✅ TODO OK\n' : `\n❌ ${fallas} FALLAS\n`);

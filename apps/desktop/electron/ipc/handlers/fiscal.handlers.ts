@@ -412,15 +412,48 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
       deps,
       async (_p, ctx): Promise<{ archivadas: number; total: number }> => {
         requireAdmin(ctx.currentUser?.role);
-        // Punto de venta configurado: las ventas migradas no lo guardan.
+        // AUDITORÍA sep-2026: la fuente son los COMPROBANTES (`fiscal_vouchers`):
+        // ahí está el punto de venta y el número que autorizó ARCA. Antes se
+        // recorrían las ventas con `afipCAE` y el PDF salía con el número
+        // interno de la venta y el primer punto de venta configurado: en la
+        // base de Denver eran 1.247 PDFs "Factura B 0004-00061639" con el CAE
+        // de la 1246. La migración ahora crea los comprobantes; las ventas con
+        // CAE que NO tengan comprobante (migraciones anteriores) caen al camino
+        // viejo, avisado como tal.
+        const vouchers = deps.repos.fiscal
+          .listVouchers({ kind: 'invoice' })
+          .filter((v) => v.saleId != null && v.status === 'approved' && v.cae);
+        let archivadas = 0;
+        const conVoucher = new Set<string>();
+        for (const v of vouchers) {
+          conVoucher.add(v.saleId!);
+          const ok = await archivar(
+            deps,
+            v.saleId!,
+            {
+              id: v.id,
+              label: `Factura ${v.letter}`,
+              letter: v.letter,
+              salePoint: v.salePoint,
+              number: v.number,
+              cae: v.cae!,
+              caeExpiry: v.caeExpiry ?? null,
+              total: v.total,
+              qrUrl: v.qrUrl ?? null,
+              observations: [],
+            } as IssuedVoucherDTO,
+            true,
+          );
+          if (ok) archivadas += 1;
+        }
+        // Camino viejo: ventas con CAE sin comprobante registrado.
         const puntos = deps.repos.fiscal.listSalePoints();
         const puntoDeVenta = puntos[0]?.number ?? 1;
-        // Se recorren las VENTAS con CAE y no `fiscal_vouchers`: en una base
-        // migrada desde StockFácil esa tabla está VACÍA —el CAE viejo vive en
-        // la venta— y las 8.014 facturas históricas no se archivarían nunca.
         const ventas = await deps.repos.sales.findByDateRange(0, Date.now());
-        const conCae = ventas.filter((s) => s.afipCAE && s.afipCAE.trim() !== '');
-        let archivadas = 0;
+        const conCae = ventas.filter((s) => s.afipCAE && s.afipCAE.trim() !== '' && !conVoucher.has(s.id));
+        if (conCae.length > 0) {
+          console.warn(`[fiscal] archivarPendientes: ${conCae.length} venta(s) con CAE sin comprobante registrado; se archivan con el número interno y el PV ${puntoDeVenta}`);
+        }
         for (const venta of conCae) {
           const ok = await archivar(
             deps,
@@ -441,7 +474,7 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
           );
           if (ok) archivadas += 1;
         }
-        return { archivadas, total: conCae.length };
+        return { archivadas, total: vouchers.length + conCae.length };
       },
     ),
 
