@@ -1453,6 +1453,10 @@ export const cashGeneralMovements = sqliteTable(
     balanceAfterCash: text('balance_after_cash').notNull().default('0'),
     /** Saldo electrónico tras este movimiento. */
     balanceAfterElectronic: text('balance_after_electronic').notNull().default('0'),
+    /** Parte del importe que fue efectivo físico (null en filas anteriores a 0032). */
+    cashAmount: text('cash_amount'),
+    /** Parte del importe que fue electrónica (null en filas anteriores a 0032). */
+    electronicAmount: text('electronic_amount'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => ({

@@ -14,6 +14,7 @@ import type { LocalDatabase } from '../local/client';
 import {
   accountsReceivable,
   cashMovements,
+  cashRegisters,
   customers,
   paymentMethods,
   payments,
@@ -88,6 +89,21 @@ export class PaymentRepository extends BaseRepository<Payment, NewPayment> {
           throw new ConstraintError(
             'PAYMENT_EXCEEDS_BALANCE',
             `El pago (${totalPaid}) supera el saldo de la cuenta (${account.balance})`,
+          );
+        }
+
+        // AUDITORÍA sep-2026 (A4): la caja tiene que seguir abierta DENTRO de
+        // la transacción; si otra terminal la cerró, la cobranza no puede
+        // entrar a un arqueo ya hecho.
+        const caja = tx
+          .select({ status: cashRegisters.status })
+          .from(cashRegisters)
+          .where(eq(cashRegisters.id, data.cashRegisterId))
+          .get();
+        if (caja?.status !== 'open') {
+          throw new ConstraintError(
+            'CASH_CLOSED',
+            'La caja se cerró mientras se registraba la cobranza. Abra una caja e intente de nuevo.',
           );
         }
 

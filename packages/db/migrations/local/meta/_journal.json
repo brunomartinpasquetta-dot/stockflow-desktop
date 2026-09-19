@@ -218,6 +218,13 @@
       "when": 1786725682783,
       "tag": "0031_company_catalogo_web_url",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1786725682784,
+      "tag": "0032_cash_general_desglose_por_movimiento",
+      "breakpoints": true
     }
   ]
 }

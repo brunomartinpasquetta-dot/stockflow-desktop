@@ -69,13 +69,23 @@ export function usePaymentSplit(activeMethods: PaymentMethodDTO[], total: number
   const isComplete = total > 0 && Math.abs(totalPaid - total) < 0.005
 
   const payments = useMemo(() => {
-    const list: Array<{ paymentMethodId: string; amount: string }> = []
+    const list: Array<{ paymentMethodId: string; amount: number }> = []
     for (const m of activeMethods) {
       const amt = numByPm[m.id] ?? 0
-      if (amt > 0.0001) list.push({ paymentMethodId: m.id, amount: amt.toFixed(4) })
+      if (amt > 0.0001) list.push({ paymentMethodId: m.id, amount: amt })
     }
-    return list
-  }, [activeMethods, numByPm])
+    // AUDITORÍA sep-2026 (A2): la pantalla da por completo el cobro con medio
+    // centavo de tolerancia, pero el servidor exige que la suma de los pagos
+    // sea EXACTAMENTE el total (a 4 decimales). Un total de $1.234,5650
+    // cobrado como 1.234,57 rebotaba con SALE_PAYMENTS_MISMATCH después de
+    // haber pasado la validación visual. El último medio absorbe la
+    // diferencia de redondeo, así lo que se manda cierra al diezmilésimo.
+    const suma = list.reduce((a, p) => a + p.amount, 0)
+    const diff = Number((total - suma).toFixed(4))
+    const last = list[list.length - 1]
+    if (last && diff !== 0 && Math.abs(diff) < 0.005 && last.amount + diff > 0) last.amount += diff
+    return list.map((p) => ({ paymentMethodId: p.paymentMethodId, amount: p.amount.toFixed(4) }))
+  }, [activeMethods, numByPm, total])
 
   return { amounts, setAmount, fillAllInCash, reset, cashMethod, totalPaid, isComplete, isExcess, remaining, payments }
 }

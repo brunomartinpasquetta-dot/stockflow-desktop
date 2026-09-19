@@ -237,7 +237,7 @@ export class SalesService {
    * Anula una venta: revierte stock y caja (vía repo) y, si la venta había abierto
    * una cuenta corriente sin pagos, la elimina. Falla si la cuenta ya recibió pagos.
    */
-  async voidSale(saleId: string): Promise<Sale> {
+  async voidSale(saleId: string, reason: string | null = null): Promise<Sale> {
     const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'void_sale');
 
@@ -258,7 +258,7 @@ export class SalesService {
       }
     }
 
-    const voided = await repos.sales.voidSale(saleId);
+    const voided = await repos.sales.voidSale(saleId, { reason, userName: currentUser.fullName });
     if (account) {
       await repos.accountsReceivable.delete(account.id);
     }

@@ -50,11 +50,23 @@ export function CobroQrModal({
 
   const beep = useBeep()
 
+  // AUDITORÍA sep-2026 (A6): la orden se creaba de nuevo cada vez que cambiaba
+  // `amount`/`description` con el modal abierto (un re-render del PDV con el
+  // total reformateado alcanzaba), dejando órdenes colgadas en Mercado Pago.
+  // Los parámetros se leen de un ref: UNA orden por apertura.
+  const paramsRef = useRef({ cashRegisterId, amount, description })
+  paramsRef.current = { cashRegisterId, amount, description }
+  // Y `onApproved` se avisa UNA vez por orden, aunque el efecto se re-suscriba
+  // porque el padre re-renderizó y cambió la identidad del callback.
+  const avisadaRef = useRef<string | null>(null)
+
   // 1) Crear orden + cargar QR al abrir. Reset y fetch siempre dentro de microtask para
   // evitar setState síncrono en el cuerpo del effect.
   useEffect(() => {
     if (!open) return
     let cancelled = false
+    const p = paramsRef.current
+    avisadaRef.current = null
     void (async () => {
       setPhase('loading')
       setOrder(null)
@@ -62,10 +74,14 @@ export function CobroQrModal({
       setErrorMsg(null)
       try {
         const [ord, qrData] = await Promise.all([
-          api.mpQr.createOrder({ cashRegisterId, amount, description }),
-          api.mpQr.getQrForCashRegister(cashRegisterId),
+          api.mpQr.createOrder({ cashRegisterId: p.cashRegisterId, amount: p.amount, description: p.description }),
+          api.mpQr.getQrForCashRegister(p.cashRegisterId),
         ])
-        if (cancelled) return
+        if (cancelled) {
+          // El modal se cerró antes de que MP contestara: la orden no debe quedar viva.
+          api.mpQr.cancelOrder(ord.id).catch(() => {})
+          return
+        }
         setOrder(ord)
         setQr(qrData)
         setPhase('pending')
@@ -78,7 +94,7 @@ export function CobroQrModal({
     return () => {
       cancelled = true
     }
-  }, [open, cashRegisterId, amount, description])
+  }, [open])
 
   // 2) Polling cada 3s mientras está pending y no expiró.
   useEffect(() => {
@@ -105,12 +121,19 @@ export function CobroQrModal({
   const effectivePhase: Phase = phase === 'pending' && expired ? 'expired' : phase
 
   // 4) Beep + auto-callback al aprobar.
+  const onApprovedRef = useRef(onApproved)
+  onApprovedRef.current = onApproved
   useEffect(() => {
     if (phase !== 'approved' || !order) return
+    if (avisadaRef.current === order.id) return
     beep()
-    const t = setTimeout(() => onApproved(order.id, order.mpPaymentId ?? null), 1500)
+    const t = setTimeout(() => {
+      if (avisadaRef.current === order.id) return
+      avisadaRef.current = order.id
+      onApprovedRef.current(order.id, order.mpPaymentId ?? null)
+    }, 1500)
     return () => clearTimeout(t)
-  }, [phase, order, beep, onApproved])
+  }, [phase, order, beep])
 
   // 5) Cleanup: si el modal se desmonta o se cierra estando pending, cancelar en MP best-effort.
   useEffect(() => {

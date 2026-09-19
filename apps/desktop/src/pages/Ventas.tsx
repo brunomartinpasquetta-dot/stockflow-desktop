@@ -22,7 +22,7 @@ import { useWindowNav } from '@/lib/useWindowNav'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
-import { calculateSaleTotals, lineTotal, resolvePrice, vatBreakdown } from '@/lib/pricing'
+import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
@@ -851,6 +851,11 @@ function PDV() {
     addArticleWithQty(article, '1')
   }
   function addArticleWithQty(article: ArticleDTO, qty: string): void {
+    // Lista 2/3 pedida pero vacía en la ficha: se cobra Lista 1 y se avisa.
+    const listaCaida = priceListFallback(article, selectedPriceList)
+    if (listaCaida) {
+      toast.warning(`${article.description}: sin precio en Lista ${listaCaida}. Se cobra a Lista 1.`, { id: `lista-${article.id}` })
+    }
     setCart((prev) => {
       const idx = prev.findIndex((l) => l.article?.id === article.id)
       if (idx >= 0) {
@@ -948,6 +953,12 @@ function PDV() {
     setIsAccountSale(false)
     setMixedMode(false)
     split.reset()
+    // AUDITORÍA sep-2026 (A5): el cliente y la lista de precios eran de la
+    // venta anterior. Tras cobrarle a un mayorista con Lista 2, el siguiente
+    // que pasaba sin identificarse quedaba a nombre del mayorista y con sus
+    // precios. Cada venta arranca con Consumidor Final y Lista 1.
+    elegirCliente(null)
+    setSelectedPriceList(1)
     // El documento cargado a mano vale para ESA venta. Y el comprobante vuelve
     // a la sugerencia: si se facturó una venta suelta trabajando con remito, la
     // siguiente no puede salir facturada sin que nadie lo pida.
@@ -1470,8 +1481,23 @@ function PDV() {
   // Atajos globales del PDV (fase de captura, para ganarle al handler de F-keys del Layout).
   // Sin deps: se re-suscribe en cada render para que el closure vea siempre el estado vigente.
   useEffect(() => {
+    // AUDITORÍA sep-2026 (A6): con un diálogo abierto (cliente, artículo,
+    // promoción, artículo rápido, devolución, cobro QR) los atajos seguían
+    // vivos: un F2 dentro del buscador de clientes cobraba la venta de atrás,
+    // y un Escape para cerrar el diálogo preguntaba si vaciar la venta.
+    const dialogoAbierto =
+      customerPickerOpen ||
+      articlePickerOpen ||
+      promoPickerOpen ||
+      rapidoOpen ||
+      devolucionPickerOpen ||
+      qrModalOpen ||
+      returningSaleId != null
     function onKeyDown(e: KeyboardEvent) {
       if (e.repeat) return
+      if (dialogoAbierto || procesando) return
+      // Diálogos con estado propio (p. ej. dentro de un componente hijo).
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return
       if (e.key === 'F2') {
         e.preventDefault()
         e.stopPropagation()

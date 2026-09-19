@@ -483,12 +483,18 @@ function DepositarCierreDialog({
     .filter((b) => !b.isPhysicalCash)
     .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
   const yaIngresado = Number(register.depositedAmount ?? '0')
+  // AUDITORÍA sep-2026 (A8): antes se suponía que lo ya ingresado había sido
+  // primero efectivo y después electrónico; si el primer ingreso fue sólo la
+  // parte electrónica, el complemento volvía a ofrecerla. Cada movimiento de
+  // Caja General guarda su desglose y acá se usa el real.
+  const yaEfectivo = Number(register.depositedCashAmount ?? '0')
+  const yaElectronico = Number(register.depositedElectronicAmount ?? '0')
 
   // Mismo criterio que el paso 2 del cierre: lo cobrado con tarjeta y
   // transferencia entra completo (ya está en la cuenta), y lo único que se
   // ajusta es el efectivo. Acá además se descuenta lo que ya se ingresó.
-  const elecPendiente = Math.max(0, elecPart - Math.max(0, yaIngresado - counted))
-  const efePendiente = Math.max(0, counted - Math.min(yaIngresado, counted))
+  const elecPendiente = Math.max(0, Number((elecPart - yaElectronico).toFixed(2)))
+  const efePendiente = Math.max(0, Number((counted - yaEfectivo).toFixed(2)))
   const [efectivo, setEfectivo] = useState(efePendiente.toFixed(2))
   const monto = parseCurrencyInput(efectivo)
   const totalIngresa = Number(monto) + elecPendiente

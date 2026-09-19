@@ -18,8 +18,8 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
       (payload: CreateSaleInputDTO, ctx): Promise<CreateSaleResultDTO> =>
         new SalesService(ctx).createSale(payload),
     ),
-    'sales:void': withSession(deps, async (payload: { id: string }, ctx): Promise<SaleDTO> => {
-      const sale = await new SalesService(ctx).voidSale(payload.id);
+    'sales:void': withSession(deps, async (payload: { id: string; reason?: string | null }, ctx): Promise<SaleDTO> => {
+      const sale = await new SalesService(ctx).voidSale(payload.id, payload.reason ?? null);
       // Si la venta venía de un pedido web, el pedido se cancela en el
       // catálogo (repone el stock allá). Best-effort: la venta ya está anulada.
       void obtenerCatalogoSync(deps.repos).cancelarPedidosDeVentasAnuladas();

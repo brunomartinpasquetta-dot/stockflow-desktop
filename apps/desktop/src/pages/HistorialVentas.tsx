@@ -343,7 +343,7 @@ function SaleDetailDialog({
 
   const sale = detailQuery.data?.sale
   const voidMutation = useMutation({
-    mutationFn: () => api.sales.void(saleId),
+    mutationFn: () => api.sales.void(saleId, reason.trim() || null),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['salesHistory'] })
       void qc.invalidateQueries({ queryKey: ['sale', saleId] })
@@ -696,7 +696,13 @@ function SaleDetailDialog({
             )}
             {canVoid && sale.status === 'completed' && confirming && (
               <div className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2">
-                <p className="text-xs text-destructive">Anular esta venta revierte stock y caja. Indicá el motivo:</p>
+                <p className="text-xs text-destructive">Anular esta venta revierte stock y caja. Indique el motivo:</p>
+                {sale.afipCAE && (
+                  <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                    Este comprobante tiene CAE de ARCA (N° {sale.afipCAE}). Anularlo acá no lo da de baja en ARCA:
+                    corresponde emitir la nota de crédito. El motivo queda registrado en la venta.
+                  </p>
+                )}
                 <textarea
                   rows={2}
                   value={reason}

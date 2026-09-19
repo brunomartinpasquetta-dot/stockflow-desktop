@@ -57,6 +57,9 @@ export interface HistoricalCashRegisterSummary {
   depositedToGeneral: boolean;
   /** Cuánto de ese cierre ya se ingresó a Caja General. */
   depositedAmount: string;
+  /** Desglose de lo ya ingresado (auditoría sep-2026, A8). */
+  depositedCashAmount: string;
+  depositedElectronicAmount: string;
   /** Cuánto podía ingresarse en total (efectivo contado + neto electrónico). */
   depositableAmount: string;
   /**
@@ -254,18 +257,21 @@ export class CashService {
 
       // Ingresos por forma de pago de esta caja. Los movimientos ya están
       // cargados: no cuesta una consulta más.
+      // Los reversos de anulación (egresos ligados a una venta) restan del
+      // medio con el que se había cobrado; un egreso manual no.
       const porMedio = new Map<string, { paymentMethodId: string | null; name: string; income: string }>();
       for (const m of movements) {
-        if (m.type !== 'income') continue;
+        const esReverso = m.type === 'expense' && m.relatedSaleId != null;
+        if (m.type !== 'income' && !esReverso) continue;
         const clave = m.paymentMethodId ?? '__efectivo__';
         const nombre = m.paymentMethodId
           ? (pmById.get(m.paymentMethodId)?.name ?? 'Medio eliminado')
           : 'Efectivo';
-        const prev = porMedio.get(clave);
+        const prev = porMedio.get(clave)?.income ?? '0';
         porMedio.set(clave, {
           paymentMethodId: m.paymentMethodId,
           name: nombre,
-          income: prev ? addDecimal(prev.income, m.amount, 4) : m.amount,
+          income: esReverso ? subDecimal(prev, m.amount, 4) : addDecimal(prev, m.amount, 4),
         });
       }
       // Lo que ese cierre podía aportar a Caja General y lo que realmente
@@ -279,7 +285,8 @@ export class CashService {
         r.status === 'closed'
           ? sumDecimals([r.closingAmount ?? '0', Number(netoElectronico) > 0 ? netoElectronico : '0'])
           : '0';
-      const yaDepositado = depositedIds.get(r.id) ?? '0';
+      const deposito = depositedIds.get(r.id);
+      const yaDepositado = deposito?.total ?? '0';
       summaries.push({
         id: r.id,
         number: r.number,
@@ -297,6 +304,8 @@ export class CashService {
         movementCount: movements.length,
         depositedToGeneral: Number(yaDepositado) >= Number(depositable) - 0.005,
         depositedAmount: yaDepositado,
+        depositedCashAmount: deposito?.cash ?? '0',
+        depositedElectronicAmount: deposito?.electronic ?? '0',
         incomeByPaymentMethod: [...porMedio.values()],
         depositableAmount: depositable,
       });

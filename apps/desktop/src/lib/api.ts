@@ -262,7 +262,7 @@ export const api = {
   },
   sales: {
     create: (input: CreateSaleInputDTO): Promise<CreateSaleResultDTO> => unwrap(sf().sales.create(input)),
-    void: (id: string): Promise<SaleDTO> => unwrap(sf().sales.void({ id })),
+    void: (id: string, reason?: string | null): Promise<SaleDTO> => unwrap(sf().sales.void({ id, reason: reason ?? null })),
     voidRange: (
       from: number,
       to: number,

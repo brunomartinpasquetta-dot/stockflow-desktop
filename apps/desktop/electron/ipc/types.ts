@@ -775,6 +775,9 @@ export interface HistoricalCashRegisterDTO {
   depositedToGeneral: boolean;
   /** Cuánto de ese cierre ya se ingresó a Caja General. */
   depositedAmount: string;
+  /** Desglose de lo ya ingresado a Caja General. */
+  depositedCashAmount: string;
+  depositedElectronicAmount: string;
   /** Cuánto podía ingresarse en total (efectivo contado + neto electrónico). */
   depositableAmount: string;
   /** Ingresos de esa caja separados por forma de pago. */
@@ -1995,7 +1998,7 @@ export interface ApiSurface {
   };
   sales: {
     create(payload: CreateSaleInputDTO): Res<CreateSaleResultDTO>;
-    void(payload: IdPayload): Res<SaleDTO>;
+    void(payload: IdPayload & { reason?: string | null }): Res<SaleDTO>;
     /** Anulación en lote de un rango. `omitidas` son las que no se pudieron anular. */
     voidRange(
       payload: DateRangeDTO,

@@ -89,17 +89,25 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
   (`--lan-token`) y en la URL de acceso de la terminal web (`?pin=`): al rotarlo, los accesos
   directos de las terminales por navegador hay que rehacerlos; `isLanRemote` sin APIPA/CGNAT.
 
-## Tanda 5 — Punto de venta y caja
-- [ ] `clearSale` vuelve a Consumidor Final y lista 1 (`Ventas.tsx:931`).
-- [ ] Pago mixto: el último medio absorbe la diferencia de centavos (`usePaymentSplit.ts:69`).
-- [ ] Anulación de venta electrónica: reverso del pago no físico, o excluir `voided` del
-  reparto y del depositable (`cash.service.ts:409`, `:273`).
-- [ ] Caja cerrada dentro de la transacción de venta/cobranza (`sale.repository.ts:168`).
-- [ ] Atajos F2/F4/F12/Escape ignoran diálogos abiertos (`Ventas.tsx:1422`); lista 2/3 en
-  $0 cae a lista 1 con aviso (`pricing.ts:29`); CobroQrModal con guardia de `isPending`.
-- [ ] Anulación individual con CAE: aviso + motivo persistido (`HistorialVentas.tsx:310`).
-- [ ] Depósito parcial en Historial de cajas: guardar cash/elec por movimiento
-  (`HistorialCajas.tsx:490`).
+## Tanda 5 — Punto de venta y caja ✅ (18-sep-2026)
+- [x] `clearSale` vuelve a Consumidor Final y lista 1 (`Ventas.tsx`).
+- [x] Pago mixto: el último medio absorbe la diferencia de centavos (`usePaymentSplit.ts`), así
+  lo que se manda cierra al diezmilésimo como exige `SALE_PAYMENTS_MISMATCH`.
+- [x] Anulación de venta electrónica: se emite el reverso `expense` con el medio original
+  (`sale.repository.ts` voidSale); el neto por medio, el neto electrónico y lo depositable
+  quedan en cero. Si la caja original está cerrada, el reverso entra a la caja abierta actual.
+  El historial resta los reversos del "ingresos por medio" (`cash.service.ts`).
+- [x] Caja `open` verificada dentro de la transacción de venta y de cobranza (`CASH_CLOSED`).
+- [x] Atajos F2/F4/F12/F10/Escape ignoran diálogos abiertos y el procesamiento en curso;
+  lista 2/3 en $0 cae a lista 1 con aviso (`pricing.ts` + toast); `CobroQrModal` crea UNA
+  orden por apertura, cancela la orden si se cierra antes de que MP conteste y avisa
+  `onApproved` una sola vez por orden.
+- [x] Anulación individual con CAE: aviso de que no da de baja en ARCA + motivo persistido en
+  las notas de la venta con usuario y fecha (`sales:void` acepta `reason`).
+- [x] Depósito parcial en Historial de cajas: cada movimiento de Caja General guarda su
+  desglose (`cash_amount`/`electronic_amount`, migración 0032, filas viejas por diferencia
+  de saldos); el diálogo usa el desglose real.
+- Smoke: `pnpm --filter @stockflow/desktop test:pdv-caja` (27 checks).
 
 ## Tanda 6 — Catálogo web y reinicio de operativa
 - [ ] `marcar()` con compare-and-set `WHERE estado='pendiente'`; `pedidoRechazar` chequea

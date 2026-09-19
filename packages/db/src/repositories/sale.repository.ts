@@ -158,6 +158,22 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           }
         }
 
+        // AUDITORÍA sep-2026 (A4): la caja se verificaba 'open' en el servicio,
+        // fuera de la transacción. Si otra terminal la cerraba en el medio, la
+        // venta y su cobro entraban a una caja ya arqueada y el cierre dejaba
+        // de cuadrar. Se vuelve a comprobar acá, dentro de la misma tx.
+        const caja = tx
+          .select({ status: cashRegisters.status })
+          .from(cashRegisters)
+          .where(eq(cashRegisters.id, data.cashRegisterId))
+          .get();
+        if (caja?.status !== 'open') {
+          throw new ConstraintError(
+            'CASH_CLOSED',
+            'La caja se cerró mientras se registraba la venta. Abra una caja e intente de nuevo.',
+          );
+        }
+
         // Cabecera.
         const insertedSale = tx
           .insert(sales)
@@ -410,7 +426,10 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
    * físico y elimina sus `sale_payments`. Atómico. Si la venta ya tuvo
    * devoluciones, sólo se repone y se reintegra lo que quedaba sin devolver.
    */
-  async voidSale(id: string): Promise<Sale> {
+  async voidSale(
+    id: string,
+    opts: { reason?: string | null; userName?: string | null } = {},
+  ): Promise<Sale> {
     try {
       return this.db.transaction((tx) => {
         const sale = tx.select().from(sales).where(eq(sales.id, id)).get();
@@ -505,11 +524,17 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           }
         }
 
-        // Reverso de caja: sólo la parte en efectivo físico.
-        // BUG-S04: se emite UN reverso por CADA pago físico, preservando su
-        //   paymentMethodId original (antes se lumpeaba todo en un único
-        //   movimiento con el primer paymentMethodId encontrado → rompía el
-        //   desglose byPaymentMethod del arqueo si había >1 medio físico).
+        // Reverso de caja: UN movimiento `expense` por CADA pago de la venta,
+        // con su paymentMethodId original.
+        // BUG-S04: antes se lumpeaba todo en un único movimiento con el primer
+        //   paymentMethodId encontrado → rompía el desglose byPaymentMethod del
+        //   arqueo si había >1 medio físico.
+        // AUDITORÍA sep-2026 (A1): los pagos NO físicos (transferencia, débito,
+        //   QR) no tenían reverso, así que una venta anulada seguía sumando en
+        //   el desglose por medio, en el "neto electrónico" del cierre y en lo
+        //   depositable a Caja General. Ahora también se revierten: el arqueo
+        //   de efectivo no los mira (filtra por isPhysicalCash) y el neto por
+        //   medio queda en cero, como corresponde.
         // BUG-S06: si el medio de pago fue borrado, el LEFT JOIN deja `isCash`
         //   en null/undefined. El cierre cuenta esos casos como efectivo físico
         //   (criterio legacy `pmId IS NULL`), así que acá los tratamos igual:
@@ -530,24 +555,25 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           // revierte sólo lo que falta. El cajón nunca devuelve más efectivo
           // del que recibió por esta venta.
           let aDescontar = yaReintegrado;
-          const physicalPayments = sps
-            .filter((s) => s.isCash !== false)
-            .map((s) => {
-              const usa = cmpDecimal(aDescontar, s.amount) < 0 ? aDescontar : s.amount;
-              aDescontar = subDecimal(aDescontar, usa, 4);
-              return { ...s, amount: subDecimal(s.amount, usa, 4) };
-            });
-          const hasPhysicalReverse = physicalPayments.some((s) => Number(s.amount) > 0);
+          const reversos = sps.map((s) => {
+            // Lo reintegrado en efectivo sólo descuenta de los pagos físicos.
+            if (s.isCash === false) return { ...s };
+            const usa = cmpDecimal(aDescontar, s.amount) < 0 ? aDescontar : s.amount;
+            aDescontar = subDecimal(aDescontar, usa, 4);
+            return { ...s, amount: subDecimal(s.amount, usa, 4) };
+          });
+          const hasReverse = reversos.some((s) => Number(s.amount) > 0);
           // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
           //   (el arqueo histórico recalcula el esperado en vivo y dejaría de
-          //   cuadrar). Resolvemos la caja DESTINO dentro de la transacción:
+          //   cuadrar; y lo electrónico ya pudo haberse depositado en Caja
+          //   General). Resolvemos la caja DESTINO dentro de la transacción:
           //   - caja original 'open'  → usar esa (comportamiento actual);
           //   - caja original 'closed' (o ya inexistente) → usar la caja ABIERTA
           //     actual (a lo sumo una);
           //   - sin caja abierta → abortar pidiendo abrir una.
           let targetRegisterId = sale.cashRegisterId;
           let fromClosedRegister = false;
-          if (hasPhysicalReverse) {
+          if (hasReverse) {
             const originReg = tx
               .select({ status: cashRegisters.status })
               .from(cashRegisters)
@@ -570,7 +596,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
               fromClosedRegister = true;
             }
           }
-          for (const sp of physicalPayments) {
+          for (const sp of reversos) {
             if (!(Number(sp.amount) > 0)) continue;
             // BUG-S06: si el medio de pago ya no existe (isCash == null por el
             // LEFT JOIN), revertir con paymentMethodId NULL — la FK rechazaría
@@ -607,9 +633,16 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         // Eliminar los pagos de la venta.
         tx.delete(salePayments).where(eq(salePayments.saleId, id)).run();
 
+        // AUDITORÍA sep-2026 (A7): el motivo que la pantalla pedía no se
+        // guardaba en ningún lado. Queda en las notas de la venta, con quién y
+        // cuándo la anuló, para poder responder después por qué se anuló un
+        // comprobante (sobre todo si tenía CAE).
+        const motivo = opts.reason?.trim();
+        const sello = `[Anulada ${new Date().toLocaleString('es-AR')}${opts.userName ? ` por ${opts.userName}` : ''}${motivo ? `: ${motivo}` : ''}]`;
+        const notas = sale.notes ? `${sale.notes}\n${sello}` : sello;
         const updated = tx
           .update(sales)
-          .set({ status: 'voided' })
+          .set({ status: 'voided', notes: notas })
           .where(eq(sales.id, id))
           .returning()
           .all()[0];

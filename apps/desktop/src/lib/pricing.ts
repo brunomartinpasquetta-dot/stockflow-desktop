@@ -27,14 +27,28 @@ export function resolvePrice(
     return article.wholesalePrice
   }
   const list = forcedList ?? customer?.priceList
+  // AUDITORÍA sep-2026 (A6): un artículo sin Lista 2/3 cargada (queda en
+  // "0.0000") se vendía a $0 a los clientes con esa lista, sin aviso. Si la
+  // lista pedida está vacía se cobra la Lista 1; `priceListFallback` deja
+  // avisar en pantalla.
   switch (list) {
     case 2:
-      return article.listPrice2
+      return n(article.listPrice2) > 0 ? article.listPrice2 : article.listPrice1
     case 3:
-      return article.listPrice3
+      return n(article.listPrice3) > 0 ? article.listPrice3 : article.listPrice1
     default:
       return article.listPrice1
   }
+}
+
+/**
+ * Devuelve la lista pedida cuando `resolvePrice` tuvo que caer a la Lista 1
+ * porque el artículo no la tiene cargada; `null` si se cobró lo que se pidió.
+ */
+export function priceListFallback(article: ArticleDTO, list: 1 | 2 | 3 | undefined): 2 | 3 | null {
+  if (list === 2 && !(n(article.listPrice2) > 0) && n(article.listPrice1) > 0) return 2
+  if (list === 3 && !(n(article.listPrice3) > 0) && n(article.listPrice1) > 0) return 3
+  return null
 }
 
 /**

@@ -41,7 +41,8 @@
     "test:catalogo": "tsx electron/__tests__/catalogo.smoke.ts",
     "test:devoluciones": "tsx electron/__tests__/devoluciones.smoke.ts",
     "test:backup": "tsx electron/__tests__/backup.smoke.ts",
-    "test:seguridad-lan": "tsx electron/__tests__/seguridad-lan.smoke.ts"
+    "test:seguridad-lan": "tsx electron/__tests__/seguridad-lan.smoke.ts",
+    "test:pdv-caja": "tsx electron/__tests__/pdv-caja.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

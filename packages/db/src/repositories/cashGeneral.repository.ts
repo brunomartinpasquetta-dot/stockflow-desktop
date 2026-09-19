@@ -62,6 +62,13 @@ export interface TransferFromDailyRepoInput {
   maxDepositable?: string;
 }
 
+/** Lo ya ingresado a Caja General por el cierre de una caja, desglosado. */
+export interface CloseDepositTotals {
+  total: string;
+  cash: string;
+  electronic: string;
+}
+
 /** Saldo de Caja General discriminado por naturaleza del dinero. */
 export interface CashGeneralBalance {
   total: string;
@@ -216,6 +223,8 @@ export class CashGeneralRepository {
       isCash: args.isCash,
       balanceAfterCash,
       balanceAfterElectronic,
+      cashAmount: args.cashDelta,
+      electronicAmount: args.electronicDelta,
       createdAt: args.now,
     };
     const inserted = tx.insert(cashGeneralMovements).values(newRow).returning().all();
@@ -300,9 +309,9 @@ export class CashGeneralRepository {
    * (el diálogo de depósito aparece una sola vez tras el cierre: si se pierde
    * —error, reinicio, "No ingresar" por equivocación— acá se recupera).
    */
-  async closeDepositRefIds(cashRegisterIds: string[]): Promise<Map<string, string>> {
+  async closeDepositRefIds(cashRegisterIds: string[]): Promise<Map<string, CloseDepositTotals>> {
     try {
-      const acc = new Map<string, string>();
+      const acc = new Map<string, CloseDepositTotals>();
       if (cashRegisterIds.length === 0) return acc;
       const rows = this.db
         .select()
@@ -314,11 +323,44 @@ export class CashGeneralRepository {
           ),
         )
         .all();
+      if (rows.length === 0) return acc;
+      // Filas anteriores a la migración 0032 no traen su desglose: se
+      // reconstruye por diferencia con el saldo del movimiento anterior.
+      const legacy = rows.filter((r) => r.cashAmount == null);
+      const prevCashById = new Map<string, string>();
+      if (legacy.length > 0) {
+        const todos = this.db
+          .select({
+            id: cashGeneralMovements.id,
+            createdAt: cashGeneralMovements.createdAt,
+            balanceAfterCash: cashGeneralMovements.balanceAfterCash,
+          })
+          .from(cashGeneralMovements)
+          .orderBy(asc(cashGeneralMovements.createdAt), asc(cashGeneralMovements.id))
+          .all();
+        let prev = '0';
+        for (const m of todos) {
+          prevCashById.set(m.id, prev);
+          prev = m.balanceAfterCash;
+        }
+      }
       // Puede haber más de un depósito por caja (un complemento tras uno
       // parcial), así que se acumulan.
       for (const r of rows) {
         if (!r.referenceId) continue;
-        acc.set(r.referenceId, addDecimal(acc.get(r.referenceId) ?? '0', r.amount, 2));
+        let cash = r.cashAmount;
+        if (cash == null) {
+          const prevCash = prevCashById.get(r.id) ?? '0';
+          const diff = Number(subDecimal(r.balanceAfterCash, prevCash, 2));
+          cash = Math.min(Math.max(0, diff), Number(r.amount)).toFixed(2);
+        }
+        const electronic = r.electronicAmount ?? subDecimal(r.amount, cash, 2);
+        const cur = acc.get(r.referenceId) ?? { total: '0', cash: '0', electronic: '0' };
+        acc.set(r.referenceId, {
+          total: addDecimal(cur.total, r.amount, 2),
+          cash: addDecimal(cur.cash, cash, 2),
+          electronic: addDecimal(cur.electronic, electronic, 2),
+        });
       }
       return acc;
     } catch (err) {
