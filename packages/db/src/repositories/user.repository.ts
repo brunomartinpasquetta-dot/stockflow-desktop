@@ -119,7 +119,10 @@ export class UserRepository extends BaseRepository<User, NewUser> {
     try {
       const user = await this.findByUsername(username);
       if (!user || !user.active) return null;
-      return bcrypt.compareSync(password, user.passwordHash) ? stripPassword(user) : null;
+      // Asíncrono a propósito: en el servidor LAN cada login de una terminal
+      // pasa por acá y la versión sync frenaba el proceso principal (y la
+      // caja del servidor) unos 100 ms por intento.
+      return (await bcrypt.compare(password, user.passwordHash)) ? stripPassword(user) : null;
     } catch (err) {
       return rethrowDbError(err);
     }

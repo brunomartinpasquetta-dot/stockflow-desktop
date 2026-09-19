@@ -61,18 +61,33 @@ Estado: `[ ]` pendiente · `[~]` en curso · `[x]` hecho (commit).
   mostrando IVA aparte en el ESC/POS (ningún cliente trabaja en net).
 
 ## Tanda 4 — Seguridad en red
-- [ ] **JWT LAN** (`LanServer.ts:346`): secreto aleatorio de 32 bytes en safeStorage; el
-  PIN sólo empareja.
-- [ ] **Canales expuestos** (`main.ts:362`): allowlist de grupos para /lan/rpc, 403 al
-  resto (`license:*`, `updater:*`, `lan:*`, `system:pickFile`).
-- [ ] **imagePath** (`articles.handlers.ts:172`): fuera del schema de update; resolver
-  siempre dentro de la carpeta de imágenes.
-- [ ] **Permisos** (`catalogo.handlers.ts:54`, `company.service.ts:14`): los 11 canales
+- [x] **JWT LAN** (`LanServer.ts:346`): secreto aleatorio de 32 bytes en safeStorage; el
+  PIN sólo empareja. — `LanManager.ts` (`getOrCreateJwtSecret`/`rotateJwtSecret`, en lan.json
+  pero FUERA de `LanConfig`: `lan:getConfig` no lo devuelve), `LanServer.ts` (`opts.jwtSecret`;
+  sin él genera uno por proceso, nunca cae al PIN), `main.ts`
+- [x] **Canales expuestos** (`main.ts:362`): allowlist de grupos para /lan/rpc, 403 al
+  resto (`license:*`, `updater:*`, `lan:*`, `system:pickFile`). — `preload-bridge.ts`
+  (`lanServerAccepts`: la misma `LAN_ROUTED_GROUPS` que rutea el cliente + `LAN_SERVER_DENIED_CHANNELS`:
+  `backup:restore`, `maintenance:*`, `users:create/update/delete`, `roles:setConfig`, `demo:load/remove/restart`;
+  las lecturas de users/roles/demo pasan para que las pantallas abran en las terminales)
+- [x] **imagePath** (`articles.handlers.ts:172`): fuera del schema de update; resolver
+  siempre dentro de la carpeta de imágenes. — `articles.handlers.ts` (`sinImagePath` en create/update,
+  `rutaDeImagen` con chequeo de prefijo en get/remove/delete/upload)
+- [x] **Permisos** (`catalogo.handlers.ts:54`, `company.service.ts:14`): los 11 canales
   `catalogo:*` con `requirePermission`; `company:get` sin el token del catálogo para
-  quien no es admin.
-- [ ] **Fuerza bruta** (`LanServer.ts:404`): contador por IP + bcrypt async; rotación
-  del PIN desde la UI; licencia readOnly también en el servidor.
-- [ ] Smoke lan: rol vendedor contra canales admin → 403; PIN equivocado ×N → bloqueado.
+  quien no es admin. — `catalogo.handlers.ts` (manage_company / create_sale / void_sale-o-manage_company /
+  view_articles / view_reports), `company.service.ts` (`catalogoToken: null` sin `manage_company`)
+- [x] **Fuerza bruta** (`LanServer.ts:404`): contador por IP + bcrypt async; rotación
+  del PIN desde la UI; licencia readOnly también en el servidor. — `LanServer.ts` (5 PIN / 10 logins
+  fallidos en 10 min → 429 + Retry-After; PIN en tiempo constante; licencia ≠ active → 403 en métodos de
+  escritura), `user.repository.ts` (`bcrypt.compare`), `lan.handlers.ts` (`lan:setMode` acepta PIN nuevo o
+  `regeneratePin` y rota el secreto), `Configuracion.tsx` (manda el PIN sólo si cambió + aviso de que las
+  terminales deben reingresar)
+- [x] Smoke lan: rol vendedor contra canales admin → 403; PIN equivocado ×N → bloqueado. — `seguridad-lan.smoke.ts`
+  (+ `lan.smoke.ts` ajustado: `system:*` ya no cruza la red)
+- [ ] Pendiente (fuera de tanda): el PIN sigue viajando en la línea de comandos del renderer
+  (`--lan-token`) y en la URL de acceso de la terminal web (`?pin=`): al rotarlo, los accesos
+  directos de las terminales por navegador hay que rehacerlos; `isLanRemote` sin APIPA/CGNAT.
 
 ## Tanda 5 — Punto de venta y caja
 - [ ] `clearSale` vuelve a Consumidor Final y lista 1 (`Ventas.tsx:931`).

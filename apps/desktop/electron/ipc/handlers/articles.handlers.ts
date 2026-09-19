@@ -14,6 +14,32 @@ function imagesDir(userDataDir: string): string {
   return path.join(userDataDir, 'article-images');
 }
 
+/**
+ * Ruta absoluta de la imagen de un artículo, o null si apunta fuera de
+ * `article-images/`. Es el ÚNICO lugar del disco que este módulo lee o borra:
+ * un `imagePath` que señale otra cosa (la clave privada de ARCA, la base) se
+ * trata como "sin imagen", venga de donde venga. Las rutas guardadas son
+ * relativas al userData (`article-images/<id>.<ext>`); una absoluta también
+ * tiene que caer adentro.
+ */
+function rutaDeImagen(userDataDir: string, imagePath: string): string | null {
+  const dir = path.resolve(imagesDir(userDataDir));
+  const abs = path.resolve(path.isAbsolute(imagePath) ? imagePath : path.join(userDataDir, imagePath));
+  return abs.startsWith(dir + path.sep) ? abs : null;
+}
+
+/**
+ * Lo que el cliente puede mandar en alta/edición nunca incluye `imagePath`:
+ * esa columna la escribe sólo `articles:uploadImage` / `removeImage`, que son
+ * los que garantizan que apunte adentro de la carpeta de imágenes.
+ */
+function sinImagePath<T extends object>(data: T): Omit<T, 'imagePath'> {
+  if (!data || typeof data !== 'object' || !('imagePath' in data)) return data;
+  const { imagePath: _ignorado, ...resto } = data as T & { imagePath?: unknown };
+  void _ignorado;
+  return resto;
+}
+
 function mimeFromExt(ext: string): string {
   switch (ext.toLowerCase()) {
     case '.jpg':
@@ -40,13 +66,21 @@ export function buildArticlesHandlers(deps: HandlerDeps): HandlerMap {
     }),
     'articles:create': withSession(deps, (payload: NewArticle, ctx): Promise<ArticleDTO> => {
       requirePermission(ctx.currentUser, 'manage_articles');
-      return ctx.repos.articles.create(payload);
+      return ctx.repos.articles.create(sinImagePath(payload) as NewArticle);
     }),
     'articles:update': withSession(
       deps,
-      (payload: { id: string; data: Partial<NewArticle> }, ctx): Promise<ArticleDTO> => {
+      async (payload: { id: string; data: Partial<NewArticle> }, ctx): Promise<ArticleDTO> => {
         requirePermission(ctx.currentUser, 'manage_articles');
-        return ctx.repos.articles.update(payload.id, payload.data);
+        const data = sinImagePath(payload.data ?? {});
+        // Si sólo venía imagePath, no queda nada que escribir: el UPDATE vacío
+        // revienta en drizzle y acá no cambió nada.
+        if (Object.keys(data).length === 0) {
+          const actual = await ctx.repos.articles.findById(payload.id);
+          if (!actual) throw new BusinessRuleError('article_not_found', 'El artículo no existe');
+          return actual;
+        }
+        return ctx.repos.articles.update(payload.id, data);
       },
     ),
     'articles:delete': withSession(
@@ -56,12 +90,8 @@ export function buildArticlesHandlers(deps: HandlerDeps): HandlerMap {
         // Best-effort: borrar imagen asociada si existe.
         try {
           const existing = await ctx.repos.articles.findById(payload.id);
-          if (existing?.imagePath) {
-            const abs = path.isAbsolute(existing.imagePath)
-              ? existing.imagePath
-              : path.join(deps.userDataDir, existing.imagePath);
-            if (fs.existsSync(abs)) fs.unlinkSync(abs);
-          }
+          const abs = existing?.imagePath ? rutaDeImagen(deps.userDataDir, existing.imagePath) : null;
+          if (abs && fs.existsSync(abs)) fs.unlinkSync(abs);
         } catch {
           /* ignore */
         }
@@ -122,10 +152,8 @@ export function buildArticlesHandlers(deps: HandlerDeps): HandlerMap {
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         // Si ya había una imagen previa con otra extensión, borrarla.
         if (article.imagePath) {
-          const prevAbs = path.isAbsolute(article.imagePath)
-            ? article.imagePath
-            : path.join(deps.userDataDir, article.imagePath);
-          if (fs.existsSync(prevAbs) && prevAbs !== path.join(dir, `${articleId}${ext}`)) {
+          const prevAbs = rutaDeImagen(deps.userDataDir, article.imagePath);
+          if (prevAbs && fs.existsSync(prevAbs) && prevAbs !== path.join(dir, `${articleId}${ext}`)) {
             try { fs.unlinkSync(prevAbs); } catch { /* ignore */ }
           }
         }
@@ -146,10 +174,8 @@ export function buildArticlesHandlers(deps: HandlerDeps): HandlerMap {
         if (!article) {
           throw new BusinessRuleError('article_not_found', 'El artículo no existe');
         }
-        if (article.imagePath) {
-          const abs = path.isAbsolute(article.imagePath)
-            ? article.imagePath
-            : path.join(deps.userDataDir, article.imagePath);
+        const abs = article.imagePath ? rutaDeImagen(deps.userDataDir, article.imagePath) : null;
+        if (abs) {
           try {
             if (fs.existsSync(abs)) fs.unlinkSync(abs);
           } catch {
@@ -169,10 +195,8 @@ export function buildArticlesHandlers(deps: HandlerDeps): HandlerMap {
         requirePermission(ctx.currentUser, 'view_articles');
         const article = await ctx.repos.articles.findById(payload.articleId);
         if (!article || !article.imagePath) return { dataUrl: null };
-        const abs = path.isAbsolute(article.imagePath)
-          ? article.imagePath
-          : path.join(deps.userDataDir, article.imagePath);
-        if (!fs.existsSync(abs)) return { dataUrl: null };
+        const abs = rutaDeImagen(deps.userDataDir, article.imagePath);
+        if (!abs || !fs.existsSync(abs)) return { dataUrl: null };
         const buf = fs.readFileSync(abs);
         const ext = path.extname(abs);
         const mime = mimeFromExt(ext);

@@ -803,15 +803,27 @@ function LanSection() {
     setClientPort(cfgQuery.data.serverPort ?? 7777)
   }
 
+  // El PIN sólo viaja si el usuario lo cambió: mandarlo siempre haría que el
+  // servidor rote el secreto de las sesiones en cada guardado y desloguee a
+  // todas las terminales por tocar el puerto.
+  const pinCambiado = mode === 'server' && token !== ((seeded as { token?: string } | undefined)?.token ?? '')
+
   const saveMut = useMutation({
     mutationFn: () => {
       if (mode === 'single') return api.lan.setMode({ mode: 'single' })
-      if (mode === 'server') return api.lan.setMode({ mode: 'server', port: serverPort })
+      if (mode === 'server') return api.lan.setMode({ mode: 'server', port: serverPort, ...(pinCambiado ? { token } : {}) })
       return api.lan.setMode({ mode: 'client', serverIp: clientIp, serverPort: clientPort, token })
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['lan', 'config'] })
-      toast.success('Configuración LAN guardada. Reiniciando…')
+      if (pinCambiado) {
+        toast.success(
+          'PIN cambiado. Las terminales deberán cargar el PIN nuevo y volver a iniciar sesión. Reiniciando…',
+          { duration: 8000 },
+        )
+      } else {
+        toast.success('Configuración LAN guardada. Reiniciando…')
+      }
       setTimeout(() => void api.lan.applyAndRestart(), 600)
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo guardar'),
@@ -854,7 +866,9 @@ function LanSection() {
   }
 
   function regenPin(): void {
-    setToken(String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0'))
+    // Aleatorio de verdad: el PIN es lo único que separa la red del servidor.
+    const n = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000
+    setToken(String(n).padStart(6, '0'))
   }
 
   return (

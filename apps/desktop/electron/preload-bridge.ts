@@ -109,6 +109,37 @@ export const LAN_ROUTED_GROUPS = new Set([
   'onboarding',
 ]);
 
+/**
+ * Lo que el servidor rechaza por /lan/rpc con 403 aunque el grupo viaje por
+ * LAN. Son operaciones sobre la MÁQUINA servidor (pisar su base con un
+ * restore, borrar la operativa, cargar o sacar la demo) o sobre quién puede
+ * entrar y con qué permisos (usuarios y roles): se hacen sentado en el
+ * servidor, nunca desde un puesto. Las lecturas de esos grupos sí pasan, para
+ * que las pantallas abran. Los grupos que no están en LAN_ROUTED_GROUPS
+ * (license, updater, lan, system, hardware...) tampoco pasan: un puesto no
+ * puede desactivar la licencia, reiniciar el servidor ni elegir archivos en
+ * su disco. Vive acá, junto a la lista de ruteo, para que haya UNA sola
+ * definición de qué cruza la red.
+ */
+export const LAN_SERVER_DENIED_CHANNELS = new Set([
+  'backup:restore',
+  'users:create',
+  'users:update',
+  'users:delete',
+  'roles:setConfig',
+  'demo:load',
+  'demo:remove',
+  'demo:restart',
+]);
+export const LAN_SERVER_DENIED_GROUPS = new Set(['maintenance']);
+
+/** ¿El servidor atiende este canal si llega por /lan/rpc? */
+export function lanServerAccepts(channel: string): boolean {
+  const group = getGroup(channel);
+  if (!LAN_ROUTED_GROUPS.has(group) || LAN_SERVER_DENIED_GROUPS.has(group)) return false;
+  return !LAN_SERVER_DENIED_CHANNELS.has(channel);
+}
+
 export const LOCAL_GROUPS = new Set([
   'system',
   'lan',

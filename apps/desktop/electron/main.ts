@@ -367,6 +367,9 @@ function bootstrap(): { lanArgs: string[] } {
       handlers,
       port,
       token: lanCfg.token,
+      // El PIN sólo empareja; las sesiones se firman con un secreto que no
+      // sale de esta máquina (cifrado en lan.json).
+      jwtSecret: lanManager.getOrCreateJwtSecret(),
       enableMdns: true,
       sessionStore,
       licenseStatus: () => licenseManager?.getState().status ?? 'unlicensed',

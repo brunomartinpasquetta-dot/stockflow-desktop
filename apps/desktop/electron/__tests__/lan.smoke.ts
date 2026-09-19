@@ -34,7 +34,11 @@ async function postJson(url: string, body: unknown): Promise<{ status: number; b
 }
 
 async function main(): Promise<void> {
+  // Canales de grupos que SÍ cruzan la red (LAN_ROUTED_GROUPS). `system:*`
+  // quedó afuera a propósito: ver seguridad-lan.smoke.ts.
   const handlers: HandlerMap = {
+    'articles:getVersion': async () =>
+      ({ ok: true, data: { version: '0.1.0' } }) as IpcResponse<unknown>,
     'system:getVersion': async () =>
       ({ ok: true, data: { version: '0.1.0' } }) as IpcResponse<unknown>,
     'auth:echo': async (payload) =>
@@ -65,7 +69,7 @@ async function main(): Promise<void> {
   const url = `http://127.0.0.1:${PORT}/lan/rpc`;
 
   // OK con token correcto
-  const r1 = await postJson(url, { channel: 'system:getVersion', payload: {}, token });
+  const r1 = await postJson(url, { channel: 'articles:getVersion', payload: {}, token });
   check(
     'POST con token válido → 200 + IpcResponse ok',
     r1.status === 200 && typeof r1.body === 'object' && (r1.body as { ok?: boolean }).ok === true,
@@ -81,12 +85,16 @@ async function main(): Promise<void> {
   check('payload se reenvía intacto al handler', ok2, JSON.stringify(r2).slice(0, 120));
 
   // 401 con token inválido
-  const r3 = await postJson(url, { channel: 'system:getVersion', payload: {}, token: 'mal' });
+  const r3 = await postJson(url, { channel: 'articles:getVersion', payload: {}, token: 'mal' });
   check('token incorrecto → 401', r3.status === 401, JSON.stringify(r3));
 
-  // 404 con canal inexistente
-  const r4 = await postJson(url, { channel: 'no:existe', payload: {}, token });
+  // 404 con canal inexistente (de un grupo que sí cruza la red)
+  const r4 = await postJson(url, { channel: 'articles:noExiste', payload: {}, token });
   check('canal inexistente → 404', r4.status === 404, JSON.stringify(r4));
+
+  // 403 con canal de un grupo que no cruza la red, aunque esté registrado
+  const r4b = await postJson(url, { channel: 'system:getVersion', payload: {}, token });
+  check('canal fuera de la lista LAN → 403', r4b.status === 403, JSON.stringify(r4b));
 
   // 400 con body roto
   const r5 = await fetch(url, {

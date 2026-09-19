@@ -2286,8 +2286,11 @@ export interface LanSetModeInputDTO {
   mode: LanModeDTO;
   serverIp?: string;
   serverPort?: number;
+  /** Modo client: PIN del servidor. Modo server: PIN nuevo si se quiere cambiar. */
   token?: string;
   port?: number;
+  /** Sólo modo server: generar un PIN nuevo al azar (invalida las sesiones de las terminales). */
+  regeneratePin?: boolean;
 }
 
 /* ----------------------------------------------------------------------- */

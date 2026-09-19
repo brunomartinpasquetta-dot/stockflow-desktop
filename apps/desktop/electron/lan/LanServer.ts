@@ -6,10 +6,23 @@
  *  - `GET  /lan/ping` — keepalive sin auth (registra al cliente).
  *
  * Auth en /lan/rpc:
- *  - `token` (PIN) en el body: identifica al "tenant" (suficiente para LAN).
+ *  - `token` (PIN) en el body: empareja el puesto con este servidor. Sólo eso:
+ *    el PIN lo conocen todas las terminales, así que no puede ser prueba de
+ *    nada más. Los intentos fallidos se cuentan por IP y a los pocos errores
+ *    el servidor contesta 429 un rato (un PIN de 6 dígitos se adivina en
+ *    minutos si se lo deja).
  *  - `Authorization: Bearer <jwt>`: identifica la SESIÓN del usuario logueado
- *    en la caja cliente. La firma del JWT usa HMAC-SHA256 con secret derivado
- *    del PIN. Se exige para todos los canales excepto `auth:login`/`auth:logout`.
+ *    en la caja cliente. La firma del JWT usa HMAC-SHA256 con un secreto
+ *    aleatorio que sólo tiene el servidor (`opts.jwtSecret`, persistido por
+ *    LanManager). Antes se derivaba del PIN y cualquier terminal podía
+ *    firmarse una sesión de administrador. Se exige para todos los canales
+ *    excepto `auth:login`/`auth:logout`.
+ *  - Sólo se atienden los canales que un puesto tiene motivo para llamar
+ *    (`lanServerAccepts`); el resto (licencia, updater, red, archivos del
+ *    servidor) recibe 403 aunque la sesión sea de administrador.
+ *  - Con la licencia del servidor en sólo lectura o revocada, los canales que
+ *    escriben reciben 403: la regla que el escritorio aplica en la pantalla
+ *    (useCanWrite) acá se aplica en el servidor, que es donde vale.
  *  - El handler `auth:login` que devuelve `{ user, sessionToken }` se intercepta
  *    en este server para **firmar** un JWT (sub=user.id, exp=12h) y agregarlo
  *    al data como `_lanSessionToken`. El cliente lo cachea (preload).
@@ -24,7 +37,7 @@
  *  - JWT inline (HS256) con `crypto.createHmac`. Cero deps nuevas.
  *  - mDNS via `bonjour-service` cargado dinámicamente (opcional).
  */
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, statSync, promises as fsp } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import path from 'node:path';
@@ -32,6 +45,7 @@ import path from 'node:path';
 import type { HandlerMap } from '../ipc/handler-context';
 import type { SessionStore } from '../ipc/session-store';
 import type { IpcResponse } from '../ipc/types';
+import { lanServerAccepts } from '../preload-bridge';
 
 interface InfoCliente {
   lastSeen: number;
@@ -63,6 +77,12 @@ export interface LanServerOptions {
   /** Duración del JWT en segundos (default 12h). */
   jwtExpiresInSec?: number;
   /**
+   * Secreto con que se firman los JWT de sesión. En la app viene de lan.json
+   * (`LanManager.getOrCreateJwtSecret`). Si no se pasa, se genera uno por
+   * proceso: nunca se cae al PIN.
+   */
+  jwtSecret?: string;
+  /**
    * Estado de la licencia de ESTE servidor. Los puestos conectados no tienen
    * licencia propia: trabajan amparados por la del servidor (una licencia por
    * comercio), así que necesitan poder consultarla.
@@ -92,6 +112,37 @@ interface RpcBody {
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2 MB
 const PING_TTL_MS = 60_000;
+
+/**
+ * Fuerza bruta: fallos de PIN o de contraseña que se toleran por IP dentro de
+ * la ventana antes de contestar 429 hasta que la ventana se vacíe. El PIN se
+ * escribe una vez por terminal, así que 5 errores seguidos ya no son un
+ * cajero distraído; la contraseña se tipea todos los días y se le da más aire.
+ */
+const VENTANA_FALLOS_MS = 10 * 60_000;
+const MAX_FALLOS_PIN = 5;
+const MAX_FALLOS_LOGIN = 10;
+
+/**
+ * Métodos que modifican datos. Con la licencia del servidor fuera de 'active'
+ * (suscripción suspendida, prueba vencida, revocada) el escritorio bloquea
+ * estos botones (useCanWrite); acá se aplica la misma regla a lo que llega
+ * por red, porque un puesto no tiene licencia propia y la interfaz servida al
+ * navegador no puede hacer cumplir nada por sí sola. Las lecturas siguen
+ * pasando: el comercio tiene que poder consultar lo suyo.
+ */
+const METODOS_DE_ESCRITURA =
+  /^(create|update|delete|void|add|receive|pay|transfer|open|close|apply|adjust|register|reset|rollback|convert|upsert|issue|save|remove|upload|execute|link|cancel|setup|set|activate|deactivate|toggle|restore|load|restart|dismiss|archivar|vincular|syncActivar|syncAhora|pedido[A-Z])/;
+
+function esEscritura(channel: string): boolean {
+  return METODOS_DE_ESCRITURA.test(channel.slice(channel.indexOf(':') + 1));
+}
+
+function mensajeSoloLectura(status: string): string {
+  if (status === 'revoked') return 'La licencia fue revocada: el sistema está en sólo lectura';
+  if (status === 'unlicensed') return 'El servidor no tiene una licencia activa: el sistema está en sólo lectura';
+  return 'La suscripción está suspendida: el sistema está en sólo lectura';
+}
 
 function b64urlEncode(buf: Buffer | string): string {
   const b = typeof buf === 'string' ? Buffer.from(buf, 'utf8') : buf;
@@ -149,14 +200,23 @@ function isLanRemote(addr: string | undefined): boolean {
   return false;
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
+function sendJson(res: ServerResponse, status: number, body: unknown, extraHeaders: Record<string, string> = {}): void {
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'access-control-allow-origin': '*',
     'access-control-allow-methods': 'POST,GET,OPTIONS',
     'access-control-allow-headers': 'content-type,authorization',
+    ...extraHeaders,
   });
   res.end(JSON.stringify(body));
+}
+
+/** Comparación en tiempo constante: un PIN corto no tiene que filtrar ni eso. */
+function mismoToken(recibido: unknown, esperado: string): boolean {
+  if (typeof recibido !== 'string') return false;
+  const a = Buffer.from(recibido, 'utf8');
+  const b = Buffer.from(esperado, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -189,9 +249,14 @@ export class LanServer {
   private readonly clients = new Map<string, InfoCliente>();
   /** Última vez que cambiaron los datos (para que los puestos web refresquen). */
   private ultimoCambio = Date.now();
+  /** Secreto de firma: el configurado o uno nuevo por proceso, nunca el PIN. */
+  private readonly jwtSecret: string;
+  /** `pin:<ip>` / `login:<ip>` → instantes de los fallos dentro de la ventana. */
+  private readonly fallos = new Map<string, number[]>();
 
   constructor(opts: LanServerOptions) {
     this.opts = opts;
+    this.jwtSecret = opts.jwtSecret ?? randomBytes(32).toString('hex');
     this.log = opts.log ?? {
       info: (m) => console.info('[lan]', m),
       warn: (m) => console.warn('[lan]', m),
@@ -342,8 +407,31 @@ export class LanServer {
     this.ultimoCambio = Date.now();
   }
 
-  private get jwtSecret(): string {
-    return `${this.opts.token}:stockflow-lan-jwt`;
+  /** Segundos que le faltan a `clave` para salir del bloqueo; 0 si no está bloqueada. */
+  private segundosBloqueada(clave: string, max: number): number {
+    const ahora = Date.now();
+    const vivos = (this.fallos.get(clave) ?? []).filter((t) => ahora - t < VENTANA_FALLOS_MS);
+    if (vivos.length === 0) this.fallos.delete(clave);
+    else this.fallos.set(clave, vivos);
+    if (vivos.length < max) return 0;
+    // Se libera cuando el fallo más viejo de los que cuentan sale de la ventana.
+    const masViejo = vivos[vivos.length - max]!;
+    return Math.max(1, Math.ceil((masViejo + VENTANA_FALLOS_MS - ahora) / 1000));
+  }
+
+  private registrarFallo(clave: string): void {
+    const lista = this.fallos.get(clave) ?? [];
+    lista.push(Date.now());
+    this.fallos.set(clave, lista);
+  }
+
+  private responderBloqueo(res: ServerResponse, segundos: number, que: string): void {
+    sendJson(
+      res,
+      429,
+      { ok: false, code: 'PERMISSION_DENIED', message: `Demasiados intentos de ${que} fallidos. Espere ${segundos} segundos y vuelva a intentar.` },
+      { 'retry-after': String(segundos) },
+    );
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -401,19 +489,50 @@ export class LanServer {
       return;
     }
 
-    if (typeof parsed.token !== 'string' || parsed.token !== this.opts.token) {
+    // El bloqueo por PIN aplica a TODO lo que venga de esa IP, acierte o no:
+    // si el intento correcto pasara, el bloqueo no frenaría nada.
+    const bloqueoPin = this.segundosBloqueada(`pin:${remote}`, MAX_FALLOS_PIN);
+    if (bloqueoPin > 0) {
+      this.responderBloqueo(res, bloqueoPin, 'PIN');
+      return;
+    }
+    if (!mismoToken(parsed.token, this.opts.token)) {
+      this.registrarFallo(`pin:${remote}`);
+      this.log.warn(`PIN incorrecto desde ${remote}`);
       sendJson(res, 401, { ok: false, code: 'UNAUTHENTICATED', message: 'Token inválido' });
       return;
     }
+    this.fallos.delete(`pin:${remote}`);
     if (typeof parsed.channel !== 'string') {
       sendJson(res, 400, { ok: false, code: 'VALIDATION', message: 'Canal requerido' });
       return;
     }
     const channel = parsed.channel;
-    const handler = this.opts.handlers[channel];
+    // Antes de mirar si el canal existe: lo que no cruza la red no cruza,
+    // tenga el rol que tenga la sesión (licencia, updater, red, archivos del
+    // servidor, restore, usuarios). Ver LAN_SERVER_DENIED_CHANNELS.
+    if (!lanServerAccepts(channel)) {
+      sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Esa operación sólo puede hacerse en el servidor' });
+      return;
+    }
+    const handler = Object.prototype.hasOwnProperty.call(this.opts.handlers, channel)
+      ? this.opts.handlers[channel]
+      : undefined;
     if (!handler) {
       sendJson(res, 404, { ok: false, code: 'NOT_FOUND', message: `Canal no registrado: ${channel}` });
       return;
+    }
+    const licencia = this.opts.licenseStatus ? this.opts.licenseStatus() : 'active';
+    if (licencia !== 'active' && esEscritura(channel)) {
+      sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: mensajeSoloLectura(licencia) });
+      return;
+    }
+    if (channel === 'auth:login') {
+      const bloqueoLogin = this.segundosBloqueada(`login:${remote}`, MAX_FALLOS_LOGIN);
+      if (bloqueoLogin > 0) {
+        this.responderBloqueo(res, bloqueoLogin, 'inicio de sesión');
+        return;
+      }
     }
 
     // En tests / configuraciones sin sessionStore+resolveUser, el JWT no se
@@ -483,13 +602,18 @@ export class LanServer {
       }
 
       // En auth:login ok: firmar JWT y adjuntarlo al data.
-      if (channel === 'auth:login' && response.ok) {
-        const data = response.data as { user?: { id?: string } };
-        if (data?.user?.id) {
-          const expiresIn = this.opts.jwtExpiresInSec ?? 12 * 60 * 60;
-          const exp = Math.floor(Date.now() / 1000) + expiresIn;
-          const jwt = signJwt({ sub: data.user.id, exp }, this.jwtSecret);
-          response = { ok: true, data: { ...data, _lanSessionToken: jwt } };
+      if (channel === 'auth:login') {
+        if (response.ok) {
+          this.fallos.delete(`login:${remote}`);
+          const data = response.data as { user?: { id?: string } };
+          if (data?.user?.id) {
+            const expiresIn = this.opts.jwtExpiresInSec ?? 12 * 60 * 60;
+            const exp = Math.floor(Date.now() / 1000) + expiresIn;
+            const jwt = signJwt({ sub: data.user.id, exp }, this.jwtSecret);
+            response = { ok: true, data: { ...data, _lanSessionToken: jwt } };
+          }
+        } else {
+          this.registrarFallo(`login:${remote}`);
         }
       }
       sendJson(res, 200, response);

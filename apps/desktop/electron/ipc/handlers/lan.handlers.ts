@@ -13,7 +13,7 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
 
-import { requirePermission } from '@stockflow/core';
+import { ValidationError, requirePermission } from '@stockflow/core';
 
 const execFileP = promisify(execFile);
 
@@ -78,11 +78,18 @@ export interface LanSetModeInput {
   /** Sólo modo client: */
   serverIp?: string;
   serverPort?: number;
-  /** Sólo modo client: PIN del servidor. */
+  /**
+   * Modo client: PIN del servidor. Modo server: PIN nuevo (6 dígitos) si se
+   * quiere cambiar el vigente; sin él se conserva el actual.
+   */
   token?: string;
   /** Sólo modo server: puerto (default 7777). */
   port?: number;
+  /** Sólo modo server: descartar el PIN vigente y generar otro al azar. */
+  regeneratePin?: boolean;
 }
+
+const PIN_VALIDO = /^\d{6}$/;
 
 /**
  * Regla de firewall de Windows para el puerto del servidor.
@@ -276,7 +283,18 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
 
         let next: LanConfig;
         if (payload.mode === 'server') {
-          const token = current.mode === 'server' && current.token ? current.token : LanManager.generatePin();
+          const vigente = current.mode === 'server' && current.token ? current.token : null;
+          if (payload.token !== undefined && payload.token !== '' && !PIN_VALIDO.test(payload.token)) {
+            throw new ValidationError('token', 'El PIN debe tener exactamente 6 dígitos');
+          }
+          const pedido = payload.token && PIN_VALIDO.test(payload.token) ? payload.token : null;
+          const token = payload.regeneratePin
+            ? LanManager.generatePin()
+            : (pedido ?? vigente ?? LanManager.generatePin());
+          // PIN nuevo → secreto de firma nuevo: las sesiones que las terminales
+          // tenían abiertas dejan de valer y tienen que volver a ingresar con
+          // el PIN nuevo. Si el PIN no cambió, nadie se entera.
+          if (token !== vigente) mgr.rotateJwtSecret();
           next = {
             mode: 'server',
             port: payload.port ?? current.port ?? DEFAULT_LAN_PORT,

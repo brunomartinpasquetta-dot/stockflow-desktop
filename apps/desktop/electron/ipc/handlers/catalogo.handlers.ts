@@ -17,7 +17,7 @@
  *       busquedasSinResultado: [{ termino: string, veces: number }],
  *     }
  */
-import { SalesService, ValidationError } from '@stockflow/core';
+import { PermissionDeniedError, SalesService, ValidationError, hasPermission, requirePermission } from '@stockflow/core';
 
 import { obtenerCatalogoSync } from '../../catalogo/CatalogoSync';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
@@ -35,11 +35,24 @@ async function avisarCatalogo(
   await obtenerCatalogoSync(deps.repos).avisarEstado(pedidoId, estado, ventaSistema);
 }
 
+/**
+ * Quién puede tocar el catálogo. Encender/apagar el espejo, publicar y
+ * vincular productos es configuración de la empresa (admin); convertir o
+ * enlazar un pedido es vender (cajero); rechazar un pedido devuelve stock en
+ * la tienda, así que pide lo mismo que anular una venta. Mirar es de todos.
+ */
+function exigirRechazo(user: { role: 'admin' | 'manager' | 'seller' }): void {
+  if (!hasPermission(user.role, 'void_sale') && !hasPermission(user.role, 'manage_company')) {
+    throw new PermissionDeniedError('void_sale', user.role);
+  }
+}
+
 export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
   return {
     /* ------------------------- Espejo de artículos ------------------------- */
 
-    'catalogo:syncEstado': withSession(deps, async () => {
+    'catalogo:syncEstado': withSession(deps, async (_payload, ctx) => {
+      requirePermission(ctx.currentUser, 'view_articles');
       const e = deps.repos.catalogo.getState();
       return {
         activo: e.enabled,
@@ -51,12 +64,14 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
       };
     }),
 
-    'catalogo:syncActivar': withSession(deps, async (payload: { activo: boolean }) => {
+    'catalogo:syncActivar': withSession(deps, async (payload: { activo: boolean }, ctx) => {
+      requirePermission(ctx.currentUser, 'manage_company');
       deps.repos.catalogo.saveState({ enabled: Boolean(payload?.activo) });
       return { ok: true as const };
     }),
 
-    'catalogo:syncAhora': withSession(deps, async (payload: { todo?: boolean }) => {
+    'catalogo:syncAhora': withSession(deps, async (payload: { todo?: boolean }, ctx) => {
+      requirePermission(ctx.currentUser, 'manage_company');
       const sync = obtenerCatalogoSync(deps.repos);
       await sync.traerPedidos();
       return payload?.todo ? sync.republicarTodo() : sync.correr();
@@ -69,14 +84,16 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
      * cruzados por nombre contra los artículos activos. Solo lectura — no
      * escribe nada hasta que se confirme con `catalogo:vincularLote`.
      */
-    'catalogo:sugerirVinculacion': withSession(deps, async () => {
+    'catalogo:sugerirVinculacion': withSession(deps, async (_payload, ctx) => {
+      requirePermission(ctx.currentUser, 'manage_company');
       const sync = obtenerCatalogoSync(deps.repos);
       return sync.sugerirVinculacion();
     }),
 
     'catalogo:vincularLote': withSession(
       deps,
-      async (payload: { vinculos: { sku: string; codigoSistema: string }[] }) => {
+      async (payload: { vinculos: { sku: string; codigoSistema: string }[] }, ctx) => {
+        requirePermission(ctx.currentUser, 'manage_company');
         const sync = obtenerCatalogoSync(deps.repos);
         return sync.vincularLote(payload.vinculos);
       },
@@ -85,11 +102,13 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
     /* ---------------------------- Pedidos web ---------------------------- */
 
     /** Liviano: solo el número, para pintar el aviso en el menú sin resolver líneas. */
-    'catalogo:pedidosContarPendientes': withSession(deps, async () => {
+    'catalogo:pedidosContarPendientes': withSession(deps, async (_payload, ctx) => {
+      requirePermission(ctx.currentUser, 'view_articles');
       return { pendientes: deps.repos.catalogoPedidos.contarPendientes() };
     }),
 
-    'catalogo:pedidosListar': withSession(deps, async (payload: { estado?: 'pendiente' | 'convertido' | 'rechazado' }) => {
+    'catalogo:pedidosListar': withSession(deps, async (payload: { estado?: 'pendiente' | 'convertido' | 'rechazado' }, ctx) => {
+      requirePermission(ctx.currentUser, 'view_articles');
       // Si alguna venta de pedido se anuló y el aviso al catálogo quedó
       // pendiente (estaba caído), se reintenta acá. Sin esperar: la pantalla
       // no depende del catálogo, y "venta anulada" lo lee de la venta.
@@ -146,7 +165,8 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
       return resueltos;
     }),
 
-    'catalogo:pedidoRechazar': withSession(deps, async (payload: { id: string }) => {
+    'catalogo:pedidoRechazar': withSession(deps, async (payload: { id: string }, ctx) => {
+      exigirRechazo(ctx.currentUser);
       const pedido = deps.repos.catalogoPedidos.buscar(payload.id);
       if (!pedido) throw new ValidationError('id', 'El pedido no existe');
       deps.repos.catalogoPedidos.marcar(payload.id, 'rechazado');
@@ -165,6 +185,7 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
         payload: { id: string; paymentMethodId: string; customerId?: string; type?: 'X' | 'A' | 'B' | 'C' },
         ctx,
       ) => {
+        requirePermission(ctx.currentUser, 'create_sale');
         const pedido = deps.repos.catalogoPedidos.buscar(payload.id);
         if (!pedido) throw new ValidationError('id', 'El pedido no existe');
         if (pedido.estado !== 'pendiente') {
@@ -221,7 +242,8 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
      * venta que YA se creó — no crea nada. Idempotente: si el pedido ya no
      * está pendiente (doble llamada), no rompe.
      */
-    'catalogo:pedidoVincularVenta': withSession(deps, async (payload: { id: string; saleId: string }) => {
+    'catalogo:pedidoVincularVenta': withSession(deps, async (payload: { id: string; saleId: string }, ctx) => {
+      requirePermission(ctx.currentUser, 'create_sale');
       const pedido = deps.repos.catalogoPedidos.buscar(payload.id);
       if (!pedido) throw new ValidationError('id', 'El pedido no existe');
       if (pedido.estado !== 'pendiente') return { ok: true as const };
@@ -239,6 +261,7 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
     'catalogo:estadisticas': withSession(
       deps,
       async (payload: { from: number; to: number }, ctx): Promise<CatalogoEstadisticasDTO> => {
+        requirePermission(ctx.currentUser, 'view_reports');
         const company = await ctx.repos.company.getOrCreate();
         const url = (company.catalogoUrl ?? '').trim();
         if (!url) return { integrado: false };
