@@ -172,3 +172,35 @@ botón de reintento).
   otro, y explica un PV "viejo" que dejó de servir.
 
 Caso Denver Drugstore (17-sep-2026): `~/Desktop/DENVER-migracion/PARA-EL-PENDRIVE/LEEME-DENVER.txt`.
+
+## Lo que salió mal con Leo Citzia, y cómo se verifica que no se repita
+
+Cada punto costó una corrida o una visita. Los seis primeros ya están resueltos
+en `migrar.py`; lo que hay que hacer es **comprobarlos en el local, mirando la
+pantalla**, porque el esquema de StockFácil cambia entre instalaciones y lo que
+está resuelto para una base puede no estarlo para otra.
+
+| Qué pasó | Cómo se comprueba, antes de irse |
+|---|---|
+| **`PRECIO1` era el COSTO**, no el precio de venta. Migrar con la lista equivocada deja el negocio vendiendo al costo | Abrir tres artículos conocidos y comparar con una **factura impresa del comercio**. No con lo que dice el dueño de memoria |
+| Los precios se dividían por 1,21 y quedaban **21% abajo** | Mismo control: tres precios contra papel |
+| **Familias y proveedores no estaban donde se esperaba** (vivían en `RELLENO`, no en `FAMILIA`) | Correr `inspeccionar` y LEER la salida: si dice "Familias: no existe", los artículos van a quedar sin rubro |
+| **Artículos dados de baja**: `VISIBLE` está al revés; migraban todos activos y el listado pasaba de 2.109 a 12.412 | Contar artículos en pantalla y comparar con lo que ve el comercio en StockFácil |
+| **Stock negativo** pisado con 0 (9.496 artículos en Leo) | Buscar un artículo que el comercio sepa en negativo y ver que siga en negativo |
+| **Se perdían las 641 cajas diarias** y sus movimientos | Caja → Historial: que haya cajas con fechas viejas, no una sola |
+| **Los medios de pago importados aparecían en la pantalla de venta** (incluso basura como 'Ç' o 'Anulación de Pagos') y el cajero elegía cualquiera | Entran INACTIVOS a propósito: **activar a mano los que el comercio usa de verdad**. En Denver, Mercado Pago (26.000 ventas) |
+| **El dueño quedó como Vendedor** y no podía entrar a Contabilidad ni a Hardware. La migración mapea `USUARIO.TIPO` y lo que no reconoce cae en vendedor | Configuración → Usuarios: revisar el ROL de cada uno **antes de irse**. En Denver, VICKY tiene que quedar administradora |
+| **Cuenta corriente vacía**: se creaba una venta de "saldo anterior" sin renglones ni pagos | Abrir la cuenta de un cliente que deba plata: tiene que verse el detalle y el saldo tiene que coincidir con el de StockFácil |
+| CUIT mal tipeados entraban como DNI y después no se les podía emitir Factura A | Abrir la ficha de un cliente Responsable Inscripto y ver que el documento sea CUIT |
+
+### Y lo que aprendimos del lado operativo
+
+- **Inspeccionar SIEMPRE antes de migrar.** El esquema varía entre
+  instalaciones: lo que se documentó con una base puede no valer para la
+  siguiente.
+- **Verificar contra los números del propio comercio** (total de artículos,
+  un precio de una factura, la deuda de un cliente), no contra lo que devuelve
+  el importador: eso sólo dice que el importador hizo lo que cree.
+- **No irse sin probar una venta real** con su impresora y, si factura, sin
+  emitir un comprobante de prueba en ARCA.
+
