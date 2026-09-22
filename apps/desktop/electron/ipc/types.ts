@@ -2236,6 +2236,15 @@ export interface ApiSurface {
     openFirewall(): Res<{ ok: boolean; needsAdmin?: boolean; command?: string; error?: string }>;
     diagnose(): Res<{ checks: { id: string; label: string; ok: boolean; detail: string; fix?: 'openFirewall' }[]; allOk: boolean }>;
     applyAndRestart(): Res<{ ok: true }>;
+    remotoEstado(): Res<{
+      disponible: boolean;
+      aprovisionado: boolean;
+      estado: string;
+      direccion: string | null;
+      ultimoError: string | null;
+    }>;
+    remotoActivar(payload: { activo: boolean }): Res<{ estado: string; direccion: string | null; ultimoError: string | null }>;
+    remotoAprovisionar(payload: { credencial: string; hostname: string; tunnelId: string }): Res<{ ok: true; direccion: string }>;
   };
   mpQr: {
     getConfig(): Res<MpConfigStatusDTO>;

@@ -270,6 +270,88 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
 
       return { checks, allOk: checks.every((c) => c.ok) };
     }),
+    /* ----------------------- Acceso remoto (túnel) ---------------------- */
+
+    /**
+     * Estado del acceso remoto para la pantalla de Configuración. Va sin
+     * sesión (como el resto del grupo `lan`, que es local) pero NO viaja por
+     * red: `lan` no está en los grupos ruteados.
+     */
+    'lan:remotoEstado': unguarded(
+      deps,
+      async (): Promise<{
+        disponible: boolean;
+        aprovisionado: boolean;
+        estado: string;
+        direccion: string | null;
+        ultimoError: string | null;
+      }> => {
+        const tunel = deps.lanExtras?.tunel;
+        if (!tunel) {
+          return { disponible: false, aprovisionado: false, estado: 'apagado', direccion: null, ultimoError: null };
+        }
+        const e = tunel.estado();
+        return {
+          disponible: true,
+          aprovisionado: tunel.estaAprovisionado(),
+          estado: e.estado,
+          direccion: e.direccion,
+          ultimoError: e.ultimoError,
+        };
+      },
+    ),
+
+    /** Prende o apaga el acceso remoto, sin reiniciar la aplicación. */
+    'lan:remotoActivar': unguarded(
+      deps,
+      async (payload: { activo: boolean }): Promise<{ estado: string; direccion: string | null; ultimoError: string | null }> => {
+        const session = deps.sessionStore.getSession();
+        if (session) requirePermission(session.user, 'manage_hardware');
+        const tunel = deps.lanExtras?.tunel;
+        if (!tunel) throw new ValidationError('activo', 'Esta instalación no tiene acceso remoto disponible');
+        const mgr = getManager(deps);
+        const cfg = mgr.getConfig();
+        // Se guarda la INTENCIÓN: si ahora falla por falta de internet, al
+        // próximo arranque se vuelve a intentar igual.
+        mgr.setConfig({ ...cfg, remotoActivado: Boolean(payload?.activo) });
+        const e = payload?.activo ? tunel.iniciar() : tunel.detener();
+        return { estado: e.estado, direccion: e.direccion, ultimoError: e.ultimoError };
+      },
+    ),
+
+    /**
+     * Carga la credencial que identifica a ESTA instalación (un archivo por
+     * cliente, que entrega el proveedor del sistema). Queda en la carpeta de
+     * datos, fuera del directorio de instalación: sobrevive a las
+     * actualizaciones, igual que el certificado de ARCA.
+     */
+    'lan:remotoAprovisionar': unguarded(
+      deps,
+      async (payload: { credencial: string; hostname: string; tunnelId: string }): Promise<{ ok: true; direccion: string }> => {
+        const session = deps.sessionStore.getSession();
+        if (session) requirePermission(session.user, 'manage_hardware');
+        const tunel = deps.lanExtras?.tunel;
+        if (!tunel) throw new ValidationError('credencial', 'Esta instalación no tiene acceso remoto disponible');
+        const hostname = (payload?.hostname ?? '').trim().toLowerCase();
+        const tunnelId = (payload?.tunnelId ?? '').trim();
+        if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(hostname)) {
+          throw new ValidationError('hostname', 'La dirección del acceso remoto no es válida');
+        }
+        if (!/^[0-9a-f-]{36}$/.test(tunnelId)) {
+          throw new ValidationError('tunnelId', 'El identificador del túnel no es válido');
+        }
+        try {
+          JSON.parse(payload.credencial);
+        } catch {
+          throw new ValidationError('credencial', 'El archivo de credencial no es válido');
+        }
+        tunel.aprovisionar(payload.credencial, hostname, tunnelId);
+        const mgr = getManager(deps);
+        mgr.setConfig({ ...mgr.getConfig(), remotoHostname: hostname });
+        return { ok: true, direccion: `https://${hostname}` };
+      },
+    ),
+
     'lan:setMode': unguarded(
       deps,
       async (payload: LanSetModeInput): Promise<{ requiresRestart: true; config: LanConfig }> => {

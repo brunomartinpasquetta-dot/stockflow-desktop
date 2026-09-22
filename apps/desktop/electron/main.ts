@@ -1,4 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, screen, shell } from 'electron';
+import { existsSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +15,7 @@ import { registerIpcHandlers, buildAllHandlers } from './ipc';
 import { SessionStore } from './ipc/session-store';
 import { obtenerCatalogoSync } from './catalogo/CatalogoSync';
 import { LanManager } from './lan/LanManager';
+import { TunelManager } from './lan/TunelManager';
 import { LanServer } from './lan/LanServer';
 import { DEFAULT_LAN_PORT } from './lan/types';
 import { LicenseManager } from './license/LicenseManager';
@@ -37,6 +40,7 @@ let catalogoTimer: NodeJS.Timeout | null = null;
 let hardwareManager: HardwareManager | null = null;
 let backupService: BackupService | null = null;
 let lanServer: LanServer | null = null;
+let tunel: TunelManager | null = null;
 let updaterController: UpdaterController | null = null;
 let desktopWindows: DesktopWindowsManager | null = null;
 let quittingForBackup = false;
@@ -322,6 +326,9 @@ function bootstrap(): { lanArgs: string[] } {
     lanExtras: {
       applyAndRestart,
       getConnectedClients: () => lanServer?.getConnectedClients() ?? [],
+      get tunel() {
+        return tunel ?? undefined;
+      },
     },
   };
 
@@ -421,6 +428,25 @@ function bootstrap(): { lanArgs: string[] } {
       .start()
       .then(() => console.info(`[LAN] modo=server puerto=${port} IP=${ip} PIN=${lanCfg.token}`))
       .catch((err) => console.error('[LAN] no se pudo iniciar el servidor:', err));
+    // ACCESO REMOTO: el túnel entrega las visitas de internet al MISMO
+    // servidor que atiende la red local. Sólo donde está la base (modo
+    // servidor): una terminal no publica nada.
+    tunel = new TunelManager({
+      userDataDir: app.getPath('userData'),
+      binario: rutaCloudflared,
+      puertoLocal: port,
+      log: {
+        info: (m) => console.info(m),
+        warn: (m) => console.warn(m),
+        error: (m) => console.error(m),
+      },
+    });
+    // Se respeta la INTENCIÓN guardada: si el comercio lo dejó prendido, vuelve
+    // solo al reiniciar la PC, aunque en ese momento no haya internet.
+    if (lanCfg.remotoActivado && tunel.estaAprovisionado()) {
+      const e = tunel.iniciar();
+      console.info(`[remoto] acceso remoto ${e.estado}${e.direccion ? ` — ${e.direccion}` : ''}`);
+    }
   } else if (lanCfg.mode === 'client') {
     console.info(
       `[LAN] modo=client server=${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`,
@@ -430,6 +456,19 @@ function bootstrap(): { lanArgs: string[] } {
   }
 
   return { lanArgs };
+}
+
+/**
+ * Dónde está el ejecutable del túnel. Empaquetado, viaja junto a la aplicación;
+ * en desarrollo se toma el del equipo (`~/bin/cloudflared`). Si no está, el
+ * acceso remoto avisa que falta el componente en vez de fallar en silencio.
+ */
+function rutaCloudflared(): string {
+  const nombre = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
+  const propio = path.join(app.getPath('userData'), 'remoto', nombre);
+  if (existsSync(propio)) return propio;
+  if (app.isPackaged) return path.join(process.resourcesPath, nombre);
+  return path.join(os.homedir(), 'bin', nombre);
 }
 
 function startLicenseHeartbeat(): void {

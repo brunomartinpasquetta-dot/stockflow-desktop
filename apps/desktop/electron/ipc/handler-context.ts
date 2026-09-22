@@ -52,12 +52,27 @@ export interface HandlerDeps {
   lanExtras?: {
     getConnectedClients?: () => { ip: string; lastSeen: number }[];
     applyAndRestart?: () => void;
+    /**
+     * Acceso remoto (túnel). Ausente si esta PC no lo tiene disponible (por
+     * ejemplo, una terminal en modo cliente): los handlers responden que está
+     * apagado en vez de romper.
+     */
+    tunel?: TunelLike;
   };
   /**
    * Gestor de ventanas nativas del SO (v0.1.17). Inyectado por main.ts; ausente
    * en los tests de integración (que corren sin Electron).
    */
   desktopWindows?: DesktopWindowsLike;
+}
+
+/** Contrato mínimo del gestor del túnel de acceso remoto. */
+export interface TunelLike {
+  estado(): { estado: string; direccion: string | null; ultimoError: string | null; desde: number };
+  estaAprovisionado(): boolean;
+  iniciar(): { estado: string; direccion: string | null; ultimoError: string | null; desde: number };
+  detener(): { estado: string; direccion: string | null; ultimoError: string | null; desde: number };
+  aprovisionar(credencialJson: string, hostname: string, tunnelId: string): void;
 }
 
 /**

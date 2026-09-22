@@ -593,6 +593,10 @@ export const api = {
     diagnose: () => unwrap(sf().lan.diagnose()),
     getConnectedClients: () => unwrap(sf().lan.getConnectedClients()),
     applyAndRestart: () => unwrap(sf().lan.applyAndRestart()),
+    remotoEstado: () => unwrap(sf().lan.remotoEstado()),
+    remotoActivar: (activo: boolean) => unwrap(sf().lan.remotoActivar({ activo })),
+    remotoAprovisionar: (credencial: string, hostname: string, tunnelId: string) =>
+      unwrap(sf().lan.remotoAprovisionar({ credencial, hostname, tunnelId })),
     /**
      * Ping directo desde el renderer (HTTP GET /lan/ping al server LAN).
      * No usa IPC: el renderer puede hacer fetch sin CORS issues (server permite *).

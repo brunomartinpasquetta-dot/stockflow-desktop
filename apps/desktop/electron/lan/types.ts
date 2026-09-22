@@ -20,6 +20,14 @@ export interface LanConfig {
   serverIp?: string;
   /** Sólo en modo client (default 7777). */
   serverPort?: number;
+  /**
+   * ACCESO REMOTO: si el comercio lo quiere prendido. Se guarda la INTENCIÓN,
+   * no el resultado: si al arrancar no hay internet, el interruptor sigue
+   * prendido y el túnel reintenta hasta lograrlo.
+   */
+  remotoActivado?: boolean;
+  /** Dirección pública asignada a esta instalación (`cliente.dominio`). */
+  remotoHostname?: string;
 }
 
 export const DEFAULT_LAN_PORT = 7777;

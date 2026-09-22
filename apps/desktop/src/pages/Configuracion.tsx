@@ -733,6 +733,173 @@ function BackupSection() {
   )
 }
 
+/* ------------------- Acceso remoto (túnel) ------------------- */
+/**
+ * Entrar al sistema desde afuera del local: el dueño abre una dirección web en
+ * su tablet y trabaja con la misma interfaz. Esta PC no publica ningún puerto:
+ * abre una conexión hacia afuera y las visitas entran por ahí.
+ *
+ * La credencial que identifica a esta instalación la entrega el proveedor del
+ * sistema (un archivo por comercio) y queda guardada fuera del directorio del
+ * programa, así sobrevive a las actualizaciones.
+ */
+function AccesoRemotoCard() {
+  const qc = useQueryClient()
+  const estado = useQuery({
+    queryKey: ['lan', 'remoto'],
+    queryFn: () => api.lan.remotoEstado(),
+    refetchInterval: 5000,
+  })
+  const [aprovisionando, setAprovisionando] = useState(false)
+  const [credencial, setCredencial] = useState('')
+  const [hostname, setHostname] = useState('')
+  const [tunnelId, setTunnelId] = useState('')
+  const [trabajando, setTrabajando] = useState(false)
+
+  const e = estado.data
+  const prendido = e?.estado === 'conectado' || e?.estado === 'conectando'
+
+  const LEYENDA: Record<string, string> = {
+    apagado: 'Apagado',
+    conectando: 'Conectando…',
+    conectado: 'Conectado',
+    error: 'Con problemas',
+  }
+
+  async function alternar(activo: boolean): Promise<void> {
+    setTrabajando(true)
+    try {
+      await api.lan.remotoActivar(activo)
+      await qc.invalidateQueries({ queryKey: ['lan', 'remoto'] })
+      toast.success(activo ? 'Acceso remoto encendido' : 'Acceso remoto apagado')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo cambiar el acceso remoto')
+    } finally {
+      setTrabajando(false)
+    }
+  }
+
+  async function guardarCredencial(): Promise<void> {
+    setTrabajando(true)
+    try {
+      const r = await api.lan.remotoAprovisionar(credencial.trim(), hostname.trim(), tunnelId.trim())
+      await qc.invalidateQueries({ queryKey: ['lan', 'remoto'] })
+      setAprovisionando(false)
+      setCredencial('')
+      toast.success(`Acceso remoto configurado en ${r.direccion}`)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo guardar la credencial')
+    } finally {
+      setTrabajando(false)
+    }
+  }
+
+  if (e && !e.disponible) return null
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">Acceso remoto</span>
+        {e?.aprovisionado && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={prendido}
+              disabled={trabajando}
+              onChange={(ev) => void alternar(ev.target.checked)}
+            />
+            <span>{prendido ? 'Encendido' : 'Apagado'}</span>
+          </label>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Permite entrar al sistema desde afuera del local (por ejemplo, desde una tablet en casa)
+        con el mismo usuario y la misma contraseña. No hace falta abrir puertos en el router.
+      </p>
+
+      {!e?.aprovisionado ? (
+        aprovisionando ? (
+          <div className="flex flex-col gap-2 rounded border bg-muted/30 p-2">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="remoto-host">Dirección asignada</Label>
+              <Input id="remoto-host" value={hostname} onChange={(ev) => setHostname(ev.target.value)} placeholder="micomercio.mistockflow.com" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="remoto-id">Identificador</Label>
+              <Input id="remoto-id" value={tunnelId} onChange={(ev) => setTunnelId(ev.target.value)} placeholder="00000000-0000-0000-0000-000000000000" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="remoto-cred">Credencial</Label>
+              <textarea
+                id="remoto-cred"
+                rows={3}
+                value={credencial}
+                onChange={(ev) => setCredencial(ev.target.value)}
+                placeholder="Contenido del archivo que entrega el proveedor"
+                className="flex w-full rounded-md border border-input bg-background px-3 py-1.5 font-mono text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" type="button" onClick={() => setAprovisionando(false)} disabled={trabajando}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                type="button"
+                onClick={() => void guardarCredencial()}
+                disabled={trabajando || !credencial.trim() || !hostname.trim() || !tunnelId.trim()}
+              >
+                {trabajando && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                Guardar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 rounded border border-dashed px-2 py-1.5">
+            <span className="text-xs text-muted-foreground">Esta instalación todavía no tiene el acceso remoto configurado.</span>
+            <Button variant="outline" size="sm" type="button" onClick={() => setAprovisionando(true)}>
+              Configurar
+            </Button>
+          </div>
+        )
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 text-xs">
+            <span
+              className={cn(
+                'h-2 w-2 shrink-0 rounded-full',
+                e.estado === 'conectado' ? 'bg-success' : e.estado === 'conectando' ? 'bg-amber-500' : 'bg-muted-foreground',
+              )}
+            />
+            <span className="font-medium">Estado: {LEYENDA[e.estado] ?? e.estado}</span>
+          </div>
+          {e.direccion && (
+            <div className="flex items-center gap-2">
+              <span className="flex-1 truncate font-mono text-xs">{e.direccion}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(e.direccion ?? '')
+                  toast.success('Dirección copiada')
+                }}
+              >
+                Copiar
+              </Button>
+            </div>
+          )}
+          {e.ultimoError && e.estado !== 'conectado' && (
+            <p className="text-xs text-destructive">{e.ultimoError}</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ----------------------- LAN ----------------------- */
 function LanSection() {
   const qc = useQueryClient()
@@ -971,6 +1138,11 @@ function LanSection() {
             )}
           </div>
         )}
+
+        {/* ACCESO REMOTO: entrar al sistema desde afuera del local (la tablet
+            del dueño en su casa). Sólo en el servidor: es la PC que tiene la
+            base y la que publica. */}
+        {mode === 'server' && <AccesoRemotoCard />}
 
         {/* Chequeo de red: dice qué falta para que los otros puestos conecten.
             El firewall de Windows bloquea el puerto por defecto y es la causa

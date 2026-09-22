@@ -96,6 +96,9 @@ export class LanManager {
         serverIp: typeof parsed.serverIp === 'string' ? parsed.serverIp : undefined,
         serverPort:
           typeof parsed.serverPort === 'number' ? parsed.serverPort : DEFAULT_LAN_PORT,
+        remotoActivado: parsed.remotoActivado === true,
+        remotoHostname:
+          typeof parsed.remotoHostname === 'string' ? parsed.remotoHostname : undefined,
       };
       return this.cache;
     } catch {
@@ -111,6 +114,8 @@ export class LanManager {
       token: next.token,
       serverIp: next.serverIp,
       serverPort: next.serverPort ?? DEFAULT_LAN_PORT,
+      remotoActivado: next.remotoActivado === true,
+      remotoHostname: next.remotoHostname,
     };
     // El secreto de firma sobrevive a cualquier cambio de config: si se
     // perdiera al guardar, todas las terminales quedarían deslogueadas.
