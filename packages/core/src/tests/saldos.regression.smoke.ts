@@ -388,7 +388,7 @@ async function main(): Promise<void> {
       payments: [
         { paymentMethodId: PM_CASH, amount: '500.0000' },
         { paymentMethodId: efectivoChica5.id, amount: '200.0000' },
-        { paymentMethodId: PM_TRANSFER, amount: '300.0000' }, // NO físico
+        { paymentMethodId: PM_TRANSFER, amount: '300.0000' }, // NO físico: se revierte, sin tocar el arqueo
       ],
       lines: [{ articleId: arts[3]!.id, quantity: '10.000', costPrice: '100.0000', vatRate: '21.00' }],
     });
@@ -397,15 +397,15 @@ async function main(): Promise<void> {
       (m) => m.relatedPurchaseId === ps5.purchase.id && m.type === 'income',
     );
     check(
-      'S05: reverso de compra emite un ingreso por cada egreso físico, con su PM',
-      revP.length === 2 &&
+      'S05: reverso de compra emite un ingreso por cada egreso, con su PM',
+      revP.length === 3 &&
         revP.find((m) => m.paymentMethodId === PM_CASH)?.amount === '500.0000' &&
         revP.find((m) => m.paymentMethodId === efectivoChica5.id)?.amount === '200.0000',
       `reversos=${revP.length}`,
     );
     check(
-      'S05: la transferencia (no físico) NO genera reverso de caja',
-      revP.find((m) => m.paymentMethodId === PM_TRANSFER) === undefined,
+      'S05: la transferencia también se revierte (no toca el arqueo de efectivo, sí su medio)',
+      revP.find((m) => m.paymentMethodId === PM_TRANSFER)?.amount === '300.0000',
     );
     await admin.cash.closeCashRegister(regS5.id, '2000.0000');
   }

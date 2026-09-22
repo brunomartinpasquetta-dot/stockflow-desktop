@@ -23,6 +23,7 @@ import {
   type Payment,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
+import { exigirCajaAbiertaEnTx } from './cajaAbierta';
 
 /** Resultado de una cobranza a nivel cuenta (distribuida entre comprobantes FIFO). */
 export interface AccountPaymentResult {
@@ -191,6 +192,11 @@ export class PaymentRepository extends BaseRepository<Payment, NewPayment> {
         if (cmpDecimal(total, '0') <= 0) {
           throw new ConstraintError('PAYMENT_ZERO', 'La cobranza debe ser mayor a cero');
         }
+        // AUDITORÍA sep-2026: la caja tiene que seguir abierta DENTRO de la
+        // transacción, igual que en la cobranza por comprobante. Si otra
+        // terminal la cerró en el medio, este ingreso entraba a un arqueo ya
+        // hecho y el cierre dejaba de cuadrar.
+        exigirCajaAbiertaEnTx(tx, data.cashRegisterId, 'la cobranza');
 
         const customer = tx
           .select({ firstName: customers.firstName, lastName: customers.lastName })

@@ -260,6 +260,27 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
         const numRow = tx.select({ value: max(returns.number) }).from(returns).get();
         const number = (numRow?.value ?? 0) + 1;
 
+        // AUDITORÍA sep-2026: no se devuelve EFECTIVO de una venta a cuenta
+        // corriente que el cliente todavía no pagó. Si se permitiera, el
+        // comercio entrega plata que nunca recibió, y al anular después la
+        // venta esa salida queda sin contrapartida. Corresponde acreditarlo en
+        // la cuenta del cliente ('account'), que es lo que baja su deuda.
+        if (input.refundMethod === 'cash' && sale.isAccountSale) {
+          const cuenta = tx
+            .select({ total: accountsReceivable.total, balance: accountsReceivable.balance })
+            .from(accountsReceivable)
+            .where(eq(accountsReceivable.saleId, sale.id))
+            .get();
+          const pagado = cuenta ? Number(cuenta.total) - Number(cuenta.balance) : 0;
+          if (pagado + 0.005 < Number(total)) {
+            throw new ConstraintError(
+              'RETURN_ACCOUNT_NOT_PAID',
+              `Esta venta es a cuenta corriente y el cliente todavía no pagó ${Number(total).toFixed(2)}: ` +
+                'la devolución se acredita en su cuenta y le baja la deuda. El reintegro en efectivo es sólo para lo que ya cobró.',
+            );
+          }
+        }
+
         // Reintegro.
         let cashRegisterId: string | null = null;
         if (input.refundMethod === 'cash') {
@@ -467,6 +488,26 @@ export class ReturnRepository extends BaseRepository<Return, NewReturn> {
             .set({ stock: subDecimal(cur.stock, c.quantity, 3) })
             .where(eq(articles.id, c.articleId))
             .run();
+        }
+
+        // Espejo del caso de ventas: si la compra fue a cuenta del proveedor y
+        // todavía no se le pagó, el reintegro NO entra en efectivo — se
+        // descuenta de lo que se le debe. Si no, el comercio recibe plata que
+        // nunca pagó y, al anular la compra, ese ingreso queda sin contrapartida.
+        if (input.refundMethod === 'cash' && purchase.paymentType === 'credit') {
+          const cuenta = tx
+            .select({ total: supplierAccountsPayable.total, balance: supplierAccountsPayable.balance })
+            .from(supplierAccountsPayable)
+            .where(eq(supplierAccountsPayable.purchaseId, purchase.id))
+            .get();
+          const pagado = cuenta ? Number(cuenta.total) - Number(cuenta.balance) : 0;
+          if (pagado + 0.005 < Number(total)) {
+            throw new ConstraintError(
+              'RETURN_ACCOUNT_NOT_PAID',
+              `Esta compra es a cuenta del proveedor y todavía no se le pagaron ${Number(total).toFixed(2)}: ` +
+                'el reintegro se descuenta de la deuda. En efectivo es sólo por lo que ya se le pagó.',
+            );
+          }
         }
 
         const numRow = tx.select({ value: max(purchaseReturns.number) }).from(purchaseReturns).get();

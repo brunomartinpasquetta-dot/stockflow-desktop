@@ -551,6 +551,21 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           .where(eq(salePayments.saleId, id))
           .all();
         let reversoElectronico = '0.0000';
+        // AUDITORÍA sep-2026: una venta a cuenta corriente con reintegro en
+        // EFECTIVO ya entregado no se puede anular sin decidir qué pasa con esa
+        // plata: la deuda se borraría y el efectivo quedaría sin contrapartida
+        // (el cajón muestra menos de lo que hay). Desde esta versión ya no se
+        // puede generar ese caso —la devolución de una venta a cuenta impaga se
+        // acredita en la cuenta—, pero las operaciones viejas existen y hay que
+        // frenarlas con una explicación, no dejar el descuadre en silencio.
+        if (sale.isAccountSale && cmpDecimal(yaReintegrado, '0') > 0) {
+          throw new ConstraintError(
+            'VOID_ACCOUNT_SALE_WITH_CASH_REFUND',
+            `Esta venta a cuenta corriente ya tuvo un reintegro en efectivo de ${Number(yaReintegrado).toFixed(2)}. ` +
+              'Para anularla hay que regularizar esa plata primero (registrar el ingreso en la caja o cobrarla), ' +
+              'porque al anular se borra la deuda y ese efectivo quedaría sin respaldo.',
+          );
+        }
         if (!sale.isAccountSale) {
           // Lo que las devoluciones ya reintegraron se descuenta PRIMERO de los
           // pagos físicos (salió del cajón) y, si no alcanzan, de los demás:

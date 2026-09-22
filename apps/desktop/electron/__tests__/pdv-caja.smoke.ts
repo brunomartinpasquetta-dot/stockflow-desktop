@@ -337,6 +337,57 @@ const main = async () => {
   await repos.sales.voidSale(vcc3.sale.id);
   check('sin cobranzas, la cuenta se borra junto con la anulación', (await repos.accountsReceivable.findById(cta3.id)) == null);
 
+  /* ------------------------------------------------------------------ */
+  console.log('\n[11] Cuenta corriente: la plata que no se cobró no se devuelve en efectivo');
+  const abierta11 = await repos.cashRegisters.getCurrentOpen();
+  if (abierta11) await svc.cash.closeCashRegister(abierta11.id, '0.0000');
+  const reg11 = await svc.cash.openCashRegister('0.0000');
+  await svc.cash.addMovement({ type: 'income', description: 'Fondeo', amount: '5000.0000', paymentMethodId: PM_CASH, cashRegisterId: reg11.id });
+  const vcta = await svc.sales.createSale({
+    type: 'X', customerId: cliCta.id, isAccountSale: true,
+    lines: [{ articleId: art.id, quantity: '2.000' }],
+  });
+  const errDevEfectivo = await falla(() =>
+    returns.createSaleReturn({ saleId: vcta.sale.id, refundMethod: 'cash', lines: [{ saleLineId: vcta.lines[0]!.id, quantity: '1.000' }] }),
+  );
+  check('venta a cuenta impaga: la devolución en efectivo se rechaza y explica por qué',
+    errDevEfectivo != null && /cuenta corriente/i.test(errDevEfectivo), errDevEfectivo ?? 'dejó devolver');
+  const okDevCuenta = await falla(() =>
+    returns.createSaleReturn({ saleId: vcta.sale.id, refundMethod: 'account', lines: [{ saleLineId: vcta.lines[0]!.id, quantity: '1.000' }] }),
+  );
+  check('la misma devolución acreditada en la cuenta sí entra', okDevCuenta == null, okDevCuenta ?? '');
+  const ctaVcta = (await repos.accountsReceivable.findOne({ saleId: vcta.sale.id }))!;
+  check('y le baja la deuda al cliente', Number(ctaVcta.balance) < Number(ctaVcta.total), `${ctaVcta.balance} de ${ctaVcta.total}`);
+
+  console.log('\n[12] Cobranza por cuenta (no por comprobante) contra caja cerrada');
+  const vcta2 = await svc.sales.createSale({ type: 'X', customerId: cliCta.id, isAccountSale: true, lines: [{ articleId: art.id, quantity: '1.000' }] });
+  void vcta2;
+  await svc.cash.closeCashRegister(reg11.id, '5000.0000');
+  const errCobranzaCuenta = await falla(() =>
+    repos.payments.createAccountPayment({
+      customerId: cliCta.id, cashRegisterId: reg11.id, userId: safe.id,
+      payments: [{ paymentMethodId: PM_CASH, amount: '100.0000' }],
+    } as never),
+  );
+  check('cobranza a nivel cuenta con la caja cerrada: CASH_CLOSED', errCobranzaCuenta != null && /cerró|cerrada/i.test(errCobranzaCuenta), errCobranzaCuenta ?? 'entró igual');
+
+  console.log('\n[13] Compra por transferencia anulada: también se revierte');
+  const abierta13 = await repos.cashRegisters.getCurrentOpen();
+  if (abierta13) await svc.cash.closeCashRegister(abierta13.id, '0.0000');
+  const reg13 = await svc.cash.openCashRegister('0.0000');
+  const cTransf = await svc.purchases.createPurchase({
+    type: 'X', supplierId: prov.id, isAccountPurchase: false, fundingSource: 'daily', updatePrices: false,
+    payments: [{ paymentMethodId: PM_TRANSF, amount: '1000.0000' }],
+    lines: [{ articleId: art.id, quantity: '1.000', costPrice: '1000.0000', salePrice: '1500.0000' }],
+  } as never);
+  const netoAntes13 = await netoDe(reg13.id, PM_TRANSF);
+  await svc.purchases.voidPurchase(cTransf.purchase.id);
+  const netoDespues13 = await netoDe(reg13.id, PM_TRANSF);
+  check('la compra por transferencia deja el medio en -1000', Number(netoAntes13) === -1000, netoAntes13);
+  check('al anularla, ese medio vuelve a 0', Number(netoDespues13) === 0, netoDespues13);
+  const repCierre = await svc.cash.getCashReport(reg13.id);
+  check('y el efectivo esperado no se movió', Number(repCierre.expectedCash) === 0, repCierre.expectedCash);
+
   closeLocalDb(db);
   rmSync(dir, { recursive: true, force: true });
   console.log(fallas === 0 ? '\n✅ TODO OK\n' : `\n❌ ${fallas} FALLAS\n`);

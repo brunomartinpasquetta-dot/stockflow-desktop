@@ -418,6 +418,17 @@ export class PurchaseRepository extends BaseRepository<
         // Lo que el proveedor ya reintegró en efectivo se descuenta de los
         // reversos (primero caja diaria, después Caja General): la casa nunca
         // recupera más de lo que pagó por esta compra.
+        // Espejo del caso de ventas: una compra a cuenta del proveedor con un
+        // reintegro en efectivo ya recibido no se anula sin decidir qué pasa
+        // con esa plata (se borraría la deuda y el ingreso quedaría colgado).
+        if (purchase.paymentType === 'credit' && cmpDecimal(yaReintegrado, '0') > 0) {
+          throw new ConstraintError(
+            'VOID_ACCOUNT_PURCHASE_WITH_CASH_REFUND',
+            `Esta compra a cuenta del proveedor ya tuvo un reintegro en efectivo de ${Number(yaReintegrado).toFixed(2)}. ` +
+              'Para anularla hay que regularizar esa plata primero, porque al anular se borra la deuda y ese ingreso quedaría sin respaldo.',
+          );
+        }
+
         let aDescontar = yaReintegrado;
 
         // Reverso de caja: sólo la parte que salió en efectivo físico.
@@ -440,14 +451,27 @@ export class PurchaseRepository extends BaseRepository<
           .where(and(eq(cashMovements.relatedPurchaseId, id), eq(cashMovements.type, 'expense')))
           .all();
         if (purchase.paymentType === 'cash') {
-          const physical = movs
+          // AUDITORÍA sep-2026: se revierten TODOS los egresos de esta compra,
+          // no sólo los que salieron en efectivo. Una compra pagada por
+          // transferencia y anulada dejaba el neto de ese medio con plata que
+          // el comercio ya no pagó, y el arqueo por medio de pago mentía.
+          // Espejo de lo que ya hace `voidSale`.
+          const descontar = (m: (typeof movs)[number]) => {
+            const usa = cmpDecimal(aDescontar, m.amount) < 0 ? aDescontar : m.amount;
+            aDescontar = subDecimal(aDescontar, usa, 4);
+            return { ...m, amount: subDecimal(m.amount, usa, 4) };
+          };
+          // Lo ya reintegrado por el proveedor en efectivo se descuenta primero
+          // de los egresos físicos; si no alcanzan, de los demás.
+          const fisicos = movs
             .filter((m) => (m.pmId == null || m.isCash === true) && Number(m.amount) > 0)
-            .map((m) => {
-              const usa = cmpDecimal(aDescontar, m.amount) < 0 ? aDescontar : m.amount;
-              aDescontar = subDecimal(aDescontar, usa, 4);
-              return { ...m, amount: subDecimal(m.amount, usa, 4) };
-            })
+            .map(descontar)
             .filter((m) => Number(m.amount) > 0);
+          const electronicos = movs
+            .filter((m) => !(m.pmId == null || m.isCash === true) && Number(m.amount) > 0)
+            .map(descontar)
+            .filter((m) => Number(m.amount) > 0);
+          const physical = fisicos;
           // BUG-CAJA: el reverso no puede entrar a una caja ya CERRADA y arqueada
           //   (el arqueo histórico recalcula el esperado en vivo y dejaría de
           //   cuadrar). Resolvemos la caja DESTINO dentro de la transacción para
@@ -476,6 +500,25 @@ export class PurchaseRepository extends BaseRepository<
             }
             return openRegisterId;
           };
+
+          // El reverso ELECTRÓNICO vuelve a la caja ORIGINAL: no toca el
+          // arqueo de efectivo y así el neto de ese medio baja donde
+          // corresponde, en vez de dejar un negativo en la caja de hoy.
+          for (const m of electronicos) {
+            tx
+              .insert(cashMovements)
+              .values({
+                cashRegisterId: m.cashRegisterId,
+                type: 'income',
+                description: `Anulación compra ${purchase.type} #${purchase.number}`,
+                amount: m.amount,
+                date: Date.now(),
+                userId: m.userId,
+                relatedPurchaseId: purchase.id,
+                paymentMethodId: m.pmId,
+              })
+              .run();
+          }
 
           for (const m of physical) {
             const originReg = tx
