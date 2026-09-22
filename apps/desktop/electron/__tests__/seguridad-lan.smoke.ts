@@ -345,6 +345,31 @@ async function main(): Promise<void> {
     console.error(`\nTEST SEGURIDAD LAN FALLÓ — ${failures} check(s) con error.\n`);
     process.exit(1);
   }
+  /* ------------------------------------------------------------------ */
+  console.log('\n[ACCESO REMOTO] la puerta del túnel tiene menos permisos que la red local');
+  {
+    const { remotoAccepts } = await import('../preload-bridge');
+    check('desde afuera NO se emite factura', remotoAccepts('fiscal:issueInvoice') === false);
+    check(
+      'desde afuera NO se importa ni se reinicia la operativa',
+      remotoAccepts('import:execute') === false && remotoAccepts('maintenance:resetOperationalData') === false,
+    );
+    check('desde afuera NO se cambia la ficha del comercio', remotoAccepts('company:upsert') === false);
+    check(
+      'desde afuera NO se borran clientes ni artículos',
+      remotoAccepts('customers:delete') === false && remotoAccepts('articles:delete') === false,
+    );
+    check(
+      'desde afuera SÍ se vende y se cobra',
+      remotoAccepts('sales:create') && remotoAccepts('cash:addMovement') && remotoAccepts('accounts:receivePayment'),
+    );
+    check('desde afuera SÍ se consulta', remotoAccepts('articles:list') && remotoAccepts('sales:get'));
+    check(
+      'lo prohibido por red sigue prohibido por el túnel',
+      remotoAccepts('backup:restore') === false && remotoAccepts('users:create') === false,
+    );
+  }
+
   console.log('\n✅ TODO OK — TEST SEGURIDAD LAN\n');
 }
 

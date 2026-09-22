@@ -302,6 +302,16 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
     ),
 
     /**
+     * Nadie publica su sistema en internet con una clave que se adivina en el
+     * primer intento. Con el acceso remoto encendido, un `admin/admin` es la
+     * puerta abierta a la caja, los clientes y la facturación del comercio.
+     */
+    'lan:remotoClavesDebiles': unguarded(deps, async (): Promise<{ usuarios: string[] }> => {
+      const usuarios = await deps.repos.users.usuariosConClaveDebil();
+      return { usuarios };
+    }),
+
+    /**
      * UN SOLO CLIC: el comercio pide su acceso remoto y queda funcionando.
      * El servidor le crea su dirección y su credencial (con su licencia como
      * identificación), acá se baja el componente si falta, se guarda todo y se
@@ -314,6 +324,17 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
         if (session) requirePermission(session.user, 'manage_hardware');
         const tunel = deps.lanExtras?.tunel;
         if (!tunel) throw new ValidationError('remoto', 'El acceso remoto sólo se activa en la PC que tiene el sistema');
+        // 0) Antes que nada: que no haya usuarios con la clave puesta por
+        // defecto. Publicar el sistema con `admin/admin` es regalarlo.
+        const debiles = await deps.repos.users.usuariosConClaveDebil();
+        if (debiles.length > 0) {
+          throw new ValidationError(
+            'claves',
+            `Antes de activar el acceso remoto hay que cambiar la contraseña de: ${debiles.join(', ')}. ` +
+              'Son claves que se adivinan en el primer intento y el sistema va a quedar accesible desde internet. ' +
+              'Se cambian en Configuración → Usuarios.',
+          );
+        }
         // 1) El componente (se descarga una sola vez por PC).
         await tunel.asegurarBinario();
         // 2) El servidor da de alta este comercio y devuelve su dirección.
@@ -335,6 +356,15 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
         if (session) requirePermission(session.user, 'manage_hardware');
         const tunel = deps.lanExtras?.tunel;
         if (!tunel) throw new ValidationError('activo', 'Esta instalación no tiene acceso remoto disponible');
+        if (payload?.activo) {
+          const debiles = await deps.repos.users.usuariosConClaveDebil();
+          if (debiles.length > 0) {
+            throw new ValidationError(
+              'claves',
+              `Antes de encender el acceso remoto hay que cambiar la contraseña de: ${debiles.join(', ')}.`,
+            );
+          }
+        }
         const mgr = getManager(deps);
         const cfg = mgr.getConfig();
         // Se guarda la INTENCIÓN: si ahora falla por falta de internet, al

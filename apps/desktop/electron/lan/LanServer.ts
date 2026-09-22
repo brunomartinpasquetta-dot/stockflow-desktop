@@ -45,7 +45,7 @@ import path from 'node:path';
 import type { HandlerMap } from '../ipc/handler-context';
 import type { SessionStore } from '../ipc/session-store';
 import type { IpcResponse } from '../ipc/types';
-import { lanServerAccepts } from '../preload-bridge';
+import { lanServerAccepts, remotoAccepts } from '../preload-bridge';
 
 interface InfoCliente {
   lastSeen: number;
@@ -208,6 +208,31 @@ export function verifyJwt(token: string, secret: string): { sub: string; exp: nu
   if (typeof parsed.sub !== 'string' || typeof parsed.exp !== 'number') return null;
   if (Date.now() / 1000 >= parsed.exp) return null;
   return { sub: parsed.sub, exp: parsed.exp };
+}
+
+/**
+ * Quién es el visitante, a los efectos del contador de intentos fallidos.
+ *
+ * Por la puerta del túnel TODO llega desde 127.0.0.1: si el contador se
+ * indexara por ahí, cinco intentos de un desconocido dejarían afuera al dueño
+ * (y un atacante podría bloquearle el acceso a propósito). El borde agrega la
+ * IP real en `X-Forwarded-For`; se toma el ÚLTIMO salto, que es el que agregó
+ * nuestro propio borde, y se agrupa por red /24 para que cambiar de IP dentro
+ * del mismo proveedor no saltee el bloqueo. Fuera del túnel la cabecera se
+ * IGNORA: ahí el que la mandaría es el propio atacante.
+ */
+function ipDelVisitante(req: IncomingMessage, esTunel: boolean): string {
+  const directa = req.socket.remoteAddress ?? '';
+  if (!esTunel) return directa;
+  const xff = req.headers['x-forwarded-for'];
+  const crudo = Array.isArray(xff) ? xff[xff.length - 1] : xff;
+  const ultimo = (crudo ?? '').split(',').map((s) => s.trim()).filter(Boolean).pop();
+  if (!ultimo) return directa;
+  const limpia = ultimo.startsWith('::ffff:') ? ultimo.slice('::ffff:'.length) : ultimo;
+  const v4 = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(limpia);
+  if (v4) return `${v4[1]}.0/24`;
+  const partes = limpia.split(':').filter(Boolean);
+  return partes.length >= 4 ? `${partes.slice(0, 4).join(':')}::/64` : limpia;
 }
 
 function isLanRemote(addr: string | undefined): boolean {
@@ -534,9 +559,12 @@ export class LanServer {
       sendJson(res, 404, { ok: false, code: 'NOT_FOUND', message: 'Ruta inexistente' });
       return;
     }
-    const remote = req.socket.remoteAddress ?? '';
-    if (!isLanRemote(remote)) {
-      this.log.warn(`origen rechazado (no-LAN): ${remote}`);
+    const directa = req.socket.remoteAddress ?? '';
+    // Contra quién se cuentan los intentos fallidos: por el túnel, la IP real
+    // del visitante; por la red local, la de la terminal.
+    const remote = ipDelVisitante(req, esTunel);
+    if (!isLanRemote(directa)) {
+      this.log.warn(`origen rechazado (no-LAN): ${directa}`);
       sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Origen no permitido' });
       return;
     }
@@ -582,6 +610,17 @@ export class LanServer {
     // servidor, restore, usuarios). Ver LAN_SERVER_DENIED_CHANNELS.
     if (!lanServerAccepts(channel)) {
       sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Esa operación sólo puede hacerse en el servidor' });
+      return;
+    }
+    // Desde INTERNET la lista es más corta que desde la red local: mirar,
+    // vender y cobrar sí; tocar la configuración, facturar ante ARCA o mover
+    // datos en bloque, no. Limita el daño si alguien consigue una contraseña.
+    if (esTunel && !remotoAccepts(channel)) {
+      sendJson(res, 403, {
+        ok: false,
+        code: 'PERMISSION_DENIED',
+        message: 'Esa operación sólo puede hacerse desde el local, no por acceso remoto',
+      });
       return;
     }
     const handler = Object.prototype.hasOwnProperty.call(this.opts.handlers, channel)

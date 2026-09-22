@@ -147,6 +147,36 @@ export const LAN_SERVER_DENIED_CHANNELS = new Set([
 ]);
 export const LAN_SERVER_DENIED_GROUPS = new Set(['maintenance']);
 
+/**
+ * Lo que NO se hace desde INTERNET, aunque sí se pueda desde la red local.
+ *
+ * Criterio: desde afuera el dueño mira, vende y cobra; lo que toca la
+ * configuración del comercio, su facturación ante ARCA o sus datos en bloque
+ * se hace sentado en el local. Es lo que limita el daño si alguien consigue
+ * una contraseña: no puede emitir facturas a nombre del comercio, cambiar la
+ * ficha fiscal, exportar el padrón de clientes ni reiniciar la operativa.
+ */
+export const REMOTO_DENIED_GROUPS = new Set(['fiscal', 'import', 'maintenance', 'demo', 'mpQr']);
+export const REMOTO_DENIED_CHANNELS = new Set([
+  'company:upsert',
+  'priceUpdate:apply',
+  'priceUpdate:rollback',
+  'sales:voidRange',
+  'catalogo:syncConfigurar',
+  'catalogo:vincularLote',
+  'paymentMethods:delete',
+  'customers:delete',
+  'suppliers:delete',
+  'articles:delete',
+]);
+
+/** ¿El servidor atiende este canal cuando la visita entra por el acceso remoto? */
+export function remotoAccepts(channel: string): boolean {
+  if (!lanServerAccepts(channel)) return false;
+  if (REMOTO_DENIED_GROUPS.has(getGroup(channel))) return false;
+  return !REMOTO_DENIED_CHANNELS.has(channel);
+}
+
 /** ¿El servidor atiende este canal si llega por /lan/rpc? */
 export function lanServerAccepts(channel: string): boolean {
   const group = getGroup(channel);
@@ -620,6 +650,7 @@ export function createApiBridge(
       remotoActivar: (p) => c<never>('lan:remotoActivar', p),
       remotoAprovisionar: (p) => c<never>('lan:remotoAprovisionar', p),
       remotoConfigurarAutomatico: () => c<never>('lan:remotoConfigurarAutomatico'),
+      remotoClavesDebiles: () => c<never>('lan:remotoClavesDebiles'),
       getConnectedClients: () => c<never>('lan:getConnectedClients'),
       applyAndRestart: () => c<never>('lan:applyAndRestart'),
     },

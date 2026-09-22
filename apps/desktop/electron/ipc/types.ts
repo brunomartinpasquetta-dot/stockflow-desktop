@@ -2246,6 +2246,7 @@ export interface ApiSurface {
     remotoActivar(payload: { activo: boolean }): Res<{ estado: string; direccion: string | null; ultimoError: string | null }>;
     remotoAprovisionar(payload: { credencial: string; hostname: string; tunnelId: string }): Res<{ ok: true; direccion: string }>;
     remotoConfigurarAutomatico(): Res<{ ok: true; direccion: string; estado: string }>;
+    remotoClavesDebiles(): Res<{ usuarios: string[] }>;
   };
   mpQr: {
     getConfig(): Res<MpConfigStatusDTO>;

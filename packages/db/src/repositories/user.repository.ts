@@ -115,6 +115,46 @@ export class UserRepository extends BaseRepository<User, NewUser> {
    * Verifica usuario + contraseña. Devuelve el usuario (sin hash) si las credenciales
    * son válidas y la cuenta está activa; `null` en cualquier otro caso.
    */
+  /**
+   * Usuarios ACTIVOS con una contraseña que se adivina en el primer intento.
+   * Se usa antes de publicar el sistema en internet: con el acceso remoto
+   * encendido, un `admin/admin` es una puerta abierta a la caja, los clientes
+   * y la facturación del comercio. Devuelve los nombres de usuario, para poder
+   * decir exactamente cuáles hay que cambiar.
+   */
+  async usuariosConClaveDebil(): Promise<string[]> {
+    try {
+      const filas = this.db
+        .select({ username: users.username, hash: users.passwordHash })
+        .from(users)
+        .where(eq(users.active, true))
+        .all();
+      const debiles: string[] = [];
+      for (const f of filas) {
+        const candidatas = [
+          'admin',
+          'Admin',
+          '1234',
+          '12345',
+          '123456',
+          'password',
+          'stockflow',
+          f.username,
+          f.username.toLowerCase(),
+        ];
+        for (const c of candidatas) {
+          if (await bcrypt.compare(c, f.hash)) {
+            debiles.push(f.username);
+            break;
+          }
+        }
+      }
+      return debiles;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async verifyPassword(username: string, password: string): Promise<SafeUser | null> {
     try {
       const user = await this.findByUsername(username);

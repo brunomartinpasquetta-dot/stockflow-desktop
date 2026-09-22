@@ -774,6 +774,12 @@ function AccesoRemotoCard() {
     queryFn: () => api.lan.remotoEstado(),
     refetchInterval: 5000,
   })
+  // Publicar el sistema en internet con la clave de fábrica es regalarlo: se
+  // avisa ANTES de que el dueño toque el botón, no después del error.
+  const debiles = useQuery({
+    queryKey: ['lan', 'clavesDebiles'],
+    queryFn: () => api.lan.remotoClavesDebiles(),
+  })
   const [aprovisionando, setAprovisionando] = useState(false)
   const [qr, setQr] = useState<string | null>(null)
   /** Dirección recién activada: el aviso espera a que el QR esté dibujado. */
@@ -932,6 +938,13 @@ function AccesoRemotoCard() {
           </div>
         ) : (
           <div className="flex flex-col gap-2 rounded border border-dashed px-2 py-2">
+            {(debiles.data?.usuarios.length ?? 0) > 0 && (
+              <div className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                Antes de activarlo hay que cambiar la contraseña de{' '}
+                <strong>{debiles.data?.usuarios.join(', ')}</strong>: son claves que se adivinan en el primer
+                intento y el sistema va a quedar accesible desde internet. Se cambian en Configuración → Usuarios.
+              </div>
+            )}
             <span className="text-xs text-muted-foreground">
               Esta instalación todavía no tiene el acceso remoto activado. Al activarlo se le asigna una
               dirección web propia; la primera vez puede demorar un minuto mientras se prepara.
@@ -940,7 +953,12 @@ function AccesoRemotoCard() {
               <Button variant="ghost" size="sm" type="button" onClick={() => setAprovisionando(true)} disabled={trabajando}>
                 Cargar datos a mano
               </Button>
-              <Button size="sm" type="button" onClick={() => void activarAutomatico()} disabled={trabajando}>
+              <Button
+                size="sm"
+                type="button"
+                onClick={() => void activarAutomatico()}
+                disabled={trabajando || (debiles.data?.usuarios.length ?? 0) > 0}
+              >
                 {trabajando && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
                 Activar acceso remoto
               </Button>
