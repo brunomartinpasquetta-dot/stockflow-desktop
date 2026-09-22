@@ -735,6 +735,30 @@ function BackupSection() {
 
 /* ------------------- Acceso remoto (túnel) ------------------- */
 /**
+ * Pestaña propia: es una función distinta de la red local del comercio y el
+ * dueño la busca por su nombre. Antes vivía al final de la pestaña LAN, al
+ * lado del botón "Guardar y reiniciar", y parecía que había que guardar algo
+ * para que tomara efecto (no hace falta: el túnel se enciende en el acto).
+ */
+function AccesoRemotoSection() {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 pt-4">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-sm font-semibold">Acceso remoto</h2>
+          <p className="text-xs text-muted-foreground">
+            Entrar al sistema desde afuera del local: por ejemplo, desde una tablet o un celular en casa.
+            Se activa y funciona en el momento, sin reiniciar el sistema.
+          </p>
+        </div>
+        <AccesoRemotoCard />
+      </CardContent>
+    </Card>
+  )
+}
+
+
+/**
  * Entrar al sistema desde afuera del local: el dueño abre una dirección web en
  * su tablet y trabaja con la misma interfaz. Esta PC no publica ningún puerto:
  * abre una conexión hacia afuera y las visitas entran por ahí.
@@ -752,6 +776,8 @@ function AccesoRemotoCard() {
   })
   const [aprovisionando, setAprovisionando] = useState(false)
   const [qr, setQr] = useState<string | null>(null)
+  /** Dirección recién activada: el aviso espera a que el QR esté dibujado. */
+  const [, setAvisarAlMostrarQr] = useState<string | null>(null)
   const [credencial, setCredencial] = useState('')
   const [hostname, setHostname] = useState('')
   const [tunnelId, setTunnelId] = useState('')
@@ -771,7 +797,16 @@ function AccesoRemotoCard() {
     void import('qrcode')
       .then((QR) => QR.toDataURL(e.direccion as string, { width: 420, margin: 1 }))
       .then((url) => {
-        if (vivo) setQr(url)
+        if (!vivo) return
+        setQr(url)
+        setAvisarAlMostrarQr((pendiente) => {
+          if (pendiente) {
+            toast.success(`Acceso remoto activado en ${pendiente}. Escanee el código con el celular o la tablet para entrar.`, {
+              duration: 15_000,
+            })
+          }
+          return null
+        })
       })
       .catch(() => {
         if (vivo) setQr(null)
@@ -807,10 +842,10 @@ function AccesoRemotoCard() {
     try {
       const r = await api.lan.remotoConfigurarAutomatico()
       await qc.invalidateQueries({ queryKey: ['lan', 'remoto'] })
-      // No hace falta reiniciar: el túnel se levanta en el momento.
-      toast.success(`Acceso remoto activado en ${r.direccion}. Ya puede entrar desde el celular con el código de abajo.`, {
-        duration: 15_000,
-      })
+      // El aviso sale RECIÉN cuando el código ya está en pantalla: si sale
+      // antes, el dueño lee "ya puede entrar con el código" y abajo todavía no
+      // hay nada. No hace falta reiniciar nada: el túnel levanta en el acto.
+      setAvisarAlMostrarQr(r.direccion)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'No se pudo activar el acceso remoto', { duration: 12_000 })
     } finally {
@@ -1197,11 +1232,6 @@ function LanSection() {
           </div>
         )}
 
-        {/* ACCESO REMOTO: entrar al sistema desde afuera del local (la tablet
-            del dueño en su casa). Sólo en el servidor: es la PC que tiene la
-            base y la que publica. */}
-        {mode === 'server' && <AccesoRemotoCard />}
-
         {/* Chequeo de red: dice qué falta para que los otros puestos conecten.
             El firewall de Windows bloquea el puerto por defecto y es la causa
             número uno de que una instalación multi-puesto no funcione. */}
@@ -1427,7 +1457,7 @@ function GeneralSection() {
 
 import { useWindowSelf } from '@/contexts/WindowManagerContext'
 
-const VALID_TABS = ['hardware', 'backup', 'lan', 'updates', 'general', 'mantenimiento'] as const
+const VALID_TABS = ['hardware', 'backup', 'lan', 'remoto', 'updates', 'general', 'mantenimiento'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 function readInitialTab(extras: unknown): TabValue | null {
@@ -1555,6 +1585,7 @@ export function Configuracion() {
           <TabsTrigger value="hardware">Hardware</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
           <TabsTrigger value="lan">LAN</TabsTrigger>
+          <TabsTrigger value="remoto">Acceso remoto</TabsTrigger>
           <TabsTrigger value="updates">Actualizaciones</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
           {isAdmin && <TabsTrigger value="mantenimiento">Mantenimiento</TabsTrigger>}
@@ -1568,6 +1599,9 @@ export function Configuracion() {
         </TabsContent>
         <TabsContent value="lan">
           <LanSection />
+        </TabsContent>
+        <TabsContent value="remoto">
+          <AccesoRemotoSection />
         </TabsContent>
         <TabsContent value="updates">
           <UpdatesSection />
