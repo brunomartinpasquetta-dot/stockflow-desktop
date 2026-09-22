@@ -40,6 +40,20 @@ export interface LanClientConfig {
   serverIp: string;
   serverPort: number;
   token: string;
+  /**
+   * Dirección COMPLETA del servidor cuando no se puede armar como
+   * `http://ip:puerto`: la terminal por navegador la toma de la página que el
+   * propio servidor le sirvió (`window.location.origin`). Hace falta para el
+   * acceso remoto: entrando por `https://…` sin puerto, armar la URL a mano
+   * daba `http://<host>:7777` y el navegador bloqueaba todo por contenido
+   * mixto. En la red local sigue sin usarse.
+   */
+  serverBaseUrl?: string;
+}
+
+/** Base contra la que se arman las llamadas al servidor. */
+export function baseDelServidor(cfg: LanClientConfig): string {
+  return (cfg.serverBaseUrl ?? `http://${cfg.serverIp}:${cfg.serverPort}`).replace(/\/$/, '');
 }
 
 export interface BridgeListenerHandle {
@@ -216,7 +230,7 @@ export function createCaller(
     if (!lanCfg) {
       return { ok: false, code: 'INTERNAL', message: 'Configuración LAN ausente' };
     }
-    const url = `http://${lanCfg.serverIp}:${lanCfg.serverPort}/lan/rpc`;
+    const url = `${baseDelServidor(lanCfg)}/lan/rpc`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {

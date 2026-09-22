@@ -16,6 +16,7 @@
  * seguros para que la interfaz no se rompa. Ver `responderLocal`.
  */
 import {
+  baseDelServidor,
   createApiBridge,
   type BridgeIO,
   type LanClientConfig,
@@ -38,8 +39,8 @@ const CORRIDA_KEY = 'stockflow.web.corrida';
  */
 let versionServidor: Promise<string> | null = null;
 
-function pedirVersion(ip: string, puerto: number): Promise<string> {
-  versionServidor ??= fetch(`http://${ip}:${puerto}/lan/ping`)
+function pedirVersion(base: string): Promise<string> {
+  versionServidor ??= fetch(`${base}/lan/ping`)
     .then((r) => (r.ok ? r.json() : null))
     .then((d: { version?: string | null } | null) => d?.version ?? 'servidor')
     .catch(() => 'servidor');
@@ -73,6 +74,11 @@ function configDesdeUrl(): LanClientConfig {
   return {
     serverIp: url.hostname,
     serverPort: Number(url.port) || 7777,
+    // La página la sirvió el servidor: se le habla por la MISMA dirección por
+    // la que entró (mismo esquema y mismo puerto). Sin esto, entrando por
+    // `https://…` las llamadas salían a `http://<host>:7777` y el navegador
+    // las bloqueaba: la terminal quedaba en blanco.
+    serverBaseUrl: url.origin,
     token: pinDeUrl ?? localStorage.getItem(PIN_KEY) ?? '',
   };
 }
@@ -204,7 +210,7 @@ async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
     // ingreso para que el comercio sepa con qué versión está trabajando.
     if (metodo === 'getVersion') {
       const cfg = configDesdeUrl();
-      return ok({ version: await pedirVersion(cfg.serverIp, cfg.serverPort) });
+      return ok({ version: await pedirVersion(baseDelServidor(cfg)) });
     }
     return ok({ ok: true });
   }
@@ -227,7 +233,7 @@ function crearListeners(): BridgeIO['listeners'] {
     try {
       const cfg = configDesdeUrl();
       const res = await fetch(
-        `http://${cfg.serverIp}:${cfg.serverPort}/lan/changes?since=${ultimo}`,
+        `${baseDelServidor(cfg)}/lan/changes?since=${ultimo}`,
       );
       if (!res.ok) return;
       const body = (await res.json()) as { changed?: boolean; at?: number };
@@ -273,7 +279,7 @@ export function instalarPuenteWeb(): void {
   // paso se pone en el TÍTULO de la ventana: la terminal muestra lo mismo que
   // el servidor ("StockFlow - Sistema de Gestión Comercial v0.4.21"), así el
   // comercio puede leer su versión sin entrar a ninguna pantalla.
-  void pedirVersion(lanCfg.serverIp, lanCfg.serverPort).then((v) => {
+  void pedirVersion(baseDelServidor(lanCfg)).then((v) => {
     if (v && v !== 'servidor') {
       document.title = `StockFlow - Sistema de Gestión Comercial v${v}`;
     }
