@@ -34,6 +34,7 @@ import { getJwtKeys } from './jwt-keys';
 import { adminRoutes } from './routes/admin.routes';
 import { billingRoutes } from './routes/billing.routes';
 import { licenseRoutes } from './routes/license.routes';
+import { remotoRoutes } from './routes/remoto.routes';
 import { EmailService } from './services/EmailService';
 import { MercadoPagoService } from './services/MercadoPagoService';
 
@@ -116,6 +117,7 @@ export async function buildServer(opts?: BuildServerOptions): Promise<FastifyIns
   // Rutas.
   await app.register(async (a) => billingRoutes(a, { mp, email }));
   await app.register(licenseRoutes);
+  await app.register(remotoRoutes);
   await app.register(async (a) => adminRoutes(a, { email }));
 
   app.get('/health', async () => ({ status: 'ok', timestamp: Date.now() }));

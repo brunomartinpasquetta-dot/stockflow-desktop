@@ -27,8 +27,24 @@
  *    sigue reintentando: al volver la conexión, el acceso vuelve solo.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+
+/**
+ * De dónde se baja el componente del túnel cuando la instalación no lo tiene.
+ * Se descarga UNA vez por PC, a la carpeta de datos: no viaja en el instalador
+ * (son ~50 MB que la mayoría de los comercios no usa) ni necesita permisos de
+ * administrador para escribirse.
+ */
+const DESCARGAS: Record<string, string> = {
+  'win32-x64': 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe',
+  'win32-ia32': 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-386.exe',
+  'darwin-arm64': 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz',
+  'darwin-x64': 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz',
+  'linux-x64': 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64',
+};
+/** Un ejecutable sano pesa decenas de MB; menos que esto es una página de error. */
+const TAMANO_MINIMO = 5_000_000;
 
 /** Estado visible en la pantalla de Configuración. */
 export type EstadoTunel = 'apagado' | 'conectando' | 'conectado' | 'error';
@@ -106,6 +122,66 @@ export class TunelManager {
   /** ¿Esta instalación tiene credencial cargada? */
   estaAprovisionado(): boolean {
     return existsSync(this.rutaCredencial);
+  }
+
+  /** ¿Está el componente del túnel en esta PC? */
+  tieneBinario(): boolean {
+    try {
+      return existsSync(this.opts.binario()) && statSync(this.opts.binario()).size > TAMANO_MINIMO;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Se asegura de que el componente esté disponible, bajándolo si falta. Es lo
+   * que permite que el instalador no engorde 50 MB para todos los comercios:
+   * sólo lo descarga el que enciende el acceso remoto, una única vez.
+   *
+   * Se baja a un archivo temporal y recién al terminar se renombra: una
+   * descarga cortada a la mitad no deja un ejecutable roto que después falle
+   * de una forma incomprensible.
+   */
+  async asegurarBinario(): Promise<void> {
+    if (this.tieneBinario()) return;
+    const clave = `${process.platform}-${process.arch}`;
+    const url = DESCARGAS[clave];
+    if (!url) throw new Error(`El acceso remoto no está disponible para este equipo (${clave})`);
+    if (!existsSync(this.carpeta)) mkdirSync(this.carpeta, { recursive: true });
+
+    const destino = path.join(this.carpeta, process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared');
+    const tmp = `${destino}.descargando`;
+    this.log.info(`[remoto] descargando el componente (${clave})`);
+    const res = await fetch(url, { redirect: 'follow' });
+    if (!res.ok || !res.body) throw new Error(`No se pudo descargar el componente (${res.status})`);
+    const datos = Buffer.from(await res.arrayBuffer());
+    if (datos.length < TAMANO_MINIMO) throw new Error('La descarga del componente llegó incompleta');
+
+    if (url.endsWith('.tgz')) {
+      // macOS lo publica comprimido; se descomprime con la herramienta del sistema.
+      const tgz = `${destino}.tgz`;
+      writeFileSync(tgz, datos);
+      await new Promise<void>((resolve, reject) => {
+        const p = spawn('tar', ['xzf', tgz, '-C', this.carpeta]);
+        p.on('error', reject);
+        p.on('exit', (c) => (c === 0 ? resolve() : reject(new Error('No se pudo descomprimir el componente'))));
+      });
+      try {
+        unlinkSync(tgz);
+      } catch {
+        /* no importa */
+      }
+    } else {
+      writeFileSync(tmp, datos);
+      renameSync(tmp, destino);
+    }
+    try {
+      chmodSync(destino, 0o755);
+    } catch {
+      /* en Windows no hace falta */
+    }
+    if (!this.tieneBinario()) throw new Error('El componente se descargó pero no quedó utilizable');
+    this.log.info('[remoto] componente listo');
   }
 
   /**

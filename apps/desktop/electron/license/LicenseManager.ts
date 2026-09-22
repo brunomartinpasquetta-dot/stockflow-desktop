@@ -537,6 +537,40 @@ export class LicenseManager {
   /* Heartbeat                                                           */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * ACCESO REMOTO: le pide al servidor el alta del túnel de ESTE comercio.
+   * Se identifica con el mismo token de licencia del heartbeat, así que sólo
+   * un cliente con licencia activa puede pedirlo. Devuelve lo que hay que
+   * guardar en la PC; la llave maestra de Cloudflare nunca baja hasta acá.
+   */
+  async pedirAltaRemota(): Promise<{ hostname: string; tunnelId: string; credencial: string }> {
+    const jwt = this.readStoredJwt();
+    if (!jwt) throw new Error('Esta instalación todavía no tiene una licencia activada.');
+    let res: Response;
+    try {
+      res = await fetch(`${this.apiUrl}/api/remoto/alta`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${jwt}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch {
+      throw new Error('No se pudo contactar al servidor. Revise la conexión a internet.');
+    }
+    const body = (await res.json().catch(() => ({}))) as {
+      hostname?: string;
+      tunnelId?: string;
+      credencial?: string;
+      error?: string;
+    };
+    if (!res.ok) {
+      throw new Error(body.error ?? `El servidor respondió ${res.status}`);
+    }
+    if (!body.hostname || !body.tunnelId || !body.credencial) {
+      throw new Error('El servidor no devolvió los datos del acceso remoto.');
+    }
+    return { hostname: body.hostname, tunnelId: body.tunnelId, credencial: body.credencial };
+  }
+
   async heartbeat(): Promise<void> {
     try {
       let jwt = this.readStoredJwt();

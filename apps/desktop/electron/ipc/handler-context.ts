@@ -70,6 +70,8 @@ export interface HandlerDeps {
 export interface TunelLike {
   estado(): { estado: string; direccion: string | null; ultimoError: string | null; desde: number };
   estaAprovisionado(): boolean;
+  tieneBinario(): boolean;
+  asegurarBinario(): Promise<void>;
   iniciar(): { estado: string; direccion: string | null; ultimoError: string | null; desde: number };
   detener(): { estado: string; direccion: string | null; ultimoError: string | null; desde: number };
   aprovisionar(credencialJson: string, hostname: string, tunnelId: string): void;

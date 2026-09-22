@@ -619,6 +619,7 @@ export function createApiBridge(
       remotoEstado: () => c<never>('lan:remotoEstado'),
       remotoActivar: (p) => c<never>('lan:remotoActivar', p),
       remotoAprovisionar: (p) => c<never>('lan:remotoAprovisionar', p),
+      remotoConfigurarAutomatico: () => c<never>('lan:remotoConfigurarAutomatico'),
       getConnectedClients: () => c<never>('lan:getConnectedClients'),
       applyAndRestart: () => c<never>('lan:applyAndRestart'),
     },

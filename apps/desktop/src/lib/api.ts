@@ -597,6 +597,7 @@ export const api = {
     remotoActivar: (activo: boolean) => unwrap(sf().lan.remotoActivar({ activo })),
     remotoAprovisionar: (credencial: string, hostname: string, tunnelId: string) =>
       unwrap(sf().lan.remotoAprovisionar({ credencial, hostname, tunnelId })),
+    remotoConfigurarAutomatico: () => unwrap(sf().lan.remotoConfigurarAutomatico()),
     /**
      * Ping directo desde el renderer (HTTP GET /lan/ping al server LAN).
      * No usa IPC: el renderer puede hacer fetch sin CORS issues (server permite *).

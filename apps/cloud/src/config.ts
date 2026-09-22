@@ -35,6 +35,19 @@ export const PLAN_FEATURES: Record<PlanId, { arca: boolean }> = {
 export const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 export const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
 
+/* ----- Acceso remoto (túnel de los comercios) ----- */
+/**
+ * Llave de Cloudflare con permiso para crear túneles y escribir el DNS del
+ * dominio. Vive SÓLO acá: en la PC de un comercio sería una llave regalada.
+ * Sin estas variables, el alta automática responde "no disponible" y el
+ * comercio puede seguir cargando la credencial a mano.
+ */
+export const REMOTO_CF_API_TOKEN = process.env.REMOTO_CF_API_TOKEN;
+export const REMOTO_CF_ACCOUNT_ID = process.env.REMOTO_CF_ACCOUNT_ID;
+export const REMOTO_CF_ZONE_ID = process.env.REMOTO_CF_ZONE_ID;
+/** Dominio bajo el que cuelga cada comercio: `<comercio>.<dominio>`. */
+export const REMOTO_DOMINIO = process.env.REMOTO_DOMINIO ?? 'mistockflow.com';
+
 /* ----- Panel admin ----- */
 export const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@stockflow.local';
 export const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH ?? '';

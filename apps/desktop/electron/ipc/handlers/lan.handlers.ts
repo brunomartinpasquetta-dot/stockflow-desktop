@@ -301,6 +301,32 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
       },
     ),
 
+    /**
+     * UN SOLO CLIC: el comercio pide su acceso remoto y queda funcionando.
+     * El servidor le crea su dirección y su credencial (con su licencia como
+     * identificación), acá se baja el componente si falta, se guarda todo y se
+     * enciende el túnel. No hay nada que copiar a mano.
+     */
+    'lan:remotoConfigurarAutomatico': unguarded(
+      deps,
+      async (): Promise<{ ok: true; direccion: string; estado: string }> => {
+        const session = deps.sessionStore.getSession();
+        if (session) requirePermission(session.user, 'manage_hardware');
+        const tunel = deps.lanExtras?.tunel;
+        if (!tunel) throw new ValidationError('remoto', 'El acceso remoto sólo se activa en la PC que tiene el sistema');
+        // 1) El componente (se descarga una sola vez por PC).
+        await tunel.asegurarBinario();
+        // 2) El servidor da de alta este comercio y devuelve su dirección.
+        const alta = await deps.licenseManager.pedirAltaRemota();
+        // 3) Queda guardado en esta PC y se enciende.
+        tunel.aprovisionar(alta.credencial, alta.hostname, alta.tunnelId);
+        const mgr = getManager(deps);
+        mgr.setConfig({ ...mgr.getConfig(), remotoActivado: true, remotoHostname: alta.hostname });
+        const e = tunel.iniciar();
+        return { ok: true, direccion: `https://${alta.hostname}`, estado: e.estado };
+      },
+    ),
+
     /** Prende o apaga el acceso remoto, sin reiniciar la aplicación. */
     'lan:remotoActivar': unguarded(
       deps,

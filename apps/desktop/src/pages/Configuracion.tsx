@@ -779,6 +779,20 @@ function AccesoRemotoCard() {
     }
   }
 
+  /** Un solo clic: el servidor da el alta y queda funcionando. */
+  async function activarAutomatico(): Promise<void> {
+    setTrabajando(true)
+    try {
+      const r = await api.lan.remotoConfigurarAutomatico()
+      await qc.invalidateQueries({ queryKey: ['lan', 'remoto'] })
+      toast.success(`Acceso remoto activado en ${r.direccion}`, { duration: 12_000 })
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'No se pudo activar el acceso remoto', { duration: 12_000 })
+    } finally {
+      setTrabajando(false)
+    }
+  }
+
   async function guardarCredencial(): Promise<void> {
     setTrabajando(true)
     try {
@@ -857,11 +871,20 @@ function AccesoRemotoCard() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2 rounded border border-dashed px-2 py-1.5">
-            <span className="text-xs text-muted-foreground">Esta instalación todavía no tiene el acceso remoto configurado.</span>
-            <Button variant="outline" size="sm" type="button" onClick={() => setAprovisionando(true)}>
-              Configurar
-            </Button>
+          <div className="flex flex-col gap-2 rounded border border-dashed px-2 py-2">
+            <span className="text-xs text-muted-foreground">
+              Esta instalación todavía no tiene el acceso remoto activado. Al activarlo se le asigna una
+              dirección web propia; la primera vez puede demorar un minuto mientras se prepara.
+            </span>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" type="button" onClick={() => setAprovisionando(true)} disabled={trabajando}>
+                Cargar datos a mano
+              </Button>
+              <Button size="sm" type="button" onClick={() => void activarAutomatico()} disabled={trabajando}>
+                {trabajando && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                Activar acceso remoto
+              </Button>
+            </div>
           </div>
         )
       ) : (
