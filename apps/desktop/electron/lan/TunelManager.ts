@@ -210,6 +210,15 @@ export class TunelManager {
     ].join('\n');
     writeFileSync(this.rutaConfig, yml, 'utf8');
     this.info = { ...this.info, direccion: `https://${hostname}` };
+    // Si ya había un túnel corriendo, está sirviendo la configuración VIEJA:
+    // hay que reiniciarlo o la dirección nueva devuelve error 1033 mientras la
+    // pantalla dice "conectado" (pasó en la primera prueba de punta a punta).
+    if (this.proc) {
+      const seguia = this.quiereCorrer;
+      this.detener();
+      this.quiereCorrer = seguia;
+      if (seguia) this.lanzar();
+    }
   }
 
   estado(): TunelInfo {

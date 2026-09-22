@@ -83,8 +83,16 @@ function configDesdeUrl(): LanClientConfig {
   };
 }
 
-/** true si todavía no tenemos el PIN del servidor. */
+/**
+ * true si todavía no tenemos el PIN del servidor.
+ *
+ * Sólo hace falta para las terminales de la RED LOCAL: el PIN es el
+ * emparejamiento de los puestos del comercio. Entrando por el acceso remoto no
+ * se pide —la puerta es el usuario y la contraseña—, y por eso esto mira
+ * también el esquema: servida por `https://` la página vino por el túnel.
+ */
 export function faltaPin(): boolean {
+  if (window.location.protocol === 'https:') return false;
   return !localStorage.getItem(PIN_KEY);
 }
 

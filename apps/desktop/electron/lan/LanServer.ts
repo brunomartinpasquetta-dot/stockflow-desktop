@@ -67,6 +67,12 @@ export interface ClienteConectado {
 export interface LanServerOptions {
   handlers: HandlerMap;
   port: number;
+  /**
+   * Puerta dedicada al acceso remoto, atada a 127.0.0.1. Sólo la alcanza el
+   * túnel de esta misma PC; por ahí no se pide el PIN de la red local.
+   * Ausente = no hay acceso remoto (comportamiento anterior).
+   */
+  tunnelPort?: number;
   token: string;
   /** Required para impersonar al usuario del JWT durante RPCs autenticados. */
   sessionStore?: SessionStore;
@@ -267,6 +273,8 @@ const NO_AUTH_CHANNELS = new Set(['auth:login', 'auth:logout']);
 export class LanServer {
   private readonly opts: LanServerOptions;
   private server: Server | null = null;
+  /** Puerta dedicada al acceso remoto: sólo la usa el túnel (ver `start`). */
+  private serverTunel: Server | null = null;
   private bonjour: { unpublishAll: (cb?: () => void) => void } | null = null;
   private bonjourService: { stop: (cb?: () => void) => void } | null = null;
   private readonly log: NonNullable<LanServerOptions['log']>;
@@ -291,17 +299,33 @@ export class LanServer {
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const server = createServer((req, res) => {
-        void this.handle(req, res).catch((err: unknown) => {
+      const atender = (esTunel: boolean) => (req: IncomingMessage, res: ServerResponse) => {
+        void this.handle(req, res, esTunel).catch((err: unknown) => {
           this.log.error(`error inesperado: ${err instanceof Error ? err.message : String(err)}`);
           if (!res.headersSent) sendJson(res, 500, { ok: false, code: 'INTERNAL', message: 'Error interno' });
         });
-      });
+      };
+      const server = createServer(atender(false));
       server.once('error', reject);
       server.listen(this.opts.port, '0.0.0.0', () => {
         this.server = server;
         this.log.info(`escuchando en :${this.opts.port}`);
         if (this.opts.enableMdns) this.tryStartMdns();
+
+        // PUERTA DEL ACCESO REMOTO: una segunda escucha, atada a 127.0.0.1, que
+        // sólo puede alcanzar el túnel corriendo en esta misma PC. "Vino de
+        // afuera" pasa a ser una propiedad de POR DÓNDE ENTRÓ y no una
+        // suposición a partir de la IP, que es lo que recomendaba el plan.
+        // Por esa puerta no se pide el PIN de la red local (el dueño entra con
+        // su usuario y su contraseña); por la otra, todo sigue igual.
+        if (this.opts.tunnelPort) {
+          const st = createServer(atender(true));
+          st.once('error', (err) => this.log.warn(`no se pudo abrir la puerta del acceso remoto: ${String(err)}`));
+          st.listen(this.opts.tunnelPort, '127.0.0.1', () => {
+            this.serverTunel = st;
+            this.log.info(`acceso remoto escuchando en 127.0.0.1:${this.opts.tunnelPort}`);
+          });
+        }
         resolve();
       });
     });
@@ -310,6 +334,10 @@ export class LanServer {
   stop(): Promise<void> {
     return new Promise((resolve) => {
       const finish = (): void => {
+        if (this.serverTunel) {
+          this.serverTunel.close();
+          this.serverTunel = null;
+        }
         if (!this.server) return resolve();
         this.server.close(() => resolve());
         this.server = null;
@@ -468,7 +496,7 @@ export class LanServer {
     );
   }
 
-  private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private async handle(req: IncomingMessage, res: ServerResponse, esTunel = false): Promise<void> {
     if (req.method === 'OPTIONS') {
       sendJson(res, 204, {});
       return;
@@ -523,20 +551,27 @@ export class LanServer {
       return;
     }
 
-    // El bloqueo por PIN aplica a TODO lo que venga de esa IP, acierte o no:
-    // si el intento correcto pasara, el bloqueo no frenaría nada.
-    const bloqueoPin = this.segundosBloqueada(`pin:${remote}`, MAX_FALLOS_PIN);
-    if (bloqueoPin > 0) {
-      this.responderBloqueo(res, bloqueoPin, 'PIN');
-      return;
+    // ACCESO REMOTO: por la puerta del túnel no se pide PIN. El PIN existe
+    // para emparejar las terminales de la red local —es un número compartido
+    // que el dueño no tiene por qué llevar a su casa—; desde afuera la puerta
+    // es el usuario y la contraseña de siempre. Esa puerta está atada a
+    // 127.0.0.1: desde la red local no se la puede alcanzar.
+    if (!esTunel) {
+      // El bloqueo por PIN aplica a TODO lo que venga de esa IP, acierte o no:
+      // si el intento correcto pasara, el bloqueo no frenaría nada.
+      const bloqueoPin = this.segundosBloqueada(`pin:${remote}`, MAX_FALLOS_PIN);
+      if (bloqueoPin > 0) {
+        this.responderBloqueo(res, bloqueoPin, 'PIN');
+        return;
+      }
+      if (!mismoToken(parsed.token, this.opts.token)) {
+        this.registrarFallo(`pin:${remote}`);
+        this.log.warn(`PIN incorrecto desde ${remote}`);
+        sendJson(res, 401, { ok: false, code: 'UNAUTHENTICATED', message: 'Token inválido' });
+        return;
+      }
+      this.fallos.delete(`pin:${remote}`);
     }
-    if (!mismoToken(parsed.token, this.opts.token)) {
-      this.registrarFallo(`pin:${remote}`);
-      this.log.warn(`PIN incorrecto desde ${remote}`);
-      sendJson(res, 401, { ok: false, code: 'UNAUTHENTICATED', message: 'Token inválido' });
-      return;
-    }
-    this.fallos.delete(`pin:${remote}`);
     if (typeof parsed.channel !== 'string') {
       sendJson(res, 400, { ok: false, code: 'VALIDATION', message: 'Canal requerido' });
       return;

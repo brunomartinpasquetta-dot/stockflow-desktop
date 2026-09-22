@@ -407,6 +407,9 @@ function bootstrap(): { lanArgs: string[] } {
       // El PIN sólo empareja; las sesiones se firman con un secreto que no
       // sale de esta máquina (cifrado en lan.json).
       jwtSecret: lanManager.getOrCreateJwtSecret(),
+      // Puerta dedicada del acceso remoto (sólo 127.0.0.1): es a donde el
+      // túnel entrega las visitas de internet.
+      tunnelPort: PUERTO_TUNEL,
       enableMdns: true,
       sessionStore,
       licenseStatus: () => licenseManager?.getState().status ?? 'unlicensed',
@@ -434,7 +437,7 @@ function bootstrap(): { lanArgs: string[] } {
     tunel = new TunelManager({
       userDataDir: app.getPath('userData'),
       binario: rutaCloudflared,
-      puertoLocal: port,
+      puertoLocal: PUERTO_TUNEL,
       log: {
         info: (m) => console.info(m),
         warn: (m) => console.warn(m),
@@ -463,6 +466,12 @@ function bootstrap(): { lanArgs: string[] } {
  * en desarrollo se toma el del equipo (`~/bin/cloudflared`). Si no está, el
  * acceso remoto avisa que falta el componente en vez de fallar en silencio.
  */
+/**
+ * Puerto local por el que el túnel entrega las visitas de internet. No se
+ * publica a la red: la escucha está atada a 127.0.0.1.
+ */
+const PUERTO_TUNEL = 7788;
+
 function rutaCloudflared(): string {
   const nombre = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
   const propio = path.join(app.getPath('userData'), 'remoto', nombre);

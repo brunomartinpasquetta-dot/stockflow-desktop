@@ -130,3 +130,19 @@ Cuatro advertencias para no vender humo:
 - El PIN sigue viajando en la URL la primera vez (`webBridge.ts:65-78`) y queda en el historial de la tablet. Dentro de la tailnet es tolerable; por internet no lo sería.
 
 Orden sensato: primero se lo pone a trabajar con StockFlow en el mostrador, después Tailscale como acceso remoto provisorio, y el túnel propio llega con la etapa 1 sin que él tenga que cambiar nada de su operación.
+
+## 9. Pendientes de pantalla (pedidos por Bruno, 22-sep-2026)
+
+Anotados después de probar la activación en la Mac. No bloquean el
+funcionamiento, sí la experiencia del comerciante:
+
+1. **El botón "Guardar y reiniciar" se habilita al activar el acceso remoto**, y
+   el acceso remoto NO necesita reinicio. Queda confuso: parece que falta un
+   paso. Activar el túnel no tiene que ensuciar el formulario de red.
+2. **El acceso remoto tiene que tener su propia pestaña**, no vivir al final de
+   la sección Red. Es una función distinta de la red local y el comerciante la
+   va a buscar por su nombre.
+3. **El cartel verde de "activado" debe aparecer JUNTO CON el QR**, no antes.
+   Hoy el aviso llega primero y el código aparece un instante después: el dueño
+   ve el mensaje, mira la pantalla y todavía no está lo que necesita.
+

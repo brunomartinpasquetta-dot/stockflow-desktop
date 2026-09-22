@@ -751,6 +751,7 @@ function AccesoRemotoCard() {
     refetchInterval: 5000,
   })
   const [aprovisionando, setAprovisionando] = useState(false)
+  const [qr, setQr] = useState<string | null>(null)
   const [credencial, setCredencial] = useState('')
   const [hostname, setHostname] = useState('')
   const [tunnelId, setTunnelId] = useState('')
@@ -758,6 +759,27 @@ function AccesoRemotoCard() {
 
   const e = estado.data
   const prendido = e?.estado === 'conectado' || e?.estado === 'conectando'
+
+  // El QR se dibuja acá mismo: el dueño apunta la cámara de la tablet y entra.
+  // Sin esto hay que copiar una dirección larga y tipearla en otro dispositivo.
+  useEffect(() => {
+    let vivo = true
+    if (!e?.direccion || e.estado !== 'conectado') {
+      setQr(null)
+      return
+    }
+    void import('qrcode')
+      .then((QR) => QR.toDataURL(e.direccion as string, { width: 420, margin: 1 }))
+      .then((url) => {
+        if (vivo) setQr(url)
+      })
+      .catch(() => {
+        if (vivo) setQr(null)
+      })
+    return () => {
+      vivo = false
+    }
+  }, [e?.direccion, e?.estado])
 
   const LEYENDA: Record<string, string> = {
     apagado: 'Apagado',
@@ -785,7 +807,10 @@ function AccesoRemotoCard() {
     try {
       const r = await api.lan.remotoConfigurarAutomatico()
       await qc.invalidateQueries({ queryKey: ['lan', 'remoto'] })
-      toast.success(`Acceso remoto activado en ${r.direccion}`, { duration: 12_000 })
+      // No hace falta reiniciar: el túnel se levanta en el momento.
+      toast.success(`Acceso remoto activado en ${r.direccion}. Ya puede entrar desde el celular con el código de abajo.`, {
+        duration: 15_000,
+      })
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'No se pudo activar el acceso remoto', { duration: 12_000 })
     } finally {
@@ -912,6 +937,16 @@ function AccesoRemotoCard() {
               >
                 Copiar
               </Button>
+            </div>
+          )}
+          {e.estado === 'conectado' && qr && (
+            <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-3">
+              <img src={qr} alt="Código para entrar desde el celular o la tablet" className="h-32 w-32 rounded bg-white p-1" />
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <span className="text-sm font-medium text-foreground">Entrar desde el celular o la tablet</span>
+                <span>Apunte la cámara a este código y toque el enlace que aparece.</span>
+                <span>Se ingresa con el mismo usuario y la misma contraseña del sistema.</span>
+              </div>
             </div>
           )}
           {e.ultimoError && e.estado !== 'conectado' && (
