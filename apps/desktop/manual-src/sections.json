@@ -1205,6 +1205,39 @@
      ],
      "steps": [],
      "tips": []
+    },
+    {
+     "heading": "Cada venta arranca limpia: cliente y lista vuelven al inicio",
+     "paragraphs": [
+      "Al terminar una venta, el punto de venta vuelve solo a Consumidor Final y a la Lista 1. Antes quedaba pegado el cliente anterior: si entraba otra persona sin identificarse, se le cobraba con la lista del cliente de antes y la venta quedaba a su nombre.",
+      "Si va a hacer varias ventas seguidas al mismo cliente, selecciónelo en cada una."
+     ],
+     "steps": [],
+     "tips": [
+      "Si el artículo no tiene cargado el precio de la Lista 2 o 3, se cobra con la Lista 1 y el sistema lo avisa en pantalla. Antes salía en cero."
+     ]
+    },
+    {
+     "heading": "Anular una venta: motivo obligatorio y aviso de CAE",
+     "paragraphs": [
+      "Al anular se pide el motivo y queda GUARDADO en la venta, junto con el usuario y la fecha. Se ve abriendo la venta en el Historial, al final de las notas.",
+      "Si la venta tiene factura con CAE, el sistema avisa que anularla no la da de baja en ARCA: para eso corresponde emitir una nota de crédito."
+     ],
+     "steps": [],
+     "tips": [
+      "Anular una venta que ya tuvo una devolución no duplica el stock ni el dinero: se revierte sólo lo que quedaba sin devolver."
+     ]
+    },
+    {
+     "heading": "Cuando ARCA no responde",
+     "paragraphs": [
+      "Si ARCA no contesta, el sistema corta la espera y lo informa. Al reintentar desde el Historial, antes de pedir un comprobante nuevo consulta el número que había pedido: si llegó a autorizarse, lo recupera en lugar de emitir otro.",
+      "Por eso no se duplican facturas cuando se corta la conexión en el peor momento."
+     ],
+     "steps": [],
+     "tips": [
+      "El ticket y el PDF archivado llevan el punto de venta y el número que autorizó ARCA, con su CAE y el código QR."
+     ]
     }
    ],
    "screenshots": [
@@ -1927,6 +1960,26 @@
      "steps": [],
      "tips": [
       "El desglose por forma de pago vive adentro de cada caja: es donde se consulta de verdad."
+     ]
+    },
+    {
+     "heading": "La caja cerrada por otra terminal frena la operación",
+     "paragraphs": [
+      "Si otra PC del local cierra la caja mientras usted está cobrando, el sistema frena la operación y avisa. Es a propósito: si la dejara pasar, esa venta entraría a un arqueo ya cerrado y el cierre dejaría de cuadrar.",
+      "Abra una caja nueva y repita la operación. No se pierde nada: la venta no llegó a registrarse."
+     ],
+     "steps": [],
+     "tips": []
+    },
+    {
+     "heading": "Anular una venta cobrada con transferencia, débito o QR",
+     "paragraphs": [
+      "Al anular se revierte todo lo cobrado, no sólo el efectivo. La parte electrónica deja de sumar en el desglose por medio de pago y en lo que ese cierre puede ingresar a Caja General.",
+      "El efectivo vuelve al cajón de la caja abierta; la parte electrónica se descuenta de la caja donde se había cobrado."
+     ],
+     "steps": [],
+     "tips": [
+      "El depósito de un cierre a Caja General ya no permite ingresar más efectivo del contado ni más electrónico del cobrado."
      ]
     }
    ],
@@ -2906,6 +2959,15 @@
      "tips": [
       "Que cada empleado tenga su usuario: así sabés quién trabaja en cada puesto."
      ]
+    },
+    {
+     "heading": "Después de actualizar, las terminales ingresan una vez",
+     "paragraphs": [
+      "El servidor usa una llave propia para firmar las sesiones de las terminales. Al actualizar, las sesiones anteriores dejan de valer: cada puesto entra una vez con su usuario y su contraseña, y no vuelve a ocurrir.",
+      "Si desde una misma PC se escribe mal el PIN cinco veces seguidas, el servidor deja de aceptar intentos de esa PC durante diez minutos. Las terminales que ya están trabajando no se ven afectadas."
+     ],
+     "steps": [],
+     "tips": []
     }
    ],
    "screenshots": [

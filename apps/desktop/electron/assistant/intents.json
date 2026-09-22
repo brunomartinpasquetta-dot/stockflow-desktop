@@ -6539,6 +6539,46 @@
       "filtro medio de pago historial"
      ],
      "answer": "Dos caminos: en Historial de Ventas, filtrá por forma de pago y mirá el total de lo filtrado. O en Caja General → Historial de cajas diarias, hacé clic en la caja del día: el detalle tiene selector de medio de pago y tilde «Sólo ventas», con el total al lado."
+    },
+    {
+     "id": "cliente-vuelve-consumidor-final",
+     "canonical": "¿Por qué después de cobrar vuelve a Consumidor Final?",
+     "patterns": [
+      "se borra el cliente despues de vender",
+      "por que vuelve a consumidor final",
+      "no me queda el cliente",
+      "se reinicia el cliente",
+      "vuelve la lista 1",
+      "se cambia la lista de precios sola",
+      "despues de cobrar se borra el cliente",
+      "el cliente no queda para la proxima venta"
+     ],
+     "answer": "Es a propósito. Cuando termina una venta, el punto de venta vuelve a Consumidor Final y a la Lista 1 para que la venta siguiente arranque limpia. Antes quedaba pegado el cliente anterior con su lista de precios, y si entraba otra persona sin identificarse se le cobraba con los precios del cliente de antes y la venta quedaba a su nombre. Si vas a hacer varias ventas al mismo cliente, elegilo de nuevo en cada una: es un clic y evita el error caro."
+    },
+    {
+     "id": "articulo-sin-precio-lista",
+     "canonical": "El sistema avisa que el artículo no tiene precio en Lista 2 o 3",
+     "patterns": [
+      "sin precio en lista 2",
+      "no tiene precio de lista 3",
+      "me cobra lista 1 y no lista 2",
+      "aviso de lista de precios",
+      "por que me cambia el precio de lista",
+      "se cobra a lista 1"
+     ],
+     "answer": "Ese aviso aparece cuando el artículo no tiene cargado el precio de la lista con la que estás vendiendo (Lista 2 o 3). En ese caso se cobra con la Lista 1 y el sistema te lo dice en pantalla. Antes salía en cero y se vendía regalado sin que nadie se enterara. Para corregirlo, cargá el precio de esa lista en la ficha del artículo."
+    },
+    {
+     "id": "anular-venta-motivo",
+     "canonical": "¿Dónde queda el motivo cuando anulo una venta?",
+     "patterns": [
+      "motivo de anulacion",
+      "por que me pide motivo para anular",
+      "donde veo por que se anulo una venta",
+      "quien anulo la venta",
+      "registro de anulaciones"
+     ],
+     "answer": "Al anular una venta el sistema te pide el motivo y lo GUARDA en la venta, junto con el usuario que la anuló y la fecha. Lo ves abriendo la venta en el Historial: aparece al final de las notas. Si la venta tenía factura con CAE, además te avisa que anularla acá no la da de baja en ARCA: para eso corresponde una nota de crédito."
     }
    ]
   },
@@ -7649,6 +7689,31 @@
       "cuanto entro en efectivo en la caja"
      ],
      "answer": "En el Historial de cajas diarias hacé clic sobre la caja: se abre su detalle con la grilla de movimientos. Arriba de la grilla hay un selector de medio de pago y un tilde «Sólo ventas»; al usarlos aparece el TOTAL de lo filtrado. Desde cada venta de la lista saltás a su detalle con un clic."
+    },
+    {
+     "id": "caja-se-cerro-otra-terminal",
+     "canonical": "No me deja cobrar: dice que la caja se cerró",
+     "patterns": [
+      "la caja se cerro mientras cobraba",
+      "no puedo cobrar caja cerrada",
+      "error caja cerrada",
+      "me dice que abra una caja",
+      "cerraron la caja desde otra pc",
+      "no me toma la venta por la caja"
+     ],
+     "answer": "Pasa cuando otra PC del local cerró la caja justo mientras vos estabas cobrando. El sistema frena la operación a propósito: si la dejara pasar, esa venta entraría a un arqueo que ya se había cerrado y el cierre dejaría de cuadrar. Abrí una caja nueva y repetí la operación; no se perdió nada, la venta no llegó a registrarse."
+    },
+    {
+     "id": "venta-electronica-anulada-arqueo",
+     "canonical": "Anulé una venta con transferencia, ¿qué pasa con el arqueo?",
+     "patterns": [
+      "anule una venta con transferencia",
+      "venta con tarjeta anulada en la caja",
+      "el reparto por medio de pago despues de anular",
+      "la transferencia sigue sumando",
+      "anulacion y medios de pago"
+     ],
+     "answer": "Al anular una venta se revierte TODO lo cobrado, no sólo el efectivo: la transferencia, el débito o el QR también dejan de sumar en el desglose por medio de pago y en lo que ese cierre puede ingresar a Caja General. El efectivo vuelve al cajón de la caja abierta; la parte electrónica se descuenta de la caja donde se había cobrado."
     }
    ]
   },
@@ -10467,6 +10532,30 @@
       "Ingresá tu contraseña de administrador para confirmar y tocá 'Reiniciar todo'.",
       "StockFlow crea un backup automático y deja las ventas/caja/stock en cero. Si te arrepentís, restaurá ese backup desde Configuración → Backup."
      ]
+    },
+    {
+     "id": "terminales-vuelven-a-ingresar",
+     "canonical": "Después de actualizar, las terminales piden usuario y contraseña de nuevo",
+     "patterns": [
+      "las cajas piden login de nuevo",
+      "se deslogearon las terminales",
+      "tengo que volver a entrar en cada pc",
+      "despues de actualizar piden usuario",
+      "perdi la sesion en la terminal"
+     ],
+     "answer": "Es esperado y pasa UNA sola vez. El servidor pasó a usar una llave propia para firmar las sesiones de las terminales (antes se derivaba del PIN, que todas conocen). Al actualizar, las sesiones viejas dejan de valer: cada puesto entra una vez con su usuario y su contraseña y no vuelve a pasar."
+    },
+    {
+     "id": "bloqueo-por-pin",
+     "canonical": "Una terminal quedó bloqueada por poner mal el PIN",
+     "patterns": [
+      "me bloqueo por el pin",
+      "dice demasiados intentos",
+      "429",
+      "espere para volver a intentar",
+      "pin incorrecto varias veces"
+     ],
+     "answer": "Si desde una misma PC se escribe mal el PIN de la red cinco veces seguidas, el servidor deja de aceptar intentos de esa PC durante diez minutos. Es para que nadie pueda adivinarlo probando. Las terminales que ya están trabajando no se ven afectadas. Se espera los diez minutos o se reinicia el sistema del servidor."
     }
    ]
   },
@@ -12707,6 +12796,31 @@
       "label": "Abrir Facturación Electrónica",
       "screen": "facturacion-electronica"
      }
+    },
+    {
+     "id": "arca-no-responde-reintento",
+     "canonical": "ARCA no respondió al facturar, ¿se emite dos veces?",
+     "patterns": [
+      "arca no contesta",
+      "se cuelga al facturar",
+      "timeout arca",
+      "reintentar factura",
+      "se factura dos veces",
+      "no se si salio la factura"
+     ],
+     "answer": "No. Si ARCA no responde, el sistema corta la espera y te avisa. Cuando reintentás desde el Historial, antes de pedir un comprobante nuevo consulta en ARCA el número que había pedido: si ese comprobante llegó a autorizarse, lo recupera en vez de emitir otro. Por eso no se duplican facturas cuando se corta la conexión en el peor momento."
+    },
+    {
+     "id": "ticket-numero-arca",
+     "canonical": "¿Qué número sale impreso en el ticket de una factura?",
+     "patterns": [
+      "numero de la factura en el ticket",
+      "punto de venta en el ticket",
+      "el ticket tiene otro numero",
+      "numero interno o de arca",
+      "qr en el ticket"
+     ],
+     "answer": "Sale el punto de venta y el número que autorizó ARCA (por ejemplo 0004-00001247), junto con el CAE, su vencimiento y el código QR obligatorio. Antes salía el número interno del sistema, que no coincide con el de ARCA: si el cliente o el contador comparaban, no cerraba."
     }
    ]
   }
