@@ -307,6 +307,9 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
      * puerta abierta a la caja, los clientes y la facturación del comercio.
      */
     'lan:remotoClavesDebiles': unguarded(deps, async (): Promise<{ usuarios: string[] }> => {
+      // La instalación maestra (la del dueño del sistema) no arrastra esta
+      // fricción: es la máquina de desarrollo, no un comercio publicado.
+      if (deps.licenseManager.esInstalacionMaestra()) return { usuarios: [] };
       const usuarios = await deps.repos.users.usuariosConClaveDebil();
       return { usuarios };
     }),
@@ -326,7 +329,9 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
         if (!tunel) throw new ValidationError('remoto', 'El acceso remoto sólo se activa en la PC que tiene el sistema');
         // 0) Antes que nada: que no haya usuarios con la clave puesta por
         // defecto. Publicar el sistema con `admin/admin` es regalarlo.
-        const debiles = await deps.repos.users.usuariosConClaveDebil();
+        const debiles = deps.licenseManager.esInstalacionMaestra()
+          ? []
+          : await deps.repos.users.usuariosConClaveDebil();
         if (debiles.length > 0) {
           throw new ValidationError(
             'claves',
@@ -356,7 +361,7 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
         if (session) requirePermission(session.user, 'manage_hardware');
         const tunel = deps.lanExtras?.tunel;
         if (!tunel) throw new ValidationError('activo', 'Esta instalación no tiene acceso remoto disponible');
-        if (payload?.activo) {
+        if (payload?.activo && !deps.licenseManager.esInstalacionMaestra()) {
           const debiles = await deps.repos.users.usuariosConClaveDebil();
           if (debiles.length > 0) {
             throw new ValidationError(

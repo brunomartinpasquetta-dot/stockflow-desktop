@@ -34,8 +34,22 @@ export function buildAuthHandlers(deps: HandlerDeps): HandlerMap {
       return { loggedOut: true };
     }),
     'auth:getCurrentUser': unguarded(deps, async (): Promise<UserDTO | null> => {
-      const user = deps.sessionStore.getSession()?.user;
-      return user ? toUserDTO(user) : null;
+      const yaHay = deps.sessionStore.getSession()?.user;
+      if (yaHay) return toUserDTO(yaHay);
+      // INSTALACIÓN MAESTRA (la del dueño del sistema): entra sola con el
+      // administrador, sin pasar por la pantalla de ingreso. Es la máquina de
+      // desarrollo, donde la aplicación se abre y se cierra decenas de veces
+      // por día. Ningún comercio tiene la licencia maestra, así que a ellos no
+      // les cambia nada: siguen ingresando con su usuario y su contraseña.
+      if (!deps.licenseManager.esInstalacionMaestra()) return null;
+      const admin = await deps.repos.users.findOne({ role: 'admin', active: true });
+      if (!admin) return null;
+      const { passwordHash: _omit, ...safe } = admin as typeof admin & { passwordHash?: string };
+      void _omit;
+      const token = auth.issueSessionToken(safe);
+      deps.sessionStore.setSession(safe, token);
+      console.info(`[auth] instalación maestra: sesión automática como ${safe.username}`);
+      return toUserDTO(safe);
     }),
   };
 }

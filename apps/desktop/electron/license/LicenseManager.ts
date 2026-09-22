@@ -156,6 +156,17 @@ export class LicenseManager {
     return existsSync(this.masterFilePath());
   }
 
+  /**
+   * ¿Es la instalación del DUEÑO del sistema (licencia maestra)?
+   *
+   * Sirve para que la máquina de desarrollo no tenga las fricciones pensadas
+   * para un comercio: el ingreso automático y el bloqueo por contraseña débil.
+   * Ningún cliente tiene esta licencia, así que nada de esto los alcanza.
+   */
+  esInstalacionMaestra(): boolean {
+    return this.hasMasterLicense();
+  }
+
   private storeJwt(jwt: string): void {
     try {
       // Asegurar el dir (en Windows, recién creado, podría no existir todavía).

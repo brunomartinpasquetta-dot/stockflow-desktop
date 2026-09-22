@@ -31,6 +31,16 @@ export class AuthService {
     return { user, sessionToken };
   }
 
+  /**
+   * Emite un token de sesión para un usuario YA verificado por otro medio.
+   * Hoy lo usa sólo la instalación maestra (la máquina del dueño del sistema),
+   * que entra sola sin pasar por la pantalla de ingreso. No valida nada: quien
+   * la llama es responsable de haber comprobado la identidad.
+   */
+  issueSessionToken(user: Pick<SafeUser, 'id' | 'username' | 'role'>): string {
+    return signSession({ sub: user.id, username: user.username, role: user.role });
+  }
+
   /** Verifica un token de sesión; devuelve el payload o `null`. */
   verifySession(token: string): SessionPayload | null {
     return verifySession(token);
