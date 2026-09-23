@@ -15,27 +15,22 @@
   </header>
 
   <main class="max-w-4xl mx-auto px-6 py-12 space-y-12">
-    <!-- Comparativa de planes -->
+    <!-- Precio -->
     <section>
-      <h2 class="text-2xl font-semibold mb-6 text-center">Planes</h2>
-      <div class="overflow-x-auto">
-        <table class="w-full border border-slate-200 bg-white rounded-lg overflow-hidden">
-          <thead class="bg-slate-100">
-            <tr>
-              <th class="text-left p-4">Característica</th>
-              <th class="p-4">Plan Básico<br /><span class="text-indigo-700 font-bold">$15.000/mes</span></th>
-              <th class="p-4">Plan Pro<br /><span class="text-indigo-700 font-bold">$25.000/mes</span></th>
-            </tr>
-          </thead>
-          <tbody class="text-center">
-            <tr class="border-t border-slate-200"><td class="text-left p-4">Stock, ventas y caja</td><td class="p-4">✓</td><td class="p-4">✓</td></tr>
-            <tr class="border-t border-slate-200"><td class="text-left p-4">Reportes</td><td class="p-4">✓</td><td class="p-4">✓</td></tr>
-            <tr class="border-t border-slate-200"><td class="text-left p-4">Facturación electrónica ARCA</td><td class="p-4 text-slate-400">—</td><td class="p-4">✓</td></tr>
-            <tr class="border-t border-slate-200"><td class="text-left p-4">Soporte prioritario</td><td class="p-4 text-slate-400">—</td><td class="p-4">✓</td></tr>
-          </tbody>
-        </table>
+      <h2 class="text-2xl font-semibold mb-6 text-center">Precio</h2>
+      <div class="bg-white border border-slate-200 rounded-lg p-8 max-w-md mx-auto text-center">
+        <p class="text-4xl font-bold text-indigo-700">$80.000<span class="text-lg font-normal text-slate-500">/mes</span></p>
+        <p class="text-sm text-slate-500 mt-1">Todo incluido. Sin límite de artículos ni de ventas.</p>
+        <ul class="text-left mt-6 space-y-2 text-slate-700">
+          <li>✓ Stock, ventas y caja</li>
+          <li>✓ Facturación electrónica ARCA</li>
+          <li>✓ Clientes, cuentas corrientes y compras</li>
+          <li>✓ Reportes y estadísticas</li>
+          <li>✓ Copias de seguridad automáticas</li>
+          <li>✓ Actualizaciones y soporte</li>
+        </ul>
+        <p class="text-sm text-slate-500 mt-6">Probalo 30 días gratis, sin tarjeta.</p>
       </div>
-      <p class="text-sm text-slate-500 mt-2 text-center">El Plan Pro incluye facturación electrónica ARCA.</p>
     </section>
 
     <!-- Formulario de alta -->
@@ -58,11 +53,8 @@
           <label class="block text-sm font-medium mb-1" for="companyName">Nombre del comercio</label>
           <input id="companyName" name="companyName" type="text" required class="w-full border border-slate-300 rounded-md px-3 py-2" />
         </div>
-        <fieldset>
-          <legend class="block text-sm font-medium mb-1">Plan</legend>
-          <label class="inline-flex items-center mr-6"><input type="radio" name="plan" value="basic" checked class="mr-2" /> Básico ($15.000/mes)</label>
-          <label class="inline-flex items-center"><input type="radio" name="plan" value="pro" class="mr-2" /> Pro ($25.000/mes)</label>
-        </fieldset>
+        <input type="hidden" name="plan" value="pro" />
+        <p class="text-sm text-slate-600">StockFlow completo, <strong>$80.000 por mes</strong>. Los primeros 30 días son gratis.</p>
         <button type="submit" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-semibold rounded-md py-2.5">Suscribirme</button>
       </form>
       <p id="result" class="mt-4 text-sm"></p>

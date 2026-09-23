@@ -21,8 +21,10 @@ export const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3009';
 
 /** Precios mensuales por plan (en ARS). */
 export const PLAN_PRICES: Record<PlanId, number> = {
-  basic: Number(process.env.PLAN_BASIC_PRICE ?? 15000),
-  pro: Number(process.env.PLAN_PRO_PRICE ?? 25000),
+  // Precio único: StockFlow completo (22-sep-2026). Los dos planes siguen
+  // existiendo en la base por compatibilidad con las licencias ya emitidas.
+  basic: Number(process.env.PLAN_BASIC_PRICE ?? 80000),
+  pro: Number(process.env.PLAN_PRO_PRICE ?? 80000),
 };
 
 /** Features habilitadas por plan (se exponen en /api/me). */
