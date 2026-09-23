@@ -1035,7 +1035,7 @@ function AccesoRemotoCard() {
   )
 }
 
-/* ----------------------- LAN ----------------------- */
+/* ----------------------- Red local ----------------------- */
 function LanSection() {
   const qc = useQueryClient()
   const cfgQuery = useQuery({ queryKey: ['lan', 'config'], queryFn: () => api.lan.getConfig() })
@@ -1124,7 +1124,7 @@ function LanSection() {
           { duration: 8000 },
         )
       } else {
-        toast.success('Configuración LAN guardada. Reiniciando…')
+        toast.success('Configuración de red guardada. Reiniciando…')
       }
       setTimeout(() => void api.lan.applyAndRestart(), 600)
     },

@@ -93,7 +93,7 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'empresa', label: 'Mi Empresa', icon: Building2, roles: ['admin'], requires: 'manage_company' },
       { pageKey: 'configuracion', label: 'Configuración General', icon: Settings, roles: ['admin'] },
       { pageKey: 'configuracion', label: 'Configuración Hardware', icon: HardDrive, roles: ['admin'], initialTab: 'hardware' },
-      { pageKey: 'configuracion', label: 'Configuración LAN', icon: Network, roles: ['admin'], initialTab: 'lan' },
+      { pageKey: 'configuracion', label: 'Configuraciones de red', icon: Network, roles: ['admin'], initialTab: 'lan' },
       { pageKey: 'configuracion', label: 'Backup / Restaurar', icon: Save, roles: ['admin'], initialTab: 'backup' },
       { pageKey: 'configuracion-mp', label: 'Configuración MercadoPago', icon: CreditCard, roles: ['admin'], requires: 'manage_mp_qr' },
       { separator: true, label: '' },
