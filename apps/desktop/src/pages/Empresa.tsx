@@ -209,7 +209,9 @@ function EmpresaForm({ company }: { company: CompanyDTO }) {
                 </p>
               </div>
             </div>
-            <EspejoCatalogo />
+            <p className="text-xs text-muted-foreground">
+              La publicación de los artículos se maneja en Configuración → Catálogo web.
+            </p>
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="emp-phone">Teléfono</Label>
@@ -358,7 +360,7 @@ export function Empresa() {
  * hay nada que hacer. El estado se refresca solo: el que empuja es un reloj del
  * proceso principal, no esta pantalla.
  */
-function EspejoCatalogo(): React.ReactElement {
+export function EspejoCatalogo(): React.ReactElement {
   const qc = useQueryClient()
   const estado = useQuery({
     queryKey: ['catalogo', 'syncEstado'],

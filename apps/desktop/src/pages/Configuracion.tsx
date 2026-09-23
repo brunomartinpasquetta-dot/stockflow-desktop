@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, RefreshCcw, AlertTriangle, Trash2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
+import { EspejoCatalogo } from './Empresa'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -729,6 +730,29 @@ function BackupSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </Card>
+  )
+}
+
+/* ----------------------- Catálogo web ----------------------- */
+/**
+ * Publicación de los artículos en el catálogo web del comercio. Vive acá, con
+ * el resto de lo que sale del local hacia afuera (red local y acceso remoto),
+ * y no mezclado con los datos fiscales de la empresa.
+ */
+function CatalogoWebSection() {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 pt-4">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-sm font-semibold">Catálogo web</h2>
+          <p className="text-xs text-muted-foreground">
+            Mantiene actualizados en el catálogo el código, el nombre, el precio y el stock de los
+            artículos. La dirección y la clave del catálogo se cargan en Mi Empresa.
+          </p>
+        </div>
+        <EspejoCatalogo />
+      </CardContent>
     </Card>
   )
 }
@@ -1475,7 +1499,7 @@ function GeneralSection() {
 
 import { useWindowSelf } from '@/contexts/WindowManagerContext'
 
-const VALID_TABS = ['hardware', 'backup', 'lan', 'remoto', 'updates', 'general', 'mantenimiento'] as const
+const VALID_TABS = ['hardware', 'backup', 'lan', 'catalogo', 'remoto', 'updates', 'general', 'mantenimiento'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 function readInitialTab(extras: unknown): TabValue | null {
@@ -1602,7 +1626,8 @@ export function Configuracion() {
         <TabsList>
           <TabsTrigger value="hardware">Hardware</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
-          <TabsTrigger value="lan">LAN</TabsTrigger>
+          <TabsTrigger value="lan">Red local</TabsTrigger>
+          <TabsTrigger value="catalogo">Catálogo web</TabsTrigger>
           <TabsTrigger value="remoto">Acceso remoto</TabsTrigger>
           <TabsTrigger value="updates">Actualizaciones</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
@@ -1617,6 +1642,9 @@ export function Configuracion() {
         </TabsContent>
         <TabsContent value="lan">
           <LanSection />
+        </TabsContent>
+        <TabsContent value="catalogo">
+          <CatalogoWebSection />
         </TabsContent>
         <TabsContent value="remoto">
           <AccesoRemotoSection />

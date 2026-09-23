@@ -17,6 +17,7 @@ import { ValidationError, requirePermission } from '@stockflow/core';
 
 const execFileP = promisify(execFile);
 
+import { altaTunelLocal, leerLlaveLocal } from '../../lan/altaCloudflare';
 import { LanManager } from '../../lan/LanManager';
 import type { LanConfig, LanMode } from '../../lan/types';
 import { DEFAULT_LAN_PORT } from '../../lan/types';
@@ -343,7 +344,21 @@ export function buildLanHandlers(deps: HandlerDeps): HandlerMap {
         // 1) El componente (se descarga una sola vez por PC).
         await tunel.asegurarBinario();
         // 2) El servidor da de alta este comercio y devuelve su dirección.
-        const alta = await deps.licenseManager.pedirAltaRemota();
+        //    Los errores del servidor (sin licencia, servicio caído) se
+        //    muestran TAL CUAL al comerciante: como error interno no le dicen
+        //    nada y no sabe si es él o el sistema.
+        let alta: { hostname: string; tunnelId: string; credencial: string };
+        // La máquina del DUEÑO no tiene un comercio en el servidor, así que no
+        // puede pedirle el alta a nadie: si tiene su propia llave de Cloudflare
+        // guardada, crea el túnel ella misma. Un comercio nunca entra por acá.
+        const llavePropia = deps.licenseManager.esInstalacionMaestra()
+          ? leerLlaveLocal(deps.userDataDir)
+          : null;
+        try {
+          alta = llavePropia ? await altaTunelLocal(llavePropia) : await deps.licenseManager.pedirAltaRemota();
+        } catch (e) {
+          throw new ValidationError('remoto', e instanceof Error ? e.message : 'No se pudo configurar el acceso remoto');
+        }
         // 3) Queda guardado en esta PC y se enciende.
         tunel.aprovisionar(alta.credencial, alta.hostname, alta.tunnelId);
         const mgr = getManager(deps);
