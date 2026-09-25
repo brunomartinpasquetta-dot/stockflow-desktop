@@ -207,6 +207,48 @@ async function parteServidor(): Promise<void> {
     await s3.stop();
   }
 
+  // --- soloTunel: el comercio de UNA PC tiene acceso remoto sin exponer la red
+  // La 1.10.0 salió con el túnel atado al modo servidor, así que en un comercio
+  // de una sola PC la pestaña de Acceso remoto quedaba vacía (Denver, 25-sep).
+  // Al arreglarlo hay que sostener las DOS mitades: que la puerta del túnel
+  // abra, y que NO aparezca nada escuchando en la red local.
+  {
+    const PUERTO_TUNEL = 47751;
+    const PUERTO_LAN = 47752;
+    const s4 = new LanServer({
+      handlers: mockHandlers(),
+      soloTunel: true,
+      tunnelPort: PUERTO_TUNEL,
+      port: PUERTO_LAN,
+      token: PIN,
+      jwtSecret: SECRETO,
+      sessionStore: new SessionStore(),
+      resolveUser,
+      log: silencio,
+    });
+    await s4.start();
+
+    // Por la puerta del túnel se entra SIN el PIN de la red local.
+    const sinPin = await rpc(`http://127.0.0.1:${PUERTO_TUNEL}/lan/rpc`, { channel: 'articles:list' }, jwtAdmin);
+    check('soloTunel: la puerta del túnel atiende y no pide PIN', sinPin.status === 200, String(sinPin.status));
+
+    // Y la lista corta de internet se sigue aplicando por esa puerta.
+    const vedado = await rpc(`http://127.0.0.1:${PUERTO_TUNEL}/lan/rpc`, { channel: 'backup:restore' }, jwtAdmin);
+    check('soloTunel: los canales vedados desde internet siguen en 403', vedado.status === 403, String(vedado.status));
+
+    // Nada en el puerto de la red local: es el punto de todo el modo.
+    let escuchaEnLaRed = false;
+    try {
+      await fetch(`http://127.0.0.1:${PUERTO_LAN}/lan/ping`, { signal: AbortSignal.timeout(1500) });
+      escuchaEnLaRed = true;
+    } catch {
+      escuchaEnLaRed = false;
+    }
+    check('soloTunel: NO escucha en el puerto de la red local', !escuchaEnLaRed);
+
+    await s4.stop();
+  }
+
   // --- LanManager: el secreto persiste y sobrevive a setConfig; rotar lo cambia
   {
     const dir = mkdtempSync(join(tmpdir(), 'stockflow-lan-secret-'));

@@ -73,6 +73,13 @@ export interface LanServerOptions {
    * Ausente = no hay acceso remoto (comportamiento anterior).
    */
   tunnelPort?: number;
+  /**
+   * Comercio de UNA sola PC: no hay red local que atender, pero el acceso
+   * remoto igual tiene que funcionar. Con esto se abre SÓLO la puerta del
+   * túnel (127.0.0.1:`tunnelPort`) y no se escucha en `port` ni se anuncia por
+   * mDNS: nada queda expuesto a la red del local. Requiere `tunnelPort`.
+   */
+  soloTunel?: boolean;
   token: string;
   /** Required para impersonar al usuario del JWT durante RPCs autenticados. */
   sessionStore?: SessionStore;
@@ -330,26 +337,44 @@ export class LanServer {
           if (!res.headersSent) sendJson(res, 500, { ok: false, code: 'INTERNAL', message: 'Error interno' });
         });
       };
+      // PUERTA DEL ACCESO REMOTO: una escucha atada a 127.0.0.1, que sólo puede
+      // alcanzar el túnel corriendo en esta misma PC. "Vino de afuera" pasa a
+      // ser una propiedad de POR DÓNDE ENTRÓ y no una suposición a partir de la
+      // IP, que es lo que recomendaba el plan. Por esa puerta no se pide el PIN
+      // de la red local (el dueño entra con su usuario y su contraseña); por la
+      // otra, todo sigue igual.
+      const abrirPuertaDelTunel = (alFallar: (err: unknown) => void, alAbrir?: () => void): void => {
+        const st = createServer(atender(true));
+        st.once('error', alFallar);
+        st.listen(this.opts.tunnelPort, '127.0.0.1', () => {
+          this.serverTunel = st;
+          this.log.info(`acceso remoto escuchando en 127.0.0.1:${this.opts.tunnelPort}`);
+          alAbrir?.();
+        });
+      };
+
+      // Una sola PC: se abre la puerta del túnel y nada más. Sin escucha en
+      // 0.0.0.0 y sin mDNS, así el acceso remoto no obliga al comercio a
+      // publicar su sistema en la red del local.
+      if (this.opts.soloTunel) {
+        if (!this.opts.tunnelPort) {
+          reject(new Error('soloTunel necesita tunnelPort'));
+          return;
+        }
+        abrirPuertaDelTunel(reject, resolve);
+        return;
+      }
+
       const server = createServer(atender(false));
       server.once('error', reject);
       server.listen(this.opts.port, '0.0.0.0', () => {
         this.server = server;
         this.log.info(`escuchando en :${this.opts.port}`);
         if (this.opts.enableMdns) this.tryStartMdns();
-
-        // PUERTA DEL ACCESO REMOTO: una segunda escucha, atada a 127.0.0.1, que
-        // sólo puede alcanzar el túnel corriendo en esta misma PC. "Vino de
-        // afuera" pasa a ser una propiedad de POR DÓNDE ENTRÓ y no una
-        // suposición a partir de la IP, que es lo que recomendaba el plan.
-        // Por esa puerta no se pide el PIN de la red local (el dueño entra con
-        // su usuario y su contraseña); por la otra, todo sigue igual.
         if (this.opts.tunnelPort) {
-          const st = createServer(atender(true));
-          st.once('error', (err) => this.log.warn(`no se pudo abrir la puerta del acceso remoto: ${String(err)}`));
-          st.listen(this.opts.tunnelPort, '127.0.0.1', () => {
-            this.serverTunel = st;
-            this.log.info(`acceso remoto escuchando en 127.0.0.1:${this.opts.tunnelPort}`);
-          });
+          abrirPuertaDelTunel((err) =>
+            this.log.warn(`no se pudo abrir la puerta del acceso remoto: ${String(err)}`),
+          );
         }
         resolve();
       });

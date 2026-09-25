@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, screen, shell } from 'electron';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -431,9 +432,54 @@ function bootstrap(): { lanArgs: string[] } {
       .start()
       .then(() => console.info(`[LAN] modo=server puerto=${port} IP=${ip} PIN=${lanCfg.token}`))
       .catch((err) => console.error('[LAN] no se pudo iniciar el servidor:', err));
-    // ACCESO REMOTO: el túnel entrega las visitas de internet al MISMO
-    // servidor que atiende la red local. Sólo donde está la base (modo
-    // servidor): una terminal no publica nada.
+    prepararAccesoRemoto();
+  } else if (lanCfg.mode === 'client') {
+    console.info(
+      `[LAN] modo=client server=${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`,
+    );
+  } else {
+    console.info('[LAN] modo=single (1 PC)');
+    // Un comercio de UNA sola PC también quiere entrar desde la tablet: de
+    // hecho es el que más lo pide. El acceso remoto no puede depender de que
+    // tenga red local montada, así que acá se levanta el MISMO servidor pero
+    // atado SÓLO a 127.0.0.1 (la puerta del túnel). No escucha en la red ni se
+    // anuncia por mDNS: desde el local no se lo alcanza.
+    lanServer = new LanServer({
+      handlers: buildAllHandlers(deps),
+      soloTunel: true,
+      tunnelPort: PUERTO_TUNEL,
+      // Sin red local no hay PIN que emparejar, y por la puerta del túnel no se
+      // pide (se entra con usuario y contraseña). Va uno al azar para que el
+      // campo nunca quede con un valor adivinable.
+      token: randomBytes(16).toString('hex'),
+      port: DEFAULT_LAN_PORT,
+      jwtSecret: lanManager.getOrCreateJwtSecret(),
+      enableMdns: false,
+      sessionStore,
+      licenseStatus: () => licenseManager?.getState().status ?? 'unlicensed',
+      appVersion: app.getVersion(),
+      webRoot: path.join(app.getAppPath(), 'dist'),
+      resolveUser: async (userId: string) => {
+        const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
+        if (!u) return null;
+        const { passwordHash: _ph, ...safe } = u;
+        void _ph;
+        return safe;
+      },
+    });
+    lanServer
+      .start()
+      .then(() => console.info(`[LAN] puerta del acceso remoto en 127.0.0.1:${PUERTO_TUNEL}`))
+      .catch((err) => console.error('[LAN] no se pudo abrir la puerta del acceso remoto:', err));
+    prepararAccesoRemoto();
+  }
+
+  /**
+   * ACCESO REMOTO: el túnel entrega las visitas de internet al servidor local
+   * que escucha en `127.0.0.1:PUERTO_TUNEL`. Vive donde está la base —modo
+   * servidor o 1 PC—; una terminal no publica nada.
+   */
+  function prepararAccesoRemoto(): void {
     tunel = new TunelManager({
       userDataDir: app.getPath('userData'),
       binario: rutaCloudflared,
@@ -450,12 +496,6 @@ function bootstrap(): { lanArgs: string[] } {
       const e = tunel.iniciar();
       console.info(`[remoto] acceso remoto ${e.estado}${e.direccion ? ` — ${e.direccion}` : ''}`);
     }
-  } else if (lanCfg.mode === 'client') {
-    console.info(
-      `[LAN] modo=client server=${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`,
-    );
-  } else {
-    console.info('[LAN] modo=single (1 PC)');
   }
 
   return { lanArgs };
