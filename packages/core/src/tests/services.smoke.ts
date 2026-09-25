@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------- auth
   console.log('[auth]');
   const authService = new AuthService(repos);
-  const { user: adminUser, sessionToken } = await authService.login('admin', 'admin');
+  const { user: adminUser, sessionToken } = await authService.login('admin', 'admin36724776');
   check('login admin OK', adminUser.username === 'admin' && sessionToken.length > 0);
   const payload = authService.verifySession(sessionToken);
   check('verifySession', payload?.sub === adminUser.id && payload?.role === 'admin');
@@ -242,8 +242,19 @@ async function main(): Promise<void> {
   check('voidSale (mixta) → voided', voided2.status === 'voided');
   check('voidSale (mixta) elimina los sale_payments', (await repos.salePayments.findBySale(mixedSale.sale.id)).length === 0);
   const movsReg = await repos.cashMovements.findByRegister(reg.id);
-  const reversal = movsReg.find((m) => m.relatedSaleId === mixedSale.sale.id && m.type === 'expense');
-  check('voidSale (mixta) genera un egreso de caja sólo por la parte efectivo (400)', reversal?.amount === '400.0000', `reversal=${reversal?.amount}`);
+  // AUDITORÍA sep-2026: se revierten TODOS los medios, no sólo el efectivo. Si
+  // la transferencia no se revierte, el neto de ese medio queda con plata que
+  // el comercio ya no cobró y el arqueo por medio de pago miente. Se busca cada
+  // reverso por SU medio: con `.find()` a secas la prueba pasaba o fallaba según
+  // el orden en que volvieran las filas.
+  const reversos = movsReg.filter((m) => m.relatedSaleId === mixedSale.sale.id && m.type === 'expense');
+  const revEfectivo = reversos.find((m) => m.paymentMethodId === PM_CASH);
+  const revTransfer = reversos.find((m) => m.paymentMethodId === PM_TRANSFER);
+  check(
+    'voidSale (mixta) revierte cada medio por su importe (400 efectivo + 600 transferencia)',
+    reversos.length === 2 && revEfectivo?.amount === '400.0000' && revTransfer?.amount === '600.0000',
+    `n=${reversos.length} efectivo=${revEfectivo?.amount} transferencia=${revTransfer?.amount}`,
+  );
 
   // -------------------------------------------------------------- pricing
   console.log('\n[pricing]');
@@ -334,7 +345,10 @@ async function main(): Promise<void> {
   const efectivoBd = report.byPaymentMethod.find((b) => b.paymentMethodId === PM_CASH);
   const transferBd = report.byPaymentMethod.find((b) => b.paymentMethodId === PM_TRANSFER);
   check('reporte: desglose Efectivo neto = 2942', efectivoBd?.net === '2942.0000', `efectivo=${efectivoBd?.net}`);
-  check('reporte: desglose Transferencia neto = 1100', transferBd?.net === '1100.0000', `transferencia=${transferBd?.net}`);
+  // 600 (parte transferencia de la venta mixta) + 500 (parte transferencia de
+  // la cobranza) − 600 (esa misma venta mixta al anularse: desde la auditoría
+  // sep-2026 el reverso alcanza a TODOS los medios, no sólo al efectivo) = 500.
+  check('reporte: desglose Transferencia neto = 500', transferBd?.net === '500.0000', `transferencia=${transferBd?.net}`);
   check(
     'reporte: notes con observaciones del cierre + arqueo',
     typeof closedReg.notes === 'string' && closedReg.notes!.includes('cierre de prueba') && closedReg.notes!.includes('Diferencia'),
@@ -415,8 +429,18 @@ async function main(): Promise<void> {
   // Anular una compra contado → vuelve voided + reverso de caja por la parte efectivo.
   const voidedPurchase = await admin.purchases.voidPurchase(compraContado.purchase.id);
   check('voidPurchase contado → voided', voidedPurchase.status === 'voided');
-  const reversalP = (await repos.cashMovements.findByRegister(reg2.id)).find((m) => m.relatedPurchaseId === compraContado.purchase.id && m.type === 'income');
-  check('voidPurchase genera ingreso de caja por la parte efectivo (600)', reversalP?.amount === '600.0000', `reversal=${reversalP?.amount}`);
+  // Espejo de voidSale: desde la auditoría sep-2026 se revierten TODOS los
+  // medios. Cada reverso se busca por SU medio, no con un `.find()` suelto.
+  const reversosP = (await repos.cashMovements.findByRegister(reg2.id)).filter(
+    (m) => m.relatedPurchaseId === compraContado.purchase.id && m.type === 'income',
+  );
+  const revPefectivo = reversosP.find((m) => m.paymentMethodId === PM_CASH);
+  const revPtransfer = reversosP.find((m) => m.paymentMethodId === PM_TRANSFER);
+  check(
+    'voidPurchase revierte cada medio por su importe (600 efectivo + 400 transferencia)',
+    reversosP.length === 2 && revPefectivo?.amount === '600.0000' && revPtransfer?.amount === '400.0000',
+    `n=${reversosP.length} efectivo=${revPefectivo?.amount} transferencia=${revPtransfer?.amount}`,
+  );
   await expectThrows(
     'voidPurchase a cuenta con pagos → BusinessRuleError',
     () => admin.purchases.voidPurchase(compraAcuenta.purchase.id),
