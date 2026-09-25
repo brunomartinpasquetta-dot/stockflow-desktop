@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   const repos = createRepositories(db);
 
   const auth = new AuthService(repos);
-  const { user: adminUser } = await auth.login('admin', 'admin');
+  const { user: adminUser } = await auth.login('admin', 'admin36724776');
   const adminCtx = createServiceContext(db, adminUser);
   const admin = createServices(adminCtx);
 

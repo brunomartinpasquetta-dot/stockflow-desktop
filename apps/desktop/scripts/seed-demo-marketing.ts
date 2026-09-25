@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     importService: new ExcelImportService(),
     emit: () => { /* noop */ },
   });
-  const login = (await h['auth:login']!({ username: 'admin', password: 'admin' })) as IpcResponse<unknown>;
+  const login = (await h['auth:login']!({ username: 'admin', password: 'admin36724776' })) as IpcResponse<unknown>;
   if (!login.ok) throw new Error('login admin/admin falló (¿la base no está virgen?)');
 
   const r = await seedDemoData(h, {

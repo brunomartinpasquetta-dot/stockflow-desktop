@@ -77,7 +77,7 @@ async function main(): Promise<void> {
   });
   const h = handlers;
 
-  await call(h, 'auth:login', { username: 'admin', password: 'admin' });
+  await call(h, 'auth:login', { username: 'admin', password: 'admin36724776' });
 
   // ── Artículos con las TRES listas cargadas (para probar el cambio de lista).
   const catalogo = [

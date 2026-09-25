@@ -89,7 +89,7 @@ async function main(): Promise<void> {
   const login = await invoke<{ user: { username: string; role: string }; sessionToken: string }>(
     handlers,
     'auth:login',
-    { username: 'admin', password: 'admin' },
+    { username: 'admin', password: 'admin36724776' },
   );
   check(
     'auth:login admin/admin',
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
   const badLogin = await invoke(handlers, 'auth:login', { username: 'admin', password: 'mala' });
   check('auth:login contraseña errónea → VALIDATION', !badLogin.ok && badLogin.code === 'VALIDATION', JSON.stringify(badLogin));
   // re-login para asegurar sesión activa
-  await invoke(handlers, 'auth:login', { username: 'admin', password: 'admin' });
+  await invoke(handlers, 'auth:login', { username: 'admin', password: 'admin36724776' });
 
   const me = await invoke<{ username: string } | null>(handlers, 'auth:getCurrentUser');
   check('auth:getCurrentUser', me.ok && me.data?.username === 'admin', JSON.stringify(me));

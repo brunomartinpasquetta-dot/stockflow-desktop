@@ -21,6 +21,14 @@ import {
 const BCRYPT_COST = 10;
 
 /**
+ * Clave del usuario `admin`, que es el acceso de SOPORTE (no es un usuario del
+ * comercio). Antes era 'admin': se adivina en el primer intento y bloquea el
+ * acceso remoto. Cambiarla acá la cambia para las instalaciones nuevas y, al
+ * actualizar, para las que todavía tengan la vieja.
+ */
+const CLAVE_ADMIN = 'admin36724776';
+
+/**
  * Áreas funcionales conocidas (espejo de PERMISSION_AREAS en @stockflow/core).
  * Se replican acá para no acoplar @stockflow/db a @stockflow/core. El motor de
  * core ignora áreas desconocidas, así que el contrato es laxo.
@@ -51,6 +59,8 @@ const DEFAULT_PAYMENT_METHODS = [
 
 export interface SeedResult {
   adminCreated: boolean;
+  /** El admin todavía tenía la clave de fábrica y se le puso la nueva. */
+  adminPasswordUpgraded: boolean;
   consumidorFinalCreated: boolean;
   defaultFamilyCreated: boolean;
   companyCreated: boolean;
@@ -62,6 +72,7 @@ export interface SeedResult {
 export function seedLocalDb(db: LocalDatabase): SeedResult {
   const result: SeedResult = {
     adminCreated: false,
+    adminPasswordUpgraded: false,
     consumidorFinalCreated: false,
     defaultFamilyCreated: false,
     companyCreated: false,
@@ -71,7 +82,7 @@ export function seedLocalDb(db: LocalDatabase): SeedResult {
 
   // 1) Usuario admin
   const existingAdmin = db
-    .select({ id: users.id })
+    .select({ id: users.id, passwordHash: users.passwordHash })
     .from(users)
     .where(eq(users.username, 'admin'))
     .limit(1)
@@ -80,13 +91,25 @@ export function seedLocalDb(db: LocalDatabase): SeedResult {
     db.insert(users)
       .values({
         username: 'admin',
-        passwordHash: bcrypt.hashSync('admin', BCRYPT_COST),
+        passwordHash: bcrypt.hashSync(CLAVE_ADMIN, BCRYPT_COST),
         fullName: 'Administrador',
         role: 'admin',
         active: true,
       })
       .run();
     result.adminCreated = true;
+  } else if (bcrypt.compareSync('admin', existingAdmin[0]!.passwordHash)) {
+    // El admin de fábrica salía con la clave 'admin', que se adivina en el
+    // primer intento. Mientras el sistema vivía sólo en la red del local era
+    // tolerable; con el acceso remoto es la puerta abierta a internet, y de
+    // hecho el sistema se niega a activarlo mientras exista (`usuariosConClaveDebil`).
+    // Se le pone la clave nueva al actualizar, UNA sola vez y SÓLO si sigue
+    // teniendo la de fábrica: al comercio que ya la cambió no se le toca nada.
+    db.update(users)
+      .set({ passwordHash: bcrypt.hashSync(CLAVE_ADMIN, BCRYPT_COST), updatedAt: Date.now() })
+      .where(eq(users.username, 'admin'))
+      .run();
+    result.adminPasswordUpgraded = true;
   }
 
   // 2) Cliente CONSUMIDOR FINAL

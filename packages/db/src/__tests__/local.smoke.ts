@@ -150,6 +150,40 @@ try {
     JSON.stringify(seed),
   );
 
+  // 8) La clave de fábrica del admin se reemplaza al actualizar, pero SÓLO si
+  // sigue siendo la de fábrica. Pisarle la contraseña al comercio que ya la
+  // cambió lo dejaría afuera de su propio sistema: es la mitad que importa.
+  {
+    const bcrypt = (await import('bcryptjs')).default;
+    const leerHash = (): string =>
+      (db.$client.prepare("SELECT password_hash AS h FROM users WHERE username = 'admin'").get() as { h: string }).h;
+
+    check('el admin NO queda con la clave de fábrica', !bcrypt.compareSync('admin', leerHash()));
+    check('el admin entra con la clave nueva', bcrypt.compareSync('admin36724776', leerHash()));
+
+    // Base vieja, con la clave de fábrica todavía puesta: al re-sembrar se sube.
+    db.$client
+      .prepare("UPDATE users SET password_hash = ? WHERE username = 'admin'")
+      .run(bcrypt.hashSync('admin', 10));
+    const subida = seedLocalDb(db);
+    check(
+      'una base vieja con la clave de fábrica queda con la nueva',
+      subida.adminPasswordUpgraded && bcrypt.compareSync('admin36724776', leerHash()),
+      JSON.stringify(subida),
+    );
+
+    // Comercio que se puso su propia clave: no se le toca.
+    db.$client
+      .prepare("UPDATE users SET password_hash = ? WHERE username = 'admin'")
+      .run(bcrypt.hashSync('la-mia-propia', 10));
+    const respetada = seedLocalDb(db);
+    check(
+      'la clave que puso el comercio NO se pisa',
+      !respetada.adminPasswordUpgraded && bcrypt.compareSync('la-mia-propia', leerHash()),
+      JSON.stringify(respetada),
+    );
+  }
+
   closeLocalDb(db);
 } catch (err) {
   console.error('\n✗ Excepción durante el smoke test:', err);

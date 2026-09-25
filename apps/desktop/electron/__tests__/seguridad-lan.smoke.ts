@@ -302,7 +302,7 @@ async function parteHandlers(): Promise<void> {
   mkdirSync(arcaDir, { recursive: true });
   writeFileSync(clave, '-----BEGIN PRIVATE KEY-----\nsecreto\n', 'utf8');
 
-  const login = await invoke(handlers, 'auth:login', { username: 'admin', password: 'admin' });
+  const login = await invoke(handlers, 'auth:login', { username: 'admin', password: 'admin36724776' });
   check('login admin', login.ok);
   const vend = await invoke<{ id: string }>(handlers, 'users:create', { username: 'vend', password: 'vend1234', fullName: 'Vendedor', role: 'seller' });
   check('alta de vendedor', vend.ok, JSON.stringify(vend).slice(0, 160));
