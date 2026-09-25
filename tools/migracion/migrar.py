@@ -276,7 +276,13 @@ def inspeccionar() -> None:
     print("\n" + "=" * 62)
     print("REVISAR ANTES DE MIGRAR")
     print("=" * 62)
-    sin_cb = qn(con, "SELECT COUNT(*) FROM ARTICULO WHERE CODIGO2 IS NULL OR CODIGO2 = ''")
+    # El código de barras puede estar en CODIGO2 (Leo Citzia) o en CODIGO
+    # (Denver): se cuenta como "sin código" sólo el que no lo tiene en NINGUNO
+    # de los dos. De CODIGO valen los numéricos de 8 dígitos para arriba.
+    sin_cb = qn(con, """SELECT COUNT(*) FROM ARTICULO
+        WHERE (CODIGO2 IS NULL OR TRIM(CODIGO2) = '')
+          AND (CODIGO IS NULL OR CHAR_LENGTH(TRIM(CODIGO)) < 8
+               OR TRIM(CODIGO) SIMILAR TO '%[^0-9]%')""")
     print(f"  Artículos sin código de barras: {sin_cb}  -> se les genera uno interno")
     # OJO: el stock vive en STOCK. CANTIDAD1 existe pero está vacía en las bases
     # reales (Leo Citzia: 0 filas con valor) — leerla daba un tranquilizador
@@ -538,11 +544,24 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
         # con el mismo CODIGO ('0000', vacío) porque el comercio nunca los
         # numeró: a esos se les da un código interno derivado de su id, así no
         # se pierde ni un artículo.
-        # Código de barras: se respeta el del fabricante si lo tiene; si no
-        # (acá NINGUNO lo tenía) se genera un EAN-13 interno válido, para que
-        # el comercio pueda imprimir etiquetas y usar el lector.
-        cand = txt(r["CODIGO2"])
-        if not cand or cand in barcodes_usados or set(cand) <= {"0"}:
+        # Código de barras: se respeta el del fabricante si lo tiene. DÓNDE lo
+        # guarda StockFácil VARÍA entre instalaciones: en Leo Citzia está en
+        # CODIGO2 y en Denver Drugstore en CODIGO (543 de 604 artículos, con
+        # CODIGO2 entero vacío). Se prueban los dos, y de CODIGO sólo se acepta
+        # lo que tenga pinta de código de barras —numérico y de 8 dígitos para
+        # arriba— porque ahí también viven códigos internos del comercio
+        # ('PROMO04', '0000'). Si no hay ninguno se genera un EAN-13 interno
+        # válido, para que igual pueda imprimir etiquetas y usar el lector.
+        cand = ""
+        for campo, exigir_ean in (("CODIGO2", False), ("CODIGO", True)):
+            v = txt(r[campo])
+            if not v or set(v) <= {"0"} or v in barcodes_usados:
+                continue
+            if exigir_ean and not (v.isdigit() and len(v) >= 8):
+                continue
+            cand = v
+            break
+        if not cand:
             cand = ean13_interno(r["IDARTICULO"] or 0)
         barcode = cand
         barcodes_usados.add(barcode)
