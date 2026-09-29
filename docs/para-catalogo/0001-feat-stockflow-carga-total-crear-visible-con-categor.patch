@@ -1,0 +1,136 @@
+From efe1880967723089e77c3603832af49f544dcb03 Mon Sep 17 00:00:00 2001
+From: Bruno <bruno.martin.pasquetta@gmail.com>
+Date: Tue, 29 Sep 2026 16:06:31 -0300
+Subject: [PATCH] =?UTF-8?q?feat(stockflow):=20carga=20total=20=E2=80=94=20?=
+ =?UTF-8?q?crear=20visible=20con=20categor=C3=ADa,=20sin=20cortes=20silenc?=
+ =?UTF-8?q?iosos?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- /articulos: `visible` + `categoria` (nombre de la familia en StockFlow)
+  crean el producto a la vista y en esa categoría (se crea si falta). Sin
+  esos campos, como siempre: oculto en "Sin clasificar".
+- /articulos: más de 500 por pedido → 413 en vez de recortar en silencio
+  (StockFlow daba por publicado lo que se perdía).
+- /articulos: el nombre sólo se pisa en lo que creó el espejo (sku SF-);
+  un producto que ya existía y se vinculó conserva su nombre.
+- /vincular: un código ya usado es un error de ese ítem y el lote sigue
+  (antes cortaba con 409 dejando lo anterior guardado y lo siguiente no).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ pb/pb_hooks/stockflow.pb.js | 66 ++++++++++++++++++++++++++++++++-----
+ 1 file changed, 57 insertions(+), 9 deletions(-)
+
+diff --git a/pb/pb_hooks/stockflow.pb.js b/pb/pb_hooks/stockflow.pb.js
+index 1141100..f7c83ca 100644
+--- a/pb/pb_hooks/stockflow.pb.js
++++ b/pb/pb_hooks/stockflow.pb.js
+@@ -79,14 +79,22 @@ routerAdd('POST', '/api/stockflow/vincular', (e) => {
+       let dueno = null;
+       try { dueno = $app.findFirstRecordByData('productos', 'codigo_sistema', cod); } catch (_) { dueno = null; }
+       if (dueno && dueno.id !== prod.id) {
+-        return e.json(409, { error: 'codigo_sistema ya asignado', codigo_sistema: cod, sku: dueno.getString('sku'), vinculados: vinculados, errores: errores });
++        // Antes cortaba el lote entero con 409 y dejaba lo anterior guardado y
++        // lo siguiente sin procesar, sin decir cuál era cuál. Ahora el choque
++        // es un error MÁS de ese ítem y el lote sigue.
++        errores.push({ sku: sku, motivo: 'el código ' + cod + ' ya está en el producto ' + dueno.getString('sku') });
++        continue;
+       }
+     }
+-    if (prod.getString('codigo_sistema') !== cod) {
+-      prod.set('codigo_sistema', cod);
+-      $app.save(prod);
++    try {
++      if (prod.getString('codigo_sistema') !== cod) {
++        prod.set('codigo_sistema', cod);
++        $app.save(prod);
++      }
++      vinculados++;
++    } catch (err) {
++      errores.push({ sku: sku, motivo: String(err && err.message ? err.message : err) });
+     }
+-    vinculados++;
+   }
+   return e.json(200, { vinculados: vinculados, errores: errores });
+ });
+@@ -103,7 +111,11 @@ routerAdd('POST', '/api/stockflow/articulos', (e) => {
+   if (!ok) return e.json(401, { error: 'no autorizado' });
+ 
+   const body = e.requestInfo().body || {};
+-  const articulos = Array.isArray(body.articulos) ? body.articulos.slice(0, 500) : [];
++  const articulos = Array.isArray(body.articulos) ? body.articulos : [];
++  // Antes se recortaba a 500 EN SILENCIO: StockFlow daba la tanda por
++  // publicada y lo que pasaba de 500 no llegaba nunca. Ahora se rechaza entera
++  // y StockFlow la manda partida.
++  if (articulos.length > 500) return e.json(413, { error: 'máximo 500 artículos por pedido', recibidos: articulos.length });
+   const crearFaltantes = body.crear_faltantes === true;
+ 
+   let actualizados = 0, creados = 0;
+@@ -126,6 +138,35 @@ routerAdd('POST', '/api/stockflow/articulos', (e) => {
+     return sinClasificar;
+   };
+ 
++  // Categoría por NOMBRE (la familia del artículo en StockFlow), para lo que
++  // se crea con `categoria`. Se busca sin distinguir mayúsculas; si no existe
++  // se crea visible. Cache por pedido.
++  const catPorNombre = {};
++  const slugDe = (n) => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'sin-nombre';
++  const categoriaDe = (nombre) => {
++    const n = String(nombre || '').trim();
++    if (!n) return null;
++    const k = n.toLowerCase();
++    if (catPorNombre[k]) return catPorNombre[k];
++    let c = null;
++    try {
++      const hall = $app.findRecordsByFilter('categorias', 'nombre ~ {:n}', '', 50, 0, { n: n });
++      for (const r of hall) if (r.getString('nombre').toLowerCase() === k) { c = r; break; }
++    } catch (_) { c = null; }
++    if (!c) {
++      const slug = slugDe(n);
++      try { c = $app.findFirstRecordByData('categorias', 'slug', slug); } catch (_) { c = null; }
++    }
++    if (!c) {
++      c = new Record($app.findCollectionByNameOrId('categorias'));
++      c.set('nombre', n); c.set('slug', slugDe(n)); c.set('rubro', 'libreria');
++      c.set('orden', 500); c.set('activa', true);
++      $app.save(c);
++    }
++    catPorNombre[k] = c;
++    return c;
++  };
++
+   for (const a of articulos) {
+     const cod = String(a.codigo == null ? '' : a.codigo).trim();
+     if (!cod) { errores.push({ codigo: cod, motivo: 'codigo vacío' }); continue; }
+@@ -139,7 +180,10 @@ routerAdd('POST', '/api/stockflow/articulos', (e) => {
+ 
+       if (prod) {
+         // Sólo lo que es del sistema. Fotos, categoría, descripción y presentación son del catálogo.
+-        if (a.nombre) prod.set('nombre', String(a.nombre));
++        // El nombre sólo se pisa en lo que creó el propio espejo (sku SF-…).
++        // Un producto que ya existía y se vinculó conserva el nombre que el
++        // comercio le puso en el catálogo.
++        if (a.nombre && prod.getString('sku').indexOf('SF-') === 0) prod.set('nombre', String(a.nombre));
+         prod.set('precio', precio);
+         prod.set('stock', stock);
+         // `activo` sólo si viene, y nunca para lo que sigue en "Sin clasificar":
+@@ -163,8 +207,12 @@ routerAdd('POST', '/api/stockflow/articulos', (e) => {
+         p.set('stock', stock);
+         p.set('controla_stock', true);
+         p.set('es_servicio', false);
+-        p.set('activo', false);                 // invisible hasta que le pongan categoría y foto
+-        p.set('categoria', catSinClasificar().id);
++        // Con `visible` y `categoria` (la carga total desde StockFlow) nace a
++        // la vista y en su categoría. Sin eso, como siempre: oculto en
++        // "Sin clasificar" hasta que alguien lo vista.
++        const cat = a.visible === true ? categoriaDe(a.categoria) : null;
++        p.set('activo', a.visible === true && activo);
++        p.set('categoria', (cat || catSinClasificar()).id);
+         if (a.unidad) p.set('unidad', String(a.unidad));
+         $app.save(p);
+         creados++;
+-- 
+2.54.0 (Apple Git-157)
+
