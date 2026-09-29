@@ -211,6 +211,41 @@ async function main(): Promise<void> {
   check('sales.createWithLines total correcto', sale.total === '1800.0000', `total=${sale.total}`);
   check('sales.createWithLines crea 2 sale_payments', payments.length === 2);
 
+  // --- DÍA DE CAJA (jornada) ---------------------------------------------
+  // Pedido de Bruno: caja abierta el lunes, venta el martes a la 1:30 → la
+  // venta es del LUNES. Pero una caja olvidada abierta días, o la "Caja
+  // histórica" de una migración (abierta DESPUÉS de sus ventas), no pueden
+  // arrastrar ventas a otro día: ahí manda la hora de la venta.
+  {
+    const raw = db.$client;
+    const regOrig = raw.prepare('SELECT open_date AS o FROM cash_registers WHERE id = ?').get(reg.id) as { o: number };
+    const saleOrig = raw.prepare('SELECT date AS d FROM sales WHERE id = ?').get(sale.id) as { d: number };
+    const lunes20 = new Date(2026, 8, 28, 20, 0).getTime(); // lunes 28-sep 20:00
+    const lunes = { from: new Date(2026, 8, 28, 0, 0).getTime(), to: new Date(2026, 8, 28, 23, 59, 59, 999).getTime() };
+    const jornadaDe = () => (raw.prepare('SELECT jornada AS j FROM sales WHERE id = ?').get(sale.id) as { j: number }).j;
+    raw.prepare('UPDATE cash_registers SET open_date = ? WHERE id = ?').run(lunes20, reg.id);
+
+    raw.prepare('UPDATE sales SET date = ? WHERE id = ?').run(new Date(2026, 8, 29, 1, 30).getTime(), sale.id); // martes 1:30
+    check('jornada: venta del martes 1:30 con la caja del lunes abierta → es del lunes', jornadaDe() === lunes20, String(jornadaDe()));
+    const porCaja = await repos.sales.findByJornadaRange(lunes.from, lunes.to);
+    const porHora = await repos.sales.findByDateRange(lunes.from, lunes.to);
+    check('jornada: el filtro "lunes" la trae; por hora real no', porCaja.some((s) => s.id === sale.id) && !porHora.some((s) => s.id === sale.id));
+    const pagosLunes = await repos.salePayments.findBySaleDateRange(lunes.from, lunes.to);
+    check('jornada: sus pagos también caen el lunes (casan con la venta)', pagosLunes.filter((p) => p.saleId === sale.id).length === 2);
+
+    const miercoles = new Date(2026, 8, 30, 10, 0).getTime(); // caja olvidada abierta: +38 h
+    raw.prepare('UPDATE sales SET date = ? WHERE id = ?').run(miercoles, sale.id);
+    check('jornada: caja olvidada abierta días → cuenta por la hora de la venta', jornadaDe() === miercoles, String(jornadaDe()));
+
+    const antes = new Date(2025, 0, 10, 12, 0).getTime(); // "Caja histórica": venta ANTERIOR a la apertura
+    raw.prepare('UPDATE sales SET date = ? WHERE id = ?').run(antes, sale.id);
+    check('jornada: venta anterior a la apertura (migración) → no se mueve', jornadaDe() === antes, String(jornadaDe()));
+
+    raw.prepare('UPDATE cash_registers SET open_date = ? WHERE id = ?').run(regOrig.o, reg.id);
+    raw.prepare('UPDATE sales SET date = ? WHERE id = ?').run(saleOrig.d, sale.id);
+    check('jornada: una venta normal (dentro de su caja) queda en su propio día de caja', jornadaDe() === regOrig.o || jornadaDe() === saleOrig.d);
+  }
+
   const stockAfter = (await repos.articles.findById(art.id))!.stock;
   check(
     'sales.createWithLines descuenta stock',

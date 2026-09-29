@@ -708,6 +708,27 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
     }
   }
 
+  /**
+   * Ventas por DÍA DE CAJA (`jornada`): lo vendido después de medianoche con
+   * la caja del día anterior abierta cuenta para ese día. Es lo que usan el
+   * Historial de Ventas, los reportes y la contabilidad. Ver migración 0036.
+   */
+  async findByJornadaRange(from: number, to: number): Promise<Sale[]> {
+    try {
+      return this.db
+        .select()
+        .from(sales)
+        .where(and(gte(sales.jornada, from), lte(sales.jornada, to)))
+        .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Ventas por la hora REAL de la venta. Sólo para lo FISCAL (Libro IVA): ahí
+   * manda la fecha del comprobante ante ARCA, no el día de caja.
+   */
   async findByDateRange(from: number, to: number): Promise<Sale[]> {
     try {
       return this.db

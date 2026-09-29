@@ -397,11 +397,19 @@ export const sales = sqliteTable(
     afipObservations: text('afip_observations'),
     afipQrUrl: text('afip_qr_url'),
     notes: text('notes'),
+    /**
+     * Día de caja: la apertura de su caja si la venta se hizo dentro de las
+     * 24 h siguientes; si no, su propia hora. Lo completan los triggers de la
+     * migración 0036 en todo insert/cambio: NO se escribe desde el código.
+     * Los filtros "por día" van por acá; lo fiscal, por la fecha del comprobante.
+     */
+    jornada: integer('jornada'),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },
   (t) => ({
     dateIdx: index('idx_sales_date').on(t.date),
+    jornadaIdx: index('idx_sales_jornada').on(t.jornada),
     customerIdx: index('idx_sales_customer').on(t.customerId),
     sellerIdx: index('idx_sales_seller').on(t.sellerId),
     numberIdx: uniqueIndex('idx_sales_number').on(t.type, t.number),
@@ -510,6 +518,8 @@ export const returns = sqliteTable(
     /** Caja que pagó el reintegro (null si fue crédito en cuenta). */
     cashRegisterId: text('cash_register_id').references(() => cashRegisters.id),
     date: integer('date').notNull(),
+    /** Día de caja (ver `sales.jornada`): lo completan los triggers de la 0036. */
+    jornada: integer('jornada'),
     refundMethod: text('refund_method', { enum: ['cash', 'account'] })
       .notNull()
       .default('cash'),
@@ -520,6 +530,7 @@ export const returns = sqliteTable(
   (t) => ({
     numberIdx: uniqueIndex('idx_returns_number').on(t.number),
     saleIdx: index('idx_returns_sale').on(t.saleId),
+    jornadaIdx: index('idx_returns_jornada').on(t.jornada),
   }),
 );
 

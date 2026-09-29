@@ -50,7 +50,9 @@ export class SalePaymentRepository extends BaseRepository<
         })
         .from(salePayments)
         .innerJoin(sales, eq(sales.id, salePayments.saleId))
-        .where(and(gte(sales.date, from), lte(sales.date, to)))
+        // Por día de caja, igual que la lista de ventas del Historial: si no,
+        // los pagos de lo vendido después de medianoche no casan con su venta.
+        .where(and(gte(sales.jornada, from), lte(sales.jornada, to)))
         .all() as SalePayment[];
     } catch (err) {
       return rethrowDbError(err);
@@ -132,8 +134,8 @@ export class SalePaymentRepository extends BaseRepository<
         .innerJoin(sales, eq(salePayments.saleId, sales.id))
         .where(
           and(
-            gte(sales.date, from),
-            lte(sales.date, to),
+            gte(sales.jornada, from),
+            lte(sales.jornada, to),
             eq(sales.status, 'completed'),
           ),
         )

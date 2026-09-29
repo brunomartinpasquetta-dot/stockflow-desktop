@@ -151,7 +151,7 @@ export class AccountingService {
     const assetsTotal = sumDecimals([articlesValue, cashValue]);
 
     // 2) Ventas
-    const salesAll = await this.ctx.repos.sales.findByDateRange(from, to);
+    const salesAll = await this.ctx.repos.sales.findByJornadaRange(from, to);
     const salesCompleted = salesAll.filter((s) => s.status === 'completed');
     const salesIds = salesCompleted.map((s) => s.id);
     const saleLinesAll = await this.ctx.repos.saleLines.findAll();
@@ -246,6 +246,7 @@ export class AccountingService {
     const priceMode = await this.getPriceMode();
     const filter = input.type ?? 'all';
 
+    // FISCAL: por la fecha del comprobante, NO por día de caja (ARCA manda).
     let sales = await this.ctx.repos.sales.findByDateRange(input.from, input.to);
     if (filter !== 'all') sales = sales.filter((s) => s.type === filter);
 

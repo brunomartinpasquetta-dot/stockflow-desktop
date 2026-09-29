@@ -65,7 +65,7 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
         // Cada venta viaja con SUS FORMAS DE PAGO, para poder filtrar el
         // historial por "transferencia" o "débito". Son dos consultas para toda
         // la pantalla: una por venta serían cientos.
-        const ventas = await ctx.repos.sales.findByDateRange(payload.from, payload.to);
+        const ventas = await ctx.repos.sales.findByJornadaRange(payload.from, payload.to);
         const pagos = await ctx.repos.salePayments.findBySaleDateRange(payload.from, payload.to);
         const nombres = await ctx.repos.paymentMethods.byId();
         const porVenta = new Map<string, { paymentMethodId: string; name: string; amount: string }[]>();

@@ -143,7 +143,7 @@ export class ReportsService {
     filters?: { sellerId?: string; customerId?: string },
   ): Promise<SalesReport> {
     this.requireReports();
-    let sales = await this.ctx.repos.sales.findByDateRange(from, to);
+    let sales = await this.ctx.repos.sales.findByJornadaRange(from, to);
     if (filters?.sellerId) sales = sales.filter((s) => s.sellerId === filters.sellerId);
     if (filters?.customerId) sales = sales.filter((s) => s.customerId === filters.customerId);
     const completed = sales.filter((s) => s.status === 'completed');
@@ -180,7 +180,7 @@ export class ReportsService {
 
   async salesBySeller(from: number, to: number): Promise<SellerReportRow[]> {
     this.requireReports();
-    const sales = (await this.ctx.repos.sales.findByDateRange(from, to)).filter(
+    const sales = (await this.ctx.repos.sales.findByJornadaRange(from, to)).filter(
       (s) => s.status === 'completed',
     );
     const users = await this.ctx.repos.users.findAll();
@@ -234,7 +234,7 @@ export class ReportsService {
 
   async topArticles(from: number, to: number, limit = 10): Promise<TopArticleRow[]> {
     this.requireReports();
-    const sales = (await this.ctx.repos.sales.findByDateRange(from, to)).filter(
+    const sales = (await this.ctx.repos.sales.findByJornadaRange(from, to)).filter(
       (s) => s.status === 'completed',
     );
     const saleIds = new Set(sales.map((s) => s.id));
@@ -446,7 +446,7 @@ export class ReportsService {
     _ctx?: ServiceContext,
   ): Promise<SalesByVendorReport> {
     this.requireReports();
-    let sales = (await this.ctx.repos.sales.findByDateRange(input.from, input.to)).filter(
+    let sales = (await this.ctx.repos.sales.findByJornadaRange(input.from, input.to)).filter(
       (s) => s.status !== 'voided',
     );
     if (input.userId) sales = sales.filter((s) => s.sellerId === input.userId);

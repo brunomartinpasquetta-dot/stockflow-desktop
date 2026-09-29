@@ -75,7 +75,7 @@ const CONSULTAS: Consulta[] = [
     ],
     async responder({ repos }) {
       const { desde, hasta } = hoy();
-      const ventas = await repos.sales.findByDateRange(desde, hasta);
+      const ventas = await repos.sales.findByJornadaRange(desde, hasta);
       const validas = ventas.filter((v) => v.status !== 'voided');
       if (validas.length === 0) return 'Todavía no hay ventas registradas hoy.';
       const total = validas.reduce((a, v) => a + Number(v.total), 0);

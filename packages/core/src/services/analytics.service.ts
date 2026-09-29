@@ -9,6 +9,12 @@
  * funciones de strftime / SUM / AVG nativas de SQLite son más eficientes y
  * legibles que armar pipelines en JS. Todos los montos se devuelven como
  * `string` para mantener coherencia con el resto del dominio.
+ *
+ * DÍA DE CAJA: los rangos y los agrupados por día/semana/mes/día de la semana
+ * van por `jornada` (el día en que se abrió la caja de la venta, si se hizo
+ * dentro de las 24 h), no por la hora de la venta: lo vendido el lunes a la
+ * 1:30 con la caja del domingo abierta es del domingo. Ver migración 0036.
+ * Excepción: `getSalesByHour` agrupa por la hora REAL de la venta.
  */
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -229,7 +235,7 @@ export class AnalyticsService {
       JOIN sales s ON s.id = sl.sale_id
       JOIN articles a ON a.id = sl.article_id
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
       GROUP BY a.id, a.barcode, a.description, a.brand
       ORDER BY qty DESC
       LIMIT ?
@@ -281,7 +287,7 @@ export class AnalyticsService {
                SUM(CAST(sl.line_total AS REAL)) AS revenue
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
-        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
         GROUP BY sl.article_id
       ) v ON v.article_id = a.id
       WHERE a.active = 1
@@ -325,7 +331,7 @@ export class AnalyticsService {
       JOIN sales s ON s.id = sp.sale_id
       JOIN payment_methods pm ON pm.id = sp.payment_method_id
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
       GROUP BY pm.id, pm.name
       ORDER BY total DESC
     `;
@@ -367,7 +373,7 @@ export class AnalyticsService {
       JOIN sales s ON s.id = sp.sale_id
       JOIN payment_methods pm ON pm.id = sp.payment_method_id
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
       GROUP BY pm.id, pm.name, pm.is_physical_cash
     `;
     const pagos = this.ctx.db.$client.prepare(sqlPagos).all(input.from, input.to) as Array<{
@@ -384,7 +390,7 @@ export class AnalyticsService {
       FROM sales s
       WHERE s.status != 'voided'
         AND s.is_account_sale = 1
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
     `;
     const cc = this.ctx.db.$client.prepare(sqlCtaCte).get(input.from, input.to) as {
       monto: number | null;
@@ -438,22 +444,22 @@ export class AnalyticsService {
     const sql = `
       SELECT bucket, paymentMethodId, name, SUM(monto) AS monto FROM (
         SELECT
-          strftime('${fmtSpec}', s.date / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', s.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
           pm.id AS paymentMethodId,
           pm.name AS name,
           CAST(sp.amount AS REAL) AS monto
         FROM sale_payments sp
         JOIN sales s ON s.id = sp.sale_id
         JOIN payment_methods pm ON pm.id = sp.payment_method_id
-        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
         UNION ALL
         SELECT
-          strftime('${fmtSpec}', s.date / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', s.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
           'cuenta-corriente' AS paymentMethodId,
           'Cuenta Corriente' AS name,
           CAST(s.total AS REAL) AS monto
         FROM sales s
-        WHERE s.status != 'voided' AND s.is_account_sale = 1 AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.is_account_sale = 1 AND s.jornada BETWEEN ? AND ?
       )
       GROUP BY bucket, paymentMethodId, name
       ORDER BY bucket ASC
@@ -487,7 +493,7 @@ export class AnalyticsService {
       FROM sales s
       JOIN customers c ON c.id = s.customer_id
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
       GROUP BY c.id, c.last_name, c.first_name
       ORDER BY total DESC
       LIMIT ?
@@ -554,19 +560,19 @@ export class AnalyticsService {
     const sql = `
       SELECT bucket, SUM(cnt) AS count, SUM(total) AS total FROM (
         SELECT
-          strftime('${fmtSpec}', s.date / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', s.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
           1 AS cnt,
           CAST(s.total AS REAL) AS total
         FROM sales s
-        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
         UNION ALL
         SELECT
-          strftime('${fmtSpec}', r.date / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', r.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
           0 AS cnt,
           -CAST(r.total AS REAL) AS total
         FROM returns r
         JOIN sales sv ON sv.id = r.sale_id
-        WHERE r.date BETWEEN ? AND ? AND sv.status != 'voided'
+        WHERE r.jornada BETWEEN ? AND ? AND sv.status != 'voided'
       )
       GROUP BY bucket
       ORDER BY bucket ASC
@@ -589,7 +595,7 @@ export class AnalyticsService {
         COUNT(*) AS count
       FROM sales s
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
     `;
     const row = this.ctx.db.$client.prepare(sql).get(input.from, input.to) as {
       avg: number | null;
@@ -614,7 +620,7 @@ export class AnalyticsService {
         SUM(CAST(s.total AS REAL)) AS total
       FROM sales s
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
       GROUP BY hour
       ORDER BY hour ASC
     `;
@@ -630,12 +636,12 @@ export class AnalyticsService {
     this.requireRead();
     const sql = `
       SELECT
-        CAST(strftime('%w', s.date / 1000, 'unixepoch', 'localtime') AS INTEGER) AS dayOfWeek,
+        CAST(strftime('%w', s.jornada / 1000, 'unixepoch', 'localtime') AS INTEGER) AS dayOfWeek,
         COUNT(*) AS count,
         SUM(CAST(s.total AS REAL)) AS total
       FROM sales s
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
       GROUP BY dayOfWeek
       ORDER BY dayOfWeek ASC
     `;
@@ -660,7 +666,7 @@ export class AnalyticsService {
       JOIN articles a ON a.id = sl.article_id
       LEFT JOIN families f ON f.id = a.family_id
       WHERE s.status != 'voided'
-        AND s.date BETWEEN ? AND ?
+        AND s.jornada BETWEEN ? AND ?
       GROUP BY f.id, f.name
       ORDER BY revenue DESC
     `;
@@ -703,7 +709,7 @@ export class AnalyticsService {
         SELECT sl.article_id, SUM(CAST(sl.quantity AS REAL)) AS qty
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
-        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
         GROUP BY sl.article_id
       ) v ON v.article_id = a.id
       WHERE a.active = 1
@@ -731,13 +737,13 @@ export class AnalyticsService {
   /** Total NETO (ventas − devoluciones) y operaciones de un rango. */
   private netoDeRango(range: DateRange): { total: number; count: number } {
     const v = this.ctx.db.$client
-      .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t, COUNT(*) AS c FROM sales WHERE status != 'voided' AND date BETWEEN ? AND ?`)
+      .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t, COUNT(*) AS c FROM sales WHERE status != 'voided' AND jornada BETWEEN ? AND ?`)
       .get(range.from, range.to) as { t: number; c: number };
     const d = this.ctx.db.$client
       // Las devoluciones de una venta ANULADA no restan: esa venta ya no suma
       // (auditoría sep-2026: venta $2000 → DEV $1000 → anular dejaba −$1000).
       .prepare(
-        `SELECT COALESCE(SUM(CAST(r.total AS REAL)), 0) AS t FROM returns r JOIN sales sv ON sv.id = r.sale_id WHERE r.date BETWEEN ? AND ? AND sv.status != 'voided'`,
+        `SELECT COALESCE(SUM(CAST(r.total AS REAL)), 0) AS t FROM returns r JOIN sales sv ON sv.id = r.sale_id WHERE r.jornada BETWEEN ? AND ? AND sv.status != 'voided'`,
       )
       .get(range.from, range.to) as { t: number };
     return { total: (v.t || 0) - (d.t || 0), count: v.c || 0 };
@@ -790,7 +796,7 @@ export class AnalyticsService {
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
         LEFT JOIN articles a ON a.id = sl.article_id
-        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
       `)
       .get(input.from, input.to) as { cmv: number };
     const comRow = this.ctx.db.$client
@@ -798,7 +804,7 @@ export class AnalyticsService {
         SELECT COALESCE(SUM(CAST(sp.commission_amount AS REAL)), 0) AS com
         FROM sale_payments sp
         JOIN sales s ON s.id = sp.sale_id
-        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
       `)
       .get(input.from, input.to) as { com: number };
     const resultado = ventasNetas - (cmvRow.cmv || 0) - (comRow.com || 0);
@@ -925,7 +931,7 @@ export class AnalyticsService {
       JOIN (
         SELECT sl.article_id, SUM(CAST(sl.quantity AS REAL)) AS qty
         FROM sale_lines sl JOIN sales s ON s.id = sl.sale_id
-        WHERE s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
         GROUP BY sl.article_id
       ) v ON v.article_id = a.id
       WHERE a.active = 1
@@ -962,7 +968,7 @@ export class AnalyticsService {
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
         JOIN articles a ON a.id = sl.article_id
-        WHERE sl.article_id = ? AND s.status != 'voided' AND s.date BETWEEN ? AND ?
+        WHERE sl.article_id = ? AND s.status != 'voided' AND s.jornada BETWEEN ? AND ?
       `)
       .get(input.articleId, input.from, input.to) as { cantidad: number; monto: number; operaciones: number; costo: number };
     const sinCosto = (row.costo || 0) <= 0 && (row.monto || 0) > 0;
