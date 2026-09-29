@@ -930,10 +930,20 @@ function PDV() {
   function removeLine(i: number): void {
     setCart((prev) => prev.filter((_, idx) => idx !== i))
   }
+  /*
+   * El renglón puede ya no existir cuando llega la edición. El campo de
+   * cantidad vuelve a guardar el valor al perder el foco (onBlur): si el
+   * renglón se quitó o el carrito se vació justo antes —cerrar la venta con el
+   * cursor todavía en la cantidad—, ese guardado llega con un índice que ya no
+   * está. Antes se leía `next[i]!` sin mirar y la pantalla de Ventas se caía
+   * entera (Denver, 27-sep-2026, "Cannot read properties of undefined (reading
+   * 'priceManuallySet')"). Si el renglón no está, no hay nada que editar.
+   */
   function setLineQty(i: number, value: string): void {
     setCart((prev) => {
+      const line = prev[i]
+      if (!line) return prev
       const next = [...prev]
-      const line = next[i]!
       next[i] = {
         ...line,
         quantity: value,
@@ -947,15 +957,19 @@ function PDV() {
   }
   function setLinePrice(i: number, value: string): void {
     setCart((prev) => {
+      const line = prev[i]
+      if (!line) return prev
       const next = [...prev]
-      next[i] = { ...next[i]!, unitPrice: value, priceManuallySet: true }
+      next[i] = { ...line, unitPrice: value, priceManuallySet: true }
       return next
     })
   }
   function setLineDiscount(i: number, value: string): void {
     setCart((prev) => {
+      const line = prev[i]
+      if (!line) return prev
       const next = [...prev]
-      next[i] = { ...next[i]!, discount: value }
+      next[i] = { ...line, discount: value }
       return next
     })
   }

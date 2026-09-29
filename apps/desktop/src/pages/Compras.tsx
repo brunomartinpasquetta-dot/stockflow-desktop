@@ -289,6 +289,10 @@ export function Compras() {
   }
   function setLine<K extends keyof CompraLine>(i: number, key: K, value: CompraLine[K]): void {
     setCart((prev) => {
+      // El renglón puede ya no existir: la cantidad se vuelve a guardar al
+      // perder el foco (onBlur), y si la línea se quitó justo antes el índice
+      // llega viejo. En Ventas eso tiraba la pantalla entera (Denver, 27-sep).
+      if (!prev[i]) return prev
       const next = [...prev]
       const linea = { ...next[i]!, [key]: value }
       // En modo utilidad, un costo nuevo recalcula las listas que el usuario
@@ -611,6 +615,7 @@ export function Compras() {
                             value={l[campo]}
                             onChange={(v) => {
                               setCart((prev) => {
+                                if (!prev[i]) return prev
                                 const next = [...prev]
                                 next[i] = { ...next[i]!, [campo]: v, [editado]: true }
                                 return next
