@@ -11,6 +11,7 @@
  *   - icon.ico            (Windows, multi-tamaño)
  *   - dmg-background.png  (540x380, fondo del .dmg)
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,10 +50,38 @@ const icns = png2icons.createICNS(png1024, png2icons.BILINEAR, 0);
 if (!icns) throw new Error('No se pudo generar icon.icns');
 await writeFile('icon.icns', icns);
 
-// 3) ICO Windows (multi-resolución).
-const ico = png2icons.createICO(png1024, png2icons.BILINEAR, 0, false, true);
-if (!ico) throw new Error('No se pudo generar icon.ico');
-await writeFile('icon.ico', ico);
+// 3) ICO Windows (multi-resolución). Los tamaños que Windows usa en la barra
+// de tareas, el escritorio y la ventana (16–64) NO salen de achicar el de 1024:
+// ese es la placa clara con el cubo fino, y achicado se veía granulado (a 16 px
+// se desarmaba). Salen de compose-icon-small.mjs, dibujados para su tamaño.
+// Los grandes (72–256) sí se reducen del maestro, con Lanczos en vez del
+// bilineal de png2icons. Todas las entradas van en PNG (Windows 7 en adelante).
+execFileSync(process.execPath, [join(here, 'compose-icon-small.mjs')], { stdio: 'inherit' });
+const entradas = [];
+for (const n of [256, 128, 96, 72]) {
+  entradas.push({ n, png: await sharp(png1024).resize(n, n, { kernel: 'lanczos3' }).png().toBuffer() });
+}
+for (const n of [64, 48, 40, 32, 24, 20, 16]) {
+  entradas.push({ n, png: readFileSync(join(buildDir, 'icon-small', `${n}.png`)) });
+}
+const cabecera = Buffer.alloc(6 + 16 * entradas.length);
+cabecera.writeUInt16LE(0, 0);
+cabecera.writeUInt16LE(1, 2);
+cabecera.writeUInt16LE(entradas.length, 4);
+let offset = cabecera.length;
+entradas.forEach(({ n, png }, i) => {
+  const o = 6 + 16 * i;
+  cabecera.writeUInt8(n >= 256 ? 0 : n, o);
+  cabecera.writeUInt8(n >= 256 ? 0 : n, o + 1);
+  cabecera.writeUInt8(0, o + 2);
+  cabecera.writeUInt8(0, o + 3);
+  cabecera.writeUInt16LE(1, o + 4);
+  cabecera.writeUInt16LE(32, o + 6);
+  cabecera.writeUInt32LE(png.length, o + 8);
+  cabecera.writeUInt32LE(offset, o + 12);
+  offset += png.length;
+});
+await writeFile('icon.ico', Buffer.concat([cabecera, ...entradas.map((e) => e.png)]));
 
 // 4) DMG background — gradiente azul + logo a la izquierda.
 const dmgSvg = `<?xml version="1.0" encoding="UTF-8"?>
