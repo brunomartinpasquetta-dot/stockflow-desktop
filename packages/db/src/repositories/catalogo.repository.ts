@@ -19,6 +19,7 @@ import {
   companies,
   catalogoPedidos,
   catalogoSync,
+  families,
   sales,
   type CatalogoPedido,
   type CatalogoSync,
@@ -36,6 +37,8 @@ export interface ArticuloParaCatalogo {
   stock: number;
   activo: boolean;
   unidad: string;
+  /** Familia del artículo (la categoría con la que nace en el catálogo). */
+  familia?: string | null;
 }
 
 /**
@@ -146,6 +149,7 @@ export class CatalogoRepository {
         activo: articles.active,
         unidad: articles.unit,
         updatedAt: articles.updatedAt,
+        familia: families.name,
       };
       // AUDITORÍA sep-2026 (B2): en modo 'net' las listas guardan precios SIN
       // IVA. La tienda muestra precios finales al consumidor, así que se
@@ -158,13 +162,14 @@ export class CatalogoRepository {
       // dejarlo en '' — eso sí hay que filtrarlo.
       const condicion = and(gt(articles.updatedAt, input.desde), sql`trim(${articles.barcode}) != ''`);
 
-      const rows = this.db.select(seleccion).from(articles).where(condicion).orderBy(articles.updatedAt).limit(input.limite).all();
+      const rows = this.db.select(seleccion).from(articles).leftJoin(families, eq(articles.familyId, families.id)).where(condicion).orderBy(articles.updatedAt).limit(input.limite).all();
 
       if (rows.length === input.limite) {
         const ultimo = rows[rows.length - 1]!.updatedAt;
         const empatados = this.db
           .select(seleccion)
           .from(articles)
+          .leftJoin(families, eq(articles.familyId, families.id))
           .where(and(condicion, eq(articles.updatedAt, ultimo)))
           .all();
         const yaTraidos = new Set(rows.map((r) => r.codigo));
@@ -233,6 +238,7 @@ export class CatalogoRepository {
       stock: string | null;
       activo: boolean | null;
       unidad: string | null;
+      familia?: string | null;
     }[],
     modoNeto: boolean,
   ): ArticuloParaCatalogo[] {
@@ -249,6 +255,7 @@ export class CatalogoRepository {
         stock: redondearExacto(String(Math.max(0, fisico - res)), 3),
         activo: Boolean(r.activo),
         unidad: r.unidad ?? 'UN',
+        ...(r.familia !== undefined ? { familia: r.familia } : {}),
       };
     });
   }

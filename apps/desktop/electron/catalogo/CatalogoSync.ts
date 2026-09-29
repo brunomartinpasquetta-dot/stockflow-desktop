@@ -122,9 +122,15 @@ export class CatalogoSync {
         const crearFaltantes = this.opts.crearFaltantes ?? estado.crearFaltantes ?? true;
         const activos = articulos.filter((a) => a.activo);
         const inactivos = articulos.filter((a) => !a.activo);
+        // Los activos que el catálogo no tiene nacen VISIBLES y en la categoría
+        // de su familia ("Varios" si no tiene), igual que en la carga total:
+        // el catálogo tiene que ser el reflejo de lo que el comercio tiene en
+        // el sistema, sin que nadie los vaya a mostrar a mano. Un catálogo que
+        // no conozca `visible`/`categoria` los ignora y los crea ocultos.
+        const activosACrear = activos.map((a) => ({ ...a, visible: true, categoria: a.familia ?? 'Varios' }));
         const tandas: { articulos: typeof articulos; crear: boolean }[] = [];
         if (crearFaltantes) {
-          if (activos.length > 0) tandas.push({ articulos: activos, crear: true });
+          if (activos.length > 0) tandas.push({ articulos: activosACrear, crear: true });
           if (inactivos.length > 0) tandas.push({ articulos: inactivos, crear: false });
         } else {
           tandas.push({ articulos, crear: false });

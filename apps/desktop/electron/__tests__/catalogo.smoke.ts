@@ -482,6 +482,20 @@ const main = async () => {
     check('aplica: los creados van visibles y con su categoría', creados.length > 0 && creados.every((a: any) => a.visible === true && typeof a.categoria === 'string'));
     check('aplica: publica al momento precio y stock de lo vinculado', publicados.length === plan.vincular.length && publicados.every((a: any) => a.precio === 100));
     check('aplica: lo conflictivo no viaja', ![...vinculos.map((v: any) => v.codigo_sistema), ...creados.map((a: any) => a.codigo)].includes('7791000000004'));
+
+    // El espejo de todos los días: un artículo NUEVO nace visible y en su
+    // categoría, así el catálogo sigue igual al sistema sin tocar nada.
+    const s3 = new CatalogoSync({ repos, fetchImpl: fetchCatalogo, crearFaltantes: true });
+    repos.catalogo.saveState({ enabled: true });
+    await s3.correr();
+    enviados.length = 0;
+    await repos.articles.create({ barcode: '7791000000099', description: 'Artículo dado de alta hoy', listPrice1: '50.0000', familyId: fam.id } as never);
+    await s3.correr();
+    const alta = enviados
+      .filter((e) => e.url.endsWith('/articulos') && e.body.crear_faltantes)
+      .flatMap((e) => e.body.articulos)
+      .find((a: any) => a.codigo === '7791000000099');
+    check('espejo: un artículo nuevo viaja visible y con la categoría de su familia', alta?.visible === true && alta?.categoria === 'Cuadernos', JSON.stringify(alta));
   }
 
   closeLocalDb(db);
