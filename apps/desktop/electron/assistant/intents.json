@@ -2117,6 +2117,25 @@
       "En la columna Estado, hacé clic en 'Activa' para pausarla (o en 'Inactiva' para reactivarla).",
       "Para borrarla definitivamente usá el tachito — solo funciona si nunca se vendió."
      ]
+    },
+    {
+     "id": "utilidad-masiva",
+     "canonical": "¿Cómo cargo la utilidad de todos los artículos de una vez?",
+     "patterns": [
+      "cargar la utilidad de todos los articulos",
+      "utilidad masiva",
+      "calcular utilidad de todos",
+      "completar utilidad",
+      "utilidad en todos los articulos",
+      "poner la utilidad a todos",
+      "utilidad desde el precio de costo y venta"
+     ],
+     "answer": "En Artículos, con el botón 'Utilidad' de la barra de arriba. Calcula la utilidad de cada lista a partir del costo y del precio de venta que ya tiene cada artículo. Los precios no cambian, y los artículos sin costo se saltean.",
+     "steps": [
+      "Abrí Artículos.",
+      "Presioná 'Utilidad' y confirmá.",
+      "Si había utilidades cargadas a mano, te pregunta aparte si también se recalculan."
+     ]
     }
    ]
   },
@@ -10556,6 +10575,61 @@
       "pin incorrecto varias veces"
      ],
      "answer": "Si desde una misma PC se escribe mal el PIN de la red cinco veces seguidas, el servidor deja de aceptar intentos de esa PC durante diez minutos. Es para que nadie pueda adivinarlo probando. Las terminales que ya están trabajando no se ven afectadas. Se espera los diez minutos o se reinicia el sistema del servidor."
+    },
+    {
+     "id": "acceso-remoto",
+     "canonical": "¿Cómo entro al sistema desde la tablet o desde mi casa?",
+     "patterns": [
+      "acceso remoto",
+      "como entro desde la tablet",
+      "usar el sistema desde mi casa",
+      "entrar desde el celular",
+      "acceder desde afuera del local",
+      "ver stockflow desde casa",
+      "como activo el acceso remoto",
+      "codigo qr acceso remoto",
+      "entrar al sistema desde otro lugar",
+      "stockflow en la tablet"
+     ],
+     "answer": "Con el Acceso remoto: se activa en la PC principal del local y después entrás desde la tablet o el celular con el navegador, con tu mismo usuario y contraseña. No hay que abrir puertos ni instalar nada en la tablet, y queda activado aunque el sistema se actualice.",
+     "steps": [
+      "En la PC principal: Configuración → pestaña 'Acceso remoto'.",
+      "Presioná 'Activar acceso remoto'. En unos segundos aparece la dirección del comercio y un código QR.",
+      "Escaneá el QR con la cámara de la tablet o el celular.",
+      "Entrá con tu usuario y contraseña de StockFlow."
+     ]
+    },
+    {
+     "id": "acceso-remoto-no-deja",
+     "canonical": "¿Por qué no me deja activar el acceso remoto?",
+     "patterns": [
+      "no me deja activar el acceso remoto",
+      "acceso remoto cambiar contraseña",
+      "dice que cambie la contraseña de admin",
+      "clave debil acceso remoto",
+      "acceso remoto no se activa",
+      "no puedo activar acceso remoto"
+     ],
+     "answer": "Porque hay algún usuario con una contraseña fácil de adivinar (como 'admin' o '1234'). Como el sistema va a quedar accesible desde internet, no se activa hasta cambiarla. El aviso te dice qué usuario es: cambiale la clave en Configuración → Usuarios y volvé a tocar 'Activar acceso remoto'."
+    },
+    {
+     "id": "catalogo-cargar-todos",
+     "canonical": "¿Cómo cargo todos mis artículos en la tienda online?",
+     "patterns": [
+      "cargar todos los articulos en el catalogo",
+      "subir los articulos a la tienda online",
+      "catalogo web cargar todo",
+      "vincular todos los articulos al catalogo",
+      "pasar los productos al catalogo",
+      "poner todos los articulos en la pagina web",
+      "catalogo duplicados"
+     ],
+     "answer": "En Mi Empresa → Catálogo web → 'Cargar todos los artículos'. Primero te muestra qué va a pasar: lo que ya existe en el catálogo se vincula (conserva nombre, foto y categoría), lo que falta se crea visible en la categoría de su familia, y lo dudoso queda 'a revisar' para no duplicar. Confirmás y listo. El precio y el stock los manda siempre StockFlow.",
+     "steps": [
+      "Mi Empresa → Catálogo web → 'Cargar todos los artículos'.",
+      "Mirá el resumen (con 'Ver' ves cada lista).",
+      "Presioná 'Cargar N artículos' y esperá sin cerrar la ventana."
+     ]
     }
    ]
   },
@@ -11791,6 +11865,20 @@
       "Usá el buscador para encontrar una operación puntual (ej: el número de una venta).",
       "Exportá a Excel si necesitás guardar o compartir el registro."
      ]
+    },
+    {
+     "id": "contar-por-dia-de-caja",
+     "canonical": "¿Cómo veo las ventas de un día incluyendo las de después de medianoche?",
+     "patterns": [
+      "contar por dia de caja",
+      "ventas despues de medianoche",
+      "la caja cierra al otro dia",
+      "ventas del viernes que cerre el sabado",
+      "filtrar por caja",
+      "ventas de la madrugada aparecen al otro dia",
+      "dia de caja estadisticas"
+     ],
+     "answer": "Tildá 'Contar por día de caja', al lado de las fechas en Historial de Ventas, Estadísticas o Ventas por vendedor. Así cada venta cuenta para el día en que se abrió su caja: si abriste el lunes y cerraste el martes a la 1:30, todo es del lunes. Queda recordado en esa PC. El Libro IVA siempre va por la fecha del comprobante."
     }
    ]
   },

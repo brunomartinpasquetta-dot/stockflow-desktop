@@ -641,6 +641,20 @@
       "Para pausar una promo hacé clic en su etiqueta 'Activa' (se conserva el historial y la podés reactivar).",
       "Si un componente se queda sin stock y no permitís vender sin stock, el sistema avisa qué artículo falta al querer cobrar."
      ]
+    },
+    {
+     "heading": "Cargar la utilidad de todos los artículos",
+     "paragraphs": [
+      "Un comercio que viene de otro sistema suele tener los precios cargados pero no la utilidad. El botón 'Utilidad' de Artículos la calcula para todos a partir del costo y del precio de venta de cada lista: utilidad = (precio ÷ costo − 1) × 100. Los precios no cambian."
+     ],
+     "steps": [
+      "Artículos → botón 'Utilidad' en la barra de arriba.",
+      "Confirme. Se completa en todos los artículos activos que tengan costo.",
+      "Si había artículos con utilidad cargada a mano, pregunta aparte si también se recalculan."
+     ],
+     "tips": [
+      "Los artículos sin costo se omiten: sin costo no hay de dónde calcular la utilidad."
+     ]
     }
    ],
    "screenshots": [
@@ -2508,6 +2522,23 @@
       "Nada se guarda hasta que confirmás en la vista previa.",
       "Todo cambio queda registrado en 'Precios → Historial de Precios', desde donde también se puede revertir."
      ]
+    },
+    {
+     "heading": "Contar por día de caja",
+     "paragraphs": [
+      "Normalmente cada venta cuenta para el día y la hora en que se hizo. Si el comercio trabaja de noche y cierra la caja después de medianoche, lo vendido de madrugada aparece al día siguiente.",
+      "La casilla 'Contar por día de caja' (en Historial de Ventas, Estadísticas y Ventas por vendedor) hace que cada venta cuente para el día en que se abrió su caja: una caja abierta el lunes y cerrada el martes a la 1:30 es del lunes."
+     ],
+     "steps": [
+      "Abra Historial de Ventas, Estadísticas o Ventas por vendedor.",
+      "Tilde 'Contar por día de caja', al lado de las fechas.",
+      "La opción queda recordada en esa PC; destíldela para volver a contar por la hora de la venta."
+     ],
+     "tips": [
+      "Si una caja quedó abierta varios días, lo vendido después de las primeras 24 horas cuenta por su propia hora.",
+      "El Libro IVA y lo fiscal siempre van por la fecha del comprobante ante ARCA, con o sin esta opción.",
+      "El resumen del día y el avance del mes siguen contando por el día calendario."
+     ]
     }
    ],
    "screenshots": [
@@ -2968,6 +2999,41 @@
      ],
      "steps": [],
      "tips": []
+    },
+    {
+     "heading": "Acceso remoto: entrar desde la tablet o el celular",
+     "paragraphs": [
+      "Permite usar StockFlow desde afuera del local —por ejemplo, desde una tablet en su casa— con el mismo usuario y la misma contraseña de siempre. No hace falta abrir puertos en el router ni instalar nada en la tablet: se entra con el navegador.",
+      "Se activa en la PC principal del comercio (la que tiene la base de datos) y funciona tanto con una sola PC como con varias cajas en red. Queda activado aunque el sistema se actualice o la PC se reinicie."
+     ],
+     "steps": [
+      "Configuración → pestaña Acceso remoto.",
+      "Presione 'Activar acceso remoto'. En unos segundos aparece la dirección propia del comercio y un código QR.",
+      "Escanee el QR con la cámara de la tablet o el celular (o escriba la dirección en el navegador).",
+      "Ingrese con su usuario y contraseña de StockFlow."
+     ],
+     "tips": [
+      "Si algún usuario tiene una contraseña fácil de adivinar (por ejemplo 'admin' o '1234'), el sistema no deja activarlo y dice cuál hay que cambiar en Configuración → Usuarios.",
+      "Desde internet no se puede facturar en ARCA, cambiar los datos del comercio, borrar artículos/clientes/proveedores, actualizar precios en lote ni restaurar copias: eso se hace en el local.",
+      "Sólo lo puede activar un usuario con permiso de Configuración de hardware (por defecto, el administrador)."
+     ]
+    },
+    {
+     "heading": "Catálogo web: cargar todos los artículos",
+     "paragraphs": [
+      "Si el comercio tiene tienda online conectada, 'Cargar todos los artículos' pone en el catálogo todo lo que tiene en StockFlow, sin duplicados: lo que ya existía en el catálogo se vincula (y conserva su nombre, foto y categoría) y lo que falta se crea visible, en la categoría de su familia.",
+      "El precio y el stock los manda siempre StockFlow. Después, cada artículo nuevo que se cargue en el sistema aparece solo en el catálogo."
+     ],
+     "steps": [
+      "Mi Empresa → Catálogo web → 'Cargar todos los artículos'.",
+      "Revise el resumen: cuántos ya estaban vinculados, cuántos se vinculan, cuántos se crean y cuántos quedan a revisar (con 'Ver' se muestra la lista de cada grupo).",
+      "Presione 'Cargar N artículos' y espere a que termine sin cerrar la ventana."
+     ],
+     "tips": [
+      "Los 'a revisar' son casos dudosos (por ejemplo, dos productos con el mismo nombre en el catálogo): no se vinculan ni se crean solos, para no duplicar.",
+      "Los productos nuevos se crean sin foto; la foto se agrega desde el panel del catálogo.",
+      "Si aparece un error 401, la 'Clave de acceso' del catálogo en Mi Empresa no es la correcta."
+     ]
     }
    ],
    "screenshots": [
