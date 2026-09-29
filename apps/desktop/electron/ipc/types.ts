@@ -1602,6 +1602,25 @@ export interface CatalogoVincularLoteResultadoDTO {
   motivo?: string;
 }
 
+/** Carga total al catálogo: qué pasaría con cada artículo activo. Sólo lectura. */
+export interface CatalogoPlanCargaTotalDTO {
+  totalArticulos: number;
+  totalCatalogo: number;
+  yaVinculados: number;
+  vincular: { sku: string; codigo: string; nombreCatalogo: string; nombreSistema: string; criterio: 'codigo' | 'nombre' }[];
+  crear: { codigo: string; nombre: string; familia: string | null }[];
+  conflictos: { codigo: string; nombre: string; motivo: string }[];
+}
+
+export interface CatalogoResultadoCargaTotalDTO {
+  ok: boolean;
+  vinculados: number;
+  creados: number;
+  publicados: number;
+  errores: { codigo: string; motivo: string }[];
+  motivo?: string;
+}
+
 /** Estado del espejo de artículos hacia el catálogo web. */
 export interface CatalogoSyncEstadoDTO {
   activo: boolean;
@@ -1902,6 +1921,11 @@ export interface ApiSurface {
     syncAhora(payload?: { todo?: boolean }): Res<CatalogoSyncResultadoDTO>;
     sugerirVinculacion(): Res<CatalogoSugerenciaVinculacionDTO>;
     vincularLote(payload: { vinculos: { sku: string; codigoSistema: string }[] }): Res<CatalogoVincularLoteResultadoDTO>;
+    planCargaTotal(): Res<CatalogoPlanCargaTotalDTO>;
+    aplicarCargaTotal(payload: {
+      vincular: { sku: string; codigo: string }[];
+      crear: { codigo: string; familia: string | null }[];
+    }): Res<CatalogoResultadoCargaTotalDTO>;
     pedidosContarPendientes(): Res<{ pendientes: number }>;
     pedidosListar(payload?: { estado?: 'pendiente' | 'convertido' | 'rechazado' }): Res<PedidoWebDTO[]>;
     pedidoConvertir(payload: { id: string; paymentMethodId: string }): Res<{ ok: true; ventaNumero: number; ventaTipo: string }>;

@@ -148,7 +148,7 @@ const MAX_FALLOS_LOGIN = 10;
 // cualquier verbo nuevo cae del lado de la escritura por defecto (antes era al
 // revés y `catalogo:syncConfigurar` o `mpQr:verifyPayment` seguían escribiendo).
 const METODOS_DE_LECTURA =
-  /^(get|list|find|search|count|preview|check|has|is|status|stats|report|summary|export|print|ping|dummy|test|whoami|me|read|show|calc|compute|resolve|suggest|validate|lookup|history|balance|breakdown|available|current|detail|movements|top|ranking|analytics|dashboard|logout|login|refresh|listar|contar|sugerir|estado|estadisticas|historial|pedidosListar|pedidosContarPendientes|syncEstado|sugerirVinculacion)(?=[A-Z_]|$)/;
+  /^(get|list|find|search|count|preview|check|has|is|status|stats|report|summary|export|print|ping|dummy|test|whoami|me|read|show|calc|compute|resolve|suggest|validate|lookup|history|balance|breakdown|available|current|detail|movements|top|ranking|analytics|dashboard|logout|login|refresh|listar|contar|sugerir|estado|estadisticas|historial|pedidosListar|pedidosContarPendientes|syncEstado|sugerirVinculacion|planCargaTotal)(?=[A-Z_]|$)/;
 
 /** Grupos y canales que son consulta pura aunque su nombre no lo diga. */
 const GRUPOS_DE_LECTURA = new Set(['analytics', 'reports', 'search', 'assistant']);

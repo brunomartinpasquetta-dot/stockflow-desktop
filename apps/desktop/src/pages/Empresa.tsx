@@ -467,8 +467,162 @@ export function EspejoCatalogo(): React.ReactElement {
           Republicar todo
         </Button>
         <VincularArticulosDialog />
+        <CargaTotalDialog />
       </div>
     </div>
+  )
+}
+
+/**
+ * CARGA TOTAL — que TODO lo que el comercio tiene en el local esté en su
+ * catálogo, sin duplicados. Primero muestra qué va a pasar con cada artículo
+ * (ya vinculado / se vincula / se crea / a revisar) y recién con la
+ * confirmación escribe. Lo dudoso nunca se adivina: queda "a revisar".
+ */
+function CargaTotalDialog(): React.ReactElement {
+  const qc = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [crearFaltantes, setCrearFaltantes] = useState(true)
+  const [ver, setVer] = useState<'vincular' | 'crear' | 'conflictos' | null>(null)
+
+  const plan = useQuery({
+    queryKey: ['catalogo', 'planCargaTotal'],
+    queryFn: () => api.catalogo.planCargaTotal(),
+    enabled: open,
+    staleTime: 0,
+  })
+
+  const aplicar = useMutation({
+    mutationFn: () =>
+      api.catalogo.aplicarCargaTotal({
+        vincular: (plan.data?.vincular ?? []).map((v) => ({ sku: v.sku, codigo: v.codigo })),
+        crear: crearFaltantes ? (plan.data?.crear ?? []).map((c) => ({ codigo: c.codigo, familia: c.familia })) : [],
+      }),
+    onSuccess: (r) => {
+      const resumen = `${r.vinculados} vinculado(s), ${r.creados} creado(s)`
+      if (r.ok) toast.success(`Catálogo cargado: ${resumen}`, { duration: 12_000 })
+      else
+        toast.warning(`Catálogo cargado con avisos: ${resumen}. ${r.errores.length} no entraron (${r.errores[0]?.motivo ?? ''}).`, {
+          duration: 20_000,
+        })
+      void qc.invalidateQueries({ queryKey: ['catalogo'] })
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo cargar el catálogo'),
+  })
+
+  const p = plan.data
+  const aEnviar = (p?.vincular.length ?? 0) + (crearFaltantes ? (p?.crear.length ?? 0) : 0)
+
+  const Fila = ({ n, texto, tono, clave }: { n: number; texto: string; tono: string; clave?: 'vincular' | 'crear' | 'conflictos' }) => (
+    <div className="flex items-center justify-between gap-2 rounded border px-3 py-2 text-sm">
+      <span>
+        <strong className={tono}>{n.toLocaleString('es-AR')}</strong> {texto}
+      </span>
+      {clave && n > 0 && (
+        <button type="button" className="text-xs text-primary underline" onClick={() => setVer(ver === clave ? null : clave)}>
+          {ver === clave ? 'Ocultar' : 'Ver'}
+        </button>
+      )}
+    </div>
+  )
+
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)} title="Poner en el catálogo todos los artículos del local, sin duplicados">
+        <UploadCloud className="h-4 w-4" />
+        Cargar todos los artículos
+      </Button>
+
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!aplicar.isPending) setOpen(v)
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Cargar todos los artículos en el catálogo</DialogTitle>
+          </DialogHeader>
+
+          {plan.isLoading && (
+            <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Comparando cada artículo con el catálogo…
+            </p>
+          )}
+          {plan.isError && (
+            <p className="py-4 text-sm text-destructive">
+              No se pudo consultar el catálogo. Verifique la dirección y la clave, o que esté en línea.
+            </p>
+          )}
+
+          {p && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                {p.totalArticulos.toLocaleString('es-AR')} artículos activos en el sistema ·{' '}
+                {p.totalCatalogo.toLocaleString('es-AR')} productos en el catálogo. Antes de crear, cada artículo se busca en el
+                catálogo por código de barras y por nombre: lo que ya existe se vincula, no se duplica.
+              </p>
+              <Fila n={p.yaVinculados} texto="ya estaban vinculados (no se tocan)" tono="text-muted-foreground" />
+              <Fila n={p.vincular.length} texto="ya existen en el catálogo y se vinculan (conservan foto, nombre y categoría)" tono="text-emerald-700" clave="vincular" />
+              {ver === 'vincular' && (
+                <ul className="max-h-56 overflow-y-auto rounded border bg-muted/30 px-3 py-2 text-xs">
+                  {p.vincular.map((v) => (
+                    <li key={v.codigo} className="py-0.5">
+                      {v.nombreSistema} → <span className="text-muted-foreground">{v.nombreCatalogo}</span>{' '}
+                      <span className="text-muted-foreground">({v.criterio === 'codigo' ? 'por código' : 'por nombre'})</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Fila n={p.crear.length} texto="no están en el catálogo y se crean, visibles y en la categoría de su familia" tono="text-primary" clave="crear" />
+              {ver === 'crear' && (
+                <ul className="max-h-56 overflow-y-auto rounded border bg-muted/30 px-3 py-2 text-xs">
+                  {p.crear.map((c) => (
+                    <li key={c.codigo} className="py-0.5">
+                      {c.nombre} <span className="text-muted-foreground">— {c.familia ?? 'Sin familia'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Fila n={p.conflictos.length} texto="a revisar a mano (no se vinculan ni se crean)" tono="text-amber-700" clave="conflictos" />
+              {ver === 'conflictos' && (
+                <ul className="max-h-56 overflow-y-auto rounded border bg-muted/30 px-3 py-2 text-xs">
+                  {p.conflictos.map((c) => (
+                    <li key={c.codigo} className="py-0.5">
+                      {c.nombre} <span className="text-muted-foreground">— {c.motivo}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label className="mt-1 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-primary"
+                  checked={crearFaltantes}
+                  onChange={(e) => setCrearFaltantes(e.target.checked)}
+                  disabled={aplicar.isPending}
+                />
+                Crear en el catálogo los que no están
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Precio y stock los manda siempre el sistema. Los productos nuevos se crean sin foto; se la agrega desde el panel del
+                catálogo.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={aplicar.isPending}>
+              Cerrar
+            </Button>
+            <Button onClick={() => aplicar.mutate()} disabled={!p || aEnviar === 0 || aplicar.isPending}>
+              {aplicar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+              {aplicar.isPending ? 'Cargando… no cierre esta ventana' : `Cargar ${aEnviar.toLocaleString('es-AR')} artículo(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

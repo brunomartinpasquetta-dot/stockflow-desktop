@@ -20,7 +20,7 @@
 import { PermissionDeniedError, SalesService, ValidationError, hasPermission, requirePermission } from '@stockflow/core';
 import { addDecimal, mulDecimal, proratedVatBreakdown, sumDecimals, type PriceMode } from '@stockflow/shared';
 
-import { obtenerCatalogoSync } from '../../catalogo/CatalogoSync';
+import { aplicarCargaTotal, obtenerCatalogoSync, planCargaTotal } from '../../catalogo/CatalogoSync';
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import type { CatalogoEstadisticasDTO } from '../types';
 
@@ -142,6 +142,30 @@ export function buildCatalogoHandlers(deps: HandlerDeps): HandlerMap {
         requirePermission(ctx.currentUser, 'manage_company');
         const sync = obtenerCatalogoSync(deps.repos);
         return sync.vincularLote(payload.vinculos);
+      },
+    ),
+
+    /**
+     * CARGA TOTAL — paso 1, sólo lectura: qué pasaría con cada artículo activo
+     * (ya vinculado / se vincula / se crea / conflicto). No escribe nada.
+     */
+    'catalogo:planCargaTotal': withSession(deps, async (_payload, ctx) => {
+      requirePermission(ctx.currentUser, 'manage_company');
+      return planCargaTotal(obtenerCatalogoSync(deps.repos), deps.repos);
+    }),
+
+    /** CARGA TOTAL — paso 2: aplica lo que el usuario confirmó del plan. */
+    'catalogo:aplicarCargaTotal': withSession(
+      deps,
+      async (
+        payload: { vincular: { sku: string; codigo: string }[]; crear: { codigo: string; familia: string | null }[] },
+        ctx,
+      ) => {
+        requirePermission(ctx.currentUser, 'manage_company');
+        return aplicarCargaTotal(obtenerCatalogoSync(deps.repos), deps.repos, {
+          vincular: Array.isArray(payload?.vincular) ? payload.vincular : [],
+          crear: Array.isArray(payload?.crear) ? payload.crear : [],
+        });
       },
     ),
 

@@ -171,27 +171,7 @@ export class CatalogoRepository {
         for (const e of empatados) if (!yaTraidos.has(e.codigo)) rows.push(e);
       }
 
-      // Lo que se publica es lo que se puede vender por web AHORA: el stock
-      // físico menos lo que ya compraron pedidos web que todavía no se
-      // convirtieron en venta. La tienda descontó esas unidades en su checkout;
-      // si acá se mandara el físico, la publicación siguiente se las devolvería
-      // y el mismo rollo se vendería dos veces. Convertido el pedido, la venta
-      // baja el físico y el pedido deja de restar: no se cuenta dos veces.
-      const reservado = this.reservadoPorPedidosPendientes();
-      const articulos = rows.map((r) => {
-        const fisico = Number(r.stock ?? 0);
-        const res = reservado.get(r.codigo) ?? 0;
-        return {
-          codigo: r.codigo,
-          nombre: r.nombre,
-          precio: modoNeto
-            ? redondearExacto(mulDecimal(r.precio ?? '0', addDecimal('1', String(Number(r.vatRate ?? '21') / 100), 4), 6), 2)
-            : redondearExacto(r.precio ?? '0', 2),
-          stock: redondearExacto(String(Math.max(0, fisico - res)), 3),
-          activo: Boolean(r.activo),
-          unidad: r.unidad ?? 'UN',
-        };
-      });
+      const articulos = this.aCatalogo(rows, modoNeto);
 
       // El cursor avanza hasta el último publicado, no hasta "ahora": si algo
       // cambió mientras se armaba la tanda, entra en la vuelta siguiente.
@@ -200,6 +180,77 @@ export class CatalogoRepository {
     } catch (err) {
       return rethrowDbError(err);
     }
+  }
+
+  /**
+   * Los mismos datos que publica el espejo, pero para una lista de códigos
+   * puntual (la carga total del catálogo: publica en el momento lo que se
+   * acaba de vincular o crear, sin esperar a que el artículo cambie).
+   */
+  paraPublicarPorCodigo(codigos: string[], precioLista: 1 | 2 | 3): ArticuloParaCatalogo[] {
+    try {
+      if (codigos.length === 0) return [];
+      const col = precioLista === 3 ? articles.listPrice3 : precioLista === 2 ? articles.listPrice2 : articles.listPrice1;
+      const empresa = this.db.select({ priceMode: companies.priceMode }).from(companies).limit(1).get();
+      const out: ArticuloParaCatalogo[] = [];
+      // `IN` con miles de parámetros choca con el tope de SQLite: de a 500.
+      for (let i = 0; i < codigos.length; i += 500) {
+        const rows = this.db
+          .select({
+            codigo: articles.barcode,
+            nombre: articles.description,
+            precio: col,
+            vatRate: articles.vatRate,
+            stock: articles.stock,
+            activo: articles.active,
+            unidad: articles.unit,
+          })
+          .from(articles)
+          .where(inArray(articles.barcode, codigos.slice(i, i + 500)))
+          .all();
+        out.push(...this.aCatalogo(rows, empresa?.priceMode === 'net'));
+      }
+      return out;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Lo que se publica es lo que se puede vender por web AHORA: el stock
+   * físico menos lo que ya compraron pedidos web que todavía no se
+   * convirtieron en venta. La tienda descontó esas unidades en su checkout;
+   * si acá se mandara el físico, la publicación siguiente se las devolvería
+   * y el mismo rollo se vendería dos veces. Convertido el pedido, la venta
+   * baja el físico y el pedido deja de restar: no se cuenta dos veces.
+   */
+  private aCatalogo(
+    rows: {
+      codigo: string;
+      nombre: string;
+      precio: string | null;
+      vatRate: string | null;
+      stock: string | null;
+      activo: boolean | null;
+      unidad: string | null;
+    }[],
+    modoNeto: boolean,
+  ): ArticuloParaCatalogo[] {
+    const reservado = this.reservadoPorPedidosPendientes();
+    return rows.map((r) => {
+      const fisico = Number(r.stock ?? 0);
+      const res = reservado.get(r.codigo) ?? 0;
+      return {
+        codigo: r.codigo,
+        nombre: r.nombre,
+        precio: modoNeto
+          ? redondearExacto(mulDecimal(r.precio ?? '0', addDecimal('1', String(Number(r.vatRate ?? '21') / 100), 4), 6), 2)
+          : redondearExacto(r.precio ?? '0', 2),
+        stock: redondearExacto(String(Math.max(0, fisico - res)), 3),
+        activo: Boolean(r.activo),
+        unidad: r.unidad ?? 'UN',
+      };
+    });
   }
 
   /**

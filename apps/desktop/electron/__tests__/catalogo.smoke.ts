@@ -414,6 +414,76 @@ const main = async () => {
   }
   check('un estado fuera de la lista es rechazado (CHECK)', checkRechazo);
 
+  // ---- CARGA TOTAL: todo el local en el catálogo, SIN duplicados ----------
+  // El enemigo es el duplicado: lo que ya existe en el catálogo se vincula,
+  // nunca se vuelve a crear; lo dudoso no se adivina. Y `=`/`#` distinguen
+  // productos (rayado vs cuadriculado): no pueden cruzarse.
+  console.log('\n[carga total]');
+  {
+    const fam = await repos.families.create({ name: 'Cuadernos' } as never);
+    const mk = (barcode: string, description: string, familyId?: string) =>
+      repos.articles.create({ barcode, description, listPrice1: '100.0000', stock: '5.000', ...(familyId ? { familyId } : {}) } as never);
+    await mk('7791000000001', 'Goma Maped Gold Soft'); // ya existe por nombre (con acento/mayúsculas distintas)
+    await mk('7791000000002', 'CUAD. 16X21 X46H. = AVON', fam.id); // rayado: tiene que ir con el rayado
+    await mk('7791000000003', 'CUAD. 16X21 X46H. # AVON', fam.id); // cuadriculado
+    await mk('7791000000004', 'Recibo Duplicado'); // dos productos así en el catálogo → a revisar
+    await mk('7791000000005', 'Lápiz nuevo que no está'); // no existe → se crea
+    await mk('7791000000006', 'Resaltador verde', fam.id); // su SKU en el catálogo ES el código → por código
+    await mk('7791000000007', 'Ya vinculado de antes');
+
+    const catalogo = [
+      { id: 'p1', sku: 'CTZ-1', nombre: 'goma maped gold soft', codigo_sistema: '', precio: 0, activo: true },
+      { id: 'p2', sku: 'CTZ-2', nombre: 'Cuad. 16x21 x46h. # Avon', codigo_sistema: '', precio: 0, activo: true },
+      { id: 'p3', sku: 'CTZ-3', nombre: 'Cuad. 16x21 x46h. = Avon', codigo_sistema: '', precio: 0, activo: true },
+      { id: 'p4', sku: 'CTZ-4', nombre: 'Recibo Duplicado', codigo_sistema: '', precio: 0, activo: true },
+      { id: 'p5', sku: 'CTZ-5', nombre: 'RECIBO DUPLICADO', codigo_sistema: '', precio: 0, activo: true },
+      { id: 'p6', sku: '7791000000006', nombre: 'Otro nombre cualquiera', codigo_sistema: '', precio: 0, activo: true },
+      { id: 'p7', sku: 'CTZ-7', nombre: 'Lo que sea', codigo_sistema: '7791000000007', precio: 0, activo: true },
+    ];
+    const enviados: any[] = [];
+    const fetchCatalogo = (async (url: any, init: any) => {
+      const u = String(url);
+      const body = init?.body ? JSON.parse(init.body) : null;
+      enviados.push({ url: u, body });
+      if (u.includes('/api/stockflow/productos')) {
+        return { ok: true, status: 200, json: async () => ({ productos: catalogo, total: catalogo.length }) } as any;
+      }
+      if (u.endsWith('/api/stockflow/vincular')) {
+        return { ok: true, status: 200, json: async () => ({ vinculados: body.vinculos.length, errores: [] }) } as any;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ actualizados: body.crear_faltantes ? 0 : body.articulos.length, creados: body.crear_faltantes ? body.articulos.length : 0, errores: [] }),
+      } as any;
+    }) as typeof fetch;
+    const { planCargaTotal, aplicarCargaTotal } = await import('../catalogo/CatalogoSync');
+    const s2 = new CatalogoSync({ repos, fetchImpl: fetchCatalogo });
+    const plan = await planCargaTotal(s2, repos);
+    const vinc = (cod: string) => plan.vincular.find((v) => v.codigo === cod);
+    check('ya vinculado: no se toca', plan.yaVinculados >= 1 && !vinc('7791000000007') && !plan.crear.some((c) => c.codigo === '7791000000007'));
+    check('existe por nombre (sin distinguir acentos/mayúsculas) → se vincula', vinc('7791000000001')?.sku === 'CTZ-1', JSON.stringify(vinc('7791000000001')));
+    check('rayado (=) va con el rayado', vinc('7791000000002')?.sku === 'CTZ-3', JSON.stringify(vinc('7791000000002')));
+    check('cuadriculado (#) va con el cuadriculado', vinc('7791000000003')?.sku === 'CTZ-2', JSON.stringify(vinc('7791000000003')));
+    check('SKU igual al código de barras → se vincula por código', vinc('7791000000006')?.sku === '7791000000006' && vinc('7791000000006')?.criterio === 'codigo');
+    check(
+      'dos productos con el mismo nombre → a revisar, ni se vincula ni se crea',
+      plan.conflictos.some((c) => c.codigo === '7791000000004') && !vinc('7791000000004') && !plan.crear.some((c) => c.codigo === '7791000000004'),
+    );
+    const nuevo = plan.crear.find((c) => c.codigo === '7791000000005');
+    check('no existe → se crea, y sin familia va a "Varios"', nuevo?.familia === 'Varios', JSON.stringify(nuevo));
+
+    enviados.length = 0;
+    const r = await aplicarCargaTotal(s2, repos, { vincular: plan.vincular, crear: plan.crear });
+    const vinculos = enviados.filter((e) => e.url.endsWith('/vincular')).flatMap((e) => e.body.vinculos);
+    const creados = enviados.filter((e) => e.url.endsWith('/articulos') && e.body.crear_faltantes).flatMap((e) => e.body.articulos);
+    const publicados = enviados.filter((e) => e.url.endsWith('/articulos') && !e.body.crear_faltantes).flatMap((e) => e.body.articulos);
+    check('aplica: vincula lo propuesto', r.ok && vinculos.length === plan.vincular.length, JSON.stringify(r));
+    check('aplica: los creados van visibles y con su categoría', creados.length > 0 && creados.every((a: any) => a.visible === true && typeof a.categoria === 'string'));
+    check('aplica: publica al momento precio y stock de lo vinculado', publicados.length === plan.vincular.length && publicados.every((a: any) => a.precio === 100));
+    check('aplica: lo conflictivo no viaja', ![...vinculos.map((v: any) => v.codigo_sistema), ...creados.map((a: any) => a.codigo)].includes('7791000000004'));
+  }
+
   closeLocalDb(db);
   rmSync(dir, { recursive: true, force: true });
   console.log(fallas === 0 ? '\n✅ TODO OK\n' : `\n❌ ${fallas} FALLAS\n`);

@@ -97,6 +97,8 @@ const DESCRIBE: Record<string, Describe> = {
   'quotes:delete': (p) => `Presupuesto eliminado (${s(g(p, 'id'))})`,
   'articles:create': (_p, r) => `Artículo creado: ${s(g(r, 'code'))} — ${s(g(r, 'description'))}`,
   'articles:update': (_p, r) => `Artículo modificado: ${s(g(r, 'code'))} — ${s(g(r, 'description'))}`,
+  'catalogo:aplicarCargaTotal': (_p, r) =>
+    `Catálogo web — carga total: ${s(g(r, 'vinculados'))} vinculado(s), ${s(g(r, 'creados'))} creado(s), ${s(g(r, 'errores') && (g(r, 'errores') as unknown[]).length)} con error`,
   'articles:delete': (p) => `Artículo eliminado (${s(g(p, 'id'))})`,
   'articles:recalcularMargenes': (_p, r) =>
     `Utilidad calculada desde los precios actuales: ${s(g(r, 'actualizados'))} artículo(s) (${s(g(r, 'sinCosto'))} sin costo, ${s(g(r, 'yaTenian'))} ya la tenían)`,
@@ -144,6 +146,9 @@ export function isAuditable(channel: string): boolean {
   if (IGNORED_GROUPS.has(group)) return false;
   if (IGNORED_CHANNELS.has(channel)) return false;
   if (channel === 'auth:login') return true;
+  // Verbo en castellano que la regex no reconoce, y crea/vincula en bloque
+  // todo el padrón del catálogo: tiene que quedar registrado.
+  if (channel === 'catalogo:aplicarCargaTotal') return true;
   return MUTATING_VERBS.test(method);
 }
 
