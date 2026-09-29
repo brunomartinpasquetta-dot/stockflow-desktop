@@ -98,6 +98,8 @@ const DESCRIBE: Record<string, Describe> = {
   'articles:create': (_p, r) => `Artículo creado: ${s(g(r, 'code'))} — ${s(g(r, 'description'))}`,
   'articles:update': (_p, r) => `Artículo modificado: ${s(g(r, 'code'))} — ${s(g(r, 'description'))}`,
   'articles:delete': (p) => `Artículo eliminado (${s(g(p, 'id'))})`,
+  'articles:recalcularMargenes': (_p, r) =>
+    `Utilidad calculada desde los precios actuales: ${s(g(r, 'actualizados'))} artículo(s) (${s(g(r, 'sinCosto'))} sin costo, ${s(g(r, 'yaTenian'))} ya la tenían)`,
   'customers:create': (_p, r) => `Cliente creado: ${s(g(r, 'lastName'))} ${s(g(r, 'firstName') ?? '')}`.trim(),
   'customers:update': (_p, r) => `Cliente modificado: ${s(g(r, 'lastName'))} ${s(g(r, 'firstName') ?? '')}`.trim(),
   'customers:delete': (p) => `Cliente eliminado (${s(g(p, 'id'))})`,

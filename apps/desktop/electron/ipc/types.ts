@@ -1952,6 +1952,8 @@ export interface ApiSurface {
     findLowStock(): Res<ArticleDTO[]>;
     uploadImage(payload: { articleId: string; sourcePath: string }): Res<{ imagePath: string }>;
     removeImage(payload: { articleId: string }): Res<{ ok: true }>;
+    /** Carga la utilidad de todos los artículos a partir de sus precios actuales. */
+    recalcularMargenes(payload?: { soloVacios?: boolean }): Res<{ actualizados: number; sinCosto: number; yaTenian: number }>;
     getImageDataUrl(payload: { articleId: string }): Res<{ dataUrl: string | null }>;
   };
   customers: {

@@ -80,6 +80,7 @@ export function initLocalDb(
     ? seedLocalDb(db)
     : {
         adminCreated: false,
+        adminPasswordUpgraded: false,
         consumidorFinalCreated: false,
         defaultFamilyCreated: false,
         companyCreated: false,

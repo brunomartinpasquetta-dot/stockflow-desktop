@@ -214,6 +214,8 @@ export const api = {
       unwrap(sf().articles.uploadImage({ articleId, sourcePath })),
     removeImage: (articleId: string): Promise<{ ok: true }> =>
       unwrap(sf().articles.removeImage({ articleId })),
+    recalcularMargenes: (soloVacios: boolean): Promise<{ actualizados: number; sinCosto: number; yaTenian: number }> =>
+      unwrap(sf().articles.recalcularMargenes({ soloVacios })),
     getImageDataUrl: (articleId: string): Promise<{ dataUrl: string | null }> =>
       unwrap(sf().articles.getImageDataUrl({ articleId })),
   },

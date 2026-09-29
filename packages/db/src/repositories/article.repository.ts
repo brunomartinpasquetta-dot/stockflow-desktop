@@ -113,6 +113,79 @@ export class ArticleRepository extends BaseRepository<Article, NewArticle> {
     }
   }
 
+  /**
+   * Carga la utilidad (% sobre el costo) de cada lista a partir de los precios
+   * que el artículo YA tiene. Es el inverso exacto de la fórmula de las compras
+   * (`precio = costo × (1 + m/100)`, redondeado a peso), así una compra
+   * posterior en modo "por margen" reproduce los precios de hoy en vez de
+   * pisarlos con otros.
+   *
+   * Un comercio migrado desde otro sistema entra con precios y sin utilidad
+   * (Denver Drugstore: 598 artículos, ninguno con margen): cargarla a mano son
+   * 600 fichas. Sólo artículos activos con costo > 0, y cada lista sólo si
+   * tiene precio > 0. Con `soloVacios` no se toca la utilidad que el comercio
+   * ya cargó a mano. Nunca cambia un precio.
+   */
+  async recalcularMargenesDesdePrecios(opts: {
+    soloVacios: boolean;
+  }): Promise<{ actualizados: number; sinCosto: number; yaTenian: number }> {
+    try {
+      return this.db.transaction((tx) => {
+        const filas = tx
+          .select({
+            id: articles.id,
+            costPrice: articles.costPrice,
+            listPrice1: articles.listPrice1,
+            listPrice2: articles.listPrice2,
+            listPrice3: articles.listPrice3,
+            margin1: articles.margin1,
+            margin2: articles.margin2,
+            margin3: articles.margin3,
+          })
+          .from(articles)
+          .where(eq(articles.active, true))
+          .all();
+        const cargado = (m: string | null): boolean => m != null && m.trim() !== '';
+        const ahora = Date.now();
+        let actualizados = 0;
+        let sinCosto = 0;
+        let yaTenian = 0;
+        for (const a of filas) {
+          const costo = Number(a.costPrice);
+          if (!(costo > 0)) {
+            sinCosto++;
+            continue;
+          }
+          const set: Partial<Record<'margin1' | 'margin2' | 'margin3', string>> = {};
+          let respetadas = 0;
+          const listas: Array<['margin1' | 'margin2' | 'margin3', string, string | null]> = [
+            ['margin1', a.listPrice1, a.margin1],
+            ['margin2', a.listPrice2, a.margin2],
+            ['margin3', a.listPrice3, a.margin3],
+          ];
+          for (const [col, precio, margenActual] of listas) {
+            const p = Number(precio);
+            if (!(p > 0)) continue;
+            if (opts.soloVacios && cargado(margenActual)) {
+              respetadas++;
+              continue;
+            }
+            set[col] = ((p / costo - 1) * 100).toFixed(2);
+          }
+          if (Object.keys(set).length === 0) {
+            if (respetadas > 0) yaTenian++;
+            continue;
+          }
+          tx.update(articles).set({ ...set, updatedAt: ahora }).where(eq(articles.id, a.id)).run();
+          actualizados++;
+        }
+        return { actualizados, sinCosto, yaTenian };
+      });
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async incrementStock(id: string, qty: string): Promise<void> {
     try {
       const res = this.db

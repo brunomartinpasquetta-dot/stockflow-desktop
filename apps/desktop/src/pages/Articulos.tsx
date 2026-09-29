@@ -27,6 +27,7 @@ import {
   FileSpreadsheet,
   FileText,
   Pencil,
+  Percent,
   Plus,
   Printer,
   Search,
@@ -478,6 +479,47 @@ export function Articulos() {
     }
   }
 
+  /**
+   * Carga la utilidad de TODOS los artículos a partir de sus precios de hoy.
+   * Pensado para el comercio que llega migrado de otro sistema: entra con
+   * precios pero sin utilidad, y sin eso el modo "por margen" de las compras no
+   * tiene con qué recalcular. Primero completa sólo los que no la tienen; si
+   * quedaron artículos con utilidad cargada a mano, pregunta aparte si también
+   * se recalculan. Nunca cambia un precio.
+   */
+  async function calcularUtilidadMasiva(): Promise<void> {
+    const ok = window.confirm(
+      'Se calculará la utilidad (% sobre el costo) de cada lista de precios a partir de los precios actuales, ' +
+        'para todos los artículos activos que tengan costo cargado.\n\n' +
+        'Los artículos que ya tienen utilidad cargada no se modifican. Los precios no cambian.\n\n¿Continuar?',
+    )
+    if (!ok) return
+    try {
+      const r = await api.articles.recalcularMargenes(true)
+      await articles.refetch()
+      const detalle = [
+        r.sinCosto > 0 ? `${r.sinCosto} sin costo (se omitieron)` : null,
+        r.yaTenian > 0 ? `${r.yaTenian} ya tenían utilidad` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      toast.success(`Utilidad calculada en ${r.actualizados} artículo(s)${detalle ? ` — ${detalle}` : ''}`, { duration: 10_000 })
+      if (r.yaTenian > 0) {
+        const tambien = window.confirm(
+          `${r.yaTenian} artículo(s) ya tenían una utilidad cargada a mano y se respetaron.\n\n` +
+            '¿Recalcular también la de esos artículos a partir de sus precios actuales? La utilidad cargada a mano se pierde.',
+        )
+        if (tambien) {
+          const r2 = await api.articles.recalcularMargenes(false)
+          await articles.refetch()
+          toast.success(`Utilidad recalculada en ${r2.actualizados} artículo(s)`)
+        }
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo calcular la utilidad')
+    }
+  }
+
   // Navegación con flechas.
   const navigateRow = useCallback(
     (delta: 1 | -1): void => {
@@ -686,6 +728,18 @@ export function Articulos() {
           <FileSpreadsheet className="mr-1 h-4 w-4" />
           Excel
         </Button>
+        {canEditArticles && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void calcularUtilidadMasiva()}
+            disabled={mode !== 'view'}
+            title="Cargar la utilidad de todos los artículos a partir de sus precios actuales"
+          >
+            <Percent className="mr-1 h-4 w-4" />
+            Utilidad
+          </Button>
+        )}
         <div className="flex-1" />
         <select
           value={brandFilter}

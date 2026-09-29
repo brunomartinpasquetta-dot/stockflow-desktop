@@ -74,6 +74,43 @@ async function main(): Promise<void> {
   const byBarcode = await repos.articles.findByBarcode('7790000000017');
   check('articles.findByBarcode', byBarcode?.id === art.id);
 
+  // --- utilidad desde los precios actuales -----------------------------
+  // Un comercio migrado entra con precios y sin utilidad. La carga masiva
+  // tiene que ser el inverso EXACTO de la fórmula de las compras
+  // (precio = costo × (1 + m/100), redondeado a peso), respetar lo que el
+  // comercio ya cargó a mano y saltear lo que no tiene costo.
+  {
+    const precioPorMargen = (costo: string, m: string): number => Math.round(Number(costo) * (1 + Number(m) / 100));
+    const conMargen = await repos.articles.create({
+      barcode: '7799000000011', description: 'Ya tiene utilidad cargada', costPrice: '1000.0000',
+      listPrice1: '1500.0000', listPrice2: '1400.0000', margin1: '33.00', vatRate: '21.00', unit: 'UN',
+    });
+    const sinCosto = await repos.articles.create({
+      barcode: '7799000000028', description: 'Sin costo', costPrice: '0.0000', listPrice1: '900.0000', vatRate: '21.00', unit: 'UN',
+    });
+    const r1 = await repos.articles.recalcularMargenesDesdePrecios({ soloVacios: true });
+    const a1 = await repos.articles.findById(art.id);
+    const a2 = await repos.articles.findById(conMargen.id);
+    const a3 = await repos.articles.findById(sinCosto.id);
+    check(
+      'recalcularMargenes: 600 → 850 da 41.67% y la lista 1 se reproduce redondeada',
+      a1?.margin1 === '41.67' && precioPorMargen('600.0000', a1?.margin1 ?? '0') === 850,
+      `margin1=${a1?.margin1}`,
+    );
+    check('recalcularMargenes: las listas sin precio quedan sin utilidad', a1?.margin2 == null && a1?.margin3 == null, `m2=${a1?.margin2} m3=${a1?.margin3}`);
+    check(
+      'recalcularMargenes (soloVacios): respeta la utilidad cargada a mano y completa la que falta',
+      a2?.margin1 === '33.00' && a2?.margin2 === '40.00',
+      `m1=${a2?.margin1} m2=${a2?.margin2}`,
+    );
+    check('recalcularMargenes: sin costo no se toca ni se inventa', a3?.margin1 == null && r1.sinCosto >= 1, `m1=${a3?.margin1} sinCosto=${r1.sinCosto}`);
+    check('recalcularMargenes: cuenta lo actualizado', r1.actualizados >= 2, JSON.stringify(r1));
+
+    const r2 = await repos.articles.recalcularMargenesDesdePrecios({ soloVacios: false });
+    const a2b = await repos.articles.findById(conMargen.id);
+    check('recalcularMargenes (todos): pisa la utilidad cargada con la real (1000 → 1500 = 50%)', a2b?.margin1 === '50.00', `m1=${a2b?.margin1} ${JSON.stringify(r2)}`);
+  }
+
   await repos.articles.incrementStock(art.id, '5.000');
   const afterInc = await repos.articles.findById(art.id);
   check('articles.incrementStock', afterInc?.stock === '15.000', `stock=${afterInc?.stock}`);

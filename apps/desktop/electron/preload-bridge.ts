@@ -168,6 +168,8 @@ export const REMOTO_DENIED_CHANNELS = new Set([
   'customers:delete',
   'suppliers:delete',
   'articles:delete',
+  // Toca la utilidad de TODO el padrón de una vez: se hace sentado en el local.
+  'articles:recalcularMargenes',
 ]);
 
 /** ¿El servidor atiende este canal cuando la visita entra por el acceso remoto? */
@@ -398,6 +400,7 @@ export function createApiBridge(
       uploadImage: (p) => c<never>('articles:uploadImage', p),
       removeImage: (p) => c<never>('articles:removeImage', p),
       getImageDataUrl: (p) => c<never>('articles:getImageDataUrl', p),
+      recalcularMargenes: (p) => c<never>('articles:recalcularMargenes', p),
     },
     customers: {
       list: () => c<never>('customers:list'),

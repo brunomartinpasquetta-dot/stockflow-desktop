@@ -83,6 +83,23 @@ export function buildArticlesHandlers(deps: HandlerDeps): HandlerMap {
         return ctx.repos.articles.update(payload.id, data);
       },
     ),
+    /**
+     * Carga la utilidad de TODOS los artículos a partir de sus precios de hoy.
+     * Un comercio migrado desde otro sistema entra con precios pero sin
+     * utilidad, y el modo "por margen" de las compras no tiene con qué
+     * recalcular: esto lo deja listo de una, sin cargar 600 fichas a mano.
+     * Cambia sólo la utilidad, nunca un precio.
+     */
+    'articles:recalcularMargenes': withSession(
+      deps,
+      async (
+        payload: { soloVacios?: boolean } | undefined,
+        ctx,
+      ): Promise<{ actualizados: number; sinCosto: number; yaTenian: number }> => {
+        requirePermission(ctx.currentUser, 'manage_articles');
+        return ctx.repos.articles.recalcularMargenesDesdePrecios({ soloVacios: payload?.soloVacios ?? true });
+      },
+    ),
     'articles:delete': withSession(
       deps,
       async (payload: { id: string }, ctx): Promise<{ deleted: true }> => {
