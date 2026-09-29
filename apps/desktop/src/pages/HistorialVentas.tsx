@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ReturnSaleDialog } from '@/components/ReturnDialogs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PorCajaToggle, usePorCaja } from '@/components/PorCajaToggle'
 import { Label } from '@/components/ui/label'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { Select } from '@/components/ui/select'
@@ -763,9 +764,10 @@ export function HistorialVentas() {
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
 
+  const [porCaja, setPorCaja] = usePorCaja()
   const salesQuery = useQuery({
-    queryKey: ['salesHistory', fromIso, toIso],
-    queryFn: () => api.sales.listByDateRange(dayStart(fromIso), dayEnd(toIso)),
+    queryKey: ['salesHistory', fromIso, toIso, porCaja],
+    queryFn: () => api.sales.listByDateRange(dayStart(fromIso), dayEnd(toIso), porCaja),
   })
 
   const customerName = useMemo(() => {
@@ -853,6 +855,7 @@ export function HistorialVentas() {
           <div className="flex flex-col gap-1">
             <Label>Hasta</Label>
             <Input type="date" value={toIso} onChange={(e) => resetPage(() => setToIso(e.target.value))} />
+            <PorCajaToggle value={porCaja} onChange={(v) => resetPage(() => setPorCaja(v))} />
           </div>
           <div className="flex flex-col gap-1">
             <Label>Cliente</Label>

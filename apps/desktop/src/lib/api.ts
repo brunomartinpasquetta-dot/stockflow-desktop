@@ -281,7 +281,8 @@ export const api = {
       unwrap(sf().sales.voidRange({ from, to })),
     get: (id: string): Promise<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }> =>
       unwrap(sf().sales.get({ id })),
-    listByDateRange: (from: number, to: number): Promise<SaleDTO[]> => unwrap(sf().sales.listByDateRange({ from, to })),
+    listByDateRange: (from: number, to: number, porCaja = false): Promise<SaleDTO[]> =>
+      unwrap(sf().sales.listByDateRange({ from, to, porCaja })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
   },
   fiscal: {
@@ -438,7 +439,7 @@ export const api = {
       unwrap(sf().reports.getLowStock(input)),
     getInventory: (input: { supplierId?: string; familyId?: string; brand?: string; includeZeroStock?: boolean }) =>
       unwrap(sf().reports.getInventory(input)),
-    getSalesByVendor: (input: { from: number; to: number; userId?: string }) =>
+    getSalesByVendor: (input: { from: number; to: number; userId?: string; porCaja?: boolean }) =>
       unwrap(sf().reports.getSalesByVendor(input)),
   },
   accounting: {
@@ -473,39 +474,39 @@ export const api = {
       diasTranscurridos: number
       diasDelMes: number
     }) => unwrap(sf().analytics.avanceDelMes(input)),
-    resultadoNeto: (input: { from: number; to: number }) => unwrap(sf().analytics.resultadoNeto(input)),
+    resultadoNeto: (input: { from: number; to: number; porCaja?: boolean }) => unwrap(sf().analytics.resultadoNeto(input)),
     antiguedadDeuda: () => unwrap(sf().analytics.antiguedadDeuda()),
-    conversionPresupuestos: (input: { from: number; to: number }) => unwrap(sf().analytics.conversionPresupuestos(input)),
+    conversionPresupuestos: (input: { from: number; to: number; porCaja?: boolean }) => unwrap(sf().analytics.conversionPresupuestos(input)),
     stockSinMovimiento: (input: { dias?: number; limit?: number }) => unwrap(sf().analytics.stockSinMovimiento(input)),
-    reposicionPrioritaria: (input: { from: number; to: number; limit?: number }) => unwrap(sf().analytics.reposicionPrioritaria(input)),
-    ventasDeArticulo: (input: { from: number; to: number; articleId: string }) => unwrap(sf().analytics.ventasDeArticulo(input)),
-    getTopSellingProducts: (input: { from: number; to: number; limit?: number }) =>
+    reposicionPrioritaria: (input: { from: number; to: number; porCaja?: boolean; limit?: number }) => unwrap(sf().analytics.reposicionPrioritaria(input)),
+    ventasDeArticulo: (input: { from: number; to: number; porCaja?: boolean; articleId: string }) => unwrap(sf().analytics.ventasDeArticulo(input)),
+    getTopSellingProducts: (input: { from: number; to: number; porCaja?: boolean; limit?: number }) =>
       unwrap(sf().analytics.getTopSellingProducts(input)),
-    getBottomSellingProducts: (input: { from: number; to: number; limit?: number }) =>
+    getBottomSellingProducts: (input: { from: number; to: number; porCaja?: boolean; limit?: number }) =>
       unwrap(sf().analytics.getBottomSellingProducts(input)),
-    getPaymentMethodsRanking: (input: { from: number; to: number }) =>
+    getPaymentMethodsRanking: (input: { from: number; to: number; porCaja?: boolean }) =>
       unwrap(sf().analytics.getPaymentMethodsRanking(input)),
-    ventasPorFormaPago: (input: { from: number; to: number }) =>
+    ventasPorFormaPago: (input: { from: number; to: number; porCaja?: boolean }) =>
       unwrap(sf().analytics.ventasPorFormaPago(input)),
     ventasPorFormaPagoEnTiempo: (
-      input: { from: number; to: number; granularity: 'daily' | 'weekly' | 'monthly' },
+      input: { from: number; to: number; porCaja?: boolean; granularity: 'daily' | 'weekly' | 'monthly' },
     ) => unwrap(sf().analytics.ventasPorFormaPagoEnTiempo(input)),
-    getTopCustomers: (input: { from: number; to: number; limit?: number }) =>
+    getTopCustomers: (input: { from: number; to: number; porCaja?: boolean; limit?: number }) =>
       unwrap(sf().analytics.getTopCustomers(input)),
-    getTopSuppliers: (input: { from: number; to: number; limit?: number }) =>
+    getTopSuppliers: (input: { from: number; to: number; porCaja?: boolean; limit?: number }) =>
       unwrap(sf().analytics.getTopSuppliers(input)),
     getSalesTrend: (
-      input: { from: number; to: number; granularity: 'daily' | 'weekly' | 'monthly' },
+      input: { from: number; to: number; porCaja?: boolean; granularity: 'daily' | 'weekly' | 'monthly' },
     ) => unwrap(sf().analytics.getSalesTrend(input)),
-    getAverageTicket: (input: { from: number; to: number }) =>
+    getAverageTicket: (input: { from: number; to: number; porCaja?: boolean }) =>
       unwrap(sf().analytics.getAverageTicket(input)),
-    getSalesByHour: (input: { from: number; to: number }) =>
+    getSalesByHour: (input: { from: number; to: number; porCaja?: boolean }) =>
       unwrap(sf().analytics.getSalesByHour(input)),
-    getSalesByDayOfWeek: (input: { from: number; to: number }) =>
+    getSalesByDayOfWeek: (input: { from: number; to: number; porCaja?: boolean }) =>
       unwrap(sf().analytics.getSalesByDayOfWeek(input)),
-    getMarginByCategory: (input: { from: number; to: number }) =>
+    getMarginByCategory: (input: { from: number; to: number; porCaja?: boolean }) =>
       unwrap(sf().analytics.getMarginByCategory(input)),
-    getStockRotation: (input: { from: number; to: number; limit?: number }) =>
+    getStockRotation: (input: { from: number; to: number; porCaja?: boolean; limit?: number }) =>
       unwrap(sf().analytics.getStockRotation(input)),
   },
   system: {

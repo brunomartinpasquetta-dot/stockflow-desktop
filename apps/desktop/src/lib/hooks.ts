@@ -281,9 +281,9 @@ export function useInventoryReport(input: { supplierId?: string; familyId?: stri
     enabled,
   })
 }
-export function useSalesByVendorReport(input: { from: number; to: number; userId?: string }, enabled = true) {
+export function useSalesByVendorReport(input: { from: number; to: number; userId?: string; porCaja?: boolean }, enabled = true) {
   return useQuery<SalesByVendorReportDTO>({
-    queryKey: ['reports', 'salesByVendor', input.from, input.to, input.userId ?? ''],
+    queryKey: ['reports', 'salesByVendor', input.from, input.to, input.userId ?? '', !!input.porCaja],
     queryFn: () => api.reports.getSalesByVendor(input),
     enabled,
   })
@@ -388,32 +388,33 @@ export function useAuditAreas() {
 }
 
 // --- Analytics (P-FIX-FASE3) ---
-type DR = { from: number; to: number }
+/** `porCaja`: la opción "Contar por día de caja" de la pantalla (apagada por defecto). */
+type DR = { from: number; to: number; porCaja?: boolean }
 
 export function useTopProducts(input: DR & { limit?: number }, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'topProducts', input.from, input.to, input.limit ?? 10],
+    queryKey: ['analytics', 'topProducts', input.from, input.to, !!input.porCaja, input.limit ?? 10],
     queryFn: () => api.analytics.getTopSellingProducts(input),
     enabled,
   })
 }
 export function useBottomProducts(input: DR & { limit?: number }, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'bottomProducts', input.from, input.to, input.limit ?? 10],
+    queryKey: ['analytics', 'bottomProducts', input.from, input.to, !!input.porCaja, input.limit ?? 10],
     queryFn: () => api.analytics.getBottomSellingProducts(input),
     enabled,
   })
 }
 export function usePaymentMethodsRanking(input: DR, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'paymentMethodsRanking', input.from, input.to],
+    queryKey: ['analytics', 'paymentMethodsRanking', input.from, input.to, !!input.porCaja],
     queryFn: () => api.analytics.getPaymentMethodsRanking(input),
     enabled,
   })
 }
 export function useVentasPorFormaPago(input: DR, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'ventasPorFormaPago', input.from, input.to],
+    queryKey: ['analytics', 'ventasPorFormaPago', input.from, input.to, !!input.porCaja],
     queryFn: () => api.analytics.ventasPorFormaPago(input),
     enabled,
   })
@@ -423,21 +424,21 @@ export function useVentasPorFormaPagoEnTiempo(
   enabled = true,
 ) {
   return useQuery({
-    queryKey: ['analytics', 'ventasPorFormaPagoEnTiempo', input.from, input.to, input.granularity],
+    queryKey: ['analytics', 'ventasPorFormaPagoEnTiempo', input.from, input.to, !!input.porCaja, input.granularity],
     queryFn: () => api.analytics.ventasPorFormaPagoEnTiempo(input),
     enabled,
   })
 }
 export function useTopCustomers(input: DR & { limit?: number }, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'topCustomers', input.from, input.to, input.limit ?? 10],
+    queryKey: ['analytics', 'topCustomers', input.from, input.to, !!input.porCaja, input.limit ?? 10],
     queryFn: () => api.analytics.getTopCustomers(input),
     enabled,
   })
 }
 export function useTopSuppliers(input: DR & { limit?: number }, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'topSuppliers', input.from, input.to, input.limit ?? 10],
+    queryKey: ['analytics', 'topSuppliers', input.from, input.to, !!input.porCaja, input.limit ?? 10],
     queryFn: () => api.analytics.getTopSuppliers(input),
     enabled,
   })
@@ -520,42 +521,42 @@ export function useSalesTrend(
   enabled = true,
 ) {
   return useQuery({
-    queryKey: ['analytics', 'salesTrend', input.from, input.to, input.granularity],
+    queryKey: ['analytics', 'salesTrend', input.from, input.to, !!input.porCaja, input.granularity],
     queryFn: () => api.analytics.getSalesTrend(input),
     enabled,
   })
 }
 export function useAverageTicket(input: DR, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'averageTicket', input.from, input.to],
+    queryKey: ['analytics', 'averageTicket', input.from, input.to, !!input.porCaja],
     queryFn: () => api.analytics.getAverageTicket(input),
     enabled,
   })
 }
 export function useSalesByHour(input: DR, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'salesByHour', input.from, input.to],
+    queryKey: ['analytics', 'salesByHour', input.from, input.to, !!input.porCaja],
     queryFn: () => api.analytics.getSalesByHour(input),
     enabled,
   })
 }
 export function useSalesByDayOfWeek(input: DR, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'salesByDayOfWeek', input.from, input.to],
+    queryKey: ['analytics', 'salesByDayOfWeek', input.from, input.to, !!input.porCaja],
     queryFn: () => api.analytics.getSalesByDayOfWeek(input),
     enabled,
   })
 }
 export function useMarginByCategory(input: DR, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'marginByCategory', input.from, input.to],
+    queryKey: ['analytics', 'marginByCategory', input.from, input.to, !!input.porCaja],
     queryFn: () => api.analytics.getMarginByCategory(input),
     enabled,
   })
 }
 export function useStockRotation(input: DR & { limit?: number }, enabled = true) {
   return useQuery({
-    queryKey: ['analytics', 'stockRotation', input.from, input.to, input.limit ?? 20],
+    queryKey: ['analytics', 'stockRotation', input.from, input.to, !!input.porCaja, input.limit ?? 20],
     queryFn: () => api.analytics.getStockRotation(input),
     enabled,
   })

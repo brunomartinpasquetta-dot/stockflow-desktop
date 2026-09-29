@@ -936,6 +936,8 @@ export interface AccountReceivableDetailDTO {
 export interface DateRangeDTO {
   from: number;
   to: number;
+  /** "Contar por día de caja" (sólo ventas; apagado por defecto = hora real). */
+  porCaja?: boolean;
 }
 
 export interface SalesReportDTO {

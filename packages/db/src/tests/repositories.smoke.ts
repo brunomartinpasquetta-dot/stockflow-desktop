@@ -230,8 +230,12 @@ async function main(): Promise<void> {
     const porCaja = await repos.sales.findByJornadaRange(lunes.from, lunes.to);
     const porHora = await repos.sales.findByDateRange(lunes.from, lunes.to);
     check('jornada: el filtro "lunes" la trae; por hora real no', porCaja.some((s) => s.id === sale.id) && !porHora.some((s) => s.id === sale.id));
-    const pagosLunes = await repos.salePayments.findBySaleDateRange(lunes.from, lunes.to);
-    check('jornada: sus pagos también caen el lunes (casan con la venta)', pagosLunes.filter((p) => p.saleId === sale.id).length === 2);
+    const pagosPorCaja = await repos.salePayments.findBySaleDateRange(lunes.from, lunes.to, true);
+    const pagosPorHora = await repos.salePayments.findBySaleDateRange(lunes.from, lunes.to);
+    check(
+      'jornada: con la opción, sus pagos caen el lunes; sin ella (por defecto) no',
+      pagosPorCaja.filter((p) => p.saleId === sale.id).length === 2 && pagosPorHora.filter((p) => p.saleId === sale.id).length === 0,
+    );
 
     const miercoles = new Date(2026, 8, 30, 10, 0).getTime(); // caja olvidada abierta: +38 h
     raw.prepare('UPDATE sales SET date = ? WHERE id = ?').run(miercoles, sale.id);

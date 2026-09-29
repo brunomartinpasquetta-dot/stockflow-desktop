@@ -26,6 +26,7 @@ import { BarChart3, CalendarDays, CalendarRange, CalendarSearch, Download, Bankn
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PorCajaToggle, usePorCaja } from '@/components/PorCajaToggle'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -170,9 +171,10 @@ export function Estadisticas() {
     setToIso(todayIso())
   }
 
+  const [porCaja, setPorCaja] = usePorCaja()
   const range = useMemo(
-    () => ({ from: dayStart(fromIso), to: dayEnd(toIso) }),
-    [fromIso, toIso],
+    () => ({ from: dayStart(fromIso), to: dayEnd(toIso), porCaja }),
+    [fromIso, toIso, porCaja],
   )
 
   // Resumen
@@ -423,6 +425,9 @@ export function Estadisticas() {
           <div className="flex flex-col gap-1">
             <Label className="text-xs">Hasta</Label>
             <Input type="date" value={toIso} onChange={(e) => { setToIso(e.target.value); setPreset('custom') }} />
+          </div>
+          <div className="flex items-end pb-2">
+            <PorCajaToggle value={porCaja} onChange={setPorCaja} />
           </div>
         </CardContent>
       </Card>

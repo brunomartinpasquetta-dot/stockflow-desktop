@@ -20,7 +20,7 @@ function check(name: string, cond: boolean, extra = ''): void {
 }
 
 const repos = {
-  sales: { findByJornadaRange: async () => [{ total: '1500', status: 'completed' }] },
+  sales: { findByDateRange: async () => [{ total: '1500', status: 'completed' }] },
   cashRegisters: { getCurrentOpen: async () => null },
   cashGeneral: { getBalanceBreakdown: async () => ({ total: '99000', cash: '50000', electronic: '49000' }) },
   accountsReceivable: { listBalances: async () => [] },

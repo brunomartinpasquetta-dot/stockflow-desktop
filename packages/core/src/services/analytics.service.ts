@@ -22,6 +22,18 @@ import type { ServiceContext } from '../context';
 export interface DateRange {
   from: number;
   to: number;
+  /**
+   * `true` = cada venta cuenta para el DÍA DE SU CAJA (`jornada`): lo vendido
+   * después de medianoche con la caja del día anterior abierta es de ese día.
+   * Por defecto (`false`), la hora real de la venta, como siempre. Es una
+   * opción de la pantalla, no un cambio de criterio: "hoy" sigue siendo hoy.
+   */
+  porCaja?: boolean;
+}
+
+/** Columna de fecha según la opción "Contar por día de caja". */
+function colDia(r: { porCaja?: boolean }): 'jornada' | 'date' {
+  return r.porCaja ? 'jornada' : 'date';
 }
 
 export interface TopProductRow {
@@ -220,6 +232,7 @@ export class AnalyticsService {
   }
 
   async getTopSellingProducts(input: DateRange & { limit?: number }): Promise<TopProductRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const limit = input.limit ?? 10;
     const sql = `
@@ -235,7 +248,7 @@ export class AnalyticsService {
       JOIN sales s ON s.id = sl.sale_id
       JOIN articles a ON a.id = sl.article_id
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
       GROUP BY a.id, a.barcode, a.description, a.brand
       ORDER BY qty DESC
       LIMIT ?
@@ -265,6 +278,7 @@ export class AnalyticsService {
   }
 
   async getBottomSellingProducts(input: DateRange & { limit?: number }): Promise<TopProductRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const limit = input.limit ?? 10;
     // LEFT JOIN contra una SUBCONSULTA ya filtrada por rango y estado: con el
@@ -287,7 +301,7 @@ export class AnalyticsService {
                SUM(CAST(sl.line_total AS REAL)) AS revenue
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
-        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.${c} BETWEEN ? AND ?
         GROUP BY sl.article_id
       ) v ON v.article_id = a.id
       WHERE a.active = 1
@@ -320,6 +334,7 @@ export class AnalyticsService {
   }
 
   async getPaymentMethodsRanking(input: DateRange): Promise<PaymentMethodRankRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const sql = `
       SELECT
@@ -331,7 +346,7 @@ export class AnalyticsService {
       JOIN sales s ON s.id = sp.sale_id
       JOIN payment_methods pm ON pm.id = sp.payment_method_id
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
       GROUP BY pm.id, pm.name
       ORDER BY total DESC
     `;
@@ -360,6 +375,7 @@ export class AnalyticsService {
    * ventas del período. Excluye anuladas (voided).
    */
   async getVentasPorFormaPago(input: DateRange): Promise<VentaPorFormaPagoRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const sqlPagos = `
       SELECT
@@ -373,7 +389,7 @@ export class AnalyticsService {
       JOIN sales s ON s.id = sp.sale_id
       JOIN payment_methods pm ON pm.id = sp.payment_method_id
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
       GROUP BY pm.id, pm.name, pm.is_physical_cash
     `;
     const pagos = this.ctx.db.$client.prepare(sqlPagos).all(input.from, input.to) as Array<{
@@ -390,7 +406,7 @@ export class AnalyticsService {
       FROM sales s
       WHERE s.status != 'voided'
         AND s.is_account_sale = 1
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
     `;
     const cc = this.ctx.db.$client.prepare(sqlCtaCte).get(input.from, input.to) as {
       monto: number | null;
@@ -438,28 +454,29 @@ export class AnalyticsService {
   async getVentasPorFormaPagoEnTiempo(
     input: DateRange & { granularity: 'daily' | 'weekly' | 'monthly' },
   ): Promise<VentaPorFormaPagoEnTiempoRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const fmtSpec =
       input.granularity === 'daily' ? '%Y-%m-%d' : input.granularity === 'weekly' ? '%Y-W%W' : '%Y-%m';
     const sql = `
       SELECT bucket, paymentMethodId, name, SUM(monto) AS monto FROM (
         SELECT
-          strftime('${fmtSpec}', s.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', s.${c} / 1000, 'unixepoch', 'localtime') AS bucket,
           pm.id AS paymentMethodId,
           pm.name AS name,
           CAST(sp.amount AS REAL) AS monto
         FROM sale_payments sp
         JOIN sales s ON s.id = sp.sale_id
         JOIN payment_methods pm ON pm.id = sp.payment_method_id
-        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.${c} BETWEEN ? AND ?
         UNION ALL
         SELECT
-          strftime('${fmtSpec}', s.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', s.${c} / 1000, 'unixepoch', 'localtime') AS bucket,
           'cuenta-corriente' AS paymentMethodId,
           'Cuenta Corriente' AS name,
           CAST(s.total AS REAL) AS monto
         FROM sales s
-        WHERE s.status != 'voided' AND s.is_account_sale = 1 AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.is_account_sale = 1 AND s.${c} BETWEEN ? AND ?
       )
       GROUP BY bucket, paymentMethodId, name
       ORDER BY bucket ASC
@@ -481,6 +498,7 @@ export class AnalyticsService {
   }
 
   async getTopCustomers(input: DateRange & { limit?: number }): Promise<CustomerRankRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const limit = input.limit ?? 10;
     const sql = `
@@ -493,7 +511,7 @@ export class AnalyticsService {
       FROM sales s
       JOIN customers c ON c.id = s.customer_id
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
       GROUP BY c.id, c.last_name, c.first_name
       ORDER BY total DESC
       LIMIT ?
@@ -547,6 +565,7 @@ export class AnalyticsService {
   async getSalesTrend(
     input: DateRange & { granularity: 'daily' | 'weekly' | 'monthly' },
   ): Promise<SalesTrendRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const fmtSpec =
       input.granularity === 'daily'
@@ -560,19 +579,19 @@ export class AnalyticsService {
     const sql = `
       SELECT bucket, SUM(cnt) AS count, SUM(total) AS total FROM (
         SELECT
-          strftime('${fmtSpec}', s.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', s.${c} / 1000, 'unixepoch', 'localtime') AS bucket,
           1 AS cnt,
           CAST(s.total AS REAL) AS total
         FROM sales s
-        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.${c} BETWEEN ? AND ?
         UNION ALL
         SELECT
-          strftime('${fmtSpec}', r.jornada / 1000, 'unixepoch', 'localtime') AS bucket,
+          strftime('${fmtSpec}', r.${c} / 1000, 'unixepoch', 'localtime') AS bucket,
           0 AS cnt,
           -CAST(r.total AS REAL) AS total
         FROM returns r
         JOIN sales sv ON sv.id = r.sale_id
-        WHERE r.jornada BETWEEN ? AND ? AND sv.status != 'voided'
+        WHERE r.${c} BETWEEN ? AND ? AND sv.status != 'voided'
       )
       GROUP BY bucket
       ORDER BY bucket ASC
@@ -586,6 +605,7 @@ export class AnalyticsService {
   }
 
   async getAverageTicket(input: DateRange): Promise<AverageTicketResult> {
+    const c = colDia(input);
     this.requireRead();
     const sql = `
       SELECT
@@ -595,7 +615,7 @@ export class AnalyticsService {
         COUNT(*) AS count
       FROM sales s
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
     `;
     const row = this.ctx.db.$client.prepare(sql).get(input.from, input.to) as {
       avg: number | null;
@@ -612,6 +632,7 @@ export class AnalyticsService {
   }
 
   async getSalesByHour(input: DateRange): Promise<SalesByHourRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const sql = `
       SELECT
@@ -620,7 +641,7 @@ export class AnalyticsService {
         SUM(CAST(s.total AS REAL)) AS total
       FROM sales s
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
       GROUP BY hour
       ORDER BY hour ASC
     `;
@@ -633,15 +654,16 @@ export class AnalyticsService {
   }
 
   async getSalesByDayOfWeek(input: DateRange): Promise<SalesByDayOfWeekRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const sql = `
       SELECT
-        CAST(strftime('%w', s.jornada / 1000, 'unixepoch', 'localtime') AS INTEGER) AS dayOfWeek,
+        CAST(strftime('%w', s.${c} / 1000, 'unixepoch', 'localtime') AS INTEGER) AS dayOfWeek,
         COUNT(*) AS count,
         SUM(CAST(s.total AS REAL)) AS total
       FROM sales s
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
       GROUP BY dayOfWeek
       ORDER BY dayOfWeek ASC
     `;
@@ -654,6 +676,7 @@ export class AnalyticsService {
   }
 
   async getMarginByCategory(input: DateRange): Promise<MarginRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const sql = `
       SELECT
@@ -666,7 +689,7 @@ export class AnalyticsService {
       JOIN articles a ON a.id = sl.article_id
       LEFT JOIN families f ON f.id = a.family_id
       WHERE s.status != 'voided'
-        AND s.jornada BETWEEN ? AND ?
+        AND s.${c} BETWEEN ? AND ?
       GROUP BY f.id, f.name
       ORDER BY revenue DESC
     `;
@@ -694,6 +717,7 @@ export class AnalyticsService {
   }
 
   async getStockRotation(input: DateRange & { limit?: number }): Promise<StockRotationRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const limit = input.limit ?? 20;
     // Mismo fix que en getBottomSellingProducts: el filtro va en una
@@ -709,7 +733,7 @@ export class AnalyticsService {
         SELECT sl.article_id, SUM(CAST(sl.quantity AS REAL)) AS qty
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
-        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.${c} BETWEEN ? AND ?
         GROUP BY sl.article_id
       ) v ON v.article_id = a.id
       WHERE a.active = 1
@@ -736,14 +760,16 @@ export class AnalyticsService {
   }
   /** Total NETO (ventas − devoluciones) y operaciones de un rango. */
   private netoDeRango(range: DateRange): { total: number; count: number } {
+    // Resumen del día y Avance del mes no pasan `porCaja`: "hoy" es hoy.
+    const col = colDia(range);
     const v = this.ctx.db.$client
-      .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t, COUNT(*) AS c FROM sales WHERE status != 'voided' AND jornada BETWEEN ? AND ?`)
+      .prepare(`SELECT COALESCE(SUM(CAST(total AS REAL)), 0) AS t, COUNT(*) AS c FROM sales WHERE status != 'voided' AND ${col} BETWEEN ? AND ?`)
       .get(range.from, range.to) as { t: number; c: number };
     const d = this.ctx.db.$client
       // Las devoluciones de una venta ANULADA no restan: esa venta ya no suma
       // (auditoría sep-2026: venta $2000 → DEV $1000 → anular dejaba −$1000).
       .prepare(
-        `SELECT COALESCE(SUM(CAST(r.total AS REAL)), 0) AS t FROM returns r JOIN sales sv ON sv.id = r.sale_id WHERE r.jornada BETWEEN ? AND ? AND sv.status != 'voided'`,
+        `SELECT COALESCE(SUM(CAST(r.total AS REAL)), 0) AS t FROM returns r JOIN sales sv ON sv.id = r.sale_id WHERE r.${col} BETWEEN ? AND ? AND sv.status != 'voided'`,
       )
       .get(range.from, range.to) as { t: number };
     return { total: (v.t || 0) - (d.t || 0), count: v.c || 0 };
@@ -788,6 +814,7 @@ export class AnalyticsService {
    * no del CMV (no registran costo): resultado levemente conservador.
    */
   async getResultadoNeto(input: DateRange): Promise<ResultadoNetoResult> {
+    const c = colDia(input);
     this.requireRead();
     const ventasNetas = this.netoDeRango(input).total;
     const cmvRow = this.ctx.db.$client
@@ -796,7 +823,7 @@ export class AnalyticsService {
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
         LEFT JOIN articles a ON a.id = sl.article_id
-        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.${c} BETWEEN ? AND ?
       `)
       .get(input.from, input.to) as { cmv: number };
     const comRow = this.ctx.db.$client
@@ -804,7 +831,7 @@ export class AnalyticsService {
         SELECT COALESCE(SUM(CAST(sp.commission_amount AS REAL)), 0) AS com
         FROM sale_payments sp
         JOIN sales s ON s.id = sp.sale_id
-        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.${c} BETWEEN ? AND ?
       `)
       .get(input.from, input.to) as { com: number };
     const resultado = ventasNetas - (cmvRow.cmv || 0) - (comRow.com || 0);
@@ -918,6 +945,7 @@ export class AnalyticsService {
 
   /** Reposición prioritaria: bajo el stock mínimo Y con ventas en el rango. */
   async getReposicionPrioritaria(input: DateRange & { limit?: number }): Promise<ReposicionPrioritariaRow[]> {
+    const c = colDia(input);
     this.requireRead();
     const limit = input.limit ?? 20;
     const sql = `
@@ -931,7 +959,7 @@ export class AnalyticsService {
       JOIN (
         SELECT sl.article_id, SUM(CAST(sl.quantity AS REAL)) AS qty
         FROM sale_lines sl JOIN sales s ON s.id = sl.sale_id
-        WHERE s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE s.status != 'voided' AND s.${c} BETWEEN ? AND ?
         GROUP BY sl.article_id
       ) v ON v.article_id = a.id
       WHERE a.active = 1
@@ -957,6 +985,7 @@ export class AnalyticsService {
   }
   /** Ventas de UN artículo en el rango: cantidad, monto, operaciones y margen. */
   async getVentasDeArticulo(input: DateRange & { articleId: string }): Promise<VentasDeArticuloResult> {
+    const c = colDia(input);
     this.requireRead();
     const row = this.ctx.db.$client
       .prepare(`
@@ -968,7 +997,7 @@ export class AnalyticsService {
         FROM sale_lines sl
         JOIN sales s ON s.id = sl.sale_id
         JOIN articles a ON a.id = sl.article_id
-        WHERE sl.article_id = ? AND s.status != 'voided' AND s.jornada BETWEEN ? AND ?
+        WHERE sl.article_id = ? AND s.status != 'voided' AND s.${c} BETWEEN ? AND ?
       `)
       .get(input.articleId, input.from, input.to) as { cantidad: number; monto: number; operaciones: number; costo: number };
     const sinCosto = (row.costo || 0) <= 0 && (row.monto || 0) > 0;

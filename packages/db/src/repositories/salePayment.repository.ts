@@ -37,7 +37,7 @@ export class SalePaymentRepository extends BaseRepository<
    * Pagos de VARIAS ventas en una sola consulta. El Historial de Ventas filtra
    * por forma de pago y con una consulta por venta serían cientos por pantalla.
    */
-  async findBySaleDateRange(from: number, to: number): Promise<SalePayment[]> {
+  async findBySaleDateRange(from: number, to: number, porCaja = false): Promise<SalePayment[]> {
     try {
       return this.db
         .select({
@@ -50,9 +50,9 @@ export class SalePaymentRepository extends BaseRepository<
         })
         .from(salePayments)
         .innerJoin(sales, eq(sales.id, salePayments.saleId))
-        // Por día de caja, igual que la lista de ventas del Historial: si no,
-        // los pagos de lo vendido después de medianoche no casan con su venta.
-        .where(and(gte(sales.jornada, from), lte(sales.jornada, to)))
+        // Con el MISMO criterio que la lista de ventas del Historial (día de
+        // caja u hora real): si no, los pagos no casan con sus ventas.
+        .where(porCaja ? and(gte(sales.jornada, from), lte(sales.jornada, to)) : and(gte(sales.date, from), lte(sales.date, to)))
         .all() as SalePayment[];
     } catch (err) {
       return rethrowDbError(err);
@@ -134,8 +134,8 @@ export class SalePaymentRepository extends BaseRepository<
         .innerJoin(sales, eq(salePayments.saleId, sales.id))
         .where(
           and(
-            gte(sales.jornada, from),
-            lte(sales.jornada, to),
+            gte(sales.date, from),
+            lte(sales.date, to),
             eq(sales.status, 'completed'),
           ),
         )

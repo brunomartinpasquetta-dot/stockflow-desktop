@@ -346,7 +346,7 @@ export class SalesService {
     const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'void_sale');
 
-    const enRango = await repos.sales.findByJornadaRange(from, to);
+    const enRango = await repos.sales.findByDateRange(from, to);
     const pendientes = enRango.filter((s) => s.status !== 'voided');
 
     let anuladas = 0;

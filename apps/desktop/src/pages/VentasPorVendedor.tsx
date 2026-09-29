@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/format'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PorCajaToggle, usePorCaja } from '@/components/PorCajaToggle'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -39,7 +40,8 @@ export function VentasPorVendedor() {
   const [fromIso, setFromIso] = useState(() => firstOfMonthIso())
   const [toIso, setToIso] = useState(() => todayIso())
   const [userId, setUserId] = useState('')
-  const [applied, setApplied] = useState<{ from: number; to: number; userId?: string } | null>(null)
+  const [porCaja, setPorCaja] = usePorCaja()
+  const [applied, setApplied] = useState<{ from: number; to: number; userId?: string; porCaja?: boolean } | null>(null)
 
   const reportQuery = useSalesByVendorReport(applied ?? { from: 0, to: 0 }, applied != null)
 
@@ -48,6 +50,7 @@ export function VentasPorVendedor() {
       from: dayStart(fromIso),
       to: dayEnd(toIso),
       userId: userId || undefined,
+      porCaja,
     })
   }
 
@@ -87,6 +90,7 @@ export function VentasPorVendedor() {
           <div className="flex flex-col gap-1">
             <Label>Hasta</Label>
             <Input type="date" value={toIso} onChange={(e) => setToIso(e.target.value)} />
+            <PorCajaToggle value={porCaja} onChange={setPorCaja} />
           </div>
           <div className="flex flex-col gap-1">
             <Label>Vendedor</Label>
