@@ -1002,6 +1002,12 @@ function PDV() {
     // siguiente no puede salir facturada sin que nadie lo pida.
     setDocManual(null)
     setTipoForzado(false)
+    // La forma de pago también vuelve a Efectivo (el efecto de arriba la
+    // resuelve al quedar en null). Quedaba la de la venta anterior: después de
+    // cobrar una con tarjeta, la siguiente —pagada en efectivo— se registraba
+    // como tarjeta si el cajero no miraba, y la caja no cuadraba al cerrar
+    // (Denver, 29-sep-2026: facturan sólo lo de tarjeta y les quedaba pegada).
+    setSelectedMethodId(null)
     // La búsqueda SÍ se limpia acá: durante la venta el desplegable queda
     // abierto para cargar varios del mismo resultado, pero terminada la venta
     // la siguiente arranca de cero, sin la lista de la anterior tapando.
