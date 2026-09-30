@@ -76,9 +76,16 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
+  # "always": el acceso directo del escritorio se vuelve a crear en CADA
+  # actualización (como hacen Slack, Discord o Teams). Con `true` sólo se creaba
+  # al instalar por primera vez y, al actualizar, Windows seguía mostrando el
+  # ícono viejo guardado en su caché (Denver, 29-sep-2026). Contra: si el
+  # comercio lo borró a propósito, vuelve a aparecer.
+  createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: StockFlow
+  # Al terminar, le avisa a Windows que refresque los íconos (ver installer.nsh).
+  include: build/installer.nsh
 
 linux:
   target:
