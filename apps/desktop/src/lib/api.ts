@@ -5,6 +5,10 @@
 import type {
   AssistantAskResultDTO,
   AssistantMessageDTO,
+  AssistantSeguirResultDTO,
+  ConfigIADTO,
+  EstadoIADTO,
+  EstadoInstalacionOllamaDTO,
   AuditEntryDTO,
   DemoStatusDTO,
   ListAuditPayloadDTO,
@@ -160,6 +164,13 @@ export const api = {
   assistant: {
     ask: (messages: AssistantMessageDTO[], conversationId?: string, screen?: string): Promise<AssistantAskResultDTO> =>
       unwrap(sf().assistant.ask({ messages, conversationId, screen })),
+    seguir: (id: string): Promise<AssistantSeguirResultDTO> => unwrap(sf().assistant.seguir({ id })),
+    iaEstado: (): Promise<EstadoIADTO> => unwrap(sf().assistant.iaEstado()),
+    iaConfigurar: (cambios: Partial<ConfigIADTO>): Promise<EstadoIADTO> => unwrap(sf().assistant.iaConfigurar(cambios)),
+    iaDescargar: (): Promise<EstadoIADTO> => unwrap(sf().assistant.iaDescargar()),
+    iaInstalarOllama: (): Promise<EstadoInstalacionOllamaDTO> => unwrap(sf().assistant.iaInstalarOllama()),
+    iaPrecalentar: (): Promise<{ ok: true }> => unwrap(sf().assistant.iaPrecalentar()),
+    iaProbar: (): Promise<{ ms: number; ia: boolean; reply: string }> => unwrap(sf().assistant.iaProbar()),
   },
   novedades: {
     pendientes: (): Promise<NovedadesPendientesDTO> => unwrap(sf().novedades.pendientes()),
@@ -213,7 +224,7 @@ export const api = {
     get: (id: string): Promise<ArticleDTO | null> => unwrap(sf().articles.get({ id })),
     create: (data: EntityPayload): Promise<ArticleDTO> => unwrap(sf().articles.create(data)),
     update: (id: string, data: EntityPayload): Promise<ArticleDTO> => unwrap(sf().articles.update({ id, data })),
-    delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().articles.delete({ id })),
+    delete: (id: string): Promise<{ deleted: boolean; dadoDeBaja: boolean }> => unwrap(sf().articles.delete({ id })),
     findByBarcode: (barcode: string): Promise<ArticleDTO | null> => unwrap(sf().articles.findByBarcode({ barcode })),
     searchByText: (query: string): Promise<ArticleDTO[]> => unwrap(sf().articles.searchByText({ query })),
     findLowStock: (): Promise<ArticleDTO[]> => unwrap(sf().articles.findLowStock()),

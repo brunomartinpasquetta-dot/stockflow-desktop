@@ -22,6 +22,7 @@ import { useWindowNav } from '@/lib/useWindowNav'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
+import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
@@ -737,6 +738,12 @@ function PDV() {
   const buscadorRef = useRef<HTMLDivElement>(null)
   // Medio de pago seleccionado en modo mono-medio (default: efectivo).
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
+  // Calculador de vuelto (casilla, se recuerda en cada PC). Sólo informativo:
+  // los pagos registrados siguen sumando exacto el total.
+  const [calcularVueltoOn, setCalcularVueltoOn] = useState<boolean>(() => leerPreferenciaVuelto())
+  const [pagaCon, setPagaCon] = useState('')
+  // Pantalla de cobro con vuelto (se abre al confirmar, como en StockFácil).
+  const [cobroVueltoOpen, setCobroVueltoOpen] = useState(false)
   // Modo mixto explícito (toggle "Pago Mixto"): expone el split N-filas.
   const [mixedMode, setMixedMode] = useState(false)
   // Lista de precios activa del PDV (override del selector). Default Lista 1.
@@ -984,6 +991,7 @@ function PDV() {
 
   function clearSale(): void {
     setCart([])
+    setPagaCon('')
     setPedidoWebId(null)
     setPedidoWebNotes(null)
     setGlobalDiscount('0')
@@ -1171,6 +1179,26 @@ function PDV() {
     () => activeMethods.find((m) => m.id === selectedMethodId) ?? null,
     [activeMethods, selectedMethodId],
   )
+
+  // Vuelto: se calcula sobre lo que se cobra en EFECTIVO. Pago único con un
+  // medio de efectivo físico → el total; pago mixto → la parte en efectivo.
+  const metodoEfectivo = useMemo(() => activeMethods.find((m) => m.isPhysicalCash) ?? null, [activeMethods])
+  const enEfectivo = accountSale
+    ? 0
+    : mixedMode
+      ? Number(split.payments.find((p) => p.paymentMethodId === metodoEfectivo?.id)?.amount ?? 0)
+      : selectedMethod?.isPhysicalCash
+        ? totalNum
+        : 0
+  // ¿Este cobro lleva efectivo? (aunque todavía no haya productos cargados)
+  const cobraEnEfectivo = !accountSale && (mixedMode ? metodoEfectivo != null : selectedMethod?.isPhysicalCash === true)
+  const pagaConNum = pagaCon.trim() ? Number(parseCurrencyInput(pagaCon)) : 0
+  const vueltoCalc = calcularVuelto(pagaConNum, enEfectivo)
+  function toggleCalcularVuelto(activo: boolean): void {
+    setCalcularVueltoOn(activo)
+    guardarPreferenciaVuelto(activo)
+    if (!activo) setPagaCon('')
+  }
 
   // ── Comisión del medio de pago (FEATURE #1, sólo informativo para el vendedor) ──
   // El comercio ABSORBE la comisión; el cliente paga el total normal. Acá se
@@ -1362,10 +1390,22 @@ function PDV() {
       setQrModalOpen(true)
       return
     }
+    // Calcular vuelto: antes de registrar se abre la pantalla de cobro (total,
+    // con cuánto paga y el vuelto). Desde ahí, Enter confirma.
+    if (calcularVueltoOn && cobraEnEfectivo && enEfectivo > 0 && !cobroVueltoOpen) {
+      setPagaCon('')
+      setCobroVueltoOpen(true)
+      return
+    }
+    // Si el billete no alcanza, no se confirma.
+    if (cobroVueltoOpen && vueltoCalc.falta > 0) return
     // Dos F2 seguidos antes del re-render: la segunda vuelta no pasa de acá.
     if (procesandoRef.current) return
     procesandoRef.current = true
     setProcesando(true)
+    // El vuelto se anota antes de limpiar la venta, para mostrarlo en el aviso.
+    const vueltoAlConfirmar = calcularVueltoOn ? vueltoCalc.vuelto : 0
+    setCobroVueltoOpen(false)
     const monoPayments =
       !accountSale && !mixedMode && selectedMethod
         ? [{ paymentMethodId: selectedMethod.id, amount: totalNum.toFixed(4) }]
@@ -1394,7 +1434,9 @@ function PDV() {
       // cerrar, lp trabado), la venta igual está hecha y el operador no queda
       // trabado ni con riesgo de vender 2 veces (BUG-OP-03b).
       toast.success(
-        `Venta ${result.sale.type} #${result.sale.number} registrada — ${formatCurrency(result.sale.total)}`,
+        `Venta ${result.sale.type} #${result.sale.number} registrada — ${formatCurrency(result.sale.total)}` +
+          (vueltoAlConfirmar > 0 ? ` · Vuelto: ${formatCurrency(vueltoAlConfirmar.toFixed(2))}` : ''),
+        vueltoAlConfirmar > 0 ? { duration: 10_000 } : undefined,
       )
       // Venía de un pedido web (no pagado): avisarle que ya se cobró. Best
       // effort — la venta ya está hecha, esto solo lo destacha de "Pedidos web".
@@ -2110,15 +2152,37 @@ function PDV() {
               Cobrar con QR MercadoPago — {formatCurrency(totals.total)}
             </Button>
           )}
-          <label className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-input"
-              checked={autoPrintOnSale}
-              onChange={(e) => toggleAutoPrint(e.target.checked)}
-            />
-            <span>Imprimir ticket automáticamente</span>
-          </label>
+          {/* Opciones de venta: preferencias de esta caja, juntas en un recuadro
+              (pedido de Bruno, 1-oct-2026). */}
+          <fieldset className="flex flex-col gap-1 rounded-md border px-2.5 pb-1.5 pt-0.5">
+            <legend className="px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Opciones de venta</legend>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={autoPrintOnSale}
+                onChange={(e) => toggleAutoPrint(e.target.checked)}
+              />
+              <span>Imprimir ticket automáticamente</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm" title="Al confirmar una venta en efectivo se abre la pantalla de cobro con el vuelto">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={calcularVueltoOn}
+                onChange={(e) => toggleCalcularVuelto(e.target.checked)}
+              />
+              <span>Calcular vuelto</span>
+            </label>
+            {/* Tildada, dice qué va a pasar (al tildarla sola no se ve ningún cambio). */}
+            {calcularVueltoOn && (
+              <p className="pl-6 text-[11px] leading-tight text-muted-foreground">
+                {cobraEnEfectivo
+                  ? 'Al confirmar se abre la pantalla del vuelto.'
+                  : 'Se calcula cuando se cobra en efectivo.'}
+              </p>
+            )}
+          </fieldset>
           <Button
             variant="success"
             className="h-14 text-lg"
@@ -2148,6 +2212,64 @@ function PDV() {
       </div>
 
       <CustomerPicker open={customerPickerOpen} customers={customers} onClose={() => setCustomerPickerOpen(false)} onSelect={pickCustomer} />
+      <Dialog open={cobroVueltoOpen} onOpenChange={(o) => { if (!o) setCobroVueltoOpen(false) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cobro en efectivo</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">Total de la venta</span>
+              <span className="text-2xl font-bold tabular-nums">{formatCurrency(totals.total)}</span>
+            </div>
+            {mixedMode && (
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-muted-foreground">En efectivo</span>
+                <span className="text-lg font-semibold tabular-nums">{formatCurrency(enEfectivo.toFixed(2))}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="cobro-paga-con" className="text-sm">
+                Paga con
+              </Label>
+              <Input
+                id="cobro-paga-con"
+                autoFocus
+                inputMode="decimal"
+                className="h-11 w-44 text-right text-xl tabular-nums"
+                placeholder="0,00"
+                value={pagaCon}
+                onChange={(e) => setPagaCon(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    if (vueltoCalc.falta <= 0) void confirmar()
+                  }
+                }}
+              />
+            </div>
+            <div className="flex items-baseline justify-between rounded-md bg-muted/50 px-3 py-2">
+              <span className="text-sm font-medium">{vueltoCalc.falta > 0 ? 'Faltan' : 'Vuelto'}</span>
+              <span className={'text-3xl font-bold tabular-nums ' + (vueltoCalc.falta > 0 ? 'text-destructive' : 'text-success')}>
+                {formatCurrency((vueltoCalc.falta > 0 ? vueltoCalc.falta : vueltoCalc.vuelto).toFixed(2))}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setCobroVueltoOpen(false)}>
+                Volver (Esc)
+              </Button>
+              <Button
+                variant="success"
+                className="flex-1"
+                disabled={vueltoCalc.falta > 0 || createSale.isPending || procesando}
+                onClick={() => void confirmar()}
+              >
+                Confirmar venta (Enter)
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <DevolucionPicker
         open={devolucionPickerOpen}
         customers={customersQuery.data ?? []}

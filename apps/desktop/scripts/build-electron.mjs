@@ -88,6 +88,10 @@ if (existsSync(dbMigrations)) {
 cpSync(join(appRoot, 'electron', 'assistant', 'intents.json'), join(outDir, 'assistant-intents.json'));
 cpSync(join(appRoot, 'manual-src', 'sections.json'), join(outDir, 'manual-sections.json'));
 cpSync(join(appRoot, 'electron', 'assistant', 'flows.json'), join(outDir, 'assistant-flows.json'));
+// Índice base de Flowy con IA (Ollama): ya calculado, así la PC del cliente no
+// lo arma (sin placa de video tardaría unos minutos). Lo genera `pnpm flowy:indice`.
+const indiceFlowy = join(appRoot, 'electron', 'assistant', 'ia', 'flowy-indice-base.json');
+if (existsSync(indiceFlowy)) cpSync(indiceFlowy, join(outDir, 'flowy-indice-base.json'));
 // Novedades post-update: mismo esquema runtime que la KB (nada inlineado).
 cpSync(join(appRoot, 'electron', 'novedades', 'release-notes.json'), join(outDir, 'novedades-release-notes.json'));
 // Datos de ejemplo del modo demo (E5): el xlsx viaja junto al bundle.

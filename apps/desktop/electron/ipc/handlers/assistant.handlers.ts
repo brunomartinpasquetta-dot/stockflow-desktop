@@ -1,19 +1,27 @@
 /**
  * Handler del Asistente virtual de StockFlow ("Flowy").
  *
- * Chatbot INTERNO: responde 100% offline, sin IA externa, sin clave y sin costo.
- * La lógica de búsqueda vive en `electron/assistant/engine.ts` (intents curados +
- * manual). Este handler solo toma el último mensaje del usuario y devuelve la
- * respuesta + sugerencias.
+ * Responde sin salir a internet. Dos cerebros:
+ *  - el motor de siempre (`electron/assistant/engine.ts`: fichas curadas +
+ *    manual, búsqueda por palabras);
+ *  - opcional, la IA LOCAL con Ollama (`electron/assistant/ia/`): entiende la
+ *    pregunta por su significado y, si la PC da, redacta la respuesta. Es
+ *    gratis y corre en la misma PC. Si no está o falla, contesta el motor.
  */
+import { randomUUID } from 'node:crypto';
 import { appendFileSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { requirePermission } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
 import { responderConDatos } from '../../assistant/consultas';
 import { resolveScreenArea } from '../../assistant/context';
-import { answerQuestion } from '../../assistant/engine';
+import { answerChat, answerQuestion, answerTopic, lastResolved, type AssistantAnswer } from '../../assistant/engine';
 import { detectFlow, handleFlowAnswer, startFlow, type FlowChecks } from '../../assistant/flows';
+import { limpiarRespuesta, type ConfigIA, type EstadoIA } from '../../assistant/ia/flowyIA';
+import type { EstadoInstalacion } from '../../assistant/ia/instalador';
+import { RegistroDecisiones, UltimaRespuestaPorCharla } from '../../assistant/ia/registro';
 import { kbLoadError } from '../../assistant/kbLoader';
 
 export interface AssistantMessage {
@@ -26,6 +34,36 @@ export interface AssistantAskResult {
   image?: string | null;
   /** Botones de navegación; el renderer los oculta si el rol no tiene permiso. */
   actions?: { label: string; screen: string }[];
+  /**
+   * La respuesta la está escribiendo la IA: el panel pide el resto con
+   * `assistant:seguir` y la muestra mientras se escribe (anda igual en los
+   * puestos de la red, que no reciben eventos del servidor).
+   */
+  pendiente?: string;
+  /** true = la contestó la IA local. */
+  ia?: boolean;
+}
+
+export interface AssistantSeguirResult extends AssistantAskResult {
+  listo: boolean;
+}
+
+/** Respuestas que la IA está escribiendo, por id. Se limpian solas a los 5 minutos. */
+interface TrabajoIA {
+  texto: string;
+  listo: boolean;
+  resultado: AssistantAskResult | null;
+  creado: number;
+}
+const TRABAJOS = new Map<string, TrabajoIA>();
+function limpiarTrabajos(): void {
+  const ahora = Date.now();
+  for (const [id, t] of TRABAJOS) if (ahora - t.creado > 5 * 60_000) TRABAJOS.delete(id);
+}
+
+/** `ia` en la respuesta = el texto lo redactó la IA (el panel lo aclara debajo). */
+function aResultado(a: AssistantAnswer): AssistantAskResult {
+  return { reply: a.reply, suggestions: a.suggestions, image: a.image ?? null, actions: a.actions ?? [], ia: Boolean(a.generated) };
 }
 
 function lastUserMessage(messages: AssistantMessage[]): string {
@@ -61,6 +99,9 @@ function logMiss(userDataDir: string, appVersion: string, question: string): voi
 }
 
 export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
+  // Registro local de decisiones de la IA y de correcciones (clic en otro botón).
+  const registro = new RegistroDecisiones(deps.userDataDir, deps.appVersion);
+  const ultimas = new UltimaRespuestaPorCharla();
   return {
     // withSession: el asistente responde con los MISMOS límites que la UI.
     // Antes era `unguarded` y consultas.ts devolvía ventas/caja/deudores a
@@ -118,10 +159,121 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
           }
         }
 
+        // IA local (Ollama), si está activada y lista en esta PC.
+        const ia = deps.flowyIA;
+        if (ia?.activa() && question.trim()) {
+          // La charla (saludos, "guiame", "no entendí", "la primera"…) la sigue
+          // manejando el motor: es rápida y ya está afinada.
+          const charla = answerChat(question, convId);
+          if (charla) return aResultado(charla);
+
+          // ¿Tocó otro botón de la respuesta anterior? Eso es una corrección.
+          const clic = ultimas.esClicEnSugerencia(convId, question);
+          const cerrar = (r: AssistantAnswer | null): AssistantAskResult => {
+            const final = r ?? answerTopic(question, convId, screenArea);
+            if (final.kind === 'fallback') logMiss(deps.userDataDir, deps.appVersion, question.trim());
+            const resuelto = final.kind === 'intent' ? lastResolved(convId) : null;
+            const elegido = resuelto ? `${resuelto.area}/${resuelto.id}` : null;
+            registro.anotar({ t: 'respuesta', q: question.trim(), pantalla: screenArea, via: r ? 'ia' : 'motor', elegido, top: ia.ultimosCandidatos() });
+            if (clic && elegido && elegido !== clic.mostrado) {
+              registro.anotar({ t: 'correccion', preguntaOriginal: clic.pregunta, mostrado: clic.mostrado, elegido });
+            }
+            ultimas.recordar(convId, question.trim(), elegido, final.suggestions);
+            return aResultado(final);
+          };
+
+          if (ia.redacta()) {
+            // Redactar tarda: se devuelve un id y el panel va mostrando el texto.
+            limpiarTrabajos();
+            const id = randomUUID();
+            const trabajo: TrabajoIA = { texto: '', listo: false, resultado: null, creado: Date.now() };
+            TRABAJOS.set(id, trabajo);
+            void (async () => {
+              let r: AssistantAnswer | null;
+              try {
+                r = await ia.responder(question, convId, screenArea, (t) => {
+                  trabajo.texto = t;
+                });
+              } catch {
+                r = null;
+              }
+              try {
+                trabajo.resultado = cerrar(r);
+              } catch {
+                trabajo.resultado = { reply: 'Uy, algo falló. Probá de nuevo.', suggestions: [] };
+              }
+              trabajo.listo = true;
+            })();
+            return { reply: '', suggestions: [], pendiente: id, ia: true };
+          }
+
+          let r: AssistantAnswer | null;
+          try {
+            r = await ia.responder(question, convId, screenArea);
+          } catch {
+            r = null;
+          }
+          return cerrar(r);
+        }
+
         const ans = answerQuestion(question, convId, screenArea);
         if (ans.kind === 'fallback' && question.trim()) logMiss(deps.userDataDir, deps.appVersion, question.trim());
         return { reply: ans.reply, suggestions: ans.suggestions, image: ans.image, actions: ans.actions ?? [] };
       },
     ),
+
+    /** Lo que lleva escrito la IA de una respuesta pendiente (el panel pregunta cada ~300 ms). */
+    'assistant:seguir': withSession(deps, (payload: { id?: string }): AssistantSeguirResult => {
+      const id = payload?.id ?? '';
+      const t = TRABAJOS.get(id);
+      if (!t) return { listo: true, reply: 'Se me perdió la respuesta. ¿Me lo preguntás de nuevo?', suggestions: [] };
+      if (t.listo && t.resultado) {
+        TRABAJOS.delete(id);
+        return { listo: true, ...t.resultado };
+      }
+      return { listo: false, reply: limpiarRespuesta(t.texto), suggestions: [], ia: true };
+    }),
+
+    /* ───────────── IA local (Ollama): estado y configuración ───────────── */
+
+    'assistant:iaEstado': withSession(deps, async (): Promise<EstadoIA & { instalacion: EstadoInstalacion | null }> => {
+      if (!deps.flowyIA) throw new Error('La IA de Flowy no está disponible en esta instalación.');
+      return { ...(await deps.flowyIA.estado()), instalacion: deps.ollamaInstalador?.estado() ?? null };
+    }),
+
+    'assistant:iaConfigurar': withSession(deps, async (payload: Partial<ConfigIA>, ctx): Promise<EstadoIA> => {
+      requirePermission(ctx.currentUser, 'manage_hardware');
+      if (!deps.flowyIA) throw new Error('La IA de Flowy no está disponible en esta instalación.');
+      return deps.flowyIA.configurar(payload ?? {});
+    }),
+
+    'assistant:iaDescargar': withSession(deps, async (_payload: unknown, ctx): Promise<EstadoIA> => {
+      requirePermission(ctx.currentUser, 'manage_hardware');
+      if (!deps.flowyIA) throw new Error('La IA de Flowy no está disponible en esta instalación.');
+      deps.flowyIA.descargarModelos();
+      return deps.flowyIA.estado();
+    }),
+
+    'assistant:iaInstalarOllama': withSession(deps, async (_payload: unknown, ctx): Promise<EstadoInstalacion> => {
+      requirePermission(ctx.currentUser, 'manage_hardware');
+      if (!deps.ollamaInstalador) throw new Error('La instalación automática de Ollama no está disponible en esta PC.');
+      return deps.ollamaInstalador.iniciar();
+    }),
+
+    /** Carga los modelos en memoria al abrir el panel: la primera respuesta sale más rápido. */
+    'assistant:iaPrecalentar': withSession(deps, async (): Promise<{ ok: true }> => {
+      void deps.flowyIA?.precalentar();
+      return { ok: true };
+    }),
+
+    /** Pregunta de prueba para ver si la PC da: cuánto tarda y qué contesta. */
+    'assistant:iaProbar': withSession(deps, async (_payload: unknown, ctx): Promise<{ ms: number; ia: boolean; reply: string }> => {
+      requirePermission(ctx.currentUser, 'manage_hardware');
+      const inicio = Date.now();
+      const r = deps.flowyIA?.activa()
+        ? await deps.flowyIA.responder('¿Cómo hago una venta?', `prueba-${inicio}`, null).catch(() => null)
+        : null;
+      return { ms: Date.now() - inicio, ia: Boolean(r), reply: r?.reply ?? '' };
+    }),
   };
 }

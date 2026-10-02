@@ -66,6 +66,8 @@ export interface AssistantAnswer {
   actions?: AssistantAction[];
   /** Clasificación interna para logging (no se manda al renderer). */
   kind?: 'intent' | 'manual' | 'meta' | 'fallback' | 'walk';
+  /** true = el texto lo redactó la IA local (no es una ficha curada). */
+  generated?: boolean;
 }
 
 /* --------------------------- normalización --------------------------- */
@@ -203,6 +205,8 @@ interface IntentDoc {
   gidx: number;
   id: string;
   canonical: string;
+  /** Frases de ejemplo tal cual están en la base (las usa la búsqueda por significado). */
+  patterns: string[];
   answer: string;
   steps: string[];
   image: string | null;
@@ -285,6 +289,7 @@ function buildIndex(): Index {
         gidx: intents.length,
         id: it.id,
         canonical: it.canonical,
+        patterns: it.patterns ?? [],
         answer: it.answer,
         steps: it.steps ?? [],
         image: it.image ?? null,
@@ -505,15 +510,53 @@ const MANUAL_THRESHOLD = 5;
  * desempata sin preguntar.
  */
 export function answerQuestion(question: string, convId = 'default', screenArea: string | null = null): AssistantAnswer {
+  const p = prepararPregunta(question, convId);
+  return pasoCharla(p) ?? pasoTema(p, screenArea);
+}
+
+/**
+ * Sólo la parte de CHARLA del motor (saludos, gracias, modo guiado, "no
+ * entendí", "el primero", "sí" a una oferta…). Devuelve null si el mensaje es
+ * una pregunta de un tema: ahí entra la IA (Ollama) y, si no puede, `answerTopic`.
+ */
+export function answerChat(question: string, convId = 'default'): AssistantAnswer | null {
+  return pasoCharla(prepararPregunta(question, convId));
+}
+
+/** Sólo la búsqueda de TEMA por palabras (pasos 5-7), sin volver a contar el turno. */
+export function answerTopic(question: string, convId = 'default', screenArea: string | null = null): AssistantAnswer {
+  const p = prepararPregunta(question, convId, false);
+  return pasoTema(p, screenArea);
+}
+
+interface Pregunta {
+  question: string;
+  idx: Index;
+  c: Convo;
+  raw: string[];
+  norm: string;
+  content: string[];
+  low: string;
+}
+
+function prepararPregunta(question: string, convId: string, contarTurno = true): Pregunta {
   const idx = getIndex();
   const c = convo(convId);
-  c.turn++;
+  if (contarTurno) c.turn++;
+  return {
+    question,
+    idx,
+    c,
+    raw: rawTokens(question),
+    norm: phraseNorm(question),
+    content: tokenize(question),
+    // Texto plano (sin acentos, sin stemming) para detectar frases de charla.
+    low: ' ' + stripAccents(question.toLowerCase()).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ',
+  };
+}
 
-  const raw = rawTokens(question);
-  const norm = phraseNorm(question);
-  const content = tokenize(question);
-  // Texto plano (sin acentos, sin stemming) para detectar frases de charla.
-  const low = ' ' + stripAccents(question.toLowerCase()).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
+function pasoCharla(p: Pregunta): AssistantAnswer | null {
+  const { question, idx, c, raw, content, low } = p;
 
   // ── 0) Saludo / vacío ──
   // OJO: "si"/"ya" son STOPWORDS → `content` queda vacío y esto se comía la
@@ -612,6 +655,13 @@ export function answerQuestion(question: string, convId = 'default', screenArea:
     return answerIntentByIdx(idx, c.offeredIdx[0]!, c);
   }
 
+  return null;
+}
+
+function pasoTema(p: Pregunta, screenArea: string | null): AssistantAnswer {
+  const { idx, c, raw, norm, content } = p;
+  const last = c.lastIntentIdx != null ? idx.intents[c.lastIntentIdx] : null;
+
   // ── 5) Búsqueda de intent (con typos y contexto) ──
   const qTokens = expand(correctTokens(content, idx), idx.aliasToTerm);
   const qNorm = norm;
@@ -646,14 +696,7 @@ export function answerQuestion(question: string, convId = 'default', screenArea:
       // del área de la charla/pantalla y el otro no, se responde ese.
       if (ctxArea && best.d.area === ctxArea && second.d.area !== ctxArea) return answerIntentByIdx(idx, best.d.gidx, c);
       if (ctxArea && second.d.area === ctxArea && best.d.area !== ctxArea) return answerIntentByIdx(idx, second.d.gidx, c);
-      c.clarify = [best.d.gidx, second.d.gidx];
-      c.lastArea = best.d.area;
-      c.lastIntentIdx = null;
-      return {
-        reply: `Para no mandarte cualquiera: ¿te referís a **${best.d.canonical}** o a **${second.d.canonical}**? Decime "el primero" o "el segundo".`,
-        suggestions: [best.d.canonical, second.d.canonical],
-        kind: 'meta',
-      };
+      return aclarar(c, best.d, second.d);
     }
     return answerIntentByIdx(idx, best.d.gidx, c);
   }
@@ -674,6 +717,23 @@ export function answerQuestion(question: string, convId = 'default', screenArea:
   };
 }
 
+/**
+ * Pregunta cuál de dos temas quiso decir. Las opciones van en el texto entre
+ * comillas (antes iban con asteriscos de markdown que el panel mostraba
+ * crudos) y también como botones para tocarlas.
+ */
+function aclarar(c: Convo, a: IntentDoc, b: IntentDoc): AssistantAnswer {
+  c.clarify = [a.gidx, b.gidx];
+  c.lastArea = a.area;
+  c.lastIntentIdx = null;
+  const nombre = (d: IntentDoc): string => `«${d.canonical.replace(/^¿|\?$/g, '')}»`;
+  return {
+    reply: `Para no mandarte cualquiera: ¿te referís a ${nombre(a)} o a ${nombre(b)}? Tocá la opción, o decime "la primera" o "la segunda".`,
+    suggestions: [a.canonical, b.canonical],
+    kind: 'meta',
+  };
+}
+
 function answerIntentByIdx(idx: Index, j: number, c: Convo): AssistantAnswer {
   const d = idx.intents[j];
   if (!d || d.area === 'meta')
@@ -689,6 +749,139 @@ function answerIntentByIdx(idx: Index, j: number, c: Convo): AssistantAnswer {
     actions: d.action ? [d.action] : [],
     kind: 'intent',
   };
+}
+
+/* ------------------ puente con la IA local (Ollama) ------------------ */
+
+export interface TemaKB {
+  gidx: number;
+  area: string;
+  id: string;
+  canonical: string;
+  patterns: string[];
+  answer: string;
+  steps: string[];
+  image: string | null;
+  action: AssistantAction | null;
+}
+
+function aTema(d: IntentDoc): TemaKB {
+  return {
+    gidx: d.gidx,
+    area: d.area,
+    id: d.id,
+    canonical: d.canonical,
+    patterns: d.patterns,
+    answer: d.answer,
+    steps: d.steps,
+    image: d.image,
+    action: d.action,
+  };
+}
+
+/**
+ * Grupos de fichas EQUIVALENTES ("area/id"): responden la misma pregunta desde
+ * áreas distintas. La IA las trata como una sola (un solo botón, gana la de la
+ * pantalla). Vive en intents.json → "equivalencias".
+ */
+export function equivalenciasKB(): string[][] {
+  const eq = (intentsData as { equivalencias?: unknown }).equivalencias;
+  return Array.isArray(eq) ? eq.filter((g): g is string[] => Array.isArray(g) && g.every((x) => typeof x === 'string')) : [];
+}
+
+/** Temas de la base (sin la charla "meta"), con el mismo índice global que usa el motor. */
+export function temasKB(): TemaKB[] {
+  return getIndex()
+    .intents.filter((d) => d.area !== 'meta')
+    .map(aTema);
+}
+
+export function temaPorGidx(gidx: number): TemaKB | null {
+  const d = getIndex().intents[gidx];
+  return d && d.area !== 'meta' ? aTema(d) : null;
+}
+
+/** Secciones del manual (red de contención), con su índice. */
+export function manualKB(): { idx: number; title: string; heading: string; body: string }[] {
+  return getIndex().manual.map((d, idx) => ({ idx, title: d.title, heading: d.heading, body: d.body }));
+}
+
+/**
+ * Ranking por PALABRAS (el motor de siempre) SIN tocar la charla: la IA lo
+ * combina con la búsqueda por significado.
+ */
+export function rankingPalabras(question: string, screenArea: string | null = null, top = 5): { gidx: number; score: number }[] {
+  const idx = getIndex();
+  const qTokens = expand(correctTokens(tokenize(question), idx), idx.aliasToTerm);
+  const qNorm = phraseNorm(question);
+  return idx.intents
+    .filter((d) => d.area !== 'meta')
+    .map((d) => ({ gidx: d.gidx, score: scoreIntent(idx, qTokens, qNorm, d, screenArea) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, top);
+}
+
+/** Respuesta curada de un tema elegido por la IA; la charla queda en ese tema ("guiame", "y después"). */
+export function responderTema(gidx: number, convId = 'default'): AssistantAnswer {
+  const idx = getIndex();
+  const c = convo(convId);
+  c.clarify = [];
+  return answerIntentByIdx(idx, gidx, c);
+}
+
+/** La IA contestó con sus palabras sobre este tema: la charla queda en él (para "guiame"). */
+export function fijarTemaCharla(gidx: number, convId = 'default'): void {
+  const d = getIndex().intents[gidx];
+  if (!d || d.area === 'meta') return;
+  const c = convo(convId);
+  c.lastArea = d.area;
+  c.lastIntentIdx = gidx;
+  c.lastSteps = d.steps;
+  c.walkIdx = -1;
+  c.clarify = [];
+  c.offeredIdx = [];
+}
+
+/** Pregunta entre dos temas que la IA no pudo separar (se eligen con "la primera"/"la segunda" o con los botones). */
+export function aclararTemas(gidxA: number, gidxB: number, convId = 'default'): AssistantAnswer | null {
+  const idx = getIndex();
+  const a = idx.intents[gidxA];
+  const b = idx.intents[gidxB];
+  if (!a || !b || a.area === 'meta' || b.area === 'meta' || gidxA === gidxB) return null;
+  return aclarar(convo(convId), a, b);
+}
+
+/**
+ * Reemplaza la oferta "(O si querés te muestro «X» o «Y» — decime "sí".)" de
+ * una respuesta por los temas que eligió la IA. La oferta original sale de
+ * palabras compartidas en el área y ofrecía cosas sin relación (probado por
+ * Bruno el 1-oct-2026: "devolución" ofrecía "cómo elijo el cliente").
+ */
+export function ofrecerTemas(reply: string, gidxs: number[], convId = 'default'): string {
+  const idx = getIndex();
+  const c = convo(convId);
+  const validos = gidxs.filter((g) => idx.intents[g] && idx.intents[g]!.area !== 'meta').slice(0, 2);
+  const sinOferta = reply.replace(/\n\n\(O si querés te muestro [\s\S]*\)$/, '');
+  c.offeredIdx = validos;
+  if (!validos.length) return sinOferta;
+  const nombres = validos.map((g) => `«${idx.intents[g]!.canonical.replace(/^¿|\?$/g, '')}»`);
+  return `${sinOferta}\n\n(O si querés te muestro ${nombres.join(' o ')} — decime "sí".)`;
+}
+
+/** Último tema de la charla (para que la IA entienda los seguimientos cortos). */
+export function temaActual(convId: string): TemaKB | null {
+  const c = SESSIONS.get(convId);
+  if (!c || c.lastIntentIdx == null) return null;
+  return temaPorGidx(c.lastIntentIdx);
+}
+
+/** Registra en la charla que la respuesta vino de otro lado (p. ej. la IA dijo que no sabe). */
+export function soltarTemaCharla(convId: string): void {
+  const c = SESSIONS.get(convId);
+  if (!c) return;
+  c.clarify = [];
+  c.offeredIdx = [];
+  c.walkIdx = -1;
 }
 
 /* --------------------------- utilidades test --------------------------- */

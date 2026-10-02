@@ -29,6 +29,9 @@
     "package:dry": "node scripts/package.mjs --mac --dir",
     "preview": "vite preview",
     "test:assistant": "tsx electron/__tests__/assistant.smoke.ts",
+    "test:flowy-ia": "tsx electron/__tests__/flowy-ia.smoke.ts",
+    "flowy:indice": "tsx scripts/generar-indice-flowy.ts",
+    "flowy:conflictos": "tsx scripts/flowy-conflictos.ts",
     "test:consultas": "tsx electron/__tests__/consultas.smoke.ts",
     "test:kb": "node scripts/validate-kb.mjs",
     "test:flows": "tsx electron/__tests__/flows.smoke.ts",
@@ -42,7 +45,8 @@
     "test:devoluciones": "tsx electron/__tests__/devoluciones.smoke.ts",
     "test:backup": "tsx electron/__tests__/backup.smoke.ts",
     "test:seguridad-lan": "tsx electron/__tests__/seguridad-lan.smoke.ts",
-    "test:pdv-caja": "tsx electron/__tests__/pdv-caja.smoke.ts"
+    "test:pdv-caja": "tsx electron/__tests__/pdv-caja.smoke.ts",
+    "test:vuelto": "tsx electron/__tests__/vuelto.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

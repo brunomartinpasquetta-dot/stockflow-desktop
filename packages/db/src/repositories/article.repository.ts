@@ -15,6 +15,28 @@ export class ArticleRepository extends BaseRepository<Article, NewArticle> {
   protected override readonly createSchema = CreateArticleSchema;
   protected override readonly updateSchema = UpdateArticleSchema;
 
+  /**
+   * Borra el artículo, o lo DA DE BAJA si ya tiene historial (ventas,
+   * devoluciones, compras, presupuestos, promociones o cambios de precio).
+   *
+   * Antes el borrado fallaba con "FOREIGN KEY constraint failed" y el comercio
+   * no tenía forma de sacarlo de la lista. Borrarlo igual rompería el
+   * historial; dado de baja deja de aparecer para vender y en la lista (salvo
+   * con "Incluir dados de baja"), y se puede reactivar.
+   */
+  async borrarODarDeBaja(id: string): Promise<'borrado' | 'dado_de_baja'> {
+    try {
+      await this.delete(id);
+      return 'borrado';
+    } catch (err) {
+      if (err instanceof ConstraintError && err.constraint.includes('FOREIGNKEY')) {
+        await this.update(id, { active: false });
+        return 'dado_de_baja';
+      }
+      throw err;
+    }
+  }
+
   constructor(db: LocalDatabase) {
     super(db, articles, 'Artículo');
   }

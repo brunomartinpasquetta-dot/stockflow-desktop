@@ -8,6 +8,7 @@ import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, Ref
 
 import { api, ApiError } from '@/lib/api'
 import { EspejoCatalogo } from './Empresa'
+import { FlowyIAConfig } from '@/components/FlowyIAConfig'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1499,7 +1500,7 @@ function GeneralSection() {
 
 import { useWindowSelf } from '@/contexts/WindowManagerContext'
 
-const VALID_TABS = ['hardware', 'backup', 'lan', 'catalogo', 'remoto', 'updates', 'general', 'mantenimiento'] as const
+const VALID_TABS = ['hardware', 'backup', 'lan', 'catalogo', 'remoto', 'flowy', 'updates', 'general', 'mantenimiento'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 function readInitialTab(extras: unknown): TabValue | null {
@@ -1623,12 +1624,15 @@ export function Configuracion() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
       <h1 className="text-lg font-semibold">Configuración</h1>
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)} className="flex flex-col gap-3">
-        <TabsList>
+        {/* flex-wrap: con 9 pestañas la fila no entra en el ancho de la ventana y
+            "Mantenimiento" quedaba afuera del recuadro; ahora pasa a otra línea. */}
+        <TabsList className="flex-wrap">
           <TabsTrigger value="hardware">Hardware</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
           <TabsTrigger value="lan">Red local</TabsTrigger>
           <TabsTrigger value="catalogo">Catálogo web</TabsTrigger>
           <TabsTrigger value="remoto">Acceso remoto</TabsTrigger>
+          <TabsTrigger value="flowy">Flowy con IA</TabsTrigger>
           <TabsTrigger value="updates">Actualizaciones</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
           {isAdmin && <TabsTrigger value="mantenimiento">Mantenimiento</TabsTrigger>}
@@ -1648,6 +1652,9 @@ export function Configuracion() {
         </TabsContent>
         <TabsContent value="remoto">
           <AccesoRemotoSection />
+        </TabsContent>
+        <TabsContent value="flowy">
+          <FlowyIAConfig />
         </TabsContent>
         <TabsContent value="updates">
           <UpdatesSection />

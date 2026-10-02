@@ -1255,15 +1255,22 @@
       "dar de baja un producto",
       "delete articulo",
       "borrar mercaderia",
-      "como saco un producto de la lista"
+      "como saco un producto de la lista",
+      "no me deja borrar un articulo",
+      "me sale error al borrar un producto",
+      "foreign key al borrar",
+      "reactivar un articulo",
+      "volver a activar un producto dado de baja",
+      "ver los articulos dados de baja"
      ],
-     "answer": "Elegís el producto en la lista, tocás el botón 'Borrar' y confirmás. Pensalo bien antes, porque no hay botón para deshacer.",
+     "answer": "Elegís el producto en la lista, tocás 'Borrar' y confirmás. Si el artículo nunca se usó, se borra. Si ya tiene ventas, compras o presupuestos registrados, no se borra: queda DADO DE BAJA, así no se pierde el historial. Un artículo dado de baja ya no aparece para vender ni en la lista, y lo podés reactivar cuando quieras.",
      "steps": [
-      "En la pantalla de Artículos (F1), hacé clic en el producto que querés eliminar (queda pintado).",
+      "En la pantalla de Artículos (F1), hacé clic en el producto que querés sacar (queda pintado).",
       "Arriba, hacé clic en el botón 'Borrar' (el del tachito de basura). También podés presionar la tecla Delete (Supr).",
       "Aparece una ventanita que pregunta '¿Borrar el artículo \"tal\"?'. Confirmá con Aceptar.",
-      "El producto desaparece de la lista y sale el cartelito 'Artículo borrado'.",
-      "Si el botón 'Borrar' está gris y no se deja tocar, primero fijate que hayas hecho clic en un producto de la lista. Si sigue gris, tu usuario no tiene permiso para manejar artículos: pedile al dueño o al administrador que te lo habilite."
+      "Si sale 'Artículo borrado', se borró. Si sale que quedó dado de baja, es porque tenía movimientos: ya no aparece para vender.",
+      "Para ver los dados de baja, tildá 'Incluir dados de baja' debajo de la lista: aparecen con la marca 'Baja'. Para volver a usar uno, seleccionalo y tocá 'Reactivar'.",
+      "Si el botón 'Borrar' está gris, primero fijate que hayas hecho clic en un producto. Si sigue gris, tu usuario no tiene permiso para manejar artículos: pedile al dueño o al administrador que te lo habilite."
      ],
      "image": "articulos-listado.png"
     },
@@ -1742,7 +1749,10 @@
       "backup de articulos",
       "imprimir lista de productos",
       "exportar pdf",
-      "como bajo la lista de articulos a excel"
+      "como bajo la lista de articulos a excel",
+      "pasar la lista de productos a excel",
+      "sacar los articulos a una planilla",
+      "descargar la lista de precios en excel"
      ],
      "answer": "En la barra de botones de la pantalla de Artículos tenés tres opciones: 'Excel' te baja una planilla con todo, 'PDF' arma un documento prolijo (ideal como lista de precios) e 'Imprimir' manda la vista directo a la impresora.",
      "steps": [
@@ -2719,7 +2729,10 @@
       "generar pdf del presupuesto",
       "mandar presupuesto por email",
       "imprimir a papel",
-      "darle el presupuesto al cliente en papel"
+      "darle el presupuesto al cliente en papel",
+      "mandar el presupuesto en pdf",
+      "enviar el presupuesto al cliente",
+      "pasar el presupuesto a pdf"
      ],
      "answer": "Abrís el presupuesto y tocás 'Imprimir PDF'. Sale una hoja A4 prolija (no el ticket de la caja) y se abre la ventana de impresión de tu computadora, donde elegís tu impresora o 'Guardar como PDF' para mandarlo por mail o WhatsApp.",
      "steps": [
@@ -6000,7 +6013,9 @@
       "venta a credito",
       "que me lo pague despues",
       "cargarle a la cuenta corriente",
-      "vender y que quede la deuda"
+      "vender y que quede la deuda",
+      "dejar fiado a un cliente",
+      "anotarle la venta en la cuenta"
      ],
      "answer": "Vender fiado es fácil: elegís al cliente por su nombre, cargás los productos y tildás el cuadradito 'Venta a cuenta corriente'. La deuda queda anotada en su cuenta y la cobrás cuando él pueda.",
      "steps": [
@@ -6184,7 +6199,10 @@
       "sacar de nuevo un comprobante",
       "reimprimir ticket",
       "imprimir una venta pasada",
-      "el cliente perdio el ticket"
+      "el cliente perdio el ticket",
+      "reimprimir un ticket viejo",
+      "reimprimir un ticket de otro dia",
+      "volver a imprimir una venta de la semana pasada"
      ],
      "answer": "Cualquier ticket se puede volver a imprimir, aunque sea de hace días: se busca la venta en el Historial de Ventas y se aprieta 'Reimprimir ticket'.",
      "steps": [
@@ -6207,7 +6225,10 @@
       "formato de impresion",
       "ticket chico o hoja",
       "tipo de papel",
-      "como cambio el tamaño del ticket"
+      "como cambio el tamaño del ticket",
+      "el ticket sale cortado",
+      "no entra el ticket en el papel",
+      "el ticket sale mal impreso"
      ],
      "answer": "El ticket puede salir en el rollo chiquito de caja (térmico, de 58 u 80 milímetros) o en una hoja A4 común, más formal. Eso se elige una sola vez en la Configuración, y después todos los tickets salen así.",
      "steps": [
@@ -6287,7 +6308,10 @@
       "quiero anular una venta de hoy",
       "sacar una venta del sistema",
       "revertir una venta confirmada",
-      "anular ticket"
+      "anular ticket",
+      "cancelar un ticket",
+      "cancelar una venta que hice mal",
+      "borrar un ticket mal hecho"
      ],
      "answer": "Si confirmaste una venta por error, se anula desde el Historial de Ventas. La anulación devuelve todo a como estaba: el stock vuelve, la plata sale de la caja y si era fiado se le borra la deuda al cliente.",
      "steps": [
@@ -6298,7 +6322,8 @@
       "Aparece un aviso que dice 'Anular esta venta revierte stock y caja. Indicá el motivo:'. Escribí en el casillero por qué la anulás (al menos 3 letras, por ejemplo 'me equivoqué de producto').",
       "Hacé clic en el botón rojo 'Confirmar anulación'. Vas a ver el cartelito 'Venta anulada'.",
       "En el historial, esa venta queda tachada con la etiqueta roja 'Anulada' (no desaparece, queda como registro).",
-      "Si no ves el botón 'Anular venta', tu usuario no tiene permiso para anular: pedile al dueño o administrador que lo haga."
+      "Si no ves el botón 'Anular venta', tu usuario no tiene permiso para anular: pedile al dueño o administrador que lo haga.",
+      "Si la anulaste para corregir algo (un precio, una cantidad, el cliente), hacé la venta de nuevo desde Ventas (F5) con los datos correctos."
      ],
      "image": "pdv-principal.png"
     },
@@ -6598,6 +6623,58 @@
       "registro de anulaciones"
      ],
      "answer": "Al anular una venta el sistema te pide el motivo y lo GUARDA en la venta, junto con el usuario que la anuló y la fecha. Lo ves abriendo la venta en el Historial: aparece al final de las notas. Si la venta tenía factura con CAE, además te avisa que anularla acá no la da de baja en ARCA: para eso corresponde una nota de crédito."
+    },
+    {
+     "id": "descuentos-empleado",
+     "canonical": "¿Puedo impedir que un empleado haga descuentos?",
+     "patterns": [
+      "como hago para que un empleado no pueda hacer descuentos",
+      "bloquear descuentos a un vendedor",
+      "que el cajero no pueda hacer descuentos",
+      "permiso para hacer descuentos",
+      "sacarle los descuentos a un empleado"
+     ],
+     "answer": "Hoy no se puede: StockFlow no tiene un permiso separado para los descuentos. Cualquier usuario que puede vender puede aplicar un descuento por producto o sobre el total. Lo que sí queda registrado es quién hizo cada venta, así que podés revisarlas en el Historial de Ventas (F7) filtrando por vendedor.",
+     "steps": []
+    },
+    {
+     "id": "corte-de-luz-venta",
+     "canonical": "¿Qué pasa si se corta la luz en medio de una venta?",
+     "patterns": [
+      "se apago la luz en medio de una venta",
+      "se corto la luz mientras vendia",
+      "se apago la computadora en una venta",
+      "se colgo la pc cobrando"
+     ],
+     "answer": "Una venta queda guardada recién cuando tocás 'Confirmar venta (F2)'. Si la luz se cortó antes, esa venta no se registró: al volver, cargala de nuevo. Si se cortó después de confirmar, ya está guardada aunque no haya salido el ticket: buscala en el Historial de Ventas (F7) y reimprimila desde ahí.",
+     "steps": []
+    },
+    {
+     "id": "calcular-vuelto",
+     "canonical": "¿Cómo calculo el vuelto en una venta?",
+     "patterns": [
+      "calcular vuelto",
+      "cuanto le doy de vuelto",
+      "el cliente me paga con 10 mil cuanto le devuelvo",
+      "calculadora de vuelto",
+      "paga con",
+      "activar el vuelto",
+      "donde esta el vuelto",
+      "me paga con un billete grande"
+     ],
+     "answer": "Tildá 'Calcular vuelto' en el recuadro 'Opciones de venta' de Ventas, arriba del botón 'Confirmar venta' (se hace una vez: queda guardado en esa PC). Desde ahí, al confirmar una venta en efectivo se abre la pantalla 'Cobro en efectivo' con el total: escribís con cuánto te paga el cliente y te muestra el vuelto en grande. Enter confirma la venta y Esc vuelve atrás.",
+     "steps": [
+      "En Ventas (F5), en el recuadro 'Opciones de venta' (arriba del botón verde 'Confirmar venta'), tildá 'Calcular vuelto'. Queda guardado en esa PC.",
+      "Cargá los productos y elegí 'Efectivo' como forma de pago.",
+      "Tocá 'Confirmar venta' o apretá F2: se abre la pantalla 'Cobro en efectivo' con el total de la venta.",
+      "En 'Paga con' escribí con cuánto te paga el cliente, por ejemplo 10000. Abajo aparece el 'Vuelto' en verde. Si el billete no alcanza, dice 'Faltan' en rojo y no deja confirmar.",
+      "Apretá Enter para confirmar la venta (o Esc para volver sin confirmar). El aviso de venta registrada también te recuerda el vuelto.",
+      "Con tarjeta o transferencia la venta se confirma directo. Con pago mixto, el vuelto se calcula sobre la parte en efectivo."
+     ],
+     "action": {
+      "label": "Abrir Ventas",
+      "screen": "ventas"
+     }
     }
    ]
   },
@@ -6966,7 +7043,10 @@
       "pasar lo recaudado a la general",
       "vaciar el cajon a caja general",
       "llevar la plata del dia a la general",
-      "transferir recaudacion"
+      "transferir recaudacion",
+      "pasar la plata del cajon a la caja fuerte",
+      "guardar la plata del cajon",
+      "sacar efectivo del cajon y guardarlo"
      ],
      "answer": "Cuando se te junta mucha plata en el cajón, la podés pasar a la Caja General (la caja grande del negocio) para no tenerla ahí. Queda todo anotado: como salida en tu caja del día y como entrada en la Caja General. Importante: hacelo antes de cerrar la caja, porque después ya no se puede.",
      "steps": [
@@ -7085,10 +7165,20 @@
       "quedo descuadrada la caja",
       "me da distinto el efectivo",
       "faltan pesos en el cajon",
-      "sobran pesos al cerrar"
+      "sobran pesos al cerrar",
+      "no me cierra la caja",
+      "no me cierra la plata de la caja",
+      "por que no me da la caja"
      ],
      "answer": "No pasa nada malo con el sistema: la caja se cierra igual y la diferencia queda anotada. Cuando escribís lo que contaste en 'Efectivo real contado', si no coincide aparece un cartelito rojo que dice 'Faltante de' tanto (falta plata) o uno amarillo que dice 'Sobrante de' tanto (sobra plata). Lo recomendable es escribir el motivo en 'Observaciones (opcional)' antes de confirmar, por ejemplo 'se encontró moneda' o 'falta $5': después en el historial la caja aparece marcada con esa diferencia y la nota ayuda a entender qué pasó.",
-     "steps": []
+     "steps": [
+      "Antes de cerrar, revisá en la Caja diaria (F4) la lista de movimientos del turno.",
+      "Fijate si algún cobro con tarjeta, transferencia o QR quedó cargado como 'Efectivo': es la causa más común de faltante.",
+      "Buscá ventas anuladas: aparecen tachadas y su plata ya salió de la caja.",
+      "Revisá si pasaste efectivo a la Caja General o hiciste un retiro sin anotarlo con 'Nuevo movimiento'.",
+      "Si encontrás el error, corregilo (anulá y rehacé la venta, o registrá el movimiento que faltaba) y volvé a contar.",
+      "Si igual queda diferencia, cerrá la caja escribiendo el motivo en 'Observaciones (opcional)': queda registrada en el historial."
+     ]
     },
     {
      "id": "historial-cajas",
@@ -8503,6 +8593,18 @@
       "En StockFlow, la ponés donde dice '¿Ya tenés una clave de licencia?' y tocás 'Activar con mi clave'.",
       "Listo: el sistema vuelve a funcionar completo, con todos los datos que cargaste en la prueba."
      ]
+    },
+    {
+     "id": "olvide-clave-administrador",
+     "canonical": "Me olvidé la contraseña del administrador, ¿qué hago?",
+     "patterns": [
+      "olvide la contraseña del administrador",
+      "no me acuerdo la clave del admin",
+      "perdi la contraseña del administrador",
+      "no puedo entrar como administrador"
+     ],
+     "answer": "Si hay otro usuario Administrador, puede ponerte una contraseña nueva desde Usuarios (F12) sin saber la vieja. Si el único administrador sos vos, comunicate con soporte: te ayudan a recuperar el acceso sin perder datos.",
+     "steps": []
     }
    ]
   },
@@ -8837,7 +8939,10 @@
       "cobrar todo lo que debe de una",
       "descontar del saldo total del cliente",
       "me pago una parte de todo lo que debe",
-      "cobrar al saldo general"
+      "cobrar al saldo general",
+      "cobrarle a alguien que me debe",
+      "cobrar una deuda de un cliente",
+      "me vino a pagar lo que debe"
      ],
      "answer": "Si el cliente te da plata sin aclarar de qué factura es, no hace falta que elijas: usá el botón 'Registrar cobranza' que está arriba a la derecha en su cuenta. El sistema reparte solo esa plata entre las facturas, empezando por la más vieja.",
      "steps": [
@@ -8896,7 +9001,10 @@
       "cobrar en cuotas la factura",
       "abonar de a poco la deuda",
       "pagar el proveedor en partes",
-      "me dio algo a cuenta de la deuda"
+      "me dio algo a cuenta de la deuda",
+      "me pago la mitad de lo que debe",
+      "me pago una parte de la deuda",
+      "cobrar solo una parte de lo que debe"
      ],
      "answer": "Sí, tranquilo. En la ventanita de cobranza o pago, en el campo del monto, escribí solo lo que te dieron (o lo que pagaste). Podés repetirlo las veces que haga falta hasta cancelar todo.",
      "steps": [
@@ -10030,7 +10138,10 @@
       "trabajar en red",
       "sincronizar cajas",
       "otra pc con stockflow",
-      "poner otra caja"
+      "poner otra caja",
+      "usar el sistema en dos computadoras",
+      "tener stockflow en dos compus",
+      "otra computadora con el mismo sistema"
      ],
      "answer": "Podés usar StockFlow en varias computadoras a la vez: una es la principal (Servidor) y las otras se conectan a ella (Cliente). Todas ven lo mismo al instante: stock, precios, clientes y la caja. Se arma en Configuración, pestaña 'LAN', primero en la PC principal y después en las otras.",
      "steps": [
@@ -10165,7 +10276,10 @@
       "donde veo cuanto perdi en comisiones",
       "comision de mercado pago como se carga",
       "por que me figura menos plata con tarjeta",
-      "poner porcentaje de comision a un medio"
+      "poner porcentaje de comision a un medio",
+      "me cobraron de mas en mercado pago",
+      "mercado pago me descuenta plata",
+      "por que me llega menos plata de la tarjeta"
      ],
      "answer": "La comisión es lo que la tarjeta o el banco te descuenta a vos por cada cobro. Se la ponés a cada medio de pago y StockFlow la calcula solo: el cliente paga el precio normal, y en tus reportes ves cuánto se fue en comisiones. Ejemplo: vendés $100 con tarjeta al 3%, te quedan $97 y $3 son comisión.",
      "steps": [
@@ -10280,7 +10394,10 @@
       "por que el empleado sigue viendo todo",
       "los cambios de permisos no le agarran",
       "restringir pantallas por rol",
-      "darle mas permisos al encargado"
+      "darle mas permisos al encargado",
+      "que el cajero no vea las ganancias",
+      "ocultarle informacion a un empleado",
+      "que un vendedor no vea los costos"
      ],
      "answer": "En la pestaña 'Roles' hay una tabla con cuadraditos: cada fila es un área del sistema (Artículos, Ventas, Caja, Reportes...) y ahí elegís a cuáles pueden entrar los Encargados y los Vendedores. El Administrador siempre puede entrar a todo.",
      "steps": [
@@ -10589,7 +10706,10 @@
       "como activo el acceso remoto",
       "codigo qr acceso remoto",
       "entrar al sistema desde otro lugar",
-      "stockflow en la tablet"
+      "stockflow en la tablet",
+      "trabajar desde el celular",
+      "usar stockflow en el celu",
+      "ver el sistema en el telefono"
      ],
      "answer": "Con el Acceso remoto: se activa en la PC principal del local y después entrás desde la tablet o el celular con el navegador, con tu mismo usuario y contraseña. No hay que abrir puertos ni instalar nada en la tablet, y queda activado aunque el sistema se actualice.",
      "steps": [
@@ -10630,6 +10750,99 @@
       "Mirá el resumen (con 'Ver' ves cada lista).",
       "Presioná 'Cargar N artículos' y esperá sin cerrar la ventana."
      ]
+    },
+    {
+     "id": "flowy-ia-que-es",
+     "canonical": "¿Flowy tiene inteligencia artificial?",
+     "patterns": [
+      "flowy tiene inteligencia artificial",
+      "flowy usa ia",
+      "flowy con ia",
+      "inteligencia artificial en stockflow",
+      "que es ollama",
+      "para que sirve ollama",
+      "ia gratis para flowy",
+      "flowy es chatgpt",
+      "flowy no entiende lo que le pregunto",
+      "hacer que flowy entienda mejor",
+      "mejorar las respuestas del asistente"
+     ],
+     "answer": "Sí, opcionalmente. Flowy puede usar Ollama, una inteligencia artificial gratuita que se instala en la PC: con ella entiende la pregunta por lo que querés decir y no sólo por las palabras, y te lleva a la ficha correcta mucho más seguido. Funciona sin internet y no manda tus preguntas a ningún lado. Se activa en Configuración, pestaña 'Flowy con IA'.",
+     "steps": [],
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
+    },
+    {
+     "id": "flowy-ia-activar",
+     "canonical": "¿Cómo activo la inteligencia artificial de Flowy?",
+     "patterns": [
+      "activar la ia de flowy",
+      "como activo la inteligencia artificial",
+      "instalar ollama",
+      "como instalo ollama",
+      "activar ollama",
+      "descargar los modelos de flowy",
+      "configurar la ia",
+      "prender la inteligencia artificial",
+      "habilitar ia en flowy"
+     ],
+     "answer": "Se hace una sola vez, en la PC servidor (o en la única PC), desde Configuración. Hace falta internet sólo para las descargas; después funciona sin conexión.",
+     "steps": [
+      "Abrí Configuración y entrá a la pestaña 'Flowy con IA'.",
+      "Elegí el modo 'Entender (recomendado)'.",
+      "Si dice 'Ollama: No instalado', tocá 'Instalar Ollama'. Se descarga el instalador oficial (alrededor de 1,5 GB) y se instala solo, sin preguntar nada. Esperá a que diga 'Ollama: Instalado'.",
+      "Cuando diga 'Ollama: Instalado', tocá 'Descargar modelos' (340 MB) y esperá a que termine.",
+      "Cuando 'Estado' diga 'Activa', tocá 'Probar' para ver cuánto tarda en responder."
+     ],
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
+    },
+    {
+     "id": "flowy-ia-requisitos",
+     "canonical": "¿Qué necesita la PC para usar Flowy con IA? ¿Usa internet?",
+     "patterns": [
+      "requisitos de la ia de flowy",
+      "la ia necesita internet",
+      "la ia manda mis datos",
+      "la ia es gratis",
+      "cuanto cuesta la ia",
+      "cuanto pesa ollama",
+      "cuanta memoria necesita la ia",
+      "la ia anda en una pc vieja",
+      "la ia en las terminales"
+     ],
+     "answer": "Es gratis y corre en la misma PC: no usa internet para responder y no envía tus preguntas a ningún lado. El modo 'Entender' anda en cualquier PC con Windows 10 u 11 y responde en menos de un segundo. Internet hace falta sólo una vez: el instalador de Ollama pesa alrededor de 1,5 GB y el modelo 340 MB. Si trabajás con varias PC en red, se instala sólo en la PC servidor y los puestos la aprovechan sin instalar nada.",
+     "steps": []
+    },
+    {
+     "id": "flowy-ia-no-anda",
+     "canonical": "La IA de Flowy no funciona o dice 'Ollama: No instalado'",
+     "patterns": [
+      "ollama no instalado",
+      "la ia no anda",
+      "flowy ia no funciona",
+      "la ia dice inactiva",
+      "ollama no responde",
+      "no se descargan los modelos",
+      "se corto la descarga de ollama",
+      "la ia no responde"
+     ],
+     "answer": "Casi siempre es que Ollama no está abierto o que falta terminar una descarga. Mientras tanto Flowy sigue respondiendo como siempre, así que no se pierde nada.",
+     "steps": [
+      "Abrí Configuración → pestaña 'Flowy con IA' y fijate qué dice cada renglón.",
+      "Si dice 'Ollama: No instalado' pero ya lo instalaste, abrí 'Ollama' desde el menú Inicio de Windows (queda un ícono de una llama al lado del reloj) y volvé a la pestaña.",
+      "Si dice 'Modelos: Faltan descargar', tocá 'Descargar modelos'. Si la descarga se cortó, volvé a tocarlo: sigue desde donde quedó.",
+      "Si dice 'Preparación: En curso', esperá a que termine.",
+      "Recién prendida la PC, la primera pregunta puede contestarla el Flowy de siempre mientras la IA se carga en memoria: las siguientes ya van con IA."
+     ],
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
     }
    ]
   },
@@ -11103,7 +11316,10 @@
       "informe contable",
       "activos ventas cmv resultado",
       "como se abre contabilidad",
-      "f10 contabilidad"
+      "f10 contabilidad",
+      "ver las ganancias del mes",
+      "cuanto gane en el mes",
+      "cuanta plata gane"
      ],
      "answer": "La pantalla de Contabilidad te muestra en cuatro tarjetas grandes cuánta plata tenés en el negocio (Activos), cuánto vendiste (Ventas), cuánto costó lo que vendiste (CMV) y si ganaste o perdiste (Resultado Bruto). Se abre apretando la tecla F10, o desde el menú de arriba.",
      "steps": [

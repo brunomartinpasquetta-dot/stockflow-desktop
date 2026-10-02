@@ -91,6 +91,17 @@ if (kb) {
         }
       }
     }
+    // Equivalencias: grupos de fichas que responden lo mismo (la IA las junta).
+    if (kb.equivalencias !== undefined) {
+      if (!Array.isArray(kb.equivalencias)) errors.push('intents.json: `equivalencias` tiene que ser un array de grupos');
+      else {
+        const existentes = new Set(kb.areas.flatMap((a) => (a.intents ?? []).map((i) => `${a.area}/${i.id}`)));
+        kb.equivalencias.forEach((g, n) => {
+          if (!Array.isArray(g) || g.length < 2) errors.push(`equivalencias[${n}]: cada grupo necesita al menos 2 fichas`);
+          else for (const f of g) if (!existentes.has(f)) errors.push(`equivalencias[${n}]: la ficha "${f}" no existe`);
+        });
+      }
+    }
     const dupIds = [...globalIds.entries()].filter(([, areas]) => areas.length > 1);
     if (dupIds.length) warns.push(`${dupIds.length} ids repetidos entre áreas: ${dupIds.slice(0, 6).map(([id, a]) => `${id} (${a.join(',')})`).join('; ')}${dupIds.length > 6 ? '…' : ''}`);
     const dupCanon = [...canonicals.entries()].filter(([, n]) => n > 1);

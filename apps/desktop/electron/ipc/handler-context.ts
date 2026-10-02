@@ -5,6 +5,8 @@
 import type { MpTokenStoreLike, ServiceContext } from '@stockflow/core';
 import type { LocalDatabase, Repositories } from '@stockflow/db';
 
+import type { FlowyIA } from '../assistant/ia/flowyIA';
+import type { InstaladorOllama } from '../assistant/ia/instalador';
 import type { BackupService } from '../backup/BackupService';
 import type { HardwareManager } from '../hardware/HardwareManager';
 import type { ExcelImportService } from '../import/ExcelImportService';
@@ -48,6 +50,13 @@ export interface HandlerDeps {
   prepareForUpdate?: () => Promise<void>;
   /** Token store seguro para credenciales MercadoPago. */
   mpTokenStore?: MpTokenStoreLike;
+  /**
+   * IA local de Flowy (Ollama). Ausente en los tests que no la usan: Flowy
+   * responde con su motor de siempre.
+   */
+  flowyIA?: FlowyIA;
+  /** Descarga y abre el instalador de Ollama (sólo en la PC que responde a Flowy). */
+  ollamaInstalador?: Pick<InstaladorOllama, 'estado' | 'iniciar'>;
   /** Extras LAN (server-side): inyectados por main.ts cuando hay LanServer. */
   lanExtras?: {
     getConnectedClients?: () => { ip: string; lastSeen: number }[];

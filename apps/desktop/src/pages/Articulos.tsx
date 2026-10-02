@@ -30,6 +30,7 @@ import {
   Percent,
   Plus,
   Printer,
+  RotateCcw,
   Search,
   Trash2,
   X,
@@ -466,16 +467,39 @@ export function Articulos() {
 
   async function handleDelete(): Promise<void> {
     if (!selectedArticle) return
-    const ok = window.confirm(`¿Borrar el artículo "${selectedArticle.description}"?`)
+    const ok = window.confirm(
+      `¿Borrar el artículo "${selectedArticle.description}"?\n\n` +
+        'Si tiene ventas, compras o presupuestos registrados no se borra: queda dado de baja para conservar el historial.',
+    )
     if (!ok) return
     try {
-      await m.remove.mutateAsync(selectedArticle.id)
+      const r = await m.remove.mutateAsync(selectedArticle.id)
       setSelectedId(null)
       setMode('idle')
       setForm(EMPTY_FORM)
-      toast.success('Artículo borrado')
+      if (r.dadoDeBaja) {
+        toast.success(
+          'El artículo tiene movimientos registrados: no se borró, quedó dado de baja. Ya no aparece para vender. ' +
+            "Para verlo o reactivarlo, tilde 'Incluir dados de baja'.",
+          { duration: 10_000 },
+        )
+      } else {
+        toast.success('Artículo borrado')
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo borrar el artículo')
+    }
+  }
+
+  /** Vuelve a activar un artículo dado de baja (aparece otra vez para vender). */
+  async function handleReactivar(): Promise<void> {
+    if (!selectedArticle) return
+    try {
+      const actualizado = await m.update.mutateAsync({ id: selectedArticle.id, data: { active: true } })
+      setForm(articleToForm(actualizado))
+      toast.success('Artículo reactivado')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo reactivar el artículo')
     }
   }
 
@@ -573,7 +597,7 @@ export function Articulos() {
         return
       }
       if (e.key === 'Delete') {
-        if (canEditArticles && selectedArticle && mode === 'view') {
+        if (canEditArticles && selectedArticle && selectedArticle.active && mode === 'view') {
           e.preventDefault()
           void handleDelete()
         }
@@ -705,16 +729,29 @@ export function Articulos() {
           <Pencil className="mr-1 h-4 w-4" />
           Modificar
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleDelete}
-          disabled={!canEditArticles || !selectedArticle || mode !== 'view'}
-          title="Borrar (Delete)"
-        >
-          <Trash2 className="mr-1 h-4 w-4" />
-          Borrar
-        </Button>
+        {selectedArticle && !selectedArticle.active ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleReactivar()}
+            disabled={!canEditArticles || mode !== 'view'}
+            title="Volver a activar el artículo dado de baja"
+          >
+            <RotateCcw className="mr-1 h-4 w-4" />
+            Reactivar
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            disabled={!canEditArticles || !selectedArticle || mode !== 'view'}
+            title="Borrar (Delete)"
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            Borrar
+          </Button>
+        )}
         <div className="mx-2 h-6 w-px bg-border" />
         <Button size="sm" variant="outline" onClick={handlePrint} title="Imprimir vista actual">
           <Printer className="mr-1 h-4 w-4" />
@@ -882,7 +919,10 @@ export function Articulos() {
                       }
                     >
                       <TableCell className="truncate py-0.5 font-mono text-xs">{a.barcode}</TableCell>
-                      <TableCell className="truncate py-0.5" title={a.description}>
+                      <TableCell className={'truncate py-0.5' + (a.active ? '' : ' text-muted-foreground')} title={a.description}>
+                        {!a.active && (
+                          <span className="mr-1.5 rounded bg-muted px-1 py-px text-[10px] font-semibold uppercase text-muted-foreground">Baja</span>
+                        )}
                         {a.description}
                       </TableCell>
                       <TableCell className="truncate py-0.5">{a.brand ?? ''}</TableCell>

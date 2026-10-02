@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { FlowyIA } from './assistant/ia/flowyIA';
+import { InstaladorOllama } from './assistant/ia/instalador';
+import { OllamaClient } from './assistant/ia/ollama';
 import { BackupService } from './backup/BackupService';
 import { DesktopWindowsManager } from './desktop-windows';
 import { getDatabasePath, initialize, shutdown, type DbHandle } from './bootstrap/db';
@@ -265,6 +268,16 @@ function bootstrap(): { lanArgs: string[] } {
   const importService = new ExcelImportService();
   const mpTokenStore = new MpTokenStore(machineId);
 
+  // IA local de Flowy (Ollama). Viene APAGADA: se activa en Configuración.
+  // Si está activada, prepara el índice en segundo plano (no demora el arranque).
+  const flowyIA = new FlowyIA({ userDataDir });
+  void flowyIA.preparar();
+  const ollamaInstalador = new InstaladorOllama({
+    abrirEnlace: (url) => shell.openExternal(url),
+    ollamaDisponible: async () => (await new OllamaClient({ baseUrl: flowyIA.getConfig().url }).version()) !== null,
+    log: (m) => console.log(`[flowy-ia] ${m}`),
+  });
+
   // Gestor de ventanas nativas del SO (v0.1.17): cada pantalla abre como una
   // BrowserWindow independiente que carga la app en modo embedded.
   desktopWindows = new DesktopWindowsManager({
@@ -309,6 +322,8 @@ function bootstrap(): { lanArgs: string[] } {
     backup: backupService,
     importService,
     mpTokenStore,
+    flowyIA,
+    ollamaInstalador,
     emit: (channel: string, payload: unknown) => {
       // A TODAS las ventanas, no solo a la principal: cada módulo abre su propia
       // BrowserWindow con su cache aislada, así que un cambio hecho en una

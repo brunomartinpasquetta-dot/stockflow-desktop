@@ -102,18 +102,22 @@ export function buildArticlesHandlers(deps: HandlerDeps): HandlerMap {
     ),
     'articles:delete': withSession(
       deps,
-      async (payload: { id: string }, ctx): Promise<{ deleted: true }> => {
+      async (payload: { id: string }, ctx): Promise<{ deleted: boolean; dadoDeBaja: boolean }> => {
         requirePermission(ctx.currentUser, 'manage_articles');
-        // Best-effort: borrar imagen asociada si existe.
-        try {
-          const existing = await ctx.repos.articles.findById(payload.id);
-          const abs = existing?.imagePath ? rutaDeImagen(deps.userDataDir, existing.imagePath) : null;
-          if (abs && fs.existsSync(abs)) fs.unlinkSync(abs);
-        } catch {
-          /* ignore */
+        const existing = await ctx.repos.articles.findById(payload.id);
+        // Con historial no se borra: queda dado de baja (ver borrarODarDeBaja).
+        const resultado = await ctx.repos.articles.borrarODarDeBaja(payload.id);
+        // La foto se borra SÓLO si el artículo se borró de verdad. Antes se
+        // borraba primero y, si el borrado fallaba, el artículo quedaba sin foto.
+        if (resultado === 'borrado') {
+          try {
+            const abs = existing?.imagePath ? rutaDeImagen(deps.userDataDir, existing.imagePath) : null;
+            if (abs && fs.existsSync(abs)) fs.unlinkSync(abs);
+          } catch {
+            /* best-effort */
+          }
         }
-        await ctx.repos.articles.delete(payload.id);
-        return { deleted: true };
+        return { deleted: resultado === 'borrado', dadoDeBaja: resultado === 'dado_de_baja' };
       },
     ),
     'articles:findByBarcode': withSession(

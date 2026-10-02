@@ -209,6 +209,34 @@ async function main(): Promise<void> {
   const articleAfter = await invoke<{ stock: string } | null>(handlers, 'articles:get', { id: created.data.id });
   check('sales:create descontó stock', articleAfter.ok && articleAfter.data?.stock === '18.000', articleAfter.ok ? `stock=${articleAfter.data?.stock}` : JSON.stringify(articleAfter));
 
+  // articles:delete de un artículo CON ventas: no se borra, queda dado de baja.
+  // Antes fallaba con "FOREIGN KEY constraint failed" (reportado por Bruno, 1-oct-2026).
+  const delConVentas = await invoke<{ deleted: boolean; dadoDeBaja: boolean }>(handlers, 'articles:delete', { id: created.data.id });
+  const trasBaja = await invoke<{ active: boolean } | null>(handlers, 'articles:get', { id: created.data.id });
+  check(
+    'articles:delete con ventas → queda dado de baja, sin error de FOREIGN KEY',
+    delConVentas.ok && delConVentas.data.dadoDeBaja === true && delConVentas.data.deleted === false && trasBaja.ok && trasBaja.data?.active === false,
+    JSON.stringify(delConVentas),
+  );
+  const reactivado = await invoke<{ active: boolean }>(handlers, 'articles:update', { id: created.data.id, data: { active: true } });
+  check('articles:update reactiva el artículo dado de baja', reactivado.ok && reactivado.data.active === true, JSON.stringify(reactivado));
+  // Sin historial: se borra de verdad.
+  const sinHistorial = await invoke<{ id: string }>(handlers, 'articles:create', {
+    barcode: '7790000099982',
+    description: 'Artículo sin movimientos',
+    listPrice1: '100.0000',
+    stock: '1.000',
+  });
+  const delSinHistorial = sinHistorial.ok
+    ? await invoke<{ deleted: boolean; dadoDeBaja: boolean }>(handlers, 'articles:delete', { id: sinHistorial.data.id })
+    : sinHistorial;
+  const yaNoEsta = sinHistorial.ok ? await invoke<unknown>(handlers, 'articles:get', { id: sinHistorial.data.id }) : null;
+  check(
+    'articles:delete sin movimientos → se borra de verdad',
+    delSinHistorial.ok && (delSinHistorial.data as { deleted: boolean }).deleted === true && !!yaNoEsta && yaNoEsta.ok && yaNoEsta.data === null,
+    JSON.stringify(delSinHistorial),
+  );
+
   // cash:getReport (incluye desglose por medio de pago)
   const report = await invoke<{ incomeTotal: string; expectedCash: string; byPaymentMethod: Array<{ paymentMethodId: string | null; net: string }> }>(
     handlers,

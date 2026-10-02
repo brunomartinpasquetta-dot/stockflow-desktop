@@ -99,7 +99,7 @@ const DESCRIBE: Record<string, Describe> = {
   'articles:update': (_p, r) => `Artículo modificado: ${s(g(r, 'code'))} — ${s(g(r, 'description'))}`,
   'catalogo:aplicarCargaTotal': (_p, r) =>
     `Catálogo web — carga total: ${s(g(r, 'vinculados'))} vinculado(s), ${s(g(r, 'creados'))} creado(s), ${s(g(r, 'errores') && (g(r, 'errores') as unknown[]).length)} con error`,
-  'articles:delete': (p) => `Artículo eliminado (${s(g(p, 'id'))})`,
+  'articles:delete': (p) => `Artículo borrado o dado de baja (${s(g(p, 'id'))})`,
   'articles:recalcularMargenes': (_p, r) =>
     `Utilidad calculada desde los precios actuales: ${s(g(r, 'actualizados'))} artículo(s) (${s(g(r, 'sinCosto'))} sin costo, ${s(g(r, 'yaTenian'))} ya la tenían)`,
   'customers:create': (_p, r) => `Cliente creado: ${s(g(r, 'lastName'))} ${s(g(r, 'firstName') ?? '')}`.trim(),

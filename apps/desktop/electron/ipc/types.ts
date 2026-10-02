@@ -1761,6 +1761,49 @@ export interface AssistantAskResultDTO {
    * únicamente si el rol tiene permiso para esa ventana (registry.requires).
    */
   actions?: AssistantActionDTO[];
+  /**
+   * La respuesta la está escribiendo la IA local: pedir el resto con
+   * `assistant.seguir({ id })` hasta que venga `listo: true`.
+   */
+  pendiente?: string;
+  /** true = la contestó la IA local (Ollama). */
+  ia?: boolean;
+}
+
+export interface AssistantSeguirResultDTO extends AssistantAskResultDTO {
+  listo: boolean;
+}
+
+/* ─────────────── IA local de Flowy (Ollama) ─────────────── */
+
+export type ModoIADTO = 'apagado' | 'entender' | 'conversar';
+
+export interface ConfigIADTO {
+  modo: ModoIADTO;
+  url: string;
+  modeloEmbeddings: string;
+  modeloChat: string;
+}
+
+export interface EstadoInstalacionOllamaDTO {
+  estado: 'inactivo' | 'descargando' | 'instalando' | 'listo' | 'error' | 'no-soportado';
+  fraccion: number | null;
+  mensaje: string;
+}
+
+export interface EstadoIADTO {
+  modo: ModoIADTO;
+  ollama: { disponible: boolean; version: string | null; url: string };
+  modelos: {
+    embeddings: { nombre: string; descargado: boolean };
+    chat: { nombre: string; descargado: boolean; necesario: boolean };
+  };
+  indice: { estado: 'sin-armar' | 'armando' | 'listo' | 'error'; progreso: number; vectores: number };
+  descarga: { modelo: string; estado: string; fraccion: number | null; bytes: number; total: number } | null;
+  activa: boolean;
+  ultimoError: string | null;
+  ultimaRespuestaMs: number | null;
+  instalacion?: EstadoInstalacionOllamaDTO | null;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1901,6 +1944,14 @@ export interface ApiSurface {
   assistant: {
     /** `screen`: pageKey de la ventana donde está el usuario (contexto E1). */
     ask(payload: { messages: AssistantMessageDTO[]; conversationId?: string; screen?: string }): Res<AssistantAskResultDTO>;
+    /** Lo que lleva escrito la IA de una respuesta pendiente. */
+    seguir(payload: { id: string }): Res<AssistantSeguirResultDTO>;
+    iaEstado(): Res<EstadoIADTO>;
+    iaConfigurar(payload: Partial<ConfigIADTO>): Res<EstadoIADTO>;
+    iaDescargar(): Res<EstadoIADTO>;
+    iaInstalarOllama(): Res<EstadoInstalacionOllamaDTO>;
+    iaPrecalentar(): Res<{ ok: true }>;
+    iaProbar(): Res<{ ms: number; ia: boolean; reply: string }>;
   };
   onboarding: {
     status(): Res<OnboardingStatusDTO>;
@@ -1972,7 +2023,8 @@ export interface ApiSurface {
     get(payload: IdPayload): Res<ArticleDTO | null>;
     create(payload: EntityPayload): Res<ArticleDTO>;
     update(payload: UpdatePayload): Res<ArticleDTO>;
-    delete(payload: IdPayload): Res<{ deleted: true }>;
+    /** Con historial no se borra: queda dado de baja (`dadoDeBaja: true`). */
+    delete(payload: IdPayload): Res<{ deleted: boolean; dadoDeBaja: boolean }>;
     findByBarcode(payload: { barcode: string }): Res<ArticleDTO | null>;
     searchByText(payload: { query: string }): Res<ArticleDTO[]>;
     findLowStock(): Res<ArticleDTO[]>;

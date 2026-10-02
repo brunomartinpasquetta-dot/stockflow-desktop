@@ -39,11 +39,11 @@ function useEntityMutations<T>(
   key: string,
   create: (data: EntityPayload) => Promise<T>,
   update: (id: string, data: EntityPayload) => Promise<T>,
-  remove: (id: string) => Promise<{ deleted: true }>,
+  remove: (id: string) => Promise<{ deleted: boolean; dadoDeBaja?: boolean }>,
 ): {
   create: UseMutationResult<T, Error, EntityPayload>
   update: UseMutationResult<T, Error, UpdateVars>
-  remove: UseMutationResult<{ deleted: true }, Error, string>
+  remove: UseMutationResult<{ deleted: boolean; dadoDeBaja?: boolean }, Error, string>
 } {
   const qc = useQueryClient()
   const invalidate = () => {

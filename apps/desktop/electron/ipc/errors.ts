@@ -22,7 +22,12 @@ export function serializeError(err: unknown): IpcErr {
     return { ok: false, code: 'VALIDATION', message: err.message, field: err.field };
   }
   if (err instanceof ConstraintError) {
-    return { ok: false, code: 'CONSTRAINT', message: err.message, constraint: err.constraint };
+    // El texto crudo de SQLite ("FOREIGN KEY constraint failed") llegaba tal
+    // cual a la pantalla. Se explica en castellano qué pasa.
+    const message = err.constraint.includes('FOREIGNKEY')
+      ? 'No se puede borrar porque está usado en otros registros (por ejemplo, ventas, compras o presupuestos).'
+      : err.message;
+    return { ok: false, code: 'CONSTRAINT', message, constraint: err.constraint };
   }
   if (err instanceof PermissionDeniedError) {
     return { ok: false, code: 'PERMISSION_DENIED', message: err.message, action: err.action };

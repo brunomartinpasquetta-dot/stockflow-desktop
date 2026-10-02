@@ -1,8 +1,10 @@
 /**
  * Panel del Asistente virtual "Flowy" — chatbot INTERNO de StockFlow.
  *
- * 100% offline: la lógica vive en el main (`assistant:ask` → engine local, sin IA
- * externa ni costo). Acá va la conversación, los chips de sugerencias y el render.
+ * Sin internet: la lógica vive en el main (`assistant:ask` → motor local y,
+ * si está activada, la IA local con Ollama). Cuando la IA redacta, la
+ * respuesta llega de a pedazos (`assistant:seguir`) y se muestra mientras se
+ * escribe. Acá va la conversación, los chips de sugerencias y el render.
  *
  * El panel es MOVIBLE (arrastrando el encabezado) y REDIMENSIONABLE (esquina
  * inferior derecha). La posición/tamaño se recuerdan entre sesiones
@@ -17,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
 import { shotUrl } from '@/lib/sofiaShots'
 import { Button } from '@/components/ui/button'
+import { TextoFlowy } from '@/components/TextoFlowy'
 import { useAssistant } from '@/contexts/AssistantContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
@@ -31,7 +34,13 @@ interface ChatMsg extends AssistantMessageDTO {
   suggestions?: string[]
   image?: string | null
   actions?: ChatAction[]
+  /** El texto lo redactó la IA local (se aclara debajo). */
+  ia?: boolean
+  /** La IA todavía lo está escribiendo. */
+  escribiendo?: boolean
 }
+
+const esperar = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 interface Rect {
   x: number
@@ -134,6 +143,9 @@ export function AssistantPanel({ screen }: { screen?: string }) {
     if (!open) return
     if (greeted) return
     setGreeted(true)
+    // Si la IA local está activada, que cargue sus modelos mientras la persona
+    // escribe: así la primera respuesta no tarda de más. Sin IA no hace nada.
+    api.assistant.iaPrecalentar().catch(() => undefined)
     void (async () => {
       try {
         const res = await api.assistant.ask([], convIdRef.current, screen)
@@ -198,9 +210,36 @@ export function AssistantPanel({ screen }: { screen?: string }) {
       // mandar el transcript entero era desperdicio (peor en modo LAN).
       const payload: AssistantMessageDTO[] = [{ role: 'user', content: q }]
       const res = await api.assistant.ask(payload, convIdRef.current, screen)
-      setMessages((prev) => [...prev, { role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image, actions: res.actions }])
+      if (!res.pendiente) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: res.reply, suggestions: res.suggestions, image: res.image, actions: res.actions, ia: res.ia },
+        ])
+      } else {
+        // La IA está redactando: se muestra el texto mientras se escribe.
+        setMessages((prev) => [...prev, { role: 'assistant', content: '', escribiendo: true, ia: true }])
+        const reemplazarUltimo = (m: ChatMsg): void =>
+          setMessages((prev) => (prev.length ? [...prev.slice(0, -1), m] : [m]))
+        const limite = Date.now() + 5 * 60_000
+        for (;;) {
+          await esperar(300)
+          const s = await api.assistant.seguir(res.pendiente)
+          if (s.listo) {
+            reemplazarUltimo({ role: 'assistant', content: s.reply, suggestions: s.suggestions, image: s.image, actions: s.actions, ia: s.ia })
+            break
+          }
+          reemplazarUltimo({ role: 'assistant', content: s.reply, escribiendo: true, ia: true })
+          if (Date.now() > limite) {
+            reemplazarUltimo({ role: 'assistant', content: 'Se me hizo largo contestar. ¿Me lo preguntás de nuevo?' })
+            break
+          }
+        }
+      }
     } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Uy, algo falló. Probá de nuevo.' }])
+      setMessages((prev) => {
+        const sinPendiente = prev[prev.length - 1]?.escribiendo ? prev.slice(0, -1) : prev
+        return [...sinPendiente, { role: 'assistant', content: 'Uy, algo falló. Probá de nuevo.' }]
+      })
     } finally {
       setBusy(false)
       setTimeout(() => inputRef.current?.focus(), 50)
@@ -243,7 +282,9 @@ export function AssistantPanel({ screen }: { screen?: string }) {
 
       {/* Mensajes */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-muted/30 p-3">
-        {messages.map((m, i) => (
+        {messages.map((m, i) =>
+          // Mientras la IA no escribió nada, se muestra "Pensando…" (abajo) en vez de una burbuja vacía.
+          m.escribiendo && !m.content ? null : (
           <div key={i} ref={m.role === 'assistant' && i === lastIdx ? lastBotRef : undefined} className="scroll-mt-3">
             <div className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
               <div
@@ -254,9 +295,13 @@ export function AssistantPanel({ screen }: { screen?: string }) {
                     : 'rounded-bl-sm border bg-background',
                 )}
               >
-                {m.content}
+                {m.role === 'assistant' ? <TextoFlowy texto={m.content} /> : m.content}
+                {m.escribiendo && <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-muted-foreground/60 align-middle" />}
               </div>
             </div>
+            {m.role === 'assistant' && m.ia && !m.escribiendo && (
+              <div className="mt-1 pl-1 text-[10px] text-muted-foreground">Respuesta redactada por la IA de esta PC: revise los pasos antes de hacer cambios importantes.</div>
+            )}
             {/* Captura de la pantalla (si la hay) — clic para agrandar */}
             {m.role === 'assistant' &&
               m.image &&
@@ -314,11 +359,11 @@ export function AssistantPanel({ screen }: { screen?: string }) {
               ))}
             </div>
           )}
-        {busy && (
+        {busy && !(messages[lastIdx]?.escribiendo && messages[lastIdx]?.content) && (
           <div className="flex justify-start">
             <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm border bg-background px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Buscando…
+              {messages[lastIdx]?.escribiendo ? 'Pensando…' : 'Buscando…'}
             </div>
           </div>
         )}

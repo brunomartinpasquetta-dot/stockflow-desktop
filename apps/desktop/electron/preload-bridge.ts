@@ -16,6 +16,9 @@
 import type {
   ApiSurface,
   AssistantAskResultDTO,
+  AssistantSeguirResultDTO,
+  EstadoIADTO,
+  EstadoInstalacionOllamaDTO,
   DemoStatusDTO,
   CatalogoEstadisticasDTO,
   CatalogoSyncEstadoDTO,
@@ -146,6 +149,12 @@ export const LAN_SERVER_DENIED_CHANNELS = new Set([
   'demo:load',
   'demo:remove',
   'demo:restart',
+  // IA de Flowy (Ollama): se instala, descarga y configura sentado en la PC
+  // servidor, que es la que responde las preguntas. Desde un puesto sólo se ve el estado.
+  'assistant:iaConfigurar',
+  'assistant:iaDescargar',
+  'assistant:iaInstalarOllama',
+  'assistant:iaProbar',
 ]);
 export const LAN_SERVER_DENIED_GROUPS = new Set(['maintenance']);
 
@@ -174,6 +183,11 @@ export const REMOTO_DENIED_CHANNELS = new Set([
   'articles:delete',
   // Toca la utilidad de TODO el padrón de una vez: se hace sentado en el local.
   'articles:recalcularMargenes',
+  // IA de Flowy: instalar/descargar/configurar se hace en el local.
+  'assistant:iaConfigurar',
+  'assistant:iaDescargar',
+  'assistant:iaInstalarOllama',
+  'assistant:iaProbar',
 ]);
 
 /** ¿El servidor atiende este canal cuando la visita entra por el acceso remoto? */
@@ -358,6 +372,13 @@ export function createApiBridge(
     },
     assistant: {
       ask: (p) => c<AssistantAskResultDTO>('assistant:ask', p),
+      seguir: (p) => c<AssistantSeguirResultDTO>('assistant:seguir', p),
+      iaEstado: () => c<EstadoIADTO>('assistant:iaEstado'),
+      iaConfigurar: (p) => c<EstadoIADTO>('assistant:iaConfigurar', p),
+      iaDescargar: () => c<EstadoIADTO>('assistant:iaDescargar'),
+      iaInstalarOllama: () => c<EstadoInstalacionOllamaDTO>('assistant:iaInstalarOllama'),
+      iaPrecalentar: () => c<{ ok: true }>('assistant:iaPrecalentar'),
+      iaProbar: () => c<{ ms: number; ia: boolean; reply: string }>('assistant:iaProbar'),
     },
     onboarding: {
       status: () => c<OnboardingStatusDTO>('onboarding:status'),
