@@ -275,7 +275,7 @@
   {
    "id": "asistente",
    "title": "Asistente virtual Flowy",
-   "overview": "Flowy es el asistente que vive adentro de StockFlow: le preguntás en tus palabras cómo hacer algo y te lo explica paso a paso, con imágenes de las pantallas. Funciona 100% dentro del programa, sin internet y sin costo: conoce todo el sistema porque fue entrenado con este mismo manual y con el programa real. Si no sabe algo, lo dice con sinceridad (no inventa).",
+   "overview": "Flowy es el asistente que vive adentro de StockFlow: le preguntás en tus palabras cómo hacer algo y te lo explica paso a paso, con imágenes de las pantallas. Funciona dentro del programa, sin internet y sin costo: conoce todo el sistema porque fue entrenado con este mismo manual y con el programa real. Si no sabe algo, lo dice con sinceridad (no inventa). Opcionalmente puede usar una inteligencia artificial gratuita instalada en la PC (Ollama) para entender mejor las preguntas.",
    "screenshots": [
     {
      "id": "main-window",
@@ -332,6 +332,27 @@
      "tips": [
       "No hace falta escribir bien los acentos ni usar palabras técnicas."
      ]
+    },
+    {
+     "heading": "Flowy con inteligencia artificial (opcional y gratis)",
+     "paragraphs": [
+      "Flowy puede usar Ollama, una inteligencia artificial gratuita que se instala en la PC. Con ella entiende la pregunta por lo que querés decir y no sólo por las palabras: 'quiero ver las ventas que hice en un mes' lo lleva directo al Historial de ventas, sin repreguntar.",
+      "Responde con las mismas fichas revisadas de siempre, pero encuentra la correcta mucho más seguido. Funciona sin internet: la IA corre en la misma PC y no manda tus preguntas a ningún lado. Internet sólo hace falta una vez, para descargarla.",
+      "En una instalación con varias PC, la IA va en la PC servidor: los puestos la aprovechan sin instalar nada."
+     ],
+     "steps": [
+      "En la PC servidor (o en la única PC), abrí Configuración y entrá a la pestaña 'Flowy con IA'.",
+      "Elegí el modo 'Entender (recomendado)'.",
+      "Si dice 'Ollama: No instalado', tocá 'Instalar Ollama'. Se descarga el instalador oficial (pesa alrededor de 1,5 GB) y se instala solo, sin preguntar nada ni pedir permisos de administrador. Esperá a que diga 'Ollama: Instalado'.",
+      "Cuando diga 'Ollama: Instalado', tocá 'Descargar modelos' (340 MB) y esperá a que termine.",
+      "Cuando 'Estado' diga 'Activa', tocá 'Probar': Flowy responde una pregunta de prueba y te dice cuánto tardó."
+     ],
+     "tips": [
+      "Con una conexión lenta, las descargas pueden tardar una hora o más. Si se cortan, volvé a tocar el botón: siguen desde donde quedaron.",
+      "Después de prender la PC, la primera pregunta puede contestarla el Flowy de siempre mientras la IA se carga en memoria; las siguientes ya van con IA.",
+      "El modo 'Conversar (en prueba)' hace que la IA redacte la respuesta con sus palabras. En PCs sin placa de video tarda entre 20 y 60 segundos y a veces se equivoca: por ahora no se recomienda.",
+      "Para dejar de usarla, elegí 'Apagado': Flowy vuelve a responder como siempre."
+     ]
     }
    ]
   },
@@ -360,7 +381,8 @@
       "Usá códigos cortos y fáciles de recordar (ej: '001', 'LEA-250', 'CAFÉ-500G')",
       "La descripción es lo que ves en los tickets y presupuestos, así que escribila clara",
       "Podés buscar rápido con Ctrl+F directamente desde la grilla (busca en código, descripción y marca)",
-      "La búsqueda es instantánea: te filtra los artículos mientras escribís"
+      "La búsqueda es instantánea: te filtra los artículos mientras escribís",
+      "Si borrás un artículo que ya tiene ventas, compras o presupuestos, no se borra: queda dado de baja para no perder el historial. Deja de aparecer para vender; para verlo tildá 'Incluir dados de baja' (aparece con la marca 'Baja') y para volver a usarlo tocá 'Reactivar'."
      ]
     },
     {
@@ -940,7 +962,8 @@
       "En pago mixto, podés usar 'Todo en efectivo' (botón rápido) para llenar automáticamente.",
       "La comisión la ABSORBE el comercio; el cliente paga el total normal (no aumenta el ticket).",
       "F4 = rotar medios (solo en modo mono, sin account). F12 = activar/desactivar modo mixto.",
-      "Si no hay medios configurados, aparece un error y un link a Medios de Pago."
+      "Si no hay medios configurados, aparece un error y un link a Medios de Pago.",
+      "Calcular vuelto: tildá 'Calcular vuelto' en el recuadro 'Opciones de venta', arriba del botón 'Confirmar venta' (queda guardada en cada PC). Al confirmar una venta en efectivo se abre la pantalla 'Cobro en efectivo' con el total: escribí con cuánto paga el cliente y se muestra el vuelto. Enter confirma, Esc vuelve. Es sólo una ayuda: lo que se registra es el total de la venta."
      ]
     },
     {

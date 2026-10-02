@@ -2,6 +2,15 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
+      "version": "1.11.0",
+      "novedades": [
+        "Flowy con inteligencia artificial, opcional y gratuita: con Ollama, un programa de inteligencia artificial que se instala en la PC servidor, Flowy entiende las preguntas por lo que se quiere decir y no sólo por las palabras, y llega a la respuesta correcta mucho más seguido. Responde sin internet y no envía las preguntas a ningún lado. Se activa en Configuración, pestaña 'Flowy con IA'.",
+        "Artículos: un artículo con ventas, compras o presupuestos ya no da error al borrarlo. Queda dado de baja para conservar el historial, deja de aparecer para vender y se puede reactivar con el botón 'Reactivar' (para verlo, tilde 'Incluir dados de baja').",
+        "Ventas: casilla 'Calcular vuelto'. Con la casilla tildada, al confirmar una venta en efectivo se abre la pantalla de cobro con el total, el monto con el que paga el cliente y el vuelto. Es opcional y queda guardada en cada PC."
+      ],
+      "internas": true
+    },
+    {
       "version": "1.10.8",
       "novedades": [
         "Ventas: al terminar cada venta, la forma de pago vuelve a Efectivo, igual que el cliente, la lista de precios y el comprobante. Así una venta cobrada con tarjeta no deja la siguiente con tarjeta por error."
