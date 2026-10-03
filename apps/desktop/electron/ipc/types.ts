@@ -1120,10 +1120,22 @@ export interface DesktopWindowOpenDTO {
   title?: string;
   /** Params serializables que viajan como querystring a la ruta embedded. */
   params?: Record<string, unknown>;
+  /**
+   * La página recibe los `extras` con la ventana abierta, sin recargarla
+   * (`WindowDef.extrasEnVivo`). Sin esto, una ventana ya abierta que recibe
+   * `extras` se recarga y pierde lo que tenía sin guardar.
+   */
+  extrasEnVivo?: boolean;
   width?: number;
   height?: number;
   minWidth?: number;
   minHeight?: number;
+}
+
+/** Lo que recibe una ventana ya abierta cuando le llegan `extras` nuevos sin recargarla. */
+export interface DesktopWindowExtrasDTO {
+  pageKey: string;
+  params: Record<string, unknown>;
 }
 
 export interface DesktopWindowInfoDTO {
@@ -1806,6 +1818,218 @@ export interface EstadoIADTO {
   instalacion?: EstadoInstalacionOllamaDTO | null;
 }
 
+/* ─────────────── Facturas de compra por teléfono ─────────────── */
+
+export type FacturaEscaneadaEstadoDTO = 'recibiendo' | 'en_cola' | 'leyendo' | 'lista' | 'error' | 'cargada' | 'descartada';
+
+export interface EstadoFacturasDTO {
+  activo: boolean;
+  /** "Mejorar lectura": lee con el modelo de Ollama (más preciso, minutos por hoja) en vez del lector del sistema. */
+  mejorLectura: boolean;
+  /** Lector de texto del sistema operativo: el principal, no necesita Ollama. */
+  lectorSistema: { disponible: boolean };
+  /** Modelo del lector (Ollama). */
+  modelo: string;
+  /** Sólo se consulta con "Mejorar lectura" o si esta PC no tiene lector del sistema. */
+  ollama: { disponible: boolean; version: string | null; url: string };
+  lector: { descargado: boolean };
+  descarga: { modelo: string; estado: string; fraccion: number | null; bytes: number; total: number } | null;
+  /** `lento`: se está leyendo con "Mejorar lectura" (cada hoja puede demorar minutos). */
+  cola: { enCola: number; leyendo: { id: string; hoja: number; hojas: number; lento: boolean } | null };
+  /** Facturas listas para revisar (el contador del botón de Compras). */
+  listas: number;
+  /** La escucha por la que entra el teléfono en la red del local. */
+  servidorFotos: { puerto: number | null; error: string | null };
+  ultimoError: string | null;
+}
+
+/** Enlaces para el QR de "Vincular teléfono". Al menos uno viene con valor. */
+export interface FacturasVincularDTO {
+  /** Por la red Wi-Fi del local; null si la PC no tiene red. */
+  urlLocal: string | null;
+  /** Por el acceso remoto, sólo si está conectado. */
+  urlInternet: string | null;
+  /** Hasta cuándo sirve el enlace (ms). Se renueva mientras el teléfono manda hojas. */
+  vence: number;
+  /** Para seguir desde la PC lo que manda este enlace (`facturas.seguir`). No sirve para mandar fotos. */
+  sesion: string;
+}
+
+/** Una factura que manda el teléfono, como la sigue Compras mientras espera. */
+export interface FacturasSeguimientoItemDTO {
+  id: string;
+  estado: FacturaEscaneadaEstadoDTO;
+  hojas: number;
+  hojasLeidas: number;
+  error: string | null;
+  /** Se lee con "Mejorar lectura": cada hoja puede demorar minutos. */
+  lento: boolean;
+  /** Cuándo la revisión la mandó de vuelta a Compras. null = todavía no. */
+  enviadaACompras: number | null;
+}
+
+export interface FacturasSeguimientoDTO {
+  /** El enlace del teléfono sigue sirviendo (null = no se preguntó por un enlace). */
+  sesionViva: boolean | null;
+  /** Las facturas que mandó el enlace, en orden, y la pedida por id. */
+  facturas: FacturasSeguimientoItemDTO[];
+}
+
+/** Datos del comprobante. Salen del QR fiscal (`qr: true`), del texto impreso (`origen: 'texto'`) o los completa el usuario. */
+export interface FacturaEscaneadaEncabezadoDTO {
+  /** `AAAA-MM-DD`. */
+  fecha: string | null;
+  /** CUIT del emisor, sólo dígitos. */
+  cuit: string | null;
+  ptoVta: number | null;
+  /** Código de comprobante de ARCA (1 = Factura A, 6 = B, 11 = C…). */
+  tipoCmp: number | null;
+  letra: 'A' | 'B' | 'C' | 'M' | null;
+  nroCmp: number | null;
+  /** Total del comprobante. */
+  importe: number | null;
+  /** CAE. */
+  codAut: string | null;
+  qr: boolean;
+  /** Tipo elegido en la revisión (el comprobante X no tiene letra). null = todavía no se eligió. */
+  tipo?: 'A' | 'B' | 'C' | 'X' | null;
+  /** De dónde salieron los datos. null = los completó el usuario. */
+  origen?: 'qr' | 'texto' | null;
+  /** Nombre del emisor tal como está impreso en la factura. */
+  razonSocial?: string | null;
+  /** Subtotal impreso en el pie, si se leyó (en Factura A es el neto). */
+  subtotal?: number | null;
+  /** Otros nombres del emisor impresos en la hoja (de fantasía, "Razón Social:"). Sólo para sugerir el proveedor. */
+  otrosNombres?: string[];
+  /** Cuándo se registró la compra de esta factura. */
+  cargadaEl?: number | null;
+}
+
+/** Renglón tal como se guarda (lo que se manda en `facturas.guardar`). */
+export interface FacturaEscaneadaRenglonDTO {
+  codigo: string | null;
+  descripcion: string;
+  /** En la unidad del precio (bultos, unidades o kg, tal cual la factura). */
+  cantidad: number | null;
+  unidadesPorBulto: number | null;
+  /** Sin IVA si la factura trae los dos. */
+  precioUnitario: number | null;
+  /** Neto del renglón; negativo en descuentos y promociones. */
+  importe: number | null;
+  esDescuento: boolean;
+  /** ok = la cuenta cierra; corregido = se ajustó la cantidad por la cuenta; revisar = no cierra o faltan datos. */
+  estado: 'ok' | 'corregido' | 'revisar';
+  motivo: string | null;
+  /** El renglón tal como se leyó. */
+  original: string;
+  hoja: number;
+  articleId: string | null;
+  /** Alícuota de IVA que trae el renglón en la factura, si se leyó. */
+  tasaIva?: number | null;
+  /** El usuario quitó el vínculo: no se vuelve a vincular solo por el código. */
+  sinVinculo?: boolean;
+  /** La hoja salió cortada en un borde: el código puede estar incompleto (no se vincula solo ni se recuerda). */
+  codigoDudoso?: boolean;
+  /** La cantidad ya está en unidades (bultos × pack de la descripción = cantidad): no se proponen unidades por bulto. */
+  packResuelto?: boolean;
+  /** Bultos leídos cuando `packResuelto` (informativo). */
+  bultos?: number | null;
+  /** Flete, gastos de envío…: no es mercadería. Cuenta para el total, no lleva artículo y no se carga como renglón. */
+  esGasto?: boolean;
+  /** El artículo lo propuso el sistema por parecido de la descripción y el usuario no lo aceptó: no se recuerda para el proveedor. */
+  sugerido?: boolean;
+}
+
+export interface FacturaEscaneadaArticuloDTO {
+  id: string;
+  barcode: string;
+  description: string;
+  costPrice: string;
+  active: boolean;
+}
+
+export interface FacturaEscaneadaRenglonDetalleDTO extends FacturaEscaneadaRenglonDTO {
+  articulo: FacturaEscaneadaArticuloDTO | null;
+  /**
+   * guardado = elegido en esta factura; proveedor = código ya vinculado a ese proveedor; codigo = es el código de
+   * barras; descripcion = descripción ya vinculada a ese proveedor (no usa códigos); sugerido = parecido de descripción.
+   */
+  vinculadoPor: 'guardado' | 'proveedor' | 'codigo' | 'descripcion' | 'sugerido' | null;
+  /** Hasta 3 artículos para ofrecer (si no hay vínculo o es sugerido): el del mismo código primero, después por descripción. */
+  sugerencias: FacturaEscaneadaArticuloDTO[];
+  /** Unidades por bulto que el usuario confirmó para este código de este proveedor (1 = sin bulto). null = nunca. */
+  uxbRecordado: number | null;
+}
+
+/** Proveedor ya cargado que puede ser el emisor leído (sólo se sugiere). */
+export interface FacturaEscaneadaProveedorDTO {
+  id: string;
+  code: string;
+  name: string;
+  cuit: string | null;
+}
+
+/** Compra ya registrada (no anulada) con el mismo proveedor y número de factura. */
+export interface FacturaEscaneadaCompraDTO {
+  id: string;
+  type: string;
+  number: number;
+  date: number;
+  total: string;
+  supplierInvoiceNumber: string | null;
+  /** Cuándo se registró. */
+  createdAt?: number;
+}
+
+export interface FacturaEscaneadaResumenDTO {
+  id: string;
+  estado: FacturaEscaneadaEstadoDTO;
+  supplierId: string | null;
+  proveedor: string | null;
+  hojas: number;
+  hojasLeidas: number;
+  error: string | null;
+  renglones: number;
+  porRevisar: number;
+  /** Suma de los importes de los renglones (los descuentos restan). */
+  sumaRenglones: number;
+  /** Total del comprobante según el QR fiscal o el texto de la factura, si se leyó. */
+  total: number | null;
+  /** ¿La suma de los renglones da el total leído (1 peso de tolerancia)? null = no se leyó ningún total. Si no, `porRevisar` lo cuenta. */
+  totalCoincide: boolean | null;
+  /** Lista, con proveedor, todo vinculado, nada en revisar y el total coincide: se puede cargar en Compras sin pasar por la revisión. */
+  listaParaCargar: boolean;
+  /** El tipo de comprobante contradice al total (Factura A cuyos renglones ya suman el total, o al revés). */
+  tipoDudoso: boolean;
+  /** Leída con una versión anterior del lector y con correcciones del usuario: se ofrece «Volver a leer». */
+  lecturaVieja: boolean;
+  /** Lo que se leyó del emisor (para mostrarlo mientras no hay proveedor asociado). */
+  proveedorLeido: { razonSocial: string | null; cuit: string | null } | null;
+  /** Se está leyendo con "Mejorar lectura": cada hoja puede demorar minutos. */
+  lecturaLenta: boolean;
+  letra: string | null;
+  /** Código de comprobante de ARCA del QR (3, 8, 13… = nota de crédito). */
+  tipoCmp: number | null;
+  ptoVta: number | null;
+  nroCmp: number | null;
+  fecha: string | null;
+  /** Hay otra factura escaneada con el mismo comprobante. */
+  repetida: boolean;
+  creadaEl: number;
+  actualizadaEl: number;
+}
+
+export interface FacturaEscaneadaDetalleDTO extends FacturaEscaneadaResumenDTO {
+  header: FacturaEscaneadaEncabezadoDTO | null;
+  lineas: FacturaEscaneadaRenglonDetalleDTO[];
+  /** Compra no anulada de ese proveedor con ese número de factura, si ya hay una. */
+  compraExistente: FacturaEscaneadaCompraDTO | null;
+  /** "Esta factura ya fue cargada el …": por una compra registrada o por otra factura escaneada «Cargada». */
+  yaCargada: { fecha: number; origen: 'compra' | 'escaneada' } | null;
+  /** Sin proveedor asociado: los ya cargados que pueden ser el emisor leído (por CUIT o por nombre). */
+  proveedoresSugeridos: FacturaEscaneadaProveedorDTO[];
+}
+
 /* ----------------------------------------------------------------------- */
 /* Superficie de la API expuesta en window.stockflow                        */
 /* ----------------------------------------------------------------------- */
@@ -1952,6 +2176,37 @@ export interface ApiSurface {
     iaInstalarOllama(): Res<EstadoInstalacionOllamaDTO>;
     iaPrecalentar(): Res<{ ok: true }>;
     iaProbar(): Res<{ ms: number; ia: boolean; reply: string }>;
+  };
+  /** Facturas de compra por teléfono. Nunca crean una compra: precargan el formulario. */
+  facturas: {
+    estado(): Res<EstadoFacturasDTO>;
+    configurar(payload: { activo?: boolean; mejorLectura?: boolean }): Res<EstadoFacturasDTO>;
+    descargarLector(): Res<EstadoFacturasDTO>;
+    vincular(): Res<FacturasVincularDTO>;
+    listar(): Res<FacturaEscaneadaResumenDTO[]>;
+    obtener(payload: { id: string }): Res<FacturaEscaneadaDetalleDTO>;
+    foto(payload: { id: string; hoja: number }): Res<{ dataUrl: string }>;
+    guardar(payload: {
+      id: string;
+      supplierId?: string | null;
+      header?: FacturaEscaneadaEncabezadoDTO | null;
+      lines?: FacturaEscaneadaRenglonDTO[];
+    }): Res<FacturaEscaneadaDetalleDTO>;
+    releer(payload: { id: string }): Res<{ ok: true }>;
+    descartar(payload: { id: string }): Res<{ ok: true }>;
+    /**
+     * La compra de la factura se registró: queda Cargada y se recuerdan los códigos del proveedor
+     * con que se REGISTRÓ la compra (`supplierId`). Lo llama Compras al confirmar.
+     */
+    marcarCargada(payload: {
+      id: string;
+      supplierId?: string;
+      vinculos: { code: string; articleId: string; unitsPerPack?: number }[];
+    }): Res<{ ok: true; guardados: number }>;
+    /** Compras (`pantalla`) sigue la factura que manda el teléfono (por el enlace) o la que está en revisión (por id). */
+    seguir(payload: { sesion?: string; id?: string; esperaRevision?: boolean; pantalla?: string }): Res<FacturasSeguimientoDTO>;
+    /** La revisión devuelve la factura a la pantalla de Compras (`pantalla`) que la espera. `recibe: false` = nadie la espera. */
+    aCompras(payload: { id: string; pantalla?: string }): Res<{ recibe: boolean }>;
   };
   onboarding: {
     status(): Res<OnboardingStatusDTO>;
@@ -2237,6 +2492,8 @@ export interface ApiSurface {
     minimizeSelf(): Res<{ minimized: boolean }>;
     focusMain(): Res<{ ok: true }>;
     openManual(): Res<{ created: boolean }>;
+    /** Esta ventana recibió `extras` nuevos sin recargarse (ver `DesktopWindowOpenDTO.extrasEnVivo`). */
+    onExtras(cb: (p: DesktopWindowExtrasDTO) => void): () => void;
   };
   print: {
     /** Diagnóstico de impresión: reporte de texto (impresoras del SO + config). */

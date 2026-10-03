@@ -15,6 +15,8 @@ interface OpenPayload {
   pageKey: string;
   title?: string;
   params?: Record<string, unknown>;
+  /** La página recibe los `extras` con la ventana abierta, sin recargarla. */
+  extrasEnVivo?: boolean;
   width?: number;
   height?: number;
   minWidth?: number;

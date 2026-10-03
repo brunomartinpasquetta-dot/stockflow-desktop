@@ -13,6 +13,9 @@ import { DesktopWindowsManager } from './desktop-windows';
 import { getDatabasePath, initialize, shutdown, type DbHandle } from './bootstrap/db';
 import { getMachineId } from './bootstrap/machine';
 import { applySessionSecret } from './bootstrap/session';
+import { LectorSistema } from './facturas/lectorSistema';
+import { FacturasTelefono } from './facturas/servicio';
+import { atenderFotos, PUERTO_FOTOS, ServidorFotos } from './facturas/servidorFotos';
 import { HardwareManager } from './hardware/HardwareManager';
 import { ExcelImportService } from './import/ExcelImportService';
 import { registerIpcHandlers, buildAllHandlers } from './ipc';
@@ -45,6 +48,9 @@ let hardwareManager: HardwareManager | null = null;
 let backupService: BackupService | null = null;
 let lanServer: LanServer | null = null;
 let tunel: TunelManager | null = null;
+let facturas: FacturasTelefono | null = null;
+let servidorFotos: ServidorFotos | null = null;
+let facturasTimer: NodeJS.Timeout | null = null;
 let updaterController: UpdaterController | null = null;
 let desktopWindows: DesktopWindowsManager | null = null;
 let quittingForBackup = false;
@@ -65,6 +71,12 @@ export async function prepararseParaActualizar(): Promise<void> {
   updaterController?.dispose?.();
   try { desktopWindows?.closeAll(); } catch { /* */ }
   try { await hardwareManager?.dispose(); } catch { /* */ }
+  if (facturasTimer) { clearTimeout(facturasTimer); facturasTimer = null; }
+  try { await facturas?.apagar(); } catch { /* */ }   // corta la lectura en curso (sigue al reabrir)
+  if (servidorFotos) {
+    try { await servidorFotos.stop(); } catch { /* */ }
+    servidorFotos = null;
+  }
   if (lanServer) {
     try { await lanServer.stop(); } catch { /* */ }   // ESPERAR: libera el puerto y suelta la UI servida
     lanServer = null;
@@ -278,6 +290,93 @@ function bootstrap(): { lanArgs: string[] } {
     log: (m) => console.log(`[flowy-ia] ${m}`),
   });
 
+  // Facturas de compra por teléfono. Vienen APAGADAS. Viven donde está la
+  // base: una terminal de la red le pide todo al servidor. El lector usa el
+  // mismo Ollama que Flowy (la dirección se toma en cada uso: puede cambiar
+  // en Configuración con la app abierta).
+  if (lanCfg.mode !== 'client') {
+    const servicio = new FacturasTelefono({
+      userDataDir,
+      repos: dbHandle.repos,
+      cliente: () => new OllamaClient({ baseUrl: flowyIA.getConfig().url }),
+      // Lector de texto "del sistema" (el principal): programas auxiliares en
+      // resources/ocr (empaquetado) o native/ (desarrollo), encadenados por
+      // plataforma (Windows: PaddleOCR → Windows.Media.Ocr; Mac: Vision → PaddleOCR).
+      // PaddleOCR (leer.mjs) corre con este mismo ejecutable como Node y toma
+      // onnxruntime-node y jpeg-js de app.asar: Electron en modo Node lee adentro
+      // del asar y redirige los .node a app.asar.unpacked.
+      lectorSistema: new LectorSistema({
+        baseNativa: app.isPackaged ? path.join(process.resourcesPath, 'ocr') : path.join(HERE, '..', 'native'),
+        electronPath: process.execPath,
+        nodeModules: app.isPackaged
+          ? [path.join(process.resourcesPath, 'app.asar', 'node_modules'), path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules')]
+          : undefined,
+        log: (m) => console.info(`[facturas] ${m}`),
+      }),
+      // Con el sistema en sólo lectura el teléfono tampoco escribe (misma
+      // regla que LanServer aplica a los puestos de la red).
+      licenciaActiva: () => (licenseManager?.getState().status ?? 'unlicensed') === 'active',
+      log: {
+        info: (m) => console.info(`[facturas] ${m}`),
+        warn: (m) => console.warn(`[facturas] ${m}`),
+        error: (m) => console.error(`[facturas] ${m}`),
+      },
+    });
+    facturas = servicio;
+    /**
+     * La escucha del teléfono (0.0.0.0:7790) existe SÓLO con la opción activa.
+     * Hace falta aunque haya servidor de red: en el comercio de una sola PC
+     * LanServer escucha nada más que en 127.0.0.1.
+     */
+    const aplicarEscucha = (activo: boolean): void => {
+      if (!activo) {
+        const viejo = servidorFotos;
+        servidorFotos = null;
+        servicio.servidorFotos = { puerto: null, error: null };
+        if (viejo) void viejo.stop().catch(() => undefined);
+        return;
+      }
+      if (servidorFotos) return;
+      const nuevo = new ServidorFotos({ puerta: servicio, port: PUERTO_FOTOS, host: '0.0.0.0' });
+      servidorFotos = nuevo;
+      nuevo
+        .start()
+        .then(() => {
+          // Si la apagaron mientras abría, no queda escuchando.
+          if (servidorFotos !== nuevo) return void nuevo.stop();
+          servicio.servidorFotos = { puerto: nuevo.puerto, error: null };
+        })
+        .catch((err: unknown) => {
+          console.error('[facturas] no se pudo abrir la escucha del teléfono:', err);
+          if (servidorFotos === nuevo) servidorFotos = null;
+          servicio.servidorFotos = {
+            puerto: null,
+            error: `No se pudo abrir el puerto ${PUERTO_FOTOS} para el teléfono. Cierre el programa que lo usa y reinicie StockFlow.`,
+          };
+        });
+    };
+    servicio.alConfigurar = (c) => aplicarEscucha(c.activo);
+    aplicarEscucha(servicio.getConfig().activo);
+    // Lo que quedó a medio leer o a medio recibir al cerrar vuelve a la cola.
+    // La limpieza va YA, antes de que exista un enlace o una lectura de esta
+    // sesión; la cola arranca un momento después: al prender la PC, Ollama
+    // puede tardar unos segundos en abrir.
+    try {
+      servicio.reanudar({ arrancar: false });
+    } catch (e) {
+      console.error('[facturas] no se pudo ordenar lo pendiente:', e);
+    }
+    facturasTimer = setTimeout(() => {
+      facturasTimer = null;
+      try {
+        servicio.retomarCola();
+      } catch (e) {
+        console.error('[facturas] no se pudo retomar la cola:', e);
+      }
+    }, 15_000);
+  }
+  const rutaFotos = facturas ? atenderFotos(facturas) : undefined;
+
   // Gestor de ventanas nativas del SO (v0.1.17): cada pantalla abre como una
   // BrowserWindow independiente que carga la app en modo embedded.
   desktopWindows = new DesktopWindowsManager({
@@ -324,6 +423,7 @@ function bootstrap(): { lanArgs: string[] } {
     mpTokenStore,
     flowyIA,
     ollamaInstalador,
+    facturas: facturas ?? undefined,
     emit: (channel: string, payload: unknown) => {
       // A TODAS las ventanas, no solo a la principal: cada módulo abre su propia
       // BrowserWindow con su cache aislada, así que un cambio hecho en una
@@ -435,6 +535,8 @@ function bootstrap(): { lanArgs: string[] } {
       // desarrollo: la interfaz compilada vive en dist/ en los dos casos.
       appVersion: app.getVersion(),
       webRoot: path.join(app.getAppPath(), 'dist'),
+      // Fotos de facturas desde el teléfono (también salen por el túnel).
+      rutaExtra: rutaFotos,
       resolveUser: async (userId: string) => {
         const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
         if (!u) return null;
@@ -474,6 +576,8 @@ function bootstrap(): { lanArgs: string[] } {
       licenseStatus: () => licenseManager?.getState().status ?? 'unlicensed',
       appVersion: app.getVersion(),
       webRoot: path.join(app.getAppPath(), 'dist'),
+      // Fotos de facturas desde el teléfono (también salen por el túnel).
+      rutaExtra: rutaFotos,
       resolveUser: async (userId: string) => {
         const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
         if (!u) return null;
@@ -649,6 +753,14 @@ if (!app.requestSingleInstanceLock()) {
     if (catalogoTimer) { clearInterval(catalogoTimer); catalogoTimer = null; }
     updaterController?.dispose?.();
     void hardwareManager?.dispose(); // cierra puertos serie (balanza/impresora)
+    // Facturas por teléfono: corta la lectura (la factura vuelve a la cola,
+    // con la base todavía abierta) y libera el puerto del teléfono.
+    if (facturasTimer) { clearTimeout(facturasTimer); facturasTimer = null; }
+    void facturas?.apagar();
+    if (servidorFotos) {
+      void servidorFotos.stop();
+      servidorFotos = null;
+    }
     if (lanServer) {
       void lanServer.stop(); // libera el puerto LAN (evita EADDRINUSE al reabrir)
       lanServer = null;

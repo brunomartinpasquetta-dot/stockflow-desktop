@@ -253,6 +253,27 @@
       "when": 1786725682788,
       "tag": "0036_ventas_dia_de_caja",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1786725682789,
+      "tag": "0037_facturas_escaneadas",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1786725682790,
+      "tag": "0038_codigo_proveedor_unidades_por_bulto",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1786725682791,
+      "tag": "0039_codigo_proveedor_descripcion",
+      "breakpoints": true
     }
   ]
 }

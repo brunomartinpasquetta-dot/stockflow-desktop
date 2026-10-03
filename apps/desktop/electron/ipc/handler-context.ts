@@ -7,6 +7,7 @@ import type { LocalDatabase, Repositories } from '@stockflow/db';
 
 import type { FlowyIA } from '../assistant/ia/flowyIA';
 import type { InstaladorOllama } from '../assistant/ia/instalador';
+import type { FacturasTelefono } from '../facturas/servicio';
 import type { BackupService } from '../backup/BackupService';
 import type { HardwareManager } from '../hardware/HardwareManager';
 import type { ExcelImportService } from '../import/ExcelImportService';
@@ -57,6 +58,11 @@ export interface HandlerDeps {
   flowyIA?: FlowyIA;
   /** Descarga y abre el instalador de Ollama (sólo en la PC que responde a Flowy). */
   ollamaInstalador?: Pick<InstaladorOllama, 'estado' | 'iniciar'>;
+  /**
+   * Facturas de compra por teléfono. Ausente en una terminal de la red (lo
+   * atiende el servidor) y en los tests que no lo usan.
+   */
+  facturas?: FacturasTelefono;
   /** Extras LAN (server-side): inyectados por main.ts cuando hay LanServer. */
   lanExtras?: {
     getConnectedClients?: () => { ip: string; lastSeen: number }[];
@@ -96,6 +102,8 @@ export interface DesktopWindowsLike {
     pageKey: string;
     title?: string;
     params?: Record<string, unknown>;
+    /** La página recibe los `extras` con la ventana abierta, sin recargarla. */
+    extrasEnVivo?: boolean;
     width?: number;
     height?: number;
     minWidth?: number;

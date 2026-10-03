@@ -23,6 +23,8 @@ import { RolePermissionRepository } from './rolePermission.repository';
 import { PromotionRepository } from './promotion.repository';
 import { ReturnRepository } from './return.repository';
 import { AuditRepository } from './audit.repository';
+import { ArticleSupplierCodeRepository } from './articleSupplierCode.repository';
+import { ScannedInvoiceRepository } from './scannedInvoice.repository';
 import { CatalogoPedidoRepository, CatalogoRepository } from './catalogo.repository';
 import { MaintenanceRepository } from './maintenance.repository';
 import { FiscalRepository } from './fiscal.repository';
@@ -74,6 +76,13 @@ export {
   type LineaPedidoWeb,
   type PedidoWebEntrante,
 } from './catalogo.repository';
+export { ArticleSupplierCodeRepository } from './articleSupplierCode.repository';
+export {
+  ScannedInvoiceRepository,
+  type ActualizarFacturaEscaneada,
+  type FacturaEscaneada,
+  type ListarFacturasEscaneadas,
+} from './scannedInvoice.repository';
 export { MaintenanceRepository, type ResetOperationalResult } from './maintenance.repository';
 export {
   FiscalRepository,
@@ -108,6 +117,10 @@ export interface Repositories {
   audit: AuditRepository;
   catalogo: CatalogoRepository;
   catalogoPedidos: CatalogoPedidoRepository;
+  /** Código de cada proveedor → artículo (facturas por teléfono). */
+  articleSupplierCodes: ArticleSupplierCodeRepository;
+  /** Facturas de compra fotografiadas desde el teléfono. */
+  scannedInvoices: ScannedInvoiceRepository;
   maintenance: MaintenanceRepository;
   fiscal: FiscalRepository;
   quotes: QuoteRepository;
@@ -144,6 +157,8 @@ export function createRepositories(db: LocalDatabase): Repositories {
     audit: new AuditRepository(db),
     catalogo: new CatalogoRepository(db),
     catalogoPedidos: new CatalogoPedidoRepository(db),
+    articleSupplierCodes: new ArticleSupplierCodeRepository(db),
+    scannedInvoices: new ScannedInvoiceRepository(db),
     maintenance: new MaintenanceRepository(db),
     fiscal: new FiscalRepository(db),
     quotes: new QuoteRepository(db),

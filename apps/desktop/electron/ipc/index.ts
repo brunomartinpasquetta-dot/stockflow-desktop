@@ -24,6 +24,7 @@ import { buildCatalogoHandlers } from './handlers/catalogo.handlers';
 import { buildGuiaHandlers } from './handlers/guia.handlers';
 import { buildNovedadesHandlers } from './handlers/novedades.handlers';
 import { buildOnboardingHandlers } from './handlers/onboarding.handlers';
+import { buildFacturasHandlers } from './handlers/facturas.handlers';
 import { buildFamiliesHandlers } from './handlers/families.handlers';
 import { buildInventoryHandlers } from './handlers/inventory.handlers';
 import { buildLanHandlers } from './handlers/lan.handlers';
@@ -98,6 +99,7 @@ const BUILDERS: HandlerBuilder[] = [
   buildAuditHandlers,
   buildMaintenanceHandlers,
   buildFiscalHandlers,
+  buildFacturasHandlers,
 ];
 
 export function buildAllHandlers(deps: HandlerDeps): HandlerMap {

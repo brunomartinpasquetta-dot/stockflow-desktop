@@ -105,6 +105,12 @@ export interface LanServerOptions {
   appVersion?: string;
   /** Carpeta con la interfaz compilada, para servirla al navegador. */
   webRoot?: string;
+  /**
+   * Rutas `/lan/foto/…` (facturas por teléfono), atendidas por fuera del RPC:
+   * tienen su propia credencial, el token del enlace. Devuelve true si
+   * contestó. Ausente = esas rutas dan 404 como siempre.
+   */
+  rutaExtra?: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
 }
 
 interface UserLite {
@@ -158,6 +164,12 @@ const CANALES_DE_LECTURA = new Set([
   'import:progress',
   'lan:diagnose',
   'print:diagnose',
+  // Facturas por teléfono: abrir una factura, ver su foto y seguir la que está
+  // en revisión no escriben nada (lo que escribe es guardar, releer, descartar
+  // y marcarCargada, que siguen cayendo del lado de la escritura).
+  'facturas:obtener',
+  'facturas:foto',
+  'facturas:seguir',
 ]);
 
 function esEscritura(channel: string): boolean {
@@ -547,6 +559,11 @@ export class LanServer {
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse, esTunel = false): Promise<void> {
+    // Fotos de facturas desde el teléfono: van antes que todo (incluido el
+    // OPTIONS de abajo, que abre CORS) porque esas rutas no lo llevan.
+    if (this.opts.rutaExtra && req.url?.startsWith('/lan/foto/')) {
+      if (await this.opts.rutaExtra(req, res)) return;
+    }
     if (req.method === 'OPTIONS') {
       sendJson(res, 204, {});
       return;

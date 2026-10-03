@@ -20,6 +20,11 @@ export interface DesktopWindowOpenInput {
   title?: string;
   /** Params serializables que se pasan como querystring a la ruta embedded. */
   params?: Record<string, unknown>;
+  /**
+   * La página sabe recibir `extras` con la ventana abierta (`WindowDef.extrasEnVivo`):
+   * se le mandan por IPC en vez de recargarla, así no pierde lo que tenía sin guardar.
+   */
+  extrasEnVivo?: boolean;
   width?: number;
   height?: number;
   minWidth?: number;
@@ -113,12 +118,22 @@ export class DesktopWindowsManager {
       // todo el día), el pedido nunca llegaba — quedaba la pantalla de siempre,
       // como si no hubiera pasado nada. Un click sin `extras` (el ícono del
       // menú, F5, etc.) sigue siendo un simple foco: no pisa una venta en curso.
+      //
+      // Recargar tira lo que la ventana tenía sin guardar (una compra a medio
+      // armar, una factura escaneada a medio corregir). Las páginas que saben
+      // recibir `extras` en caliente (`extrasEnVivo`: Compras, Facturas
+      // escaneadas) los reciben por IPC y deciden qué hacer con lo que hay;
+      // las demás siguen recargándose, como siempre.
       if (input.params && EXTRAS_PARAM in input.params) {
-        const hash = buildEmbeddedHash(input.pageKey, input.params);
-        if (this.config.isDev) {
-          void existing.loadURL(`${this.config.devServerUrl}/#${hash}`);
+        if (input.extrasEnVivo === true) {
+          existing.webContents.send('desktopWindow:extras', { pageKey: input.pageKey, params: input.params });
         } else {
-          void existing.loadFile(this.config.prodIndexHtml, { hash });
+          const hash = buildEmbeddedHash(input.pageKey, input.params);
+          if (this.config.isDev) {
+            void existing.loadURL(`${this.config.devServerUrl}/#${hash}`);
+          } else {
+            void existing.loadFile(this.config.prodIndexHtml, { hash });
+          }
         }
       }
       existing.focus();

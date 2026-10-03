@@ -88,7 +88,9 @@ export function GeneradorCompras() {
         unitPrice: c.row.lastCost,
       }))
     if (lines.length === 0) return
-    openInWindow('compras', { extras: { prefilledLines: lines, from: 'lowStock' } })
+    // `lote` distinto en cada pasaje: Compras recibe los `extras` con la ventana
+    // ya abierta (sin recargarla) y aplica cada pasaje una sola vez.
+    openInWindow('compras', { extras: { prefilledLines: lines, from: 'lowStock', lote: Date.now() } })
   }
 
   function exportarExcel(): void {

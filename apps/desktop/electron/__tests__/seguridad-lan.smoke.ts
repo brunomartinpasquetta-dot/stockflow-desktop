@@ -77,6 +77,7 @@ function mockHandlers(): HandlerMap {
     'maintenance:resetOperationalData', 'license:deactivate', 'updater:quitAndInstall',
     'lan:applyAndRestart', 'system:pickFile', 'fiscal:issueInvoice', 'fiscal:listVouchers',
     'catalogo:pedidoConvertir', 'catalogo:pedidosListar', 'company:get', 'company:upsert',
+    'facturas:obtener', 'facturas:foto', 'facturas:seguir', 'facturas:guardar', 'facturas:marcarCargada',
   ]) {
     h[ch] = async () => ok({ canal: ch });
   }
@@ -195,15 +196,26 @@ async function parteServidor(): Promise<void> {
     const w2 = await rpc(u3, { channel: 'cash:open', token: PIN }, jwtAdmin);
     const w3 = await rpc(u3, { channel: 'catalogo:pedidoConvertir', token: PIN }, jwtAdmin);
     const w4 = await rpc(u3, { channel: 'fiscal:issueInvoice', token: PIN }, jwtAdmin);
+    const w5 = await rpc(u3, { channel: 'facturas:guardar', token: PIN }, jwtAdmin);
+    const w6 = await rpc(u3, { channel: 'facturas:marcarCargada', token: PIN }, jwtAdmin);
     const rd = await rpc(u3, { channel: 'sales:get', token: PIN }, jwtAdmin);
     const rd2 = await rpc(u3, { channel: 'catalogo:pedidosListar', token: PIN }, jwtAdmin);
+    // Facturas por teléfono desde un puesto: abrir una factura, ver la foto y
+    // seguir la que está en revisión son consultas (antes caían en 403).
+    const rd3 = await rpc(u3, { channel: 'facturas:obtener', token: PIN }, jwtAdmin);
+    const rd4 = await rpc(u3, { channel: 'facturas:foto', token: PIN }, jwtAdmin);
+    const rd5 = await rpc(u3, { channel: 'facturas:seguir', token: PIN }, jwtAdmin);
     const lg = await rpc(u3, { channel: 'auth:login', payload: { username: 'admin', password: 'ok' }, token: PIN });
     check(
       `licencia ${estado}: escrituras → 403`,
-      w.status === 403 && w2.status === 403 && w3.status === 403 && w4.status === 403 && /sólo lectura/.test(w.body?.ok === false ? w.body.message : ''),
-      `${w.status}/${w2.status}/${w3.status}/${w4.status} ${JSON.stringify(w.body)}`,
+      w.status === 403 && w2.status === 403 && w3.status === 403 && w4.status === 403 && w5.status === 403 && w6.status === 403 && /sólo lectura/.test(w.body?.ok === false ? w.body.message : ''),
+      `${w.status}/${w2.status}/${w3.status}/${w4.status}/${w5.status}/${w6.status} ${JSON.stringify(w.body)}`,
     );
-    check(`licencia ${estado}: lecturas y login → 200`, rd.status === 200 && rd2.status === 200 && lg.status === 200, `${rd.status}/${rd2.status}/${lg.status}`);
+    check(
+      `licencia ${estado}: lecturas (también facturas:obtener/foto/seguir) y login → 200`,
+      rd.status === 200 && rd2.status === 200 && rd3.status === 200 && rd4.status === 200 && rd5.status === 200 && lg.status === 200,
+      `${rd.status}/${rd2.status}/${rd3.status}/${rd4.status}/${rd5.status}/${lg.status}`,
+    );
     await s3.stop();
   }
 

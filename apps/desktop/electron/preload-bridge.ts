@@ -19,6 +19,11 @@ import type {
   AssistantSeguirResultDTO,
   EstadoIADTO,
   EstadoInstalacionOllamaDTO,
+  EstadoFacturasDTO,
+  FacturaEscaneadaDetalleDTO,
+  FacturaEscaneadaResumenDTO,
+  FacturasSeguimientoDTO,
+  FacturasVincularDTO,
   DemoStatusDTO,
   CatalogoEstadisticasDTO,
   CatalogoSyncEstadoDTO,
@@ -126,6 +131,8 @@ export const LAN_ROUTED_GROUPS = new Set([
   // Modo demo y primeros pasos (E5): el estado del negocio vive en el servidor.
   'demo',
   'onboarding',
+  // Facturas por teléfono: las fotos, la cola de lectura y la base están en el servidor.
+  'facturas',
 ]);
 
 /**
@@ -155,6 +162,10 @@ export const LAN_SERVER_DENIED_CHANNELS = new Set([
   'assistant:iaDescargar',
   'assistant:iaInstalarOllama',
   'assistant:iaProbar',
+  // Facturas por teléfono: activar la opción (abre una escucha en la red) y
+  // descargar el lector se hacen sentado en la PC servidor.
+  'facturas:configurar',
+  'facturas:descargarLector',
 ]);
 export const LAN_SERVER_DENIED_GROUPS = new Set(['maintenance']);
 
@@ -188,6 +199,9 @@ export const REMOTO_DENIED_CHANNELS = new Set([
   'assistant:iaDescargar',
   'assistant:iaInstalarOllama',
   'assistant:iaProbar',
+  // Facturas por teléfono: activar y descargar el lector se hace en el local.
+  'facturas:configurar',
+  'facturas:descargarLector',
 ]);
 
 /** ¿El servidor atiende este canal cuando la visita entra por el acceso remoto? */
@@ -392,6 +406,21 @@ export function createApiBridge(
       estado: () => c<GuiaEstadoDTO>('guia:estado'),
       progreso: (p) => c<{ ok: true }>('guia:progreso', p),
       vista: () => c<{ ok: true }>('guia:vista'),
+    },
+    facturas: {
+      estado: () => c<EstadoFacturasDTO>('facturas:estado'),
+      configurar: (p) => c<EstadoFacturasDTO>('facturas:configurar', p),
+      descargarLector: () => c<EstadoFacturasDTO>('facturas:descargarLector'),
+      vincular: () => c<FacturasVincularDTO>('facturas:vincular'),
+      listar: () => c<FacturaEscaneadaResumenDTO[]>('facturas:listar'),
+      obtener: (p) => c<FacturaEscaneadaDetalleDTO>('facturas:obtener', p),
+      foto: (p) => c<{ dataUrl: string }>('facturas:foto', p),
+      guardar: (p) => c<FacturaEscaneadaDetalleDTO>('facturas:guardar', p),
+      releer: (p) => c<{ ok: true }>('facturas:releer', p),
+      descartar: (p) => c<{ ok: true }>('facturas:descartar', p),
+      marcarCargada: (p) => c<{ ok: true; guardados: number }>('facturas:marcarCargada', p),
+      seguir: (p) => c<FacturasSeguimientoDTO>('facturas:seguir', p),
+      aCompras: (p) => c<{ recibe: boolean }>('facturas:aCompras', p),
     },
     catalogo: {
       estadisticas: (p) => c<CatalogoEstadisticasDTO>('catalogo:estadisticas', p),
@@ -616,6 +645,7 @@ export function createApiBridge(
       minimizeSelf: () => c<{ minimized: boolean }>('desktopWindow:minimizeSelf'),
       focusMain: () => c<{ ok: true }>('desktopWindow:focusMain'),
       openManual: () => c<never>('desktopWindow:openManual'),
+      onExtras: (cb) => on('desktopWindow:extras', (p) => cb(p as never)),
     },
     print: {
       diagnose: (p) => c<never>('print:diagnose', p),

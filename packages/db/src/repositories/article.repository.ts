@@ -41,6 +41,24 @@ export class ArticleRepository extends BaseRepository<Article, NewArticle> {
     super(db, articles, 'Artículo');
   }
 
+  /**
+   * "Huella" del padrón: cuántos artículos hay y la última modificación. Si
+   * no cambió, lo que se armó a partir del padrón (el índice del asociador de
+   * facturas por teléfono) sigue valiendo. Toda escritura por el repositorio
+   * pisa `updated_at`, y el máximo sale del índice de esa columna.
+   */
+  async huella(): Promise<{ cantidad: number; ultimaModificacion: number }> {
+    try {
+      const fila = this.db
+        .select({ n: sql<number>`count(*)`, u: sql<number>`coalesce(max(${articles.updatedAt}), 0)` })
+        .from(articles)
+        .get();
+      return { cantidad: Number(fila?.n ?? 0), ultimaModificacion: Number(fila?.u ?? 0) };
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async findByBarcode(barcode: string): Promise<Article | null> {
     try {
       const row = this.db.select().from(articles).where(eq(articles.barcode, barcode)).get();

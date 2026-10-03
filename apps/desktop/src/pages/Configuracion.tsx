@@ -9,6 +9,7 @@ import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, Ref
 import { api, ApiError } from '@/lib/api'
 import { EspejoCatalogo } from './Empresa'
 import { FlowyIAConfig } from '@/components/FlowyIAConfig'
+import { FacturasTelefonoConfig } from '@/components/FacturasTelefonoConfig'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1500,7 +1501,7 @@ function GeneralSection() {
 
 import { useWindowSelf } from '@/contexts/WindowManagerContext'
 
-const VALID_TABS = ['hardware', 'backup', 'lan', 'catalogo', 'remoto', 'flowy', 'updates', 'general', 'mantenimiento'] as const
+const VALID_TABS = ['hardware', 'backup', 'lan', 'catalogo', 'remoto', 'flowy', 'facturas', 'updates', 'general', 'mantenimiento'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 function readInitialTab(extras: unknown): TabValue | null {
@@ -1633,6 +1634,7 @@ export function Configuracion() {
           <TabsTrigger value="catalogo">Catálogo web</TabsTrigger>
           <TabsTrigger value="remoto">Acceso remoto</TabsTrigger>
           <TabsTrigger value="flowy">Flowy con IA</TabsTrigger>
+          <TabsTrigger value="facturas">Facturas por teléfono</TabsTrigger>
           <TabsTrigger value="updates">Actualizaciones</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
           {isAdmin && <TabsTrigger value="mantenimiento">Mantenimiento</TabsTrigger>}
@@ -1655,6 +1657,9 @@ export function Configuracion() {
         </TabsContent>
         <TabsContent value="flowy">
           <FlowyIAConfig />
+        </TabsContent>
+        <TabsContent value="facturas">
+          <FacturasTelefonoConfig />
         </TabsContent>
         <TabsContent value="updates">
           <UpdatesSection />

@@ -157,6 +157,8 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
         pageKey: input.pageKey,
         title: input.title ?? def.title,
         ...(params ? { params } : {}),
+        // La ventana ya abierta recibe los `extras` sin recargarse (si la página sabe).
+        ...(def.extrasEnVivo ? { extrasEnVivo: true } : {}),
         ...(def.defaultSize ? { width: def.defaultSize.width, height: def.defaultSize.height } : {}),
         ...(def.minWidth ? { minWidth: def.minWidth } : {}),
         ...(def.minHeight ? { minHeight: def.minHeight } : {}),

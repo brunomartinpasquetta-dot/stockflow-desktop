@@ -551,6 +551,51 @@ async function main(): Promise<void> {
     );
   }
 
+  // (6) COMPRAS POR PROVEEDOR (Contabilidad): el listado por rango trae TODAS
+  // las compras cargadas — B y C incluidas, no sólo las que van al Libro IVA —
+  // de más de un proveedor, cada una con tipo, número del proveedor, estado e
+  // importes. La pantalla agrupa y suma en el cliente sobre este contrato.
+  if (artC.ok && provC.ok) {
+    const provD = await invoke<{ id: string }>(handlers, 'suppliers:create', {
+      name: 'PROV DOS', code: 'PC2', cuit: '30-71234567-1',
+    });
+    check('setup segundo proveedor ok', provD.ok, provD.ok ? '' : JSON.stringify(provD));
+    const segundoProv = provD.ok ? provD.data.id : provC.data.id;
+    // A cuenta del proveedor: no toca la caja, así el guión no depende del fondeo.
+    const cB = await invoke<{ purchase: { id: string } }>(handlers, 'purchases:create', {
+      type: 'B', supplierId: segundoProv, supplierInvoiceNumber: '0001-00000123',
+      isAccountPurchase: true, updatePrices: false,
+      lines: [{ articleId: artC.data.id, quantity: '1.000', costPrice: '300.0000' }],
+    });
+    const cC = await invoke<{ purchase: { id: string } }>(handlers, 'purchases:create', {
+      type: 'C', supplierId: provC.data.id, supplierInvoiceNumber: '0002-00000777',
+      isAccountPurchase: true, updatePrices: false,
+      lines: [{ articleId: artC.data.id, quantity: '2.000', costPrice: '100.0000' }],
+    });
+    check('setup compras B y C ok', cB.ok && cC.ok, `${cB.ok ? '' : JSON.stringify(cB)} ${cC.ok ? '' : JSON.stringify(cC)}`.trim());
+
+    const listado = await invoke<Array<{
+      id: string; type: string; number: number; supplierId: string;
+      supplierInvoiceNumber: string | null; status: string; total: string; vatAmount: string;
+    }>>(handlers, 'purchases:listByDateRange', { from: Date.now() - 86_400_000, to: Date.now() + 86_400_000 });
+    const tipos = new Set(listado.ok ? listado.data.map((p) => p.type) : []);
+    const proveedores = new Set(listado.ok ? listado.data.map((p) => p.supplierId) : []);
+    check(
+      'purchases:listByDateRange trae todas las compras del rango (X, B y C) de más de un proveedor',
+      listado.ok && tipos.has('X') && tipos.has('B') && tipos.has('C') && proveedores.size >= 2,
+      listado.ok ? `tipos=${[...tipos].sort().join(',')} proveedores=${proveedores.size} compras=${listado.data.length}` : JSON.stringify(listado),
+    );
+    const fB = listado.ok && cB.ok ? listado.data.find((p) => p.id === cB.data.purchase.id) : undefined;
+    const fC = listado.ok && cC.ok ? listado.data.find((p) => p.id === cC.data.purchase.id) : undefined;
+    check(
+      'cada compra viene con tipo, número del proveedor, estado e importes (neto = total − IVA ≥ 0)',
+      !!fB && fB.type === 'B' && fB.supplierInvoiceNumber === '0001-00000123' && fB.status === 'completed' && fB.supplierId === segundoProv
+        && Number(fB.total) > 0 && Number(fB.total) - Number(fB.vatAmount) >= 0
+        && !!fC && fC.type === 'C' && fC.supplierInvoiceNumber === '0002-00000777' && fC.status === 'completed' && Number(fC.total) > 0,
+      fB && fC ? `B n°${fB.number} ${fB.supplierInvoiceNumber} total=${fB.total} iva=${fB.vatAmount}; C n°${fC.number} ${fC.supplierInvoiceNumber} total=${fC.total}` : `fB=${JSON.stringify(fB)} fC=${JSON.stringify(fC)}`,
+    );
+  }
+
   // sales:voidRange — anulación en lote del día. Va AL FINAL a propósito: anula
   // la venta que usaron todos los checks anteriores, así que mover esto para
   // arriba los rompe. Lo que importa verificar es que no sea un borrado suelto:

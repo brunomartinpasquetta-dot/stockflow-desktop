@@ -16,7 +16,7 @@
  * todo el RouterProvider en `main.tsx`, así que esta ruta los hereda. Sólo falta
  * `AuthProvider`, que lo aporta `AuthShell` arriba de las rutas.
  */
-import { type CSSProperties, Suspense, useEffect, useMemo } from 'react'
+import { type CSSProperties, Suspense, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/contexts/AuthContext'
@@ -58,7 +58,7 @@ export function EmbeddedWindow() {
   }, [def?.title])
 
   // Params planos de la querystring (excluyendo el param reservado de extras).
-  const params = useMemo<Record<string, string>>(() => {
+  const paramsDeUrl = useMemo<Record<string, string>>(() => {
     const out: Record<string, string> = {}
     for (const [k, v] of searchParams.entries()) {
       if (k === EXTRAS_PARAM) continue
@@ -67,7 +67,25 @@ export function EmbeddedWindow() {
     return out
   }, [searchParams])
 
-  const extras = useMemo(() => decodeExtras(searchParams.get(EXTRAS_PARAM)), [searchParams])
+  const extrasDeUrl = useMemo(() => decodeExtras(searchParams.get(EXTRAS_PARAM)), [searchParams])
+
+  // `extras` que llegan con la ventana YA abierta, sin recargarla: sólo para
+  // las páginas que lo declaran (`extrasEnVivo` en el registry; el main
+  // process los manda por IPC en vez de recargar). Pisan los de la URL.
+  const [enVivo, setEnVivo] = useState<{ params: Record<string, string>; extras: unknown } | null>(null)
+  const extrasEnVivo = def?.extrasEnVivo === true
+  useEffect(() => {
+    if (!extrasEnVivo || !pageKey) return
+    return api.desktopWindow.onExtras((p) => {
+      if (p.pageKey !== pageKey) return
+      const planos: Record<string, string> = {}
+      for (const [k, v] of Object.entries(p.params ?? {})) if (k !== EXTRAS_PARAM && v != null) planos[k] = String(v)
+      const crudo = p.params?.[EXTRAS_PARAM]
+      setEnVivo({ params: planos, extras: decodeExtras(typeof crudo === 'string' ? crudo : null) })
+    })
+  }, [extrasEnVivo, pageKey])
+  const params = enVivo?.params ?? paramsDeUrl
+  const extras = enVivo ? enVivo.extras : extrasDeUrl
 
   if (loading) {
     return <PageSpinner />

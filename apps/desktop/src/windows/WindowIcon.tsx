@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   FileText,
   History,
+  ScanLine,
   Info,
   Landmark,
   Package,
@@ -43,6 +44,7 @@ export function WindowIcon({ name, className }: { name: string | undefined; clas
     case 'FileSpreadsheet': return <FileSpreadsheet className={className} />
     case 'FileText': return <FileText className={className} />
     case 'History': return <History className={className} />
+    case 'ScanLine': return <ScanLine className={className} />
     case 'Info': return <Info className={className} />
     case 'Landmark': return <Landmark className={className} />
     case 'Package': return <Package className={className} />

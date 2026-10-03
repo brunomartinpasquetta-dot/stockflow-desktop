@@ -18,6 +18,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -1029,6 +1030,97 @@ export const catalogoPedidos = sqliteTable(
 export type CatalogoPedido = typeof catalogoPedidos.$inferSelect;
 
 /* ------------------------------------------------------------------ */
+/* FACTURAS DE COMPRA POR TELÉFONO                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Código con que CADA proveedor llama a un artículo. Se guarda cuando el
+ * usuario vincula un renglón de una factura escaneada; la próxima factura de
+ * ese proveedor sale vinculada sola. Un código es de un solo artículo por
+ * proveedor; un artículo puede tener varios códigos.
+ *
+ * Si se borra el artículo o el proveedor el vínculo no significa nada: se va
+ * con ellos (cascade), así no traba el borrado.
+ */
+export const articleSupplierCodes = sqliteTable(
+  'article_supplier_codes',
+  {
+    id: pk(),
+    articleId: text('article_id')
+      .notNull()
+      .references(() => articles.id, { onDelete: 'cascade' }),
+    supplierId: text('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(),
+    /**
+     * Unidades por bulto que el usuario confirmó para este código (migración
+     * 0038). null = todavía no se confirmó; 1 = el artículo ES lo que cotiza la factura.
+     */
+    unitsPerPack: real('units_per_pack'),
+    /**
+     * Descripción con que el proveedor imprimió ese código la vez que se
+     * vinculó (migración 0039). La próxima factura la compara con la suya antes
+     * de confiar en el código: un dígito mal leído cae en el código de OTRO
+     * producto. null = aprendido antes de la columna.
+     */
+    description: text('description'),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    supplierCodeIdx: uniqueIndex('idx_article_supplier_codes_supplier_code').on(t.supplierId, t.code),
+    articleIdx: index('idx_article_supplier_codes_article').on(t.articleId),
+  }),
+);
+export type ArticleSupplierCode = typeof articleSupplierCodes.$inferSelect;
+
+/** Estados de una factura escaneada (sin CHECK en la base: ver migración 0037). */
+export const SCANNED_INVOICE_STATUSES = [
+  'recibiendo',
+  'en_cola',
+  'leyendo',
+  'lista',
+  'error',
+  'cargada',
+  'descartada',
+] as const;
+export type ScannedInvoiceStatus = (typeof SCANNED_INVOICE_STATUSES)[number];
+
+/**
+ * Factura de compra fotografiada desde el teléfono. NO es una compra: es el
+ * borrador que se lee de fondo, se revisa y recién después precarga el
+ * formulario de Compras. `photos`, `pagesText`, `header` y `lines` son JSON en
+ * texto; los serializa/parsea ScannedInvoiceRepository.
+ */
+export const scannedInvoices = sqliteTable(
+  'scanned_invoices',
+  {
+    id: pk(),
+    status: text('status', { enum: SCANNED_INVOICE_STATUSES }).notNull().default('recibiendo'),
+    supplierId: text('supplier_id').references(() => suppliers.id, { onDelete: 'set null' }),
+    /** JSON: nombres de archivo de las fotos (hoja-1.jpg, …). */
+    photos: text('photos').notNull().default('[]'),
+    /** JSON: texto leído por hoja. */
+    pagesText: text('pages_text').notNull().default('[]'),
+    /** JSON: encabezado (datos del QR fiscal, tipo, número, fecha). */
+    header: text('header'),
+    /** JSON: renglones leídos y sus vínculos. */
+    lines: text('lines').notNull().default('[]'),
+    error: text('error'),
+    pagesDone: integer('pages_done').notNull().default(0),
+    /** Usuario que vinculó el teléfono (sin FK, como audit_log.user_id). */
+    createdBy: text('created_by'),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    statusIdx: index('idx_scanned_invoices_status').on(t.status, t.createdAt),
+  }),
+);
+export type ScannedInvoiceRow = typeof scannedInvoices.$inferSelect;
+
+/* ------------------------------------------------------------------ */
 /* FACTURACIÓN ELECTRÓNICA ARCA (ex AFIP)                              */
 /* ------------------------------------------------------------------ */
 
@@ -1596,6 +1688,8 @@ export const localSchema = {
   auditLog,
   catalogoSync,
   catalogoPedidos,
+  articleSupplierCodes,
+  scannedInvoices,
   fiscalConfig,
   salePoints,
   fiscalVouchers,

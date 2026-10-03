@@ -329,6 +329,128 @@ async function main(): Promise<void> {
     closed.notes ?? '',
   );
 
+  // --- facturas por teléfono --------------------------------------------
+  // Códigos de proveedor (el vínculo que se recuerda entre facturas), la
+  // factura escaneada con sus columnas JSON y el proveedor por CUIT.
+  console.log('\n[facturas escaneadas]');
+  {
+    const prov = await repos.suppliers.create({ code: 'PF01', name: 'Mayorista de prueba', cuit: '30-71234567-1' } as never);
+    const prov2 = await repos.suppliers.create({ code: 'PF02', name: 'Otro mayorista' } as never);
+    // Los proveedores migrados traen el CUIT como estaba escrito (no pasan por la validación del alta).
+    db.$client.prepare("UPDATE suppliers SET cuit = '20 11222333 4' WHERE id = ?").run(prov2.id);
+    const artA = await repos.articles.create({
+      barcode: '7798000000011', description: 'Yerba 1kg', costPrice: '100.0000', listPrice1: '150.0000', vatRate: '21.00', unit: 'UN',
+    });
+    const artB = await repos.articles.create({
+      barcode: '7798000000028', description: 'Azúcar 1kg', costPrice: '100.0000', listPrice1: '150.0000', vatRate: '21.00', unit: 'UN',
+    });
+
+    // suppliers.findByCuit: sólo dígitos, de los dos lados
+    check('suppliers.findByCuit sin separadores (como llega del QR)', (await repos.suppliers.findByCuit('30712345671'))?.id === prov.id);
+    check('suppliers.findByCuit con guiones', (await repos.suppliers.findByCuit('30-71234567-1'))?.id === prov.id);
+    check('suppliers.findByCuit guardado con espacios', (await repos.suppliers.findByCuit('20112223334'))?.id === prov2.id);
+    check('suppliers.findByCuit desconocido → null', (await repos.suppliers.findByCuit('30999999999')) === null);
+    check('suppliers.findByCuit vacío → null (no trae proveedores sin CUIT)', (await repos.suppliers.findByCuit('')) === null && (await repos.suppliers.findByCuit('--')) === null);
+
+    // article_supplier_codes
+    const codigos = repos.articleSupplierCodes;
+    check('codigos.buscar sin vínculo → null', codigos.buscar(prov.id, '123456') === null);
+    const v1 = codigos.guardar(prov.id, ' 123456 ', artA.id);
+    check('codigos.guardar crea y recorta espacios', v1.code === '123456' && v1.articleId === artA.id);
+    check('codigos.buscar encuentra el vínculo', codigos.buscar(prov.id, '123456')?.articleId === artA.id);
+    const v2 = codigos.guardar(prov.id, '123456', artB.id);
+    check('codigos.guardar es upsert: mismo id, artículo nuevo', v2.id === v1.id && v2.articleId === artB.id && v2.createdAt === v1.createdAt);
+    codigos.guardar(prov2.id, '123456', artA.id);
+    check('el mismo código en otro proveedor es otro vínculo', codigos.buscar(prov2.id, '123456')?.articleId === artA.id && codigos.buscar(prov.id, '123456')?.articleId === artB.id);
+    codigos.guardar(prov.id, '000777', artA.id);
+    const lista = codigos.listarPorProveedor(prov.id);
+    check('codigos.listarPorProveedor sólo los de ese proveedor, por código', lista.length === 2 && lista[0]!.code === '000777' && lista[1]!.code === '123456', lista.map((c) => c.code).join(','));
+    codigos.borrar(lista[0]!.id);
+    check('codigos.borrar', codigos.buscar(prov.id, '000777') === null && codigos.listarPorProveedor(prov.id).length === 1);
+    let lanzo = false;
+    try { codigos.guardar(prov.id, '   ', artA.id); } catch { lanzo = true; }
+    check('codigos.guardar con código vacío lanza', lanzo);
+    lanzo = false;
+    try { codigos.guardar(prov.id, '555', 'no-existe'); } catch { lanzo = true; }
+    check('codigos.guardar con artículo inexistente lanza (FK)', lanzo);
+
+    // scanned_invoices
+    const facturas = repos.scannedInvoices;
+    const f1 = facturas.crear({ createdBy: admin.id });
+    check(
+      'facturas.crear nace recibiendo y vacía',
+      f1.status === 'recibiendo' && f1.photos.length === 0 && f1.pagesText.length === 0 && f1.lines.length === 0 &&
+        f1.header === null && f1.supplierId === null && f1.pagesDone === 0 && f1.createdBy === admin.id,
+    );
+    check('facturas.obtener inexistente → null', facturas.obtener('no-existe') === null);
+    check('facturas.siguienteEnCola sin nada en cola → null', facturas.siguienteEnCola() === null);
+
+    const renglones = [{ codigo: '123456', descripcion: 'YERBA "X" 1KG', cantidad: 2, importe: -276.78, estado: 'ok' }];
+    const f1b = facturas.actualizar(f1.id, {
+      status: 'en_cola',
+      photos: ['hoja-1.jpg', 'hoja-2.jpg'],
+      pagesText: ['línea 1\nlínea 2', '<table><tr><td>ñ</td></tr></table>'],
+      header: { cuit: '30712345678', tipoCmp: 1, importe: 1234.56 },
+      lines: renglones,
+      supplierId: prov.id,
+      pagesDone: 1,
+    });
+    check(
+      'facturas.actualizar serializa y devuelve los JSON tal cual',
+      !!f1b && f1b.status === 'en_cola' && f1b.photos.length === 2 && f1b.pagesText[1] === '<table><tr><td>ñ</td></tr></table>' &&
+        JSON.stringify(f1b.header) === JSON.stringify({ cuit: '30712345678', tipoCmp: 1, importe: 1234.56 }) &&
+        JSON.stringify(f1b.lines) === JSON.stringify(renglones) && f1b.supplierId === prov.id && f1b.pagesDone === 1,
+    );
+    const crudo = db.$client.prepare('SELECT photos, header FROM scanned_invoices WHERE id = ?').get(f1.id) as { photos: string; header: string };
+    check('en la base quedan como texto JSON', crudo.photos === '["hoja-1.jpg","hoja-2.jpg"]' && typeof crudo.header === 'string');
+    const f1c = facturas.actualizar(f1.id, { error: 'Ollama apagado' });
+    check('facturas.actualizar parcial no pisa lo demás', f1c?.error === 'Ollama apagado' && f1c.photos.length === 2 && f1c.status === 'en_cola' && f1c.updatedAt >= f1b!.updatedAt);
+    check('facturas.actualizar puede limpiar (header/error/proveedor a null)', (() => {
+      const x = facturas.actualizar(f1.id, { header: null, error: null, supplierId: null });
+      const ok = !!x && x.header === null && x.error === null && x.supplierId === null;
+      facturas.actualizar(f1.id, { supplierId: prov.id });
+      return ok;
+    })());
+    check('facturas.actualizar inexistente → null', facturas.actualizar('no-existe', { status: 'error' }) === null);
+
+    const f2 = facturas.crear();
+    facturas.actualizar(f2.id, { status: 'en_cola' });
+    const f3 = facturas.crear({ createdBy: null });
+    check('facturas.siguienteEnCola devuelve la más vieja en cola', facturas.siguienteEnCola()?.id === f1.id);
+    facturas.actualizar(f1.id, { status: 'leyendo' });
+    check('facturas.siguienteEnCola avanza al cambiar el estado', facturas.siguienteEnCola()?.id === f2.id);
+    const todas = facturas.listar();
+    check('facturas.listar: todas, más nuevas primero', todas.length === 3 && todas[0]!.id === f3.id && todas[2]!.id === f1.id);
+    const filtradas = facturas.listar({ estados: ['leyendo', 'recibiendo'] });
+    check('facturas.listar por estados', filtradas.length === 2 && filtradas.every((f) => f.status !== 'en_cola'));
+    check('facturas.listar con estados vacío → nada', facturas.listar({ estados: [] }).length === 0);
+    check('facturas.listar respeta el límite', facturas.listar({ limite: 1 }).length === 1);
+    const livianas = facturas.listar({ sinTexto: true });
+    const liviana1 = livianas.find((f) => f.id === f1.id);
+    check(
+      'facturas.listar sinTexto: no trae el texto de las hojas y sí todo lo demás',
+      livianas.length === 3 && !!liviana1 && liviana1.pagesText.length === 0 && liviana1.photos.length === 2 &&
+        JSON.stringify(liviana1.lines) === JSON.stringify(renglones) && liviana1.status === 'leyendo' && liviana1.pagesDone === 1,
+    );
+    const cuenta = facturas.contarPorEstado();
+    check(
+      'facturas.contarPorEstado cuenta por estado sin traer filas',
+      cuenta.leyendo === 1 && cuenta.en_cola === 1 && cuenta.recibiendo === 1 && cuenta.lista === undefined,
+      JSON.stringify(cuenta),
+    );
+    db.$client.prepare("UPDATE scanned_invoices SET lines = '{roto', photos = 'null' WHERE id = ?").run(f3.id);
+    const rota = facturas.obtener(f3.id);
+    check('un JSON dañado no rompe la lectura (cae a vacío)', !!rota && rota.lines.length === 0 && rota.photos.length === 0);
+
+    // Borrados: los vínculos se van con el artículo/proveedor; la factura queda sin proveedor.
+    db.$client.prepare('DELETE FROM articles WHERE id = ?').run(artB.id);
+    check('borrar el artículo se lleva su código de proveedor (cascade)', codigos.buscar(prov.id, '123456') === null);
+    codigos.guardar(prov.id, '999', artA.id);
+    await repos.suppliers.delete(prov.id);
+    check('borrar el proveedor no se traba: se lleva sus códigos', codigos.listarPorProveedor(prov.id).length === 0 && codigos.buscar(prov2.id, '123456') !== null);
+    check('…y la factura escaneada queda sin proveedor (set null)', facturas.obtener(f1.id)?.supplierId === null);
+  }
+
   // --- company ---------------------------------------------------------
   console.log('\n[company]');
   const company1 = await repos.company.getOrCreate();

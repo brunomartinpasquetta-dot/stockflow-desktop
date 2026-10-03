@@ -24,6 +24,8 @@ export interface OllamaModelo {
 export interface ChatMensaje {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /** Imágenes en base64 (sin prefijo `data:`), para modelos que leen fotos. */
+  images?: string[];
 }
 
 export interface ChatResultado {

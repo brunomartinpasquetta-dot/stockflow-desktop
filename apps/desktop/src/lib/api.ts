@@ -9,6 +9,13 @@ import type {
   ConfigIADTO,
   EstadoIADTO,
   EstadoInstalacionOllamaDTO,
+  EstadoFacturasDTO,
+  FacturaEscaneadaDetalleDTO,
+  FacturaEscaneadaEncabezadoDTO,
+  FacturaEscaneadaRenglonDTO,
+  FacturaEscaneadaResumenDTO,
+  FacturasSeguimientoDTO,
+  FacturasVincularDTO,
   AuditEntryDTO,
   DemoStatusDTO,
   ListAuditPayloadDTO,
@@ -171,6 +178,38 @@ export const api = {
     iaInstalarOllama: (): Promise<EstadoInstalacionOllamaDTO> => unwrap(sf().assistant.iaInstalarOllama()),
     iaPrecalentar: (): Promise<{ ok: true }> => unwrap(sf().assistant.iaPrecalentar()),
     iaProbar: (): Promise<{ ms: number; ia: boolean; reply: string }> => unwrap(sf().assistant.iaProbar()),
+  },
+  /** Facturas de compra por teléfono (nunca crean una compra: precargan el formulario). */
+  facturas: {
+    estado: (): Promise<EstadoFacturasDTO> => unwrap(sf().facturas.estado()),
+    configurar: (cambios: { activo?: boolean; mejorLectura?: boolean }): Promise<EstadoFacturasDTO> =>
+      unwrap(sf().facturas.configurar(cambios)),
+    descargarLector: (): Promise<EstadoFacturasDTO> => unwrap(sf().facturas.descargarLector()),
+    vincular: (): Promise<FacturasVincularDTO> => unwrap(sf().facturas.vincular()),
+    listar: (): Promise<FacturaEscaneadaResumenDTO[]> => unwrap(sf().facturas.listar()),
+    obtener: (id: string): Promise<FacturaEscaneadaDetalleDTO> => unwrap(sf().facturas.obtener({ id })),
+    foto: (id: string, hoja: number): Promise<{ dataUrl: string }> => unwrap(sf().facturas.foto({ id, hoja })),
+    guardar: (input: {
+      id: string;
+      supplierId?: string | null;
+      header?: FacturaEscaneadaEncabezadoDTO | null;
+      lines?: FacturaEscaneadaRenglonDTO[];
+    }): Promise<FacturaEscaneadaDetalleDTO> => unwrap(sf().facturas.guardar(input)),
+    releer: (id: string): Promise<{ ok: true }> => unwrap(sf().facturas.releer({ id })),
+    descartar: (id: string): Promise<{ ok: true }> => unwrap(sf().facturas.descartar({ id })),
+    /** `supplierId` = el proveedor con que se registró la compra (puede no ser el de la factura). */
+    marcarCargada: (
+      id: string,
+      vinculos: { code: string; articleId: string; unitsPerPack?: number }[],
+      supplierId?: string,
+    ): Promise<{ ok: true; guardados: number }> =>
+      unwrap(sf().facturas.marcarCargada({ id, vinculos, ...(supplierId ? { supplierId } : {}) })),
+    /** Compras (`pantalla`) sigue la factura que manda el teléfono (por el enlace) o la que está en revisión (por id). */
+    seguir: (input: { sesion?: string; id?: string; esperaRevision?: boolean; pantalla?: string }): Promise<FacturasSeguimientoDTO> =>
+      unwrap(sf().facturas.seguir(input)),
+    /** La revisión devuelve la factura a la pantalla de Compras (`pantalla`) que la espera. */
+    aCompras: (id: string, pantalla?: string | null): Promise<{ recibe: boolean }> =>
+      unwrap(sf().facturas.aCompras({ id, ...(pantalla ? { pantalla } : {}) })),
   },
   novedades: {
     pendientes: (): Promise<NovedadesPendientesDTO> => unwrap(sf().novedades.pendientes()),
@@ -553,6 +592,8 @@ export const api = {
       unwrap(sf().desktopWindow.list()),
     closeSelf: (): Promise<{ closed: boolean }> => unwrap(sf().desktopWindow.closeSelf()),
     minimizeSelf: (): Promise<{ minimized: boolean }> => unwrap(sf().desktopWindow.minimizeSelf()),
+    /** Esta ventana recibió `extras` nuevos sin recargarse (páginas con `extrasEnVivo` en el registry). */
+    onExtras: (cb: (p: import('@/types/api').DesktopWindowExtrasDTO) => void): (() => void) => sf().desktopWindow.onExtras(cb),
     focusMain: (): Promise<{ ok: true }> => unwrap(sf().desktopWindow.focusMain()),
     openManual: (): Promise<{ created: boolean }> => unwrap(sf().desktopWindow.openManual()),
   },

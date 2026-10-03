@@ -13,6 +13,10 @@ files:
   # Los workspace packages (@stockflow/*) ya están bundleados en dist-electron/main.mjs;
   # excluirlos del traversal de node_modules para evitar el bucle de symlinks de pnpm.
   - "!**/node_modules/@stockflow/**"
+  # onnxruntime-node (lector PaddleOCR de "Facturas por teléfono") trae los binarios
+  # de TODAS las plataformas (~290 MB): a cada paquete va sólo el suyo (ver
+  # mac/win/linux.files más abajo). Su script de instalación no se usa.
+  - "!**/node_modules/onnxruntime-node/script/**"
 
 extraResources:
   - from: ../../packages/db/migrations/local
@@ -21,10 +25,35 @@ extraResources:
       - "**/*"
   - from: build/manual.pdf
     to: manual.pdf
+  # Lector de texto del sistema para "Facturas por teléfono" (programas auxiliares).
+  # `ocr-mac/vision-ocr` NO está versionado: lo compila el job de Mac del
+  # release (.github/workflows/release.yml, universal) o `native/ocr-mac/compilar.sh`
+  # a mano. Si falta, este filtro lo saltea EN SILENCIO: por eso el workflow
+  # falla si no quedó el binario.
+  # `ocr-paddle` (PaddleOCR sobre ONNX Runtime; principal en Windows, respaldo en
+  # Mac): el script corre con el propio Electron como Node y carga onnxruntime-node
+  # y jpeg-js desde app.asar / app.asar.unpacked (no van acá). Los modelos (12,7 MB)
+  # SÍ están versionados.
+  - from: native
+    to: ocr
+    filter:
+      - "ocr-mac/vision-ocr"
+      - "ocr-win/leer.ps1"
+      - "ocr-paddle/leer.mjs"
+      - "ocr-paddle/modelos/**"
 
 asar: true
+# onnxruntime-node queda entero en app.asar.unpacked sin pedirlo: electron-builder
+# desempaqueta el paquete completo al ver sus .dylib/.dll/.so (unpackDetector).
+# jpeg-js y onnxruntime-common se desempaquetan también para que leer.mjs pueda
+# cargar todo desde app.asar.unpacked si no pudiera leer el asar (segunda vía;
+# la primera es app.asar, que Electron en modo Node lee). Con pnpm los patrones
+# se comparan contra la ruta REAL del archivo (.pnpm/...), por eso van con `**/`
+# y sin `node_modules/` adelante.
 asarUnpack:
   - "**/*.node"
+  - "**/jpeg-js/**"
+  - "**/onnxruntime-common/**"
 # Nota: SumatraPDF.exe NO se desempaqueta acá (el asarUnpack con pnpm no funcionó,
 # v0.1.39). Se copia a resources/ vía extraResources en electron-builder.win.yml.
 
@@ -47,6 +76,14 @@ mac:
         - x64
         - arm64
   icon: build/icon.icns
+  files:
+    # onnxruntime-node: sólo el binario de esta plataforma y arquitectura.
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/{linux,win32}/**"
+    # Intel: onnxruntime-node 1.30 no trae binario darwin/x64 (en esas Mac lee sólo Vision).
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/!(${arch})/**"
+    # libonnxruntime.1.30.0.dylib es una copia byte a byte de libonnxruntime.1.dylib
+    # (npm no conserva symlinks); el binding carga @rpath/libonnxruntime.1.dylib. −44 MB.
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/*/libonnxruntime.1.30.0.dylib"
 
 dmg:
   background: build/dmg-background.png
@@ -65,6 +102,12 @@ win:
       arch:
         - x64
   icon: build/icon.ico
+  files:
+    # onnxruntime-node: sólo win32/x64. Van también DirectML.dll, dxcompiler.dll y
+    # dxil.dll (37 MB): el lector usa sólo CPU y no deberían hacer falta, pero no
+    # se probó en una PC con Windows que onnxruntime.dll cargue sin ellas.
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/{darwin,linux}/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/!(${arch})/**"
 
 nsis:
   # Descarga COMPLETA siempre (sin diferencial por bloques). El diferencial
@@ -94,6 +137,9 @@ linux:
         - x64
   category: Office
   icon: build/icon.png
+  files:
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/{darwin,win32}/**"
+    - "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/!(${arch})/**"
 
 publish:
   - provider: github

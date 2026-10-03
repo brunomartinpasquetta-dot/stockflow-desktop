@@ -39,6 +39,10 @@ const transitiveDeps = [
   'napi-build-utils',
   'simple-get',
   'tar-fs',
+  // onnxruntime-node (lector PaddleOCR de "Facturas por teléfono") hace
+  // require('onnxruntime-common'); sin esta copia el paquete sale sin ella y el
+  // lector dice "no disponible" (visto en package:dry, 3-oct-2026).
+  'onnxruntime-common',
 ];
 
 function copyTransitives() {

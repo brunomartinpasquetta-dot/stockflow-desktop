@@ -56,6 +56,8 @@ const EXPECTED_TABLES = [
   'returns',
   'role_area_access',
   'sale_points',
+  'article_supplier_codes',
+  'scanned_invoices',
 ];
 
 let failures = 0;

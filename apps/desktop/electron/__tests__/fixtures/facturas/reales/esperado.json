@@ -1,0 +1,220 @@
+{
+ "alvinovino": {
+  "encabezado": {
+   "cuit": "30712492437",
+   "razonSocial": "AL VINO VINO",
+   "numero": "0011-00030638",
+   "fecha": "2021-01-05",
+   "total": 48122.16
+  },
+  "nota": "Cantidad total en unidades = cantidad×UxB. En los renglones L5 la columna es CAJAS y el pack sale de la descripción o de la cuenta (2 cajas × 12 × 960,002 = 23.040,05).",
+  "renglones": [
+   {
+    "codigo": "1047",
+    "cantidad": 2,
+    "unidadesPorBulto": 12,
+    "descripcion": "RON BACARDI BCO. 12 X 1 LI.",
+    "precioUnitario": 960.002,
+    "importe": 23040.05
+   },
+   {
+    "codigo": "2051",
+    "cantidad": 6,
+    "unidadesPorBulto": null,
+    "descripcion": "GIN BOMBAY X 750 cc. (12X750)",
+    "precioUnitario": 1880.001,
+    "importe": 11280.01
+   },
+   {
+    "codigo": "641",
+    "cantidad": 3,
+    "unidadesPorBulto": null,
+    "descripcion": "GIN BULLDOG (06X700CC",
+    "precioUnitario": 1320.004,
+    "importe": 3960.01
+   },
+   {
+    "codigo": "1081",
+    "cantidad": 3,
+    "unidadesPorBulto": null,
+    "descripcion": "GIN BEEFEATER x 1 Lt (6x1000cc",
+    "precioUnitario": 1444.583,
+    "importe": 4333.75
+   },
+   {
+    "codigo": "704",
+    "cantidad": 6,
+    "unidadesPorBulto": null,
+    "descripcion": "GIN BURNETTS (6x 1 Lt.",
+    "precioUnitario": 363.467,
+    "importe": 2180.8
+   },
+   {
+    "codigo": "3690",
+    "cantidad": 2,
+    "unidadesPorBulto": null,
+    "descripcion": "LICOR BORGHETTI (06x700)",
+    "precioUnitario": 738.346,
+    "importe": 1476.69
+   },
+   {
+    "codigo": "1400",
+    "cantidad": 1,
+    "unidadesPorBulto": null,
+    "descripcion": "GASTOS DE ENVIO",
+    "precioUnitario": 1850.852,
+    "importe": 1850.85
+   }
+  ]
+ },
+ "bernardi": {
+  "encabezado": {
+   "cuit": "33715137009",
+   "razonSocial": "BERNARDI DISTRIBUCIONES S.R.L",
+   "numero": "0004-00019142",
+   "fecha": "2021-01-18",
+   "total": 49519.4
+  },
+  "nota": "19 renglones; cantidad = columna Cantidad (unidades), Bultos se ignora. Códigos cortos (926…29071) en la primera columna.",
+  "codigos": [
+   "1023",
+   "1025",
+   "950",
+   "952",
+   "979",
+   "989",
+   "992",
+   "987",
+   "928",
+   "927",
+   "926",
+   "2394",
+   "2395",
+   "2396",
+   "968",
+   "969",
+   "29071",
+   "940",
+   "976"
+  ],
+  "cantidadRenglones": 19,
+  "suma": 49519.41
+ },
+ "roa": {
+  "encabezado": {
+   "cuit": "27248159362",
+   "razonSocial": "ROA DISTRIBUCIONES",
+   "numero": "0001-00017141",
+   "fecha": "2021-01-07",
+   "letra": "B",
+   "total": 27070
+  },
+  "nota": "5 renglones; el último empieza con una viñeta ('• 4.00 CERVEZA LATA IMP IPA X 473 X 6 510.00 2040.00') y hoy se pierde. El CUIT 00-23178456-0 es del CLIENTE (consumidor final), no del proveedor.",
+  "renglones": [
+   {
+    "codigo": null,
+    "cantidad": 7,
+    "unidadesPorBulto": null,
+    "descripcion": "CERVEZA IMPERIAL X 1L X 12",
+    "precioUnitario": 1620,
+    "importe": 11340
+   },
+   {
+    "codigo": null,
+    "cantidad": 4,
+    "unidadesPorBulto": null,
+    "descripcion": "CERVEZA HEINEKEN X 1L X 12",
+    "precioUnitario": 1710,
+    "importe": 6840
+   },
+   {
+    "codigo": null,
+    "cantidad": 1,
+    "unidadesPorBulto": null,
+    "descripcion": "CERVEZA BARRIL X 30L IMPERIAL",
+    "precioUnitario": 5100,
+    "importe": 5100
+   },
+   {
+    "codigo": null,
+    "cantidad": 1,
+    "unidadesPorBulto": null,
+    "descripcion": "CERVEZA IMPERIAL STOUT X 500 X 12",
+    "precioUnitario": 1750,
+    "importe": 1750
+   },
+   {
+    "codigo": null,
+    "cantidad": 4,
+    "unidadesPorBulto": null,
+    "descripcion": "CERVEZA LATA IMP IPA X 473 X 6",
+    "precioUnitario": 510,
+    "importe": 2040
+   }
+  ]
+ },
+ "bernardi-2": {
+  "nota": "Segunda foto de la MISMA factura Bernardi (0004-00019142), torcida y con cruces de birome. El lector del sistema NO leyó las descripciones de 968 (COCA-COLA RETOR. 8X2 LTS) ni 969 (SPRITE RETOR. 8X2 LTS): esos renglones deben salir igual, con código, cantidad 24 y 16, precio 102,16, importes 2.451,85 y 1.634,56, estado 'revisar' y motivo de descripción faltante. 'SPEED CON CAFE 24X24' es del código 29071 (no de 940). Razón social completa: BERNARDI DISTRIBUCIONES S.R.L. La cantidad ya viene en unidades (Bultos × pack = Cantidad): NO proponer UxB.",
+  "encabezado": {
+   "cuit": "33715137009",
+   "razonSocial": "BERNARDI DISTRIBUCIONES S.R.L",
+   "numero": "0004-00019142",
+   "fecha": "2021-01-18",
+   "letra": "B",
+   "total": 49519.4
+  },
+  "cantidadRenglones": 19,
+  "suma": 49519.41,
+  "codigos": [
+   "1023",
+   "1025",
+   "950",
+   "952",
+   "979",
+   "989",
+   "992",
+   "987",
+   "928",
+   "927",
+   "926",
+   "2394",
+   "2395",
+   "2396",
+   "968",
+   "969",
+   "29071",
+   "940",
+   "976"
+  ],
+  "sinDescripcion": [
+   "968",
+   "969"
+  ],
+  "descripciones": {
+   "29071": "SPEED CON CAFE 24X24",
+   "940": "POWERADE MOUNTAIN BLAST 6X500",
+   "976": "POWERADE F.TROP. 6X500"
+  },
+  "cantidades": {
+   "1023": 72,
+   "1025": 6,
+   "950": 36,
+   "952": 96,
+   "979": 72,
+   "989": 48,
+   "992": 48,
+   "987": 30,
+   "928": 64,
+   "927": 32,
+   "926": 32,
+   "2394": 24,
+   "2395": 24,
+   "2396": 24,
+   "968": 24,
+   "969": 16,
+   "29071": 96,
+   "940": 36,
+   "976": 36
+  }
+ }
+}

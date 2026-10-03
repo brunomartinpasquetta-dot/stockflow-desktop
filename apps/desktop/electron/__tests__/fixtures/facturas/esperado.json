@@ -1,0 +1,976 @@
+{
+ "vital-12": [
+  {
+   "codigo": "0100695",
+   "cantidad": 13,
+   "unidadesPorBulto": null,
+   "descripcion": "Atun S&P desmenuzado en aceite x170gr",
+   "precioUnitario": 825.62,
+   "importe": 10733.06
+  },
+  {
+   "codigo": "0152743",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Atun S&P trozos aceite abre facil x170g",
+   "precioUnitario": 2128.1,
+   "importe": 6384.3
+  },
+  {
+   "codigo": "0100683",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Caballa PUGLISI al agua x380g",
+   "precioUnitario": 3921.49,
+   "importe": 11764.47
+  },
+  {
+   "codigo": "0190207",
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "Fideos CICA tirabuzon forti x500g",
+   "precioUnitario": 619.01,
+   "importe": 3714.06
+  },
+  {
+   "codigo": "0151288",
+   "cantidad": 9,
+   "unidadesPorBulto": null,
+   "descripcion": "Fideos FAVORITA spaghetti x500gr",
+   "precioUnitario": 665.29,
+   "importe": 5987.61
+  },
+  {
+   "codigo": "0101368",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Galletitas CHOCOLINAS x250/262grs",
+   "precioUnitario": 1900.0,
+   "importe": 5700.0
+  },
+  {
+   "codigo": "0121102",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Galletitas KESITAS x75gr",
+   "precioUnitario": 1073.55,
+   "importe": 3220.65
+  },
+  {
+   "codigo": "0121101",
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "Galletitas REX bolsa x75gr",
+   "precioUnitario": 1073.55,
+   "importe": 6441.3
+  },
+  {
+   "codigo": "0112621",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Galletitas SONRISAS frambuesa x108g",
+   "precioUnitario": 990.91,
+   "importe": 2972.73
+  },
+  {
+   "codigo": "0105805",
+   "cantidad": 2,
+   "unidadesPorBulto": null,
+   "descripcion": "Levadura LEVEX sobre 2x10g",
+   "precioUnitario": 718.18,
+   "importe": 1436.36
+  },
+  {
+   "codigo": "0191362",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Magdalena BON MASE c/chips x175g",
+   "precioUnitario": 1404.13,
+   "importe": 1404.13
+  },
+  {
+   "codigo": "0179778",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Mani frito S&P salado s/piel x250gr",
+   "precioUnitario": 2276.24,
+   "importe": 2276.24
+  },
+  {
+   "codigo": "0162080",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Maq afeitar desc SOLEIL x2u",
+   "precioUnitario": 3308.18,
+   "importe": 3308.18
+  },
+  {
+   "codigo": "0147134",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Pimenton ALICANTE x25gr",
+   "precioUnitario": 751.24,
+   "importe": 2253.72
+  },
+  {
+   "codigo": "0127944",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Provenzal ALICANTE x25gr",
+   "precioUnitario": 1057.02,
+   "importe": 3171.06
+  },
+  {
+   "codigo": "0173522",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Rapiditas BIMBO clasicas x275gr",
+   "precioUnitario": 3197.52,
+   "importe": 3197.52
+  },
+  {
+   "codigo": "0115997",
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "Sal fina DOS ESTRELLAS x500gr",
+   "precioUnitario": 453.72,
+   "importe": 2722.32
+  },
+  {
+   "codigo": "0176159",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Te LA VIRGINIA tilo/manza./cedron x25sq",
+   "precioUnitario": 2171.7,
+   "importe": 2171.7
+  },
+  {
+   "codigo": "0149542",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Te LA VIRGINIA verde x20sq",
+   "precioUnitario": 1462.68,
+   "importe": 1462.68
+  },
+  {
+   "codigo": "0189883",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Yerba LA MERCED campo sur liviana x1kg",
+   "precioUnitario": 4607.44,
+   "importe": 13822.32
+  },
+  {
+   "codigo": "0152821",
+   "cantidad": 4,
+   "unidadesPorBulto": null,
+   "descripcion": "Yerba ROSAMONTE PLUS SUAVE 55 ani.x500gr",
+   "precioUnitario": 1238.84,
+   "importe": 4955.36
+  },
+  {
+   "codigo": "00239848",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "ALICANTE ESPECIAS D3U15%",
+   "precioUnitario": -112.69,
+   "importe": -338.06
+  },
+  {
+   "codigo": "00239848",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "ALICANTE ESPECIAS D3U15%",
+   "precioUnitario": -158.55,
+   "importe": -475.66
+  }
+ ],
+ "vital-13": [
+  {
+   "codigo": "0189463",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "SET BAÑO cortina/alfombra/ganchos",
+   "precioUnitario": 20247.93,
+   "importe": 20247.93
+  },
+  {
+   "codigo": "0172161",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Shampoo PLUSBELLE ESEN saludable x970ml",
+   "precioUnitario": 3705.28,
+   "importe": 3705.28
+  },
+  {
+   "codigo": "0130455",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Shampoo TRESEMME liso efect botox x500ml",
+   "precioUnitario": 5784.3,
+   "importe": 17352.9
+  },
+  {
+   "codigo": "0176850",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Sopa crema KNORR verduras nueva x60gr",
+   "precioUnitario": 2276.24,
+   "importe": 2276.24
+  },
+  {
+   "codigo": "0188730",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "TOALLA diseños surtidos 70x140cm",
+   "precioUnitario": 4958.68,
+   "importe": 4958.68
+  },
+  {
+   "codigo": "0188688",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "TOP DEPORTIVO SIN COSTURA Talle 3XL",
+   "precioUnitario": 5785.12,
+   "importe": 5785.12
+  },
+  {
+   "codigo": "0148287",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Toa fem NOSOTRAS normal c/a x16u",
+   "precioUnitario": 2819.21,
+   "importe": 8457.63
+  },
+  {
+   "codigo": "0117803",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Toa fem SIEMPRE LIBRE especial c/a x8u",
+   "precioUnitario": 1528.1,
+   "importe": 4584.3
+  },
+  {
+   "codigo": "0185480",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Tostadas arroz MOLINOS ALA veggie x150gr",
+   "precioUnitario": 2067.15,
+   "importe": 2067.15
+  },
+  {
+   "codigo": "0123164",
+   "cantidad": 2,
+   "unidadesPorBulto": null,
+   "descripcion": "Trapo de piso MEDIA NARANJA blanco G",
+   "precioUnitario": 3011.86,
+   "importe": 6023.72
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -114.46,
+   "importe": -343.39
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -443.39,
+   "importe": -443.39
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 2,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -301.19,
+   "importe": -602.37
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 5,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -122.73,
+   "importe": -613.64
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 24,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -27.19,
+   "importe": -652.56
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -112.31,
+   "importe": -673.88
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 20,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -34.3,
+   "importe": -685.96
+  },
+  {
+   "codigo": "00239767",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -261.07,
+   "importe": -783.22
+  },
+  {
+   "codigo": "00239780",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CERVEZAS Y CUIDADO DEL CABELLO 10%",
+   "precioUnitario": -416.93,
+   "importe": -416.93
+  },
+  {
+   "codigo": "00239799",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CUIDADO DE LA ROPA 15%",
+   "precioUnitario": -1090.78,
+   "importe": -1090.78
+  },
+  {
+   "codigo": "00239799",
+   "cantidad": 2,
+   "unidadesPorBulto": null,
+   "descripcion": "CUIDADO DE LA ROPA 15%",
+   "precioUnitario": -929.63,
+   "importe": -1859.26
+  },
+  {
+   "codigo": "00239853",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "LA CAMPAGNOLA ESPECIAS D3U15%",
+   "precioUnitario": -148.98,
+   "importe": -148.98
+  },
+  {
+   "codigo": "00239853",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "LA CAMPAGNOLA ESPECIAS D3U15%",
+   "precioUnitario": -165.5,
+   "importe": -496.49
+  },
+  {
+   "codigo": "00239855",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "NOSOTRAS/CALIPSO 20%",
+   "precioUnitario": -563.84,
+   "importe": -1691.53
+  }
+ ],
+ "vital-14": [
+  {
+   "codigo": "0183509",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Acond PLUSBELLE ESEN hidrat int x970ml",
+   "precioUnitario": 4169.28,
+   "importe": 4169.28
+  },
+  {
+   "codigo": "0188760",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Antitr DOVE duraz/lech roll-on x50ml",
+   "precioUnitario": 2147.93,
+   "importe": 6443.79
+  },
+  {
+   "codigo": "0179051",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Antitr DOVE original tam.ec x250ml",
+   "precioUnitario": 5577.69,
+   "importe": 16733.07
+  },
+  {
+   "codigo": "0183416",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Arroz largo fino MOLINOS ALA g.sel. x1kg",
+   "precioUnitario": 1114.88,
+   "importe": 3344.64
+  },
+  {
+   "codigo": "0182402",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Bolsa resid VIRUTEX 45x60 plana 10u",
+   "precioUnitario": 1144.63,
+   "importe": 3433.89
+  },
+  {
+   "codigo": "0175191",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Caldo KNORR gallina deshidratado x12u",
+   "precioUnitario": 2140.58,
+   "importe": 2140.58
+  },
+  {
+   "codigo": "0175194",
+   "cantidad": 1,
+   "unidadesPorBulto": 10,
+   "descripcion": "Caldo KNORR gallina deshidratado x6u",
+   "precioUnitario": 1230.58,
+   "importe": 12305.8
+  },
+  {
+   "codigo": "0175166",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Caldo KNORR verdura deshidratado x12u",
+   "precioUnitario": 2140.58,
+   "importe": 2140.58
+  },
+  {
+   "codigo": "0175151",
+   "cantidad": 1,
+   "unidadesPorBulto": 10,
+   "descripcion": "Caldo KNORR verdura deshidratado x6u",
+   "precioUnitario": 1230.58,
+   "importe": 12305.8
+  },
+  {
+   "codigo": "0122490",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Capelettini GIACOMO tridicci x500gr",
+   "precioUnitario": 3718.18,
+   "importe": 11154.54
+  },
+  {
+   "codigo": "0161395",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Cepillo dental COLGATE twister med. 3x2",
+   "precioUnitario": 6148.22,
+   "importe": 6148.22
+  },
+  {
+   "codigo": "0183684",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Chimichurri LA CAMPAGNOLA x23gr",
+   "precioUnitario": 993.19,
+   "importe": 993.19
+  },
+  {
+   "codigo": "0187367",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Crema dent SENSODYNE antisarro x90g",
+   "precioUnitario": 5619.01,
+   "importe": 16857.03
+  },
+  {
+   "codigo": "0155551",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Detergente CIF Bioactive lima d/p x450ml",
+   "precioUnitario": 2610.74,
+   "importe": 7832.22
+  },
+  {
+   "codigo": "0103942",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Espirales RAID x12u",
+   "precioUnitario": 2162.73,
+   "importe": 2162.73
+  },
+  {
+   "codigo": "0103822",
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "Esponja MORTIMER de bronce doble cara",
+   "precioUnitario": 1123.14,
+   "importe": 6738.84
+  },
+  {
+   "codigo": "0103840",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Esponja MORTIMER de fibra cuadriculada",
+   "precioUnitario": 809.09,
+   "importe": 2427.27
+  },
+  {
+   "codigo": "0101154",
+   "cantidad": 2,
+   "unidadesPorBulto": null,
+   "descripcion": "Fideos LUCCHETTI coditos x500gr",
+   "precioUnitario": 1090.0,
+   "importe": 2180.0
+  },
+  {
+   "codigo": "0185202",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Fideos LUCCHETTI nido fettuccine x500gr",
+   "precioUnitario": 1862.73,
+   "importe": 1862.73
+  },
+  {
+   "codigo": "0151685",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Jabon liq ALA matic ecolavado d/p x3lt",
+   "precioUnitario": 7271.9,
+   "importe": 7271.9
+  },
+  {
+   "codigo": "0183674",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Jabon liq GRANBY matic limon d/p x3lt",
+   "precioUnitario": 6197.52,
+   "importe": 6197.52
+  },
+  {
+   "codigo": "0183676",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Jabon liq GRANBY matic rosas d/p x3lt",
+   "precioUnitario": 6197.52,
+   "importe": 6197.52
+  },
+  {
+   "codigo": "0171656",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Lampara led PHILIPS ecohome fria 10/12w",
+   "precioUnitario": 1247.96,
+   "importe": 1247.96
+  },
+  {
+   "codigo": "0128894",
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "Mayonesa CADA DIA doy pack x250gr",
+   "precioUnitario": 495.04,
+   "importe": 2970.24
+  },
+  {
+   "codigo": "0128893",
+   "cantidad": 1,
+   "unidadesPorBulto": 20,
+   "descripcion": "Mayonesa CADA DIA sachet x125g",
+   "precioUnitario": 342.98,
+   "importe": 6859.6
+  },
+  {
+   "codigo": "0130348",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Mayonesa MAYOLIVA sachet x125gr",
+   "precioUnitario": 1090.0,
+   "importe": 3270.0
+  },
+  {
+   "codigo": "0101741",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Mayonesa NATURA d/p x1kg",
+   "precioUnitario": 4433.88,
+   "importe": 4433.88
+  },
+  {
+   "codigo": "0101737",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Mayonesa NATURA doy pack x250gr",
+   "precioUnitario": 1073.55,
+   "importe": 3220.65
+  },
+  {
+   "codigo": "0175267",
+   "cantidad": 1,
+   "unidadesPorBulto": 24,
+   "descripcion": "Mostaza DANICA seleccion granos x60g",
+   "precioUnitario": 271.9,
+   "importe": 6525.6
+  },
+  {
+   "codigo": "0184156",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "Premezcla LUCCHETTI chipa x400grs",
+   "precioUnitario": 5121.78,
+   "importe": 5121.78
+  },
+  {
+   "codigo": "0173580",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Provenzal LA CAMPAGNOLA x23g",
+   "precioUnitario": 1103.31,
+   "importe": 3309.93
+  },
+  {
+   "codigo": "0132736",
+   "cantidad": 5,
+   "unidadesPorBulto": null,
+   "descripcion": "Rejilla MEDIA NARANJA reforzada",
+   "precioUnitario": 1227.27,
+   "importe": 6136.35
+  },
+  {
+   "codigo": "0103878",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Repelente OFF family aerosol x165ml",
+   "precioUnitario": 4255.37,
+   "importe": 12766.11
+  }
+ ],
+ "vital-15": [
+  {
+   "codigo": "106988",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Aceite girasol COCINERO x900cc",
+   "precioUnitario": 2767.77,
+   "importe": 8303.31
+  },
+  {
+   "codigo": "183417",
+   "cantidad": 1,
+   "unidadesPorBulto": 10,
+   "descripcion": "Arroz largo fino MOLINOS ALA g.selx500gr",
+   "precioUnitario": 566.12,
+   "importe": 5661.2
+  },
+  {
+   "codigo": "102847",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Jugo de limon MINERVA pet x250ml",
+   "precioUnitario": 1371.07,
+   "importe": 4113.21
+  },
+  {
+   "codigo": "179398",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Lavandina AYUDIN original x4lt",
+   "precioUnitario": 3883.47,
+   "importe": 11650.41
+  },
+  {
+   "codigo": "176278",
+   "cantidad": 1,
+   "unidadesPorBulto": 3,
+   "descripcion": "Limpiador POETT suavidad de bebex4lt",
+   "precioUnitario": 6338.02,
+   "importe": 19014.06
+  },
+  {
+   "codigo": "101966",
+   "cantidad": 1,
+   "unidadesPorBulto": 12,
+   "descripcion": "Pure de tomate NOEL tetrabrik x520gr",
+   "precioUnitario": 561.16,
+   "importe": 6733.92
+  },
+  {
+   "codigo": "124328",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Salsa chimi. TAHITI t/casero pet x275gr",
+   "precioUnitario": 1486.78,
+   "importe": 4460.34
+  },
+  {
+   "codigo": "153115",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "Vinagre de alcohol S&P x500cc",
+   "precioUnitario": 742.98,
+   "importe": 2228.94
+  },
+  {
+   "codigo": "239767",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -276.78,
+   "importe": -830.33
+  },
+  {
+   "codigo": "239767",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITES, ADEREZOS Y LIMPIEZA DEL HOGAR 10%",
+   "precioUnitario": -633.8,
+   "importe": -1901.41
+  }
+ ],
+ "buensol": [
+  {
+   "codigo": "016203711000",
+   "cantidad": 4,
+   "unidadesPorBulto": null,
+   "descripcion": "ACEITE GIRASOL NATURA X 5 L SIN TACC @",
+   "precioUnitario": 18671.716,
+   "importe": 74686.86
+  },
+  {
+   "codigo": "020101350001",
+   "cantidad": 2,
+   "unidadesPorBulto": null,
+   "descripcion": "KETCHUP DANICA 192 X 8 CC # SIN TACC",
+   "precioUnitario": 9599.0,
+   "importe": 19198.0
+  },
+  {
+   "codigo": "013101350192",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "MAYONESA DANICA S.ORIG./192 X 8 CC",
+   "precioUnitario": 8902.95,
+   "importe": 8902.95
+  },
+  {
+   "codigo": "020103710001",
+   "cantidad": 12,
+   "unidadesPorBulto": null,
+   "descripcion": "KETCHUP NATURA X 250 CC #",
+   "precioUnitario": 1331.0,
+   "importe": 15972.0
+  },
+  {
+   "codigo": "013103710003",
+   "cantidad": 12,
+   "unidadesPorBulto": null,
+   "descripcion": "MAYONESA NATURA X 250 OFERTA SIN TACC @",
+   "precioUnitario": 1197.0001,
+   "importe": 14364.0
+  },
+  {
+   "codigo": "086809990016",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "MAIZ PISINGALLO TRIMACER X 5 KG.",
+   "precioUnitario": 6814.0001,
+   "importe": 6814.0
+  },
+  {
+   "codigo": "056701600007",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "CHIMICHURRI VANOLI X 190 CC PICANTE SIN TACC",
+   "precioUnitario": 1145.5501,
+   "importe": 3436.65
+  },
+  {
+   "codigo": "045904880002",
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "CHAMPIÑON CUMANA LAMINADO X 400 G SIN TACC",
+   "precioUnitario": 2105.0,
+   "importe": 12630.0
+  },
+  {
+   "codigo": "053504880001",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "PALMITO CUMANA' X 396 GRS TROZOS",
+   "precioUnitario": 1463.0001,
+   "importe": 4389.0
+  },
+  {
+   "codigo": "040602100002",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "LENTEJAS INALPA X 300 GR. &",
+   "precioUnitario": 760.0,
+   "importe": 2280.0
+  },
+  {
+   "codigo": "069605010017",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CONDIMENTO LA VIRGINIA 12 X 25 EMPANADAS Y RELLENOS #",
+   "precioUnitario": 11906.4505,
+   "importe": 11906.45
+  },
+  {
+   "codigo": "069505010002",
+   "cantidad": 2,
+   "unidadesPorBulto": null,
+   "descripcion": "CONDIMENTO PARA PIZZA LA VIRGINIA 12 X 25 GRS # SIN TACC",
+   "precioUnitario": 8880.0,
+   "importe": 17760.0
+  },
+  {
+   "codigo": "069305010010",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CONDIMENTO PARA ARROZ LA VIRGINIA 12 X 25 GRS # SIN TACC",
+   "precioUnitario": 10253.698,
+   "importe": 10253.7
+  },
+  {
+   "codigo": "040108180001",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "CHOCLO DOÑA PUPA GRANO AMARILLO X 340 GR # SIN TACC",
+   "precioUnitario": 1219.5201,
+   "importe": 3658.56
+  },
+  {
+   "codigo": "045608180001",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "ARVEJAS AL NAT DOÑA PUPA X 340 G SIN TACC",
+   "precioUnitario": 509.386,
+   "importe": 1528.16
+  },
+  {
+   "codigo": "040108180003",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "CHOCLO DOÑA PUPA MIX C/ARVEJAS X 340 GR # SIN TACC",
+   "precioUnitario": 867.29,
+   "importe": 2601.87
+  },
+  {
+   "codigo": "055108180001",
+   "cantidad": 3,
+   "unidadesPorBulto": null,
+   "descripcion": "JARDINERA DOÑA PUPA X 340 G SIN TACC",
+   "precioUnitario": 808.0001,
+   "importe": 2424.0
+  },
+  {
+   "codigo": "050508920017",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CALDO ALICANTE X 12U x 7.5 G GALLINA # SIN TACC",
+   "precioUnitario": 3116.7075,
+   "importe": 3116.71
+  },
+  {
+   "codigo": "050508920016",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CALDO ALICANTE X 12U x 7,5 G CHAMP Y HONGOS # SIN TACC",
+   "precioUnitario": 3573.4989,
+   "importe": 3573.5
+  },
+  {
+   "codigo": "050508920010",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CALDO ALICANTE X 12U x 7,5 G FINAS HIERBAS # SIN TACC",
+   "precioUnitario": 3354.828,
+   "importe": 3354.83
+  },
+  {
+   "codigo": "050508920012",
+   "cantidad": 1,
+   "unidadesPorBulto": null,
+   "descripcion": "CALDO ALICANTE X 12U x 7.5 G VERDURAS # SIN TACC",
+   "precioUnitario": 3043.4966,
+   "importe": 3043.5
+  }
+ ],
+ "pedido-munini": [
+  {
+   "codigo": null,
+   "cantidad": 20,
+   "unidadesPorBulto": null,
+   "descripcion": "TUBO CALAMAR \"M\" IQF X KG 10",
+   "precioUnitario": 22200.0,
+   "importe": null
+  },
+  {
+   "codigo": null,
+   "cantidad": 12,
+   "unidadesPorBulto": null,
+   "descripcion": "BASTON DE CALAMAR REBOZADO",
+   "precioUnitario": 4500.0,
+   "importe": null
+  },
+  {
+   "codigo": null,
+   "cantidad": 6,
+   "unidadesPorBulto": null,
+   "descripcion": "BOCADITO DE PAPA Y QUESO",
+   "precioUnitario": 4300.0,
+   "importe": null
+  },
+  {
+   "codigo": null,
+   "cantidad": 30,
+   "unidadesPorBulto": null,
+   "descripcion": "PATITA DE POLLO REBOZADA",
+   "precioUnitario": 5300.0,
+   "importe": null
+  }
+ ],
+ "bebidas": [
+  {
+   "codigo": null,
+   "cantidad": null,
+   "unidadesPorBulto": null,
+   "descripcion": "AQUARIUS NARANJA 6X1500",
+   "precioUnitario": 2937.59,
+   "importe": null
+  },
+  {
+   "codigo": null,
+   "cantidad": null,
+   "unidadesPorBulto": null,
+   "descripcion": "COCA-COLA 6X21/4",
+   "precioUnitario": 4844.99,
+   "importe": null
+  },
+  {
+   "codigo": null,
+   "cantidad": null,
+   "unidadesPorBulto": null,
+   "descripcion": "AGUA DE MESA 6X2 LITROS",
+   "precioUnitario": 874.27,
+   "importe": null
+  },
+  {
+   "codigo": null,
+   "cantidad": null,
+   "unidadesPorBulto": null,
+   "descripcion": "SODA SIFON ESTAMBUL 6X1,75",
+   "precioUnitario": 1523.71,
+   "importe": null
+  },
+  {
+   "codigo": null,
+   "cantidad": null,
+   "unidadesPorBulto": null,
+   "descripcion": "FERNET BRANCA 12X750",
+   "precioUnitario": 17154.55,
+   "importe": null
+  }
+ ]
+}

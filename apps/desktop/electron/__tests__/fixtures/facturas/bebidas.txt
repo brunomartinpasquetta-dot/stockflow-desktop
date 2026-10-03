@@ -1,0 +1,1 @@
+<table border="1"><tr><td>DESCRIPCION</td><td>Unitario</td></tr><tr><td>AQUARIUS NARANJA 6X1500</td><td>2,937.59</td></tr><tr><td>COCA-COLA 6X21/4</td><td>4,844.99</td></tr><tr><td>AGUA DE MESA 6X2 LITROS</td><td>874.27</td></tr><tr><td>SODA SIFON ESTAMBUL 6X1,75</td><td>1,523.71</td></tr><tr><td>FERNET BRANCA 12X750</td><td>17,154.55</td></tr></table>
