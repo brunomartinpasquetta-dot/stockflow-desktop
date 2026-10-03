@@ -5,7 +5,8 @@
       "version": "1.12.0",
       "novedades": [
         "Compras: cargar facturas de proveedores con el teléfono. En Compras, el botón 'Cargar con el teléfono' muestra un código QR; se escanea con el celular, se fotografían las hojas de la factura y la PC las lee en segundos: proveedor, número, fecha y los renglones con cantidad y costo completan el formulario de Compras. Si una foto sale borrosa, oscura o cortada, el teléfono pide repetirla. Los artículos se vinculan solos desde la segunda factura de cada proveedor; nada entra al stock hasta confirmar la compra. Es opcional y viene apagada: se activa en Configuración, pestaña 'Facturas por teléfono'.",
-        "Contabilidad: nueva vista 'Facturas de compra' con todas las facturas de compra cargadas (A, B, C y X), agrupadas por proveedor con subtotales y ordenadas por fecha, con filtros por período, proveedor y tipo de comprobante, detalle de cada compra y exportación a Excel."
+        "Contabilidad: nueva vista 'Facturas de compra' con todas las facturas de compra cargadas (A, B, C y X), agrupadas por proveedor con subtotales y ordenadas por fecha, con filtros por período, proveedor y tipo de comprobante, detalle de cada compra y exportación a Excel.",
+        "Contabilidad: nueva vista 'Facturas emitidas' con todos los comprobantes de venta del período (facturas A, B y C con su CAE y número fiscal, comprobantes X y notas de crédito), agrupados por cliente con subtotales y ordenados por fecha, con filtros por período, cliente y tipo de comprobante, detalle de cada venta y exportación a Excel."
       ],
       "internas": true
     },

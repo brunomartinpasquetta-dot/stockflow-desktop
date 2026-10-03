@@ -1648,6 +1648,18 @@ a { color: inherit; }
 <div class='tip'><span>Al pie se ven los totales del listado: cantidad de comprobantes, proveedores, neto, IVA y total. Las anuladas se cuentan aparte y no suman.</span></div>
 <div class='tip'><span>Si la compra se cargó sin el número de factura del proveedor, en &#x27;Número&#x27; se muestra el número interno (&#x27;Int. N&#x27;).</span></div>
 </div>
+<h3>Facturas emitidas (todos los comprobantes de venta, no sólo los del Libro IVA)</h3>
+<p>Es la misma vista del lado de las ventas. &#x27;Facturas emitidas&#x27; muestra todos los comprobantes de venta del período —facturas A, B y C electrónicas con su CAE y número fiscal, comprobantes X y notas de crédito o débito emitidas— agrupados por cliente con subtotales de neto, IVA y total, y ordenados por fecha dentro de cada grupo. Responde &#x27;¿cuánto le facturé a tal cliente este mes?&#x27; de un vistazo.</p>
+<ol class='steps'>
+<li>Menú Contabilidad → &#x27;Facturas emitidas&#x27;, o el botón del mismo nombre en la pantalla de Contabilidad (F10), junto a &#x27;Facturas de compra&#x27;.</li>
+<li>Elija el período con &#x27;Desde&#x27; y &#x27;Hasta&#x27; (viene el mes en curso) o un atajo, y presione &#x27;Calcular&#x27;.</li>
+<li>Filtre por &#x27;Cliente&#x27; y por &#x27;Comprobante&#x27; (Todos, A, B, C o X). En &#x27;Orden&#x27; elija &#x27;Agrupar por cliente&#x27; o &#x27;Sólo por fecha&#x27;.</li>
+<li>Tilde &#x27;Incluir anuladas&#x27; para ver también las ventas anuladas (tachadas). &#x27;Ver&#x27; abre el detalle de la venta y &#x27;Excel&#x27; exporta la lista en el mismo orden que la pantalla.</li>
+</ol>
+<div class='tips'>
+<div class='tip'><span>Con CAE, en &#x27;Número&#x27; se muestra la numeración fiscal (punto de venta y número, 00004-00001234); sin CAE, el número interno. Una factura A, B o C sin CAE con la facturación electrónica activa figura como &#x27;Pendiente&#x27;.</span></div>
+<div class='tip'><span>Las ventas sin cliente asignado quedan en el grupo &#x27;Consumidor final&#x27;. Las notas de crédito aparecen como &#x27;NC&#x27; con importe negativo y restan en los totales; las anuladas se cuentan aparte y no suman.</span></div>
+</div>
 <h3>Presupuestos: Crear, Imprimir y Convertir en Venta</h3>
 <p>Generá presupuestos (cotizaciones) sin tocar stock ni caja. Armá un listado de artículos con precios, imprimí en PDF A4 formal (con membrete, número de presupuesto, vigencia), y cuando el cliente acepte, convertilo directo en una venta eligiendo si usar el precio congelado o el actual.</p>
 <p>NEW (2026-06): Ticket A4 FORMAL con marco que ocupa la hoja, diferente del ticket de 58/80mm. Presupuestos con validez configurable, número secuencial P-0001, P-0002, etc.</p>

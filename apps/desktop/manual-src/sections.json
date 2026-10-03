@@ -2462,6 +2462,22 @@
      ]
     },
     {
+     "heading": "Facturas emitidas (todos los comprobantes de venta, no sólo los del Libro IVA)",
+     "paragraphs": [
+      "Es la misma vista del lado de las ventas. 'Facturas emitidas' muestra todos los comprobantes de venta del período —facturas A, B y C electrónicas con su CAE y número fiscal, comprobantes X y notas de crédito o débito emitidas— agrupados por cliente con subtotales de neto, IVA y total, y ordenados por fecha dentro de cada grupo. Responde '¿cuánto le facturé a tal cliente este mes?' de un vistazo."
+     ],
+     "steps": [
+      "Menú Contabilidad → 'Facturas emitidas', o el botón del mismo nombre en la pantalla de Contabilidad (F10), junto a 'Facturas de compra'.",
+      "Elija el período con 'Desde' y 'Hasta' (viene el mes en curso) o un atajo, y presione 'Calcular'.",
+      "Filtre por 'Cliente' y por 'Comprobante' (Todos, A, B, C o X). En 'Orden' elija 'Agrupar por cliente' o 'Sólo por fecha'.",
+      "Tilde 'Incluir anuladas' para ver también las ventas anuladas (tachadas). 'Ver' abre el detalle de la venta y 'Excel' exporta la lista en el mismo orden que la pantalla."
+     ],
+     "tips": [
+      "Con CAE, en 'Número' se muestra la numeración fiscal (punto de venta y número, 00004-00001234); sin CAE, el número interno. Una factura A, B o C sin CAE con la facturación electrónica activa figura como 'Pendiente'.",
+      "Las ventas sin cliente asignado quedan en el grupo 'Consumidor final'. Las notas de crédito aparecen como 'NC' con importe negativo y restan en los totales; las anuladas se cuentan aparte y no suman."
+     ]
+    },
+    {
      "heading": "Presupuestos: Crear, Imprimir y Convertir en Venta",
      "paragraphs": [
       "Generá presupuestos (cotizaciones) sin tocar stock ni caja. Armá un listado de artículos con precios, imprimí en PDF A4 formal (con membrete, número de presupuesto, vigencia), y cuando el cliente acepte, convertilo directo en una venta eligiendo si usar el precio congelado o el actual.",

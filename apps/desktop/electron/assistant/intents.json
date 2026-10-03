@@ -11803,6 +11803,43 @@
      }
     },
     {
+     "id": "facturas-emitidas",
+     "canonical": "¿Dónde veo todos los comprobantes de venta emitidos, agrupados por cliente y fecha (Facturas emitidas)?",
+     "patterns": [
+      "ver facturas emitidas",
+      "listado de facturas de venta",
+      "cuanto le facture a tal cliente",
+      "cuanto le facture a este cliente en el mes",
+      "comprobantes emitidos por cliente",
+      "comprobantes de venta por cliente",
+      "facturas de venta agrupadas por cliente",
+      "todas las facturas que le hice a un cliente",
+      "ver las facturas b y c de ventas en contabilidad",
+      "el libro iva ventas no me muestra los comprobantes x",
+      "listado de ventas por cliente con numero de factura",
+      "exportar las facturas emitidas a excel",
+      "notas de credito emitidas por cliente",
+      "ventas sin cae en el mes",
+      "resumen de facturacion por cliente",
+      "informe de facturas emitidas",
+      "que le vendi a tal cliente este mes con factura"
+     ],
+     "answer": "En el menú 'Contabilidad' → 'Facturas emitidas' (también con el botón del mismo nombre en la pantalla de Contabilidad, junto a 'Facturas de compra'). Es la misma vista del lado de las ventas: muestra todos los comprobantes de venta del período —facturas A, B y C con su CAE y número fiscal, comprobantes X y notas de crédito o débito— agrupados por cliente con subtotales de neto, IVA y total, y ordenados por fecha dentro de cada grupo. Sirve para responder '¿cuánto le facturé a tal cliente este mes?' aunque los comprobantes no vayan al Libro IVA Ventas. Por defecto muestra el mes en curso; se filtra por Cliente y por Comprobante (Todos, A, B, C o X), se puede ordenar 'Sólo por fecha', tildar 'Incluir anuladas' (salen tachadas y no suman), abrir cada venta con 'Ver' y exportar todo a Excel. Las ventas sin cliente asignado quedan en el grupo 'Consumidor final'; una factura A, B o C sin CAE con la facturación electrónica activa figura como 'Pendiente'.",
+     "steps": [
+      "Menú 'Contabilidad' → 'Facturas emitidas' (o F10 → botón 'Facturas emitidas'). Requiere el permiso de contabilidad.",
+      "Elija 'Desde' y 'Hasta' (viene el mes en curso; los 'Atajos' cambian el período de un toque) y presione 'Calcular'.",
+      "Si quiere un solo cliente, elíjalo en 'Cliente'; en 'Comprobante' puede dejar Todos o ver sólo A, B, C o X.",
+      "En 'Orden' elija 'Agrupar por cliente' (cada cliente con su subtotal) o 'Sólo por fecha' (una lista única con la columna Cliente).",
+      "Tilde 'Incluir anuladas' si quiere ver también las ventas anuladas: aparecen tachadas y no suman en los totales.",
+      "Con 'Ver' (o doble clic) se abre el detalle de la venta, con su comprobante fiscal si lo tiene; con 'Excel' se descarga la planilla en el mismo orden que la pantalla."
+     ],
+     "image": "contabilidad-resumen.png",
+     "action": {
+      "label": "Abrir Facturas emitidas",
+      "screen": "facturas-emitidas"
+     }
+    },
+    {
      "id": "crear-presupuesto",
      "canonical": "¿Cómo hago un presupuesto?",
      "patterns": [
