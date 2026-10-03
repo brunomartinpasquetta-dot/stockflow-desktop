@@ -55,6 +55,21 @@ jobs:
       # frente al IVA del receptor (RG 5616). Sin ese campo ARCA rechaza TODOS
       # los comprobantes desde el 1/12/2026 — no puede romperse en silencio.
       - run: pnpm --filter @stockflow/desktop run test:fiscal-xml
+      # "Facturas por teléfono": el armado de renglones y el vinculador de
+      # artículos son TypeScript puro (sin base de datos): corren acá con node.
+      - run: pnpm --filter @stockflow/desktop run test:facturas-parser
+      - run: pnpm --filter @stockflow/desktop run test:facturas-asociador
+      # Lector de texto del sistema para "Facturas por teléfono" en Mac
+      # (apps/desktop/native/ocr-mac/vision-ocr). NO está versionado: se compila
+      # acá, universal (Intel + Apple Silicon). Si falta, el paquete de Mac
+      # saldría sin lector y la función obligaría a instalar Ollama; por eso el
+      # job falla si no quedó el binario (electron-builder lo copia en silencio).
+      - name: Compilar lector del sistema (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          sh apps/desktop/native/ocr-mac/compilar.sh
+          test -x apps/desktop/native/ocr-mac/vision-ocr
+          lipo -info apps/desktop/native/ocr-mac/vision-ocr
       - run: pnpm --filter @stockflow/desktop run build:web
       - run: pnpm --filter @stockflow/desktop run build:electron
       - name: Publish (macOS)
@@ -85,3 +100,23 @@ jobs:
           # estable de los clientes). Tag vX.Y.Z limpio → release final.
           EP_PRE_RELEASE: ${{ contains(github.ref_name, '-beta') }}
         run: pnpm --filter @stockflow/desktop run publish:win
+      # El lector de Windows (PaddleOCR sobre onnxruntime-node) viaja como
+      # recursos extra + módulo nativo desempaquetado. electron-builder los copia
+      # en silencio: si faltan, la función lee con el lector nativo de Windows,
+      # que midió peor. Se comprueba sobre lo que se acaba de empaquetar.
+      - name: Verificar lector de facturas en el paquete (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $base = "apps/desktop/release/win-unpacked/resources"
+          foreach ($f in @(
+            "$base/ocr/ocr-paddle/leer.mjs",
+            "$base/ocr/ocr-paddle/modelos/ch_PP-OCRv5_det_mobile.onnx",
+            "$base/ocr/ocr-paddle/modelos/latin_PP-OCRv5_rec_mobile.onnx",
+            "$base/ocr/ocr-win/leer.ps1",
+            "$base/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll",
+            "$base/app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime_binding.node"
+          )) {
+            if (-not (Test-Path -LiteralPath $f)) { Write-Error "FALTA en el paquete: $f"; exit 1 }
+            Write-Host "OK $f"
+          }

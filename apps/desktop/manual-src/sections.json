@@ -1524,7 +1524,7 @@
   {
    "id": "compras",
    "title": "Módulo de Compras",
-   "overview": "El módulo de Compras te permite registrar compras de productos a proveedores de forma rápida y eficiente. Manejá costos, actualiza automáticamente stock y precios de venta, elegí cómo pagar (contado, cuenta corriente o múltiples medios) y controlá el historial completo de compras con posibilidad de anular cuando sea necesario.",
+   "overview": "El módulo de Compras te permite registrar compras de productos a proveedores de forma rápida y eficiente. Manejá costos, actualiza automáticamente stock y precios de venta, elegí cómo pagar (contado, cuenta corriente o múltiples medios) y controlá el historial completo de compras con posibilidad de anular cuando sea necesario. Y si el proveedor le entrega la factura en papel, puede fotografiarla con el teléfono y dejar que el sistema complete el formulario ('Cargar con el teléfono').",
    "subsections": [
     {
      "heading": "Registrar una compra",
@@ -1657,6 +1657,55 @@
       "En la zona de pago, en 'El dinero sale de' elegí Caja diaria o Caja General.",
       "Si elegís Caja General, mirá el saldo disponible que se muestra.",
       "Elegí la forma de pago y confirmá (F2). El egreso queda registrado en la caja elegida."
+     ]
+    },
+    {
+     "heading": "Cargar facturas con el teléfono",
+     "paragraphs": [
+      "Con 'Cargar con el teléfono' la factura del proveedor se fotografía con el celular y el sistema la lee: completa el formulario de Compras con el proveedor, el tipo y número de comprobante, la fecha y los renglones con cantidad y costo. Usted revisa y confirma la compra como siempre: nada entra al stock ni a la cuenta corriente del proveedor hasta que la registra.",
+      "La lectura la hace la PC con el lector de texto del sistema (Windows y Mac), en segundos por hoja y sin descargar nada. Las fotos no salen del comercio.",
+      "La función viene apagada. Se activa una sola vez en Configuración → pestaña 'Facturas por teléfono' (en una red de varias PC, en la PC servidor). Si Windows pregunta por el Firewall, permita el acceso en redes privadas: la PC recibe las fotos por el puerto 7790."
+     ],
+     "steps": [
+      "En Compras, presione 'Cargar con el teléfono' (arriba a la derecha, junto a 'Ver historial'). Aparece un código QR.",
+      "Elija cómo se conecta el teléfono: 'Por Wi-Fi' (debe estar en la misma red Wi-Fi que la PC) o 'Por internet' (sólo si el comercio tiene activado el Acceso remoto; sirve con datos móviles o cualquier Wi-Fi).",
+      "Escanee el QR con la cámara del teléfono. Se abre la página 'Factura de compra', sin instalar nada.",
+      "Saque una foto de cada hoja, en orden, con 'Sacar foto de la hoja 1', 'Sacar foto de la hoja 2'… Por internet la cámara se abre dentro de la página, con un recuadro guía y avisos de luz, reflejo, distancia y enfoque: cuando el recuadro se pone verde ('Listo. Toque para capturar'), capture.",
+      "Si una hoja salió borrosa, oscura, cortada o inclinada, o se leyó pero le faltan renglones, el teléfono avisa y pide repetirla. 'Repetir la foto' la saca de nuevo; 'Usar igual' sigue con esa foto.",
+      "Toque 'Enviar factura'. La PC lee cada hoja ('Leyendo hoja 1 de 2…'); puede dejar el teléfono y seguir trabajando.",
+      "Si todo se reconoció, el formulario de Compras se completa solo y aparece 'Factura cargada desde el teléfono: revise y confirme la compra'. Si hay algo que resolver, se abre 'Facturas escaneadas' en la revisión de esa factura (vea la subsección siguiente); al terminar allí con 'Cargar en Compras', la factura vuelve a este formulario.",
+      "Controle los renglones, el total y la forma de pago, y confirme la compra (F2) como con cualquier otra."
+     ],
+     "tips": [
+      "Para una buena foto: apoye la hoja plana sobre la mesa, con buena luz y sin sombras ni reflejos; sostenga el teléfono derecho, paralelo a la hoja, y haga entrar la hoja completa (con sus bordes) en la foto. Espere a que la cámara enfoque antes de capturar.",
+      "Una factura puede tener hasta 12 hojas. Con el mismo QR puede enviar varias facturas, una por vez: cuando terminó la primera, toque 'Cargar otra factura' en el teléfono.",
+      "El código QR tiene vencimiento (la cuenta regresiva se ve debajo). Si venció, presione 'Generar otro'. Mientras el teléfono está enviando hojas, no vence.",
+      "Si el formulario de Compras ya tiene renglones cargados, el sistema pregunta '¿Reemplazar la compra en curso?' antes de pisarlos.",
+      "El sistema aprende: al registrar la compra recuerda el código con el que ese proveedor imprime cada artículo (o la descripción, si no usa códigos). Desde la segunda factura del mismo proveedor los renglones salen vinculados solos.",
+      "Lo que NO hace: no registra compras por su cuenta, no lee los renglones desde ARCA (ARCA no los tiene) y no reemplaza su control: compare siempre la factura con lo que llegó."
+     ]
+    },
+    {
+     "heading": "Revisar la factura fotografiada: proveedor, artículos y control",
+     "paragraphs": [
+      "Cuando la factura necesita una decisión suya, se abre 'Facturas escaneadas' (también desde el botón del mismo nombre en Compras, que muestra cuántas facturas hay listas). A la izquierda se ve la foto de la hoja, con zoom; a la derecha, el encabezado y la tabla de renglones. Al tocar un renglón, la foto salta a su hoja.",
+      "Cada renglón muestra el código del proveedor, la descripción leída, el artículo de StockFlow, la columna 'Vínculo' (Código, Aprendido, Sugerido, Elegido, o '—' si no tiene), cantidad, unidades por bulto, precio e importe, y un estado: 'Correcto' (la cuenta cantidad × precio = importe cierra), 'Corregido' (el sistema ajustó la cantidad para que cierre) o 'Revisar', en rojo (no cierra o falta un dato). Al pie, 'Control' compara la suma de los renglones con el total impreso en la factura: 'Coincide' o 'Difiere en $…'."
+     ],
+     "steps": [
+      "Proveedor: si lo reconoció por el CUIT del código QR fiscal, ya está elegido. Si no está registrado, presione 'Crear proveedor': se abre con el nombre y el CUIT leídos de la factura para que los controle y lo cree. Si el proveedor existe pero sin CUIT, aparece la casilla 'Guardar el CUIT … en este proveedor': déjela tildada y las próximas facturas se asocian solas.",
+      "Tipo, número y fecha: vienen del código QR fiscal de la factura. Si no se leyeron, complételos; el tipo es obligatorio porque define si los precios leídos son netos (Factura A) o finales (B, C y X).",
+      "Renglones sin artículo: el sistema propone el más parecido, con la etiqueta 'Sugerido' en la columna Vínculo o como pregunta '¿…?' debajo del renglón. Contrólelo contra la factura; 'Aceptar sugeridos' confirma todos de una vez. Si no es el correcto, 'Cambiar' o 'Vincular' abre el buscador por código, descripción o marca.",
+      "Producto que no existe: 'Crear artículo' lo da de alta con los datos de la factura (descripción, código de barras si lo tiene o uno interno con 'Generar', IVA, costo y, si quiere, precio de venta) y lo deja vinculado.",
+      "Flete, envío u otros cargos: márquelos con 'Es un gasto'. Cuentan para el total de la factura pero no se cargan como mercadería.",
+      "Renglones en rojo ('Revisar'): compárelos con la foto y corrija cantidad, unidades por bulto, precio o importe hasta que la cuenta cierre. Si 'Control' dice 'Difiere', suele faltar un renglón (hoja cortada), o la diferencia es de percepciones, impuestos internos u otra alícuota de IVA.",
+      "Presione 'Cargar en Compras'. Si vino desde 'Cargar con el teléfono', la factura vuelve al formulario de Compras que la esperaba; allí la confirma. Recién al registrar la compra la factura pasa a 'Cargada' y el sistema recuerda los vínculos."
+     ],
+     "tips": [
+      "Factura repetida: si ese comprobante ya se cargó, aparece 'Esta factura ya fue cargada el dd/mm/aaaa' (o 'Repetida' en la lista). Si la carga de nuevo, el stock y la deuda quedan duplicados.",
+      "'Volver a leer' repite la lectura de las fotos (se pierden las correcciones hechas); 'Descartar' borra las fotos y lo leído. Las fotos de las facturas ya cargadas se borran solas a los 90 días.",
+      "Un código subrayado en ámbar es un 'código dudoso': la hoja salió cortada en un borde o el código estaba en una línea aparte. Esos renglones no se vinculan solos ni se recuerdan para el proveedor.",
+      "Las notas de crédito no se cargan como compra: la revisión lo avisa.",
+      "Mejorar lectura (Configuración → Facturas por teléfono): para facturas difíciles (letra muy chica, mal impresas) puede activar un lector con inteligencia artificial, más preciso. Requiere Ollama (se instala desde la pestaña 'Flowy con IA') y una descarga única de 1,6 GB; cada hoja puede demorar varios minutos, pero se lee de fondo y puede seguir trabajando. El lector común alcanza para la mayoría de las facturas."
      ]
     }
    ],
@@ -2397,6 +2446,22 @@
      ]
     },
     {
+     "heading": "Facturas de compra (todas las facturas de compra, no sólo las del Libro IVA)",
+     "paragraphs": [
+      "El Libro IVA Compras lista únicamente los comprobantes que van al libro. 'Facturas de compra' muestra todas las facturas de compra cargadas en el período, sean A, B, C o X, agrupadas por proveedor con subtotales de neto, IVA y total, y ordenadas por fecha dentro de cada grupo. Responde '¿qué le compré a tal proveedor este mes?' de un vistazo."
+     ],
+     "steps": [
+      "Menú Contabilidad → 'Facturas de compra', o el botón del mismo nombre en la pantalla de Contabilidad (F10), junto a los Libros IVA.",
+      "Elija el período con 'Desde' y 'Hasta' (viene el mes en curso) o un atajo, y presione 'Calcular'.",
+      "Filtre por 'Proveedor' y por 'Comprobante' (Todos, A, B, C o X). En 'Orden' elija 'Agrupar por proveedor' o 'Sólo por fecha'.",
+      "Tilde 'Incluir anuladas' para ver también las anuladas (tachadas). 'Ver' abre el detalle de cada compra y 'Excel' exporta la lista en el mismo orden que la pantalla."
+     ],
+     "tips": [
+      "Al pie se ven los totales del listado: cantidad de comprobantes, proveedores, neto, IVA y total. Las anuladas se cuentan aparte y no suman.",
+      "Si la compra se cargó sin el número de factura del proveedor, en 'Número' se muestra el número interno ('Int. N')."
+     ]
+    },
+    {
      "heading": "Presupuestos: Crear, Imprimir y Convertir en Venta",
      "paragraphs": [
       "Generá presupuestos (cotizaciones) sin tocar stock ni caja. Armá un listado de artículos con precios, imprimí en PDF A4 formal (con membrete, número de presupuesto, vigencia), y cuando el cliente acepte, convertilo directo en una venta eligiendo si usar el precio congelado o el actual.",
@@ -3039,6 +3104,22 @@
       "Si algún usuario tiene una contraseña fácil de adivinar (por ejemplo 'admin' o '1234'), el sistema no deja activarlo y dice cuál hay que cambiar en Configuración → Usuarios.",
       "Desde internet no se puede facturar en ARCA, cambiar los datos del comercio, borrar artículos/clientes/proveedores, actualizar precios en lote ni restaurar copias: eso se hace en el local.",
       "Sólo lo puede activar un usuario con permiso de Configuración de hardware (por defecto, el administrador)."
+     ]
+    },
+    {
+     "heading": "Facturas por teléfono",
+     "paragraphs": [
+      "Activa la carga de facturas de compra fotografiándolas con el celular (vea Compras → 'Cargar facturas con el teléfono'). Viene apagada; mientras está apagada, Compras no cambia en nada."
+     ],
+     "steps": [
+      "Configuración → pestaña 'Facturas por teléfono' (en una red de varias PC, en la PC servidor; en los puestos sólo se ve el estado).",
+      "Tilde 'Activar las facturas por teléfono'. Si Windows pregunta por el Firewall, permita el acceso en redes privadas: la PC recibe las fotos por el puerto 7790.",
+      "Controle que 'Lector' diga 'Incluido en el sistema', 'Recepción de fotos' diga 'Activa' y 'Estado' diga 'Listo'. En Compras aparecen los botones 'Cargar con el teléfono' y 'Facturas escaneadas'."
+     ],
+     "tips": [
+      "'Mejorar lectura' es opcional: un lector con inteligencia artificial, más preciso para facturas difíciles y mucho más lento (varios minutos por hoja, de fondo). Necesita Ollama instalado (pestaña 'Flowy con IA', sin necesidad de activar a Flowy) y 'Descargar lector (1,6 GB)' una sola vez.",
+      "Sólo la puede activar un usuario con permiso de Configuración de hardware (por defecto, el administrador).",
+      "'Por internet' en el QR de Compras sólo aparece si el Acceso remoto está activado y conectado."
      ]
     },
     {

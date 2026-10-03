@@ -28,6 +28,9 @@ const SINGLE = [
   'como cobro el mes de un cliente', 'filtrar la cuenta corriente por fechas',
   'buscar articulos por marca', 'porque se cambia sola la lista de precios',
   'lista 2 en cero no se actualiza',
+  // facturas por teléfono (v1.12.0):
+  'como cargo una factura con el celular', 'no me abre el qr de compras', 'que es mejorar lectura',
+  'ver compras por proveedor',
 ]
 console.log('── Single-shot ──')
 for (const q of SINGLE) {

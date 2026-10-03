@@ -4434,6 +4434,15 @@
       "empezar de nuevo",
       "arrancar de cero"
      ]
+    },
+    {
+     "term": "teléfono",
+     "aliases": [
+      "celular",
+      "celu",
+      "móvil",
+      "smartphone"
+     ]
     }
    ],
    "intents": [
@@ -5250,6 +5259,302 @@
       "Verificá el saldo que muestra y elegí la forma de pago.",
       "Confirmá: el egreso queda registrado en Caja General."
      ]
+    },
+    {
+     "id": "facturas-telefono-que-es",
+     "canonical": "¿Qué es 'Cargar con el teléfono' (facturas por teléfono)?",
+     "patterns": [
+      "que es facturas por telefono",
+      "que es cargar con el telefono",
+      "cargar con el telefono",
+      "facturas por telefono",
+      "como cargo una factura con el celular",
+      "cargar una factura de compra con el celular",
+      "sacar foto a la factura",
+      "sacarle una foto a la factura del proveedor",
+      "fotografiar la factura de compra",
+      "escanear factura de compra",
+      "escanear la factura del proveedor con el celular",
+      "cargar la compra con una foto",
+      "leer la factura con el telefono",
+      "la factura se carga sola con una foto",
+      "el sistema lee las facturas de los proveedores",
+      "pasar la factura del proveedor a compras con el celular",
+      "puedo cargar las compras con el telefono",
+      "cargar facturas sin tipear los renglones",
+      "ocr de facturas de compra"
+     ],
+     "answer": "Es la carga de facturas de compra con una foto. En Compras presiona 'Cargar con el teléfono', escanea el código QR con el celular, fotografía las hojas de la factura del proveedor y la envía. La PC la lee en segundos (con el lector de texto de Windows o Mac, sin descargar nada) y completa el formulario de Compras: proveedor, tipo y número de comprobante, fecha y renglones con cantidad y costo. Usted revisa y confirma la compra como siempre: nada entra al stock hasta que la registra. Si falta algo (proveedor no registrado, un producto sin artículo, una cuenta que no cierra), se abre la revisión en 'Facturas escaneadas' para resolverlo. Viene apagada: se activa en Configuración → 'Facturas por teléfono'.",
+     "steps": [
+      "Active la función una sola vez: Configuración → pestaña 'Facturas por teléfono' → 'Activar las facturas por teléfono'.",
+      "En Compras, presione 'Cargar con el teléfono' y escanee el QR con la cámara del celular.",
+      "Saque una foto por hoja, en orden, y toque 'Enviar factura'.",
+      "Espere a que la PC la lea: el formulario de Compras se completa solo, o se abre la revisión si hay algo que resolver.",
+      "Controle los renglones y confirme la compra (F2) como con cualquier otra."
+     ],
+     "image": "compras-principal.png",
+     "action": {
+      "label": "Abrir Compras",
+      "screen": "compras"
+     }
+    },
+    {
+     "id": "facturas-telefono-activar",
+     "canonical": "¿Cómo activo las facturas por teléfono?",
+     "patterns": [
+      "activar facturas por telefono",
+      "como activo cargar con el telefono",
+      "habilitar la carga de facturas con el celular",
+      "no me aparece el boton cargar con el telefono",
+      "no aparece cargar con el telefono en compras",
+      "donde se activa la carga de facturas con el celular",
+      "pestaña facturas por telefono en configuracion",
+      "windows pregunta por el firewall al activar facturas por telefono",
+      "permitir stockflow en el firewall para las facturas",
+      "para que es el puerto 7790",
+      "recepcion de fotos puerto 7790"
+     ],
+     "answer": "En Configuración → pestaña 'Facturas por teléfono' → tilde 'Activar las facturas por teléfono'. Viene apagada. En una red de varias PC se activa en la PC servidor (en los puestos sólo se ve el estado) y hace falta el permiso de Configuración de hardware (por defecto, el administrador). La primera vez, Windows puede pedir permiso en el Firewall: acepte el acceso en redes privadas, porque la PC recibe las fotos por el puerto 7790. Al activarla, en Compras aparecen los botones 'Cargar con el teléfono' y 'Facturas escaneadas'.",
+     "steps": [
+      "Abra Configuración y entre a la pestaña 'Facturas por teléfono'.",
+      "Tilde 'Activar las facturas por teléfono'. Si Windows pregunta por el Firewall, permita el acceso en redes privadas.",
+      "Controle que 'Lector' diga 'Incluido en el sistema', 'Recepción de fotos' diga 'Activa' (puerto 7790) y 'Estado' diga 'Listo'.",
+      "Vaya a Compras: ya está el botón 'Cargar con el teléfono'."
+     ],
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
+    },
+    {
+     "id": "facturas-telefono-vincular",
+     "canonical": "¿Cómo vinculo el teléfono para fotografiar la factura (QR por Wi-Fi o por internet)?",
+     "patterns": [
+      "vincular el telefono para cargar facturas",
+      "como vinculo el celular con compras",
+      "qr de cargar con el telefono",
+      "escanear el qr para sacar fotos de la factura",
+      "por wifi o por internet en el qr de compras",
+      "diferencia entre por wifi y por internet en facturas por telefono",
+      "el telefono tiene que estar en el mismo wifi para mandar la factura",
+      "puedo mandar la factura con datos moviles",
+      "camara con recuadro para fotografiar la factura",
+      "recuadro guia de la camara en la factura",
+      "cuanto dura el qr de cargar con el telefono",
+      "generar otro qr para la factura",
+      "mandar varias facturas con el mismo qr",
+      "como saco las fotos de la factura desde el celular",
+      "enviar la factura desde el telefono",
+      "elegir fotos ya guardadas de la factura",
+      "cuantas hojas puede tener la factura fotografiada"
+     ],
+     "answer": "En Compras presione 'Cargar con el teléfono': aparece un código QR. Escanéelo con la cámara del celular y se abre la página 'Factura de compra', sin instalar nada. Hay dos formas de conexión: 'Por Wi-Fi', el teléfono debe estar en la misma red Wi-Fi que la PC; 'Por internet' aparece sólo si el comercio tiene activado el Acceso remoto, y sirve con datos móviles o cualquier Wi-Fi. Por internet, además, la cámara se abre dentro de la página con un recuadro guía que avisa si falta luz, hay reflejo, la hoja está lejos o desenfocada: cuando se pone verde ('Listo. Toque para capturar'), capture. El QR tiene vencimiento (se ve la cuenta regresiva); si venció, 'Generar otro'. Con el mismo QR puede enviar varias facturas, una por vez, de hasta 12 hojas cada una.",
+     "steps": [
+      "En Compras, presione 'Cargar con el teléfono' (arriba a la derecha, junto a 'Ver historial').",
+      "Si aparecen las dos opciones, elija 'Por Wi-Fi' o 'Por internet'. Por Wi-Fi, conecte antes el celular a la red del local.",
+      "Escanee el QR con la cámara del teléfono y abra el enlace: se ve la página 'Factura de compra'.",
+      "Toque 'Sacar foto de la hoja 1' (o 'Abrir la cámara', por internet) y fotografíe cada hoja, en orden. También puede usar 'Elegir fotos ya guardadas'.",
+      "Revise las miniaturas (con 'Quitar' saca una) y toque 'Enviar factura'. Deje la página abierta hasta que diga 'Lista para revisar en la PC'."
+     ],
+     "image": "compras-principal.png",
+     "action": {
+      "label": "Abrir Compras",
+      "screen": "compras"
+     }
+    },
+    {
+     "id": "facturas-telefono-foto-rechazada",
+     "canonical": "El teléfono dice que la foto de la factura salió mal y pide repetirla, ¿qué hago?",
+     "patterns": [
+      "el telefono me pide repetir la foto de la factura",
+      "me rechaza la foto de la factura",
+      "la foto de la factura salio borrosa",
+      "dice que la foto salio muy oscura",
+      "falta parte de la hoja a la derecha",
+      "falta parte de la hoja a la izquierda",
+      "la hoja salio muy inclinada",
+      "se leyeron renglones y quedaron para revisar repita la foto",
+      "la suma de los renglones no coincide con el total repita la foto",
+      "usar igual o repetir la foto",
+      "que significa usar igual en el telefono",
+      "consejos para sacar la foto de la factura",
+      "como saco bien la foto de la factura",
+      "la foto de la factura no se lee bien",
+      "falta luz o demasiado reflejo en la factura",
+      "no entra la hoja completa en la foto"
+     ],
+     "answer": "El sistema controla cada hoja antes de usarla: si salió borrosa u oscura, cortada en un borde, muy inclinada, o se leyó pero faltan renglones o la suma no da el total, el teléfono muestra el motivo y ofrece 'Repetir la foto' o 'Usar igual'. Conviene repetirla: una hoja mal leída después da renglones en rojo. Para una buena foto: apoye la hoja plana sobre la mesa, con buena luz y sin sombras ni reflejos; sostenga el teléfono derecho y paralelo a la hoja; haga entrar la hoja completa con sus bordes (aléjese un poco si hace falta) y espere a que la cámara enfoque antes de capturar. 'Usar igual' sigue con esa foto de todos modos; lo que no se lea bien lo corrige después en la revisión.",
+     "steps": [
+      "Lea el motivo que muestra el teléfono: oscura, borrosa, falta parte de la hoja, inclinada, o faltan renglones.",
+      "Acomode la hoja plana, con buena luz y sin sombras, y aléjese lo necesario para que entre completa y derecha.",
+      "Toque 'Repetir la foto' y vuelva a sacarla; espere el enfoque antes de capturar.",
+      "Si la hoja realmente está así (arrugada, mal impresa), toque 'Usar igual' y corrija lo que falte en la revisión."
+     ]
+    },
+    {
+     "id": "facturas-telefono-proveedor-nuevo",
+     "canonical": "La factura fotografiada es de un proveedor que no tengo registrado, ¿qué hago?",
+     "patterns": [
+      "proveedor no registrado en la factura escaneada",
+      "la factura del telefono no encuentra el proveedor",
+      "no reconoce el proveedor de la factura fotografiada",
+      "crear proveedor desde la factura escaneada",
+      "proveedor sin registrar en facturas por telefono",
+      "me pide elegir el proveedor en la revision de la factura",
+      "guardar el cuit en este proveedor",
+      "es alguno de estos proveedores en la factura",
+      "la factura leyo el cuit pero no hay proveedor con ese cuit",
+      "cargar un proveedor nuevo con la foto de la factura",
+      "la factura escaneada vino sin proveedor"
+     ],
+     "answer": "El sistema reconoce al proveedor por el CUIT del código QR fiscal de la factura (o por el nombre exacto). Si no hay ningún proveedor con ese CUIT, la factura se abre en la revisión ('Facturas escaneadas') con el proveedor vacío: presione 'Crear proveedor' y se abre el alta con el nombre y el CUIT leídos de la factura; contrólelos y confirme. Si el proveedor ya existe pero está cargado sin CUIT, elíjalo en el selector (el sistema puede sugerirlo con '¿Es alguno de éstos?') y deje tildada la casilla 'Guardar el CUIT … en este proveedor': las próximas facturas se asocian solas.",
+     "steps": [
+      "En la revisión, mire el campo 'Proveedor' (arriba, a la derecha de la foto).",
+      "Si es nuevo: 'Crear proveedor' → controle el Nombre y el CUIT leídos → 'Crear proveedor'. El resto de los datos se completa después en Proveedores.",
+      "Si ya existe: elíjalo en el selector y deje tildado 'Guardar el CUIT … en este proveedor'.",
+      "Siga con los renglones y presione 'Cargar en Compras'."
+     ],
+     "action": {
+      "label": "Abrir Facturas escaneadas",
+      "screen": "facturasEscaneadas"
+     }
+    },
+    {
+     "id": "facturas-telefono-articulos",
+     "canonical": "¿Cómo vinculo los renglones de la factura fotografiada con mis artículos (sugeridos, crear artículo)?",
+     "patterns": [
+      "renglones sin articulo en la factura escaneada",
+      "la factura del telefono no reconoce los productos",
+      "vincular un renglon de la factura con un articulo",
+      "que es sugerido en la factura escaneada",
+      "aceptar sugeridos",
+      "crear articulo desde la factura escaneada",
+      "el producto de la factura no esta en el sistema",
+      "el sistema aprende el codigo del proveedor",
+      "la segunda factura sale vinculada sola",
+      "el flete de la factura como lo cargo",
+      "no es mercaderia el flete en la factura fotografiada",
+      "es un gasto en un renglon de la factura",
+      "cambiar el articulo vinculado en la factura escaneada",
+      "quitar el articulo vinculado a un renglon de la factura escaneada",
+      "codigo dudoso en la factura escaneada",
+      "columna vinculo codigo aprendido sugerido elegido",
+      "la factura fotografiada vincula mal los articulos"
+     ],
+     "answer": "En la revisión, cada renglón muestra el producto leído y el artículo de StockFlow que le corresponde. La columna 'Vínculo' dice de dónde salió: 'Código' (código de barras o código del proveedor ya aprendido), 'Aprendido' (por la descripción, de una factura anterior), 'Sugerido' (el sistema lo eligió por parecido: contrólelo) o 'Elegido' (lo eligió usted). Si no tiene artículo, puede aceptar la sugerencia '¿…?' que aparece debajo, usar 'Vincular' para buscarlo por código, descripción o marca, 'Crear artículo' si el producto no existe (se da de alta con los datos de la factura) o 'Es un gasto' para fletes y envíos, que no son mercadería. 'Aceptar sugeridos' confirma todos los sugeridos de una vez. El sistema aprende: al registrar la compra recuerda el código con el que ese proveedor imprime cada artículo, y desde la segunda factura los renglones salen vinculados solos.",
+     "steps": [
+      "Revise contra la factura los renglones con 'Sugerido' en la columna Vínculo; si están bien, presione 'Aceptar sugeridos'.",
+      "En los renglones sin artículo ('—'), toque la sugerencia '¿…?' o 'Vincular' y busque el artículo por código, descripción o marca.",
+      "Si el producto no está en el sistema, 'Crear artículo': controle la descripción, el código de barras (o 'Generar' uno interno), el IVA y el costo, y presione 'Crear y vincular'. Antes elija el tipo de comprobante: define si el costo leído es neto o final.",
+      "Fletes, envíos y otros cargos: 'Es un gasto'. Cuentan para el total pero no se cargan como mercadería.",
+      "Presione 'Cargar en Compras' y confirme la compra: recién ahí se guardan los vínculos para el proveedor."
+     ],
+     "action": {
+      "label": "Abrir Facturas escaneadas",
+      "screen": "facturasEscaneadas"
+     }
+    },
+    {
+     "id": "facturas-telefono-revisar",
+     "canonical": "¿Por qué la factura fotografiada se abre en 'Revisar' en vez de completar Compras? (renglones en rojo, total que no coincide, factura repetida)",
+     "patterns": [
+      "la factura del telefono se abrio en revisar",
+      "revisar factura escaneada",
+      "renglones en rojo en la factura escaneada",
+      "que significa revisar en rojo en la factura",
+      "la cuenta no cierra cantidad por precio",
+      "el total de la factura no coincide con los renglones",
+      "control difiere en la factura escaneada",
+      "aviso de factura repetida",
+      "esta factura ya fue cargada",
+      "comprobante repetido en facturas por telefono",
+      "cargar en compras desde facturas escaneadas",
+      "donde quedan las fotos de facturas que mande desde el telefono",
+      "lista de facturas escaneadas",
+      "la factura del telefono no completo el formulario de compras",
+      "volver a leer la factura escaneada",
+      "descartar una factura escaneada",
+      "la factura escaneada entra al stock sola",
+      "cuando se descuenta el stock de la factura fotografiada",
+      "la factura necesita una revision"
+     ],
+     "answer": "La factura completa el formulario de Compras sola únicamente si salió perfecta: proveedor reconocido, tipo de comprobante leído, todos los renglones con artículo, ninguno en 'Revisar', el total coincide y no se cargó antes. Ante cualquier duda se abre 'Facturas escaneadas' en la revisión de esa factura, con la foto a la izquierda. Un renglón en rojo ('Revisar') es uno donde la cuenta cantidad × precio no da el importe, o falta un dato: compárelo con la foto y corrija cantidad, unidades por bulto, precio o importe. 'Control: Difiere en $…' significa que la suma de los renglones no da el total impreso: suele faltar un renglón (hoja cortada) o ser una percepción, un impuesto interno u otra alícuota de IVA. Si dice 'Esta factura ya fue cargada el …' o 'Repetida', ese comprobante ya está registrado: cargarlo de nuevo duplica el stock y la deuda. Al terminar, 'Cargar en Compras'; la compra la confirma usted allí y recién entonces la factura queda 'Cargada'. Nada entra al stock antes.",
+     "steps": [
+      "Abra la revisión (se abre sola, o desde Compras → 'Facturas escaneadas' → 'Revisar').",
+      "Complete lo que falte en el encabezado: proveedor, tipo (A, B, C o X), número y fecha.",
+      "Corrija los renglones en rojo mirando la foto (al tocar un renglón, la foto salta a su hoja). 'Guardar' conserva lo corregido.",
+      "Mire 'Control' al pie: debe decir 'Coincide'. Si no se leyó el total, escríbalo en 'Total de la factura'.",
+      "Presione 'Cargar en Compras' y confirme la compra en el formulario. Si la lectura salió mal, 'Volver a leer'; si no sirve, 'Descartar'."
+     ],
+     "action": {
+      "label": "Abrir Facturas escaneadas",
+      "screen": "facturasEscaneadas"
+     }
+    },
+    {
+     "id": "facturas-telefono-mejorar-lectura",
+     "canonical": "¿Qué es 'Mejorar lectura' en Facturas por teléfono?",
+     "patterns": [
+      "mejorar lectura en facturas por telefono",
+      "que es mejorar lectura",
+      "la factura se lee mal conviene mejorar lectura",
+      "lector con ia para las facturas",
+      "descargar lector 1,6 gb",
+      "descargar el lector mejorado de ollama",
+      "la lectura de la factura tarda minutos",
+      "por que tarda tanto en leer la factura",
+      "los precios leidos de la factura salen con errores",
+      "lee mal la factura del proveedor",
+      "lector del sistema o lector de ollama para facturas",
+      "necesito ollama para las facturas por telefono",
+      "lector incluido en el sistema facturas",
+      "lectura mejorada pendiente",
+      "la factura se lee de fondo"
+     ],
+     "answer": "Es un lector opcional con inteligencia artificial, más preciso para facturas difíciles (letra muy chica, mal impresas, con tablas complicadas). El lector normal, el del sistema (Windows o Mac), lee cada hoja en segundos sin descargar nada y alcanza para la mayoría de las facturas. 'Mejorar lectura' necesita Ollama instalado (se instala desde Configuración → 'Flowy con IA', sin necesidad de activar a Flowy) y una descarga única de 1,6 GB; cada hoja puede demorar varios minutos según la computadora, pero se lee de fondo: puede seguir trabajando y el sistema avisa cuando la factura está lista. Se activa en Configuración → 'Facturas por teléfono' → 'Mejorar lectura'. Nada sale a internet: la lectura se hace en la PC.",
+     "steps": [
+      "Configuración → pestaña 'Facturas por teléfono' (con la función ya activada).",
+      "Tilde 'Mejorar lectura'. Si 'Ollama' dice 'Ausente', instálelo desde la pestaña 'Flowy con IA' y vuelva.",
+      "Presione 'Descargar lector (1,6 GB)' y espere a que 'Lectura mejorada' diga 'Descargado'. Con conexión lenta puede tardar bastante; mientras tanto se sigue leyendo con el lector del sistema.",
+      "Para volver al lector rápido, destilde 'Mejorar lectura'."
+     ],
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
+    },
+    {
+     "id": "facturas-telefono-no-anda",
+     "canonical": "El teléfono no abre la página al escanear el QR de Compras, ¿qué reviso?",
+     "patterns": [
+      "no me abre el qr de compras",
+      "el celular no abre el qr de la factura",
+      "escaneo el qr y no carga la pagina de la factura",
+      "el telefono no se conecta con la pc para mandar la factura",
+      "no se pudo generar el enlace en facturas por telefono",
+      "se perdio la conexion con la pc al mandar la factura",
+      "no funciona cargar con el telefono",
+      "facturas por telefono no anda",
+      "el qr de cargar con el telefono no funciona",
+      "el telefono dice que el enlace vencio",
+      "el firewall bloquea las facturas por telefono",
+      "recepcion de fotos inactiva",
+      "no aparece por internet en el qr de compras",
+      "el telefono no esta en la misma red que la pc",
+      "en el puesto no puedo activar facturas por telefono"
+     ],
+     "answer": "Revise en este orden: (1) Por Wi-Fi, el celular tiene que estar conectado a la misma red Wi-Fi que la PC (no con datos móviles ni en una red de invitados). (2) En Configuración → 'Facturas por teléfono', 'Recepción de fotos' debe decir 'Activa' (puerto 7790); si dice 'Inactiva', lea el error que muestra. (3) El Firewall de Windows: si al activar la función no se permitió el acceso en redes privadas, la PC no recibe las fotos; permita StockFlow en el Firewall para redes privadas. (4) El QR vence: si en la PC dice 'El enlace venció', presione 'Generar otro' y escanee el nuevo. (5) 'Por internet' sólo aparece si el Acceso remoto está activado y conectado; si no, use Wi-Fi. (6) Si el teléfono dice 'Se perdió la conexión con la PC', vuelva a conectar el celular a la red y toque 'Enviar' de nuevo: las hojas que ya llegaron no se mandan dos veces. En una red de varias PC, la función se activa en la PC servidor; desde un puesto se usa igual.",
+     "steps": [
+      "Conecte el celular a la red Wi-Fi del local (la misma que la PC) y vuelva a escanear el QR.",
+      "En Configuración → 'Facturas por teléfono', controle 'Recepción de fotos: Activa' y 'Estado: Listo'.",
+      "Si Windows nunca preguntó por el Firewall o se le dijo que no: en el Firewall de Windows, 'Permitir una aplicación a través del firewall', marque StockFlow en 'Privada'.",
+      "Si el enlace venció, presione 'Generar otro' en el diálogo de Compras y escanee el QR nuevo.",
+      "Si sigue sin funcionar, pruebe 'Por internet' (requiere el Acceso remoto activado) o consulte a soporte."
+     ],
+     "action": {
+      "label": "Abrir Configuración",
+      "screen": "configuracion"
+     }
     }
    ]
   },
@@ -11460,6 +11765,42 @@
       "No hagas nada: el sistema ya lo descuenta solo de los totales de abajo."
      ],
      "image": "contabilidad-resumen.png"
+    },
+    {
+     "id": "compras-por-proveedor",
+     "canonical": "¿Dónde veo todas las facturas de compra cargadas, filtradas por proveedor y fecha (Facturas de compra)?",
+     "patterns": [
+      "compras por proveedor",
+      "ver compras por proveedor",
+      "cuanto le compre a tal proveedor este mes",
+      "que le compre a este proveedor en el mes",
+      "listado de facturas de compra b y c",
+      "ver las facturas de compra que no son a",
+      "el libro iva compras no me muestra todas las facturas",
+      "las facturas c no aparecen en el libro iva compras",
+      "listado de compras agrupado por proveedor",
+      "todas las compras de un proveedor en un periodo",
+      "compras del mes agrupadas por proveedor",
+      "exportar las compras por proveedor a excel",
+      "facturas de compra de un proveedor por fecha",
+      "incluir anuladas en compras por proveedor",
+      "resumen de compras por proveedor",
+      "informe de compras por proveedor"
+     ],
+     "answer": "En el menú 'Contabilidad' → 'Facturas de compra' (también con el botón del mismo nombre en la pantalla de Contabilidad, junto a los Libros IVA). Muestra todas las facturas de compra cargadas en el período, sean A, B, C o X, agrupadas por proveedor con subtotales de neto, IVA y total, y ordenadas por fecha dentro de cada grupo. Sirve para responder '¿qué le compré a tal proveedor este mes?' aunque las facturas no sean A: el Libro IVA Compras sólo lista las que van al libro. Por defecto muestra el mes en curso; se filtra por Proveedor y por Comprobante (Todos, A, B, C o X), se puede ordenar 'Sólo por fecha', tildar 'Incluir anuladas' (salen tachadas), abrir cada compra con 'Ver' y exportar todo a Excel.",
+     "steps": [
+      "Menú 'Contabilidad' → 'Facturas de compra' (o F10 → botón 'Facturas de compra'). Requiere el permiso de contabilidad.",
+      "Elija 'Desde' y 'Hasta' (viene el mes en curso; los 'Atajos' cambian el período de un toque) y presione 'Calcular'.",
+      "Si quiere un solo proveedor, elíjalo en 'Proveedor'; en 'Comprobante' puede dejar Todos o ver sólo A, B, C o X.",
+      "En 'Orden' elija 'Agrupar por proveedor' (cada proveedor con su subtotal) o 'Sólo por fecha' (una lista única con la columna Proveedor).",
+      "Tilde 'Incluir anuladas' si quiere ver también las compras anuladas: aparecen tachadas y no suman en los totales.",
+      "Con 'Ver' (o doble clic) se abre el detalle de la compra; con 'Excel' se descarga la planilla en el mismo orden que la pantalla."
+     ],
+     "image": "contabilidad-resumen.png",
+     "action": {
+      "label": "Abrir Facturas de compra",
+      "screen": "compras-por-proveedor"
+     }
     },
     {
      "id": "crear-presupuesto",
