@@ -180,11 +180,12 @@ public static class PreprocesoFactura {
   $resultado = Esperar ($motor.RecognizeAsync($mapa)) ([Windows.Media.Ocr.OcrResult])
 
   $textos = New-Object System.Collections.ArrayList
+  # $palabras: objetos propios { Text, X, Y, Width, Height } (ver abajo), no los OcrWord.
   function Agregar-Caja($palabras) {
     if ($palabras.Count -eq 0) { return }
-    $primera = $palabras[0].BoundingRect
-    $ultima = $palabras[$palabras.Count - 1].BoundingRect
-    $altos = @($palabras | ForEach-Object { [double]$_.BoundingRect.Height } | Sort-Object)
+    $primera = $palabras[0]
+    $ultima = $palabras[$palabras.Count - 1]
+    $altos = @($palabras | ForEach-Object { [double]$_.Height } | Sort-Object)
     $altoLetra = $altos[[int][Math]::Floor($altos.Count / 2)]
     $texto = (@($palabras | ForEach-Object { $_.Text }) -join ' ')
     $null = $textos.Add([ordered]@{
@@ -199,20 +200,41 @@ public static class PreprocesoFactura {
   }
 
   foreach ($linea in $resultado.Lines) {
-    $palabras = @($linea.Words | Sort-Object { [double]$_.BoundingRect.X })
-    if ($palabras.Count -eq 0) { continue }
-    $altos = @($palabras | ForEach-Object { [double]$_.BoundingRect.Height } | Sort-Object)
+    $ocrPalabras = @($linea.Words | Sort-Object { [double]$_.BoundingRect.X })
+    if ($ocrPalabras.Count -eq 0) { continue }
+    $altos = @($ocrPalabras | ForEach-Object { [double]$_.BoundingRect.Height } | Sort-Object)
     $altoLinea = $altos[[int][Math]::Floor($altos.Count / 2)]
+    # Copia editable de cada palabra. Windows parte los importes en el separador
+    # decimal ("4.169," + "28", "21," + "oo", "495," + "04"; medido en GitHub
+    # Actions, oct-2026): un numero terminado en coma o punto seguido de
+    # exactamente dos digitos (u "oo", que es "00" mal leido) se vuelve a pegar.
+    $palabras = New-Object System.Collections.ArrayList
+    foreach ($palabra in $ocrPalabras) {
+      $r = $palabra.BoundingRect
+      $item = [pscustomobject]@{ Text = [string]$palabra.Text; X = [double]$r.X; Y = [double]$r.Y; Width = [double]$r.Width; Height = [double]$r.Height }
+      $previa = if ($palabras.Count -gt 0) { $palabras[$palabras.Count - 1] } else { $null }
+      if ($null -ne $previa -and $previa.Text -match '\d[.,]$' -and $item.Text -match '^(\d{2}|[oO0]{2})$' -and
+          ($item.X - ($previa.X + $previa.Width)) -lt ($altoLinea * 2.0)) {
+        $previa.Text = $previa.Text + ($item.Text -replace '[oO]', '0')
+        $fin = [Math]::Max($previa.X + $previa.Width, $item.X + $item.Width)
+        $arriba = [Math]::Min($previa.Y, $item.Y)
+        $abajo = [Math]::Max($previa.Y + $previa.Height, $item.Y + $item.Height)
+        $previa.Width = $fin - $previa.X
+        $previa.Y = $arriba
+        $previa.Height = $abajo - $arriba
+        continue
+      }
+      $null = $palabras.Add($item)
+    }
     $tramo = New-Object System.Collections.ArrayList
     $finAnterior = $null
     foreach ($palabra in $palabras) {
-      $r = $palabra.BoundingRect
-      if ($null -ne $finAnterior -and ([double]$r.X - $finAnterior) -gt ($altoLinea * 1.2)) {
+      if ($null -ne $finAnterior -and ($palabra.X - $finAnterior) -gt ($altoLinea * 1.2)) {
         Agregar-Caja $tramo
         $tramo = New-Object System.Collections.ArrayList
       }
       $null = $tramo.Add($palabra)
-      $finAnterior = [double]$r.X + [double]$r.Width
+      $finAnterior = $palabra.X + $palabra.Width
     }
     Agregar-Caja $tramo
   }
