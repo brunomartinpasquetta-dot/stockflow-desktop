@@ -80,7 +80,7 @@ export function Contabilidad() {
 
       <Card>
         <CardContent className="flex flex-col gap-3 pt-4">
-          <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-5">
+          <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-4">
             <div className="flex flex-col gap-1">
               <Label>Desde</Label>
               <Input type="date" value={fromIso} onChange={(e) => setFromIso(e.target.value)} />
@@ -94,32 +94,34 @@ export function Contabilidad() {
               <Printer className="h-4 w-4" />
               Imprimir
             </Button>
-            <div className="flex flex-wrap gap-2">
-              {/*
-                Abrimos la ventana NATIVA con `useWindowNav` en vez de navegar con
-                <Link>: Contabilidad ya es una ventana de módulo (#/embedded/...),
-                y una navegación de router la sacaría de esa ruta (la ventana se
-                cerraría en lugar de abrir el libro).
-              */}
-              <Button variant="outline" onClick={() => openWindow('libro-iva-ventas')}>
-                <FileText className="h-4 w-4" />
-                Libro IVA Ventas
-              </Button>
-              <Button variant="outline" onClick={() => openWindow('libro-iva-compras')}>
-                <FileText className="h-4 w-4" />
-                Libro IVA Compras
-              </Button>
-              {/* Todos los comprobantes de venta (A, B, C y X, con o sin CAE), por cliente y fecha. */}
-              <Button variant="outline" onClick={() => openWindow('facturas-emitidas')}>
-                <Receipt className="h-4 w-4" />
-                Facturas emitidas
-              </Button>
-              {/* Todas las compras cargadas (A, B, C y X), por proveedor y fecha. */}
-              <Button variant="outline" onClick={() => openWindow('compras-por-proveedor')}>
-                <Truck className="h-4 w-4" />
-                Facturas de compra
-              </Button>
-            </div>
+          </div>
+          {/*
+            Listados, en su propia fila (dentro de la grilla de filtros se apilaban
+            en una columna angosta y estiraban toda la tarjeta). Abrimos la ventana
+            NATIVA con `useWindowNav` en vez de navegar con <Link>: Contabilidad ya
+            es una ventana de módulo (#/embedded/...), y una navegación de router la
+            sacaría de esa ruta (la ventana se cerraría en lugar de abrir el libro).
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">Listados:</span>
+            <Button variant="outline" size="sm" onClick={() => openWindow('libro-iva-ventas')}>
+              <FileText className="h-4 w-4" />
+              Libro IVA Ventas
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => openWindow('libro-iva-compras')}>
+              <FileText className="h-4 w-4" />
+              Libro IVA Compras
+            </Button>
+            {/* Todos los comprobantes de venta (A, B, C y X, con o sin CAE), por cliente y fecha. */}
+            <Button variant="outline" size="sm" onClick={() => openWindow('facturas-emitidas')}>
+              <Receipt className="h-4 w-4" />
+              Facturas emitidas
+            </Button>
+            {/* Todas las compras cargadas (A, B, C y X), por proveedor y fecha. */}
+            <Button variant="outline" size="sm" onClick={() => openWindow('compras-por-proveedor')}>
+              <Truck className="h-4 w-4" />
+              Facturas de compra
+            </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-muted-foreground">Atajos:</span>
