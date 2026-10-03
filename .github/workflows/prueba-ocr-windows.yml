@@ -12,6 +12,12 @@ name: Prueba OCR Windows
 
 on:
   workflow_dispatch:
+  # GitHub solo deja disparar a mano (API/botón) los workflows que están en la
+  # rama por defecto. Mientras este viva solo en su rama de prueba, se corre
+  # con cada push a esa rama. No toca main ni tags.
+  push:
+    branches:
+      - prueba/ocr-windows
 
 permissions:
   contents: read
