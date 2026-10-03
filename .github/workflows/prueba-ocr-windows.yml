@@ -19,8 +19,10 @@ on:
     branches:
       - prueba/ocr-windows
 
+# `write` y no `read`: con solo lectura el GITHUB_TOKEN no ve los releases
+# BORRADOR ("release not found", run 37094459136). El workflow no escribe nada.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   ocr:
@@ -71,21 +73,10 @@ jobs:
             Get-WindowsCapability -Online -Name 'Language.OCR*' | Select-Object Name, State | Format-Table -AutoSize | Out-String | Tee-Object -FilePath salida/capacidades-ocr.txt
           } catch { "no se pudieron listar las capacidades: $($_.Exception.Message)" }
 
-      - name: Instalar lectura en castellano (si se puede)
-        continue-on-error: true
-        timeout-minutes: 10
-        run: |
-          $antes = Get-Content salida/idiomas-antes.txt -ErrorAction SilentlyContinue
-          if (($antes | Where-Object { $_ -match '^\s+es-' }).Count -gt 0) { 'ya hay castellano'; exit 0 }
-          foreach ($cap in @('Language.OCR~~~es-ES~0.0.1.0', 'Language.OCR~~~es-MX~0.0.1.0')) {
-            try {
-              "instalando $cap ..."
-              $r = Add-WindowsCapability -Online -Name $cap
-              "resultado: RestartNeeded=$($r.RestartNeeded)"
-              break
-            } catch { "no se pudo instalar ${cap}: $($_.Exception.Message)" }
-          }
-          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File idiomas.ps1 | Tee-Object -FilePath salida/idiomas-despues.txt
+      # No se intenta instalar el castellano: en el runner (Windows Server 2025)
+      # `Add-WindowsCapability -Online -Name Language.OCR~~~es-ES~0.0.1.0` se
+      # quedó colgado hasta el tope de 10 minutos (run 37094459136). Se mide
+      # con el motor en-US, el único instalado.
 
       - name: Fotos del release borrador
         env:
@@ -133,10 +124,10 @@ jobs:
               $sufijo = if ($modo -eq 'pre') { '' } else { '.color' }
               $json = "salida/$n$sufijo.json"
               $err = "salida/$n$sufijo.err"
-              $args = @('-NoProfile', '-NonInteractive', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', $script, '-Ruta', $f.FullName)
-              if ($modo -eq 'color') { $args += '-SinPreproceso' }
+              $argumentos = @('-NoProfile', '-NonInteractive', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', $script, '-Ruta', $f.FullName)
+              if ($modo -eq 'color') { $argumentos += '-SinPreproceso' }
               $sw = [Diagnostics.Stopwatch]::StartNew()
-              $out = & $ps @args 2> $err
+              $out = & $ps @argumentos 2> $err
               $rc = $LASTEXITCODE
               $sw.Stop()
               $ms = [int]$sw.ElapsedMilliseconds
