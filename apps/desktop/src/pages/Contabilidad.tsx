@@ -3,7 +3,7 @@
  * Muestra activos, ventas, CMV, resultado bruto y posición IVA en un período.
  */
 import { useState } from 'react'
-import { Calculator, FileText, Printer, Truck } from 'lucide-react'
+import { Calculator, FileText, Printer, Receipt, Truck } from 'lucide-react'
 
 import { useCompany, useFinancialSummary } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
@@ -108,6 +108,11 @@ export function Contabilidad() {
               <Button variant="outline" onClick={() => openWindow('libro-iva-compras')}>
                 <FileText className="h-4 w-4" />
                 Libro IVA Compras
+              </Button>
+              {/* Todos los comprobantes de venta (A, B, C y X, con o sin CAE), por cliente y fecha. */}
+              <Button variant="outline" onClick={() => openWindow('facturas-emitidas')}>
+                <Receipt className="h-4 w-4" />
+                Facturas emitidas
               </Button>
               {/* Todas las compras cargadas (A, B, C y X), por proveedor y fecha. */}
               <Button variant="outline" onClick={() => openWindow('compras-por-proveedor')}>

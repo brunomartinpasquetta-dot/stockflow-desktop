@@ -596,6 +596,71 @@ async function main(): Promise<void> {
     );
   }
 
+  // (7) FACTURAS EMITIDAS (Contabilidad): el listado de ventas por rango trae
+  // TODOS los comprobantes de venta — A, B y X, de más de un cliente —, cada
+  // uno con tipo, número interno, cliente, estado e importes; y la consulta de
+  // comprobantes fiscales del rango responde (vacía: acá no hay ARCA). La
+  // pantalla une ambas fuentes por venta y agrupa por cliente sobre este contrato.
+  {
+    const cliRI = await invoke<{ id: string }>(handlers, 'customers:create', {
+      lastName: 'EMPRESA UNO SA', docType: 'CUIT', docNumber: '30712345671', category: 'RI',
+    });
+    check('setup cliente responsable inscripto ok', cliRI.ok, cliRI.ok ? '' : JSON.stringify(cliRI));
+    const clienteRI = cliRI.ok ? cliRI.data.id : cf.id;
+    const vA = await invoke<{ sale: { id: string; number: number } }>(handlers, 'sales:create', {
+      type: 'A', customerId: clienteRI,
+      payments: [{ paymentMethodId: 'pm-efectivo', amount: '1000.0000' }],
+      lines: [{ description: 'SERVICIO TECNICO', quantity: '1.000', unitPrice: '1000.0000', vatRate: '21.00' }],
+    });
+    const vX = await invoke<{ sale: { id: string; number: number } }>(handlers, 'sales:create', {
+      type: 'X', customerId: cf.id,
+      payments: [{ paymentMethodId: 'pm-efectivo', amount: '250.0000' }],
+      lines: [{ description: 'VARIOS', quantity: '1.000', unitPrice: '250.0000', vatRate: '21.00' }],
+    });
+    check('setup ventas A (cliente RI) y X (consumidor final) ok', vA.ok && vX.ok, `${vA.ok ? '' : JSON.stringify(vA)} ${vX.ok ? '' : JSON.stringify(vX)}`.trim());
+
+    type VentaListada = {
+      id: string; type: string; number: number; customerId: string;
+      status: string; total: string; vatAmount: string; afipCAE: string | null;
+    };
+    const rango = { from: Date.now() - 86_400_000, to: Date.now() + 86_400_000 };
+    const emitidas = await invoke<VentaListada[]>(handlers, 'sales:listByDateRange', rango);
+    const tiposVenta = new Set(emitidas.ok ? emitidas.data.map((s) => s.type) : []);
+    const clientesVenta = new Set(emitidas.ok ? emitidas.data.map((s) => s.customerId) : []);
+    check(
+      'sales:listByDateRange trae todos los comprobantes del rango (A, B y X) de más de un cliente',
+      emitidas.ok && tiposVenta.has('A') && tiposVenta.has('B') && tiposVenta.has('X') && clientesVenta.size >= 2,
+      emitidas.ok ? `tipos=${[...tiposVenta].sort().join(',')} clientes=${clientesVenta.size} ventas=${emitidas.data.length}` : JSON.stringify(emitidas),
+    );
+    const fA = emitidas.ok && vA.ok ? emitidas.data.find((s) => s.id === vA.data.sale.id) : undefined;
+    const fX = emitidas.ok && vX.ok ? emitidas.data.find((s) => s.id === vX.data.sale.id) : undefined;
+    check(
+      'cada venta viene con tipo, número, cliente, estado e importes (neto = total − IVA ≥ 0)',
+      !!fA && fA.type === 'A' && fA.number > 0 && fA.customerId === clienteRI && fA.status === 'completed'
+        && fA.total === '1000.0000' && Number(fA.total) - Number(fA.vatAmount) >= 0
+        && !!fX && fX.type === 'X' && fX.number > 0 && fX.customerId === cf.id && fX.status === 'completed' && fX.total === '250.0000',
+      fA && fX ? `A n°${fA.number} total=${fA.total} iva=${fA.vatAmount}; X n°${fX.number} total=${fX.total}` : `fA=${JSON.stringify(fA)} fX=${JSON.stringify(fX)}`,
+    );
+    const vouchers = await invoke<unknown[]>(handlers, 'fiscal:listVouchers', rango);
+    check(
+      'fiscal:listVouchers del rango responde array (sin ARCA no hay comprobantes con CAE)',
+      vouchers.ok && Array.isArray(vouchers.data) && vouchers.data.length === 0,
+      vouchers.ok ? `len=${vouchers.data.length}` : JSON.stringify(vouchers),
+    );
+    // Una venta anulada sigue en el listado, marcada 'voided': la pantalla la
+    // oculta salvo con "Incluir anuladas" y nunca la suma. Se anulan las dos
+    // acá mismo para no alterar el conteo de sales:voidRange de abajo.
+    const anulX = vX.ok ? await invoke(handlers, 'sales:void', { id: vX.data.sale.id, reason: 'Prueba de Facturas emitidas' }) : vX;
+    const anulA = vA.ok ? await invoke(handlers, 'sales:void', { id: vA.data.sale.id, reason: 'Prueba de Facturas emitidas' }) : vA;
+    const trasAnular = await invoke<VentaListada[]>(handlers, 'sales:listByDateRange', rango);
+    const fXAnulada = trasAnular.ok && vX.ok ? trasAnular.data.find((s) => s.id === vX.data.sale.id) : undefined;
+    check(
+      'la venta anulada sigue en el listado con estado voided (la pantalla la tacha y no la suma)',
+      anulX.ok && anulA.ok && !!fXAnulada && fXAnulada.status === 'voided' && fXAnulada.type === 'X',
+      fXAnulada ? `status=${fXAnulada.status}` : JSON.stringify({ anulX, anulA }).slice(0, 200),
+    );
+  }
+
   // sales:voidRange — anulación en lote del día. Va AL FINAL a propósito: anula
   // la venta que usaron todos los checks anteriores, así que mover esto para
   // arriba los rompe. Lo que importa verificar es que no sea un borrado suelto:

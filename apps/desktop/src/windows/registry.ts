@@ -188,6 +188,15 @@ export const WINDOWS: Record<string, WindowDef> = {
     minWidth: 1100,
     minHeight: 600,
   },
+  'facturas-emitidas': {
+    pageKey: 'facturas-emitidas',
+    title: 'Facturas emitidas',
+    iconName: 'Receipt',
+    component: lazy(() => import('@/pages/FacturasEmitidas').then((m) => ({ default: m.FacturasEmitidas }))),
+    requires: 'view_accounting',
+    minWidth: 1100,
+    minHeight: 600,
+  },
   'facturacion-electronica': {
     pageKey: 'facturacion-electronica',
     title: 'Facturación Electrónica',
@@ -358,6 +367,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/contabilidad/libro-iva-ventas': 'libro-iva-ventas',
   '/contabilidad/libro-iva-compras': 'libro-iva-compras',
   '/contabilidad/compras-por-proveedor': 'compras-por-proveedor',
+  '/contabilidad/facturas-emitidas': 'facturas-emitidas',
   '/familias': 'familias',
   '/promociones': 'promociones',
   '/auditoria': 'auditoria',

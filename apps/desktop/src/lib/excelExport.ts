@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 
 import type { VatBookPurchaseRowDTO, VatBookSaleRowDTO } from '@/types/api'
 import type { CompraProveedorFila } from '@/lib/comprasPorProveedor'
+import { etiquetaTipo, type FacturaEmitidaFila } from '@/lib/facturasEmitidas'
 import { formatDate } from '@/lib/format'
 
 function periodLabel(period: { from: number; to: number }): string {
@@ -199,4 +200,68 @@ export function exportComprasPorProveedorToExcel(
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Facturas de compra')
   XLSX.writeFile(wb, `compras-por-proveedor-${ymd(period.from)}.xlsx`)
+}
+
+/**
+ * Facturas emitidas (Contabilidad): tabla plana en el MISMO orden que la
+ * pantalla (agrupado cliente → fecha, o sólo por fecha), con cliente y
+ * CUIT/DNI en cada fila para que el contador pueda filtrar. Las anuladas van
+ * en 0 con estado ANULADA; las notas de crédito, en negativo, como en pantalla.
+ */
+export function exportFacturasEmitidasToExcel(
+  rows: FacturaEmitidaFila[],
+  period: { from: number; to: number },
+  companyName: string,
+): void {
+  const headerRows: (string | number)[][] = [
+    [companyName],
+    [`Facturas emitidas — período: ${periodLabel(period)}`],
+    [],
+    ['Cliente', 'CUIT/DNI', 'Fecha', 'Tipo', 'Número', 'N° interno', 'CAE', 'Neto', 'IVA', 'Total', 'Estado'],
+  ]
+  const dataStart = headerRows.length + 1
+  const dataRows = rows.map((r) => [
+    r.customerName,
+    r.customerDoc ?? '',
+    formatDate(r.date),
+    etiquetaTipo(r),
+    // Numeración FISCAL (punto de venta + número) cuando hay CAE; si no, la interna.
+    r.numeroFiscal ?? (r.number || ''),
+    r.number || '',
+    r.cae ?? '',
+    r.status === 'voided' ? 0 : Number(r.net),
+    r.status === 'voided' ? 0 : Number(r.vat),
+    r.status === 'voided' ? 0 : Number(r.total),
+    r.status === 'voided' ? 'ANULADA' : r.status === 'pending' ? 'Pendiente' : 'Registrada',
+  ])
+  const dataEnd = dataStart + dataRows.length - 1
+  const aoa: (string | number)[][] = [...headerRows, ...dataRows]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  if (dataRows.length > 0) {
+    const totalRow = dataEnd + 1
+    const sumCol = (col: string) => ({ t: 'n', f: `SUM(${col}${dataStart}:${col}${dataEnd})` })
+    XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', '', 'TOTALES']], { origin: `A${totalRow}` })
+    ws[`H${totalRow}`] = sumCol('H')
+    ws[`I${totalRow}`] = sumCol('I')
+    ws[`J${totalRow}`] = sumCol('J')
+  }
+
+  ws['!cols'] = [
+    { wch: 32 },
+    { wch: 18 },
+    { wch: 12 },
+    { wch: 6 },
+    { wch: 16 },
+    { wch: 10 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 12 },
+  ]
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Facturas emitidas')
+  XLSX.writeFile(wb, `facturas-emitidas-${ymd(period.from)}.xlsx`)
 }
