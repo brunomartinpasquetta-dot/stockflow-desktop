@@ -164,6 +164,7 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'contabilidad', label: 'Resumen', icon: Calculator, shortcut: 'F10', requires: 'view_accounting' },
       { pageKey: 'libro-iva-ventas', label: 'Libro IVA Ventas', icon: Calculator, requires: 'view_accounting' },
       { pageKey: 'libro-iva-compras', label: 'Libro IVA Compras', icon: Calculator, requires: 'view_accounting' },
+      { pageKey: 'compras-por-proveedor', label: 'Facturas de compra', icon: Truck, requires: 'view_accounting' },
       { separator: true, label: '' },
       { pageKey: 'facturacion-electronica', label: 'Facturación Electrónica (ARCA)', icon: ShieldCheck, roles: ['admin'] },
     ],

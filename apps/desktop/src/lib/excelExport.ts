@@ -5,6 +5,7 @@
 import * as XLSX from 'xlsx'
 
 import type { VatBookPurchaseRowDTO, VatBookSaleRowDTO } from '@/types/api'
+import type { CompraProveedorFila } from '@/lib/comprasPorProveedor'
 import { formatDate } from '@/lib/format'
 
 function periodLabel(period: { from: number; to: number }): string {
@@ -137,4 +138,65 @@ export function exportVatBookPurchasesToExcel(
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Libro IVA Compras')
   XLSX.writeFile(wb, `libro-iva-compras-${ymd(period.from)}.xlsx`)
+}
+
+/**
+ * Compras por proveedor (Contabilidad): tabla plana en el MISMO orden que la
+ * pantalla (agrupado proveedor → fecha, o sólo por fecha), con proveedor y
+ * CUIT en cada fila para que el contador pueda filtrar. Las anuladas van en 0
+ * con estado ANULADA, igual que en los libros de IVA.
+ */
+export function exportComprasPorProveedorToExcel(
+  rows: CompraProveedorFila[],
+  period: { from: number; to: number },
+  companyName: string,
+): void {
+  const headerRows: (string | number)[][] = [
+    [companyName],
+    [`Facturas de compra — período: ${periodLabel(period)}`],
+    [],
+    ['Proveedor', 'CUIT', 'Fecha', 'Tipo', 'N° proveedor', 'N° interno', 'Neto', 'IVA', 'Total', 'Estado'],
+  ]
+  const dataStart = headerRows.length + 1
+  const dataRows = rows.map((r) => [
+    r.supplierName,
+    r.supplierCuit ?? '',
+    formatDate(r.date),
+    r.type,
+    r.supplierInvoiceNumber ?? '',
+    r.number,
+    r.status === 'voided' ? 0 : Number(r.net),
+    r.status === 'voided' ? 0 : Number(r.vat),
+    r.status === 'voided' ? 0 : Number(r.total),
+    r.status === 'voided' ? 'ANULADA' : r.status === 'pending' ? 'Pendiente' : 'Registrada',
+  ])
+  const dataEnd = dataStart + dataRows.length - 1
+  const aoa: (string | number)[][] = [...headerRows, ...dataRows]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  if (dataRows.length > 0) {
+    const totalRow = dataEnd + 1
+    const sumCol = (col: string) => ({ t: 'n', f: `SUM(${col}${dataStart}:${col}${dataEnd})` })
+    XLSX.utils.sheet_add_aoa(ws, [['', '', '', '', '', 'TOTALES']], { origin: `A${totalRow}` })
+    ws[`G${totalRow}`] = sumCol('G')
+    ws[`H${totalRow}`] = sumCol('H')
+    ws[`I${totalRow}`] = sumCol('I')
+  }
+
+  ws['!cols'] = [
+    { wch: 32 },
+    { wch: 16 },
+    { wch: 12 },
+    { wch: 6 },
+    { wch: 16 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 12 },
+  ]
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Facturas de compra')
+  XLSX.writeFile(wb, `compras-por-proveedor-${ymd(period.from)}.xlsx`)
 }

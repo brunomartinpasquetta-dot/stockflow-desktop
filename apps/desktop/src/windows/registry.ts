@@ -21,6 +21,13 @@ export interface WindowDef {
   /** Mínimo absoluto de ancho/alto que respeta el WindowManager al hacer resize. */
   minWidth?: number
   minHeight?: number
+  /**
+   * La página reacciona a `extras` nuevos con la ventana YA abierta (los lee
+   * de `useWindowSelf().extras`, que cambia): se le entregan por IPC en vez de
+   * recargar la ventana, así no pierde lo que tenía sin guardar. Sin esto, la
+   * ventana abierta que recibe `extras` se recarga (comportamiento de siempre).
+   */
+  extrasEnVivo?: boolean
 }
 
 export const WINDOWS: Record<string, WindowDef> = {
@@ -68,6 +75,9 @@ export const WINDOWS: Record<string, WindowDef> = {
     requires: 'manage_purchases',
     minWidth: 1100,
     minHeight: 700,
+    // Una factura escaneada llega con la ventana abierta: Compras pregunta
+    // antes de pisar una compra a medio armar (ver Compras.tsx).
+    extrasEnVivo: true,
   },
   ventas: {
     pageKey: 'ventas',
@@ -114,6 +124,19 @@ export const WINDOWS: Record<string, WindowDef> = {
     minWidth: 1000,
     minHeight: 600,
   },
+  facturasEscaneadas: {
+    pageKey: 'facturasEscaneadas',
+    title: 'Facturas escaneadas',
+    iconName: 'ScanLine',
+    component: lazy(() => import('@/pages/FacturasEscaneadas').then((m) => ({ default: m.FacturasEscaneadas }))),
+    requires: 'manage_purchases',
+    defaultSize: { width: 1360, height: 820 },
+    minWidth: 1100,
+    minHeight: 640,
+    // Compras pide la revisión de otra factura con la ventana abierta: se
+    // guarda lo corregido y se cambia, sin recargar (ver FacturasEscaneadas.tsx).
+    extrasEnVivo: true,
+  },
   'caja-general': {
     pageKey: 'caja-general',
     title: 'Caja General',
@@ -152,6 +175,15 @@ export const WINDOWS: Record<string, WindowDef> = {
     title: 'Libro IVA Compras',
     iconName: 'Calculator',
     component: lazy(() => import('@/pages/LibroIvaCompras').then((m) => ({ default: m.LibroIvaCompras }))),
+    requires: 'view_accounting',
+    minWidth: 1100,
+    minHeight: 600,
+  },
+  'compras-por-proveedor': {
+    pageKey: 'compras-por-proveedor',
+    title: 'Facturas de compra',
+    iconName: 'Truck',
+    component: lazy(() => import('@/pages/ComprasPorProveedor').then((m) => ({ default: m.ComprasPorProveedor }))),
     requires: 'view_accounting',
     minWidth: 1100,
     minHeight: 600,
@@ -325,6 +357,7 @@ export const ROUTE_TO_PAGEKEY: Record<string, string> = {
   '/contabilidad': 'contabilidad',
   '/contabilidad/libro-iva-ventas': 'libro-iva-ventas',
   '/contabilidad/libro-iva-compras': 'libro-iva-compras',
+  '/contabilidad/compras-por-proveedor': 'compras-por-proveedor',
   '/familias': 'familias',
   '/promociones': 'promociones',
   '/auditoria': 'auditoria',
