@@ -1,0 +1,162 @@
+name: Prueba OCR Windows
+
+# Mide el lector de texto de Windows (Windows.Media.Ocr, apps/desktop/native/ocr-win/leer.ps1)
+# sobre fotos reales de facturas en un runner de GitHub, porque no hay PC con Windows a mano.
+#
+# - Se dispara SOLO a mano (workflow_dispatch). No crea releases ni tags.
+# - Las fotos NO están en el repo: se bajan de un release BORRADOR llamado
+#   `prueba-ocr-windows` (un borrador no tiene tag y solo lo ve quien puede escribir).
+# - El resultado (JSON de cajas de texto por foto, sin la foto) sube como artifact
+#   `ocr-windows` con 1 día de retención. Los logs no imprimen el texto leído: solo
+#   tamaños, cantidades y tiempos.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ocr:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versión de Windows y PowerShell
+        run: |
+          New-Item -ItemType Directory -Force salida | Out-Null
+          $os = Get-CimInstance Win32_OperatingSystem
+          $ps51 = powershell.exe -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
+          $info = @(
+            "Windows: $($os.Caption) $($os.Version) (build $($os.BuildNumber))"
+            "Imagen del runner: $env:ImageOS $env:ImageVersion"
+            "pwsh: $($PSVersionTable.PSVersion)"
+            "Windows PowerShell: $ps51"
+            "Idioma del sistema: $((Get-WinSystemLocale).Name)  usuario: $((Get-Culture).Name)"
+          )
+          $info
+          $info | Set-Content salida/sistema.txt
+
+      - name: Idiomas de lectura disponibles (Windows PowerShell 5.1)
+        run: |
+          @'
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.Runtime.WindowsRuntime
+          $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
+          $null = [Windows.Globalization.Language, Windows.Globalization, ContentType = WindowsRuntime]
+          $idiomas = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages
+          "idiomas de lectura: $($idiomas.Count)"
+          foreach ($i in $idiomas) { "  $($i.LanguageTag)  $($i.DisplayName)" }
+          "MaxImageDimension: $([Windows.Media.Ocr.OcrEngine]::MaxImageDimension)"
+          foreach ($e in @('es-AR', 'es-ES', 'es-MX', 'es', 'en-US')) {
+            $l = New-Object Windows.Globalization.Language($e)
+            "IsLanguageSupported($e): $([Windows.Media.Ocr.OcrEngine]::IsLanguageSupported($l))"
+          }
+          $perfil = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+          if ($perfil) { "motor del perfil: $($perfil.RecognizerLanguage.LanguageTag)" } else { "motor del perfil: ninguno" }
+          '@ | Set-Content idiomas.ps1
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File idiomas.ps1 | Tee-Object -FilePath salida/idiomas-antes.txt
+          "codigo: $LASTEXITCODE"
+          try {
+            Get-WindowsCapability -Online -Name 'Language.OCR*' | Select-Object Name, State | Format-Table -AutoSize | Out-String | Tee-Object -FilePath salida/capacidades-ocr.txt
+          } catch { "no se pudieron listar las capacidades: $($_.Exception.Message)" }
+
+      - name: Instalar lectura en castellano (si se puede)
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          $antes = Get-Content salida/idiomas-antes.txt -ErrorAction SilentlyContinue
+          if (($antes | Where-Object { $_ -match '^\s+es-' }).Count -gt 0) { 'ya hay castellano'; exit 0 }
+          foreach ($cap in @('Language.OCR~~~es-ES~0.0.1.0', 'Language.OCR~~~es-MX~0.0.1.0')) {
+            try {
+              "instalando $cap ..."
+              $r = Add-WindowsCapability -Online -Name $cap
+              "resultado: RestartNeeded=$($r.RestartNeeded)"
+              break
+            } catch { "no se pudo instalar ${cap}: $($_.Exception.Message)" }
+          }
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File idiomas.ps1 | Tee-Object -FilePath salida/idiomas-despues.txt
+
+      - name: Fotos del release borrador
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release download prueba-ocr-windows -D fotos --repo $env:REPO
+          if ($LASTEXITCODE -ne 0) {
+            "gh release download falló ($LASTEXITCODE); intento por la API"
+            $rels = gh api "repos/$env:REPO/releases?per_page=100" | ConvertFrom-Json
+            $rel = $rels | Where-Object { $_.tag_name -eq 'prueba-ocr-windows' } | Select-Object -First 1
+            if (-not $rel) { throw 'el release borrador prueba-ocr-windows no es visible con este token' }
+            New-Item -ItemType Directory -Force fotos | Out-Null
+            foreach ($a in $rel.assets) {
+              curl.exe -sSL -H "Authorization: Bearer $env:GH_TOKEN" -H 'Accept: application/octet-stream' -o "fotos/$($a.name)" "https://api.github.com/repos/$env:REPO/releases/assets/$($a.id)"
+            }
+          }
+          $fotos = Get-ChildItem fotos -Filter *.jpg
+          if ($fotos.Count -eq 0) { throw 'no se bajó ninguna foto' }
+          $fotos | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: leer.ps1 -Probar
+        continue-on-error: true
+        run: |
+          $ps = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $salida = & $ps -NoProfile -NonInteractive -NoLogo -ExecutionPolicy Bypass -File apps/desktop/native/ocr-win/leer.ps1 -Probar 2>&1
+          $rc = $LASTEXITCODE
+          "salida: $salida"
+          "codigo de salida: $rc  ($([int]$sw.ElapsedMilliseconds) ms)"
+          @("salida: $salida", "codigo: $rc", "ms: $($sw.ElapsedMilliseconds)") | Set-Content salida/probar.txt
+          if ($rc -ne 0) { throw "leer.ps1 -Probar terminó con $rc" }
+
+      - name: Leer las fotos (con preproceso y sin preproceso)
+        run: |
+          [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+          $ps = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+          $script = (Resolve-Path apps/desktop/native/ocr-win/leer.ps1).Path
+          $fotos = Get-ChildItem fotos -Filter *.jpg | Sort-Object Name
+          $resumen = @()
+          $fallas = 0
+          foreach ($modo in @('pre', 'color')) {
+            foreach ($f in $fotos) {
+              $n = $f.BaseName
+              $sufijo = if ($modo -eq 'pre') { '' } else { '.color' }
+              $json = "salida/$n$sufijo.json"
+              $err = "salida/$n$sufijo.err"
+              $args = @('-NoProfile', '-NonInteractive', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', $script, '-Ruta', $f.FullName)
+              if ($modo -eq 'color') { $args += '-SinPreproceso' }
+              $sw = [Diagnostics.Stopwatch]::StartNew()
+              $out = & $ps @args 2> $err
+              $rc = $LASTEXITCODE
+              $sw.Stop()
+              $ms = [int]$sw.ElapsedMilliseconds
+              $texto = (@($out) -join "`n")
+              [IO.File]::WriteAllText((Join-Path $PWD $json), $texto, [Text.UTF8Encoding]::new($false))
+              $bytes = $texto.Length
+              $cajas = -1
+              try { $cajas = @(($texto | ConvertFrom-Json).textos).Count } catch { }
+              $stderr = if (Test-Path $err) { Get-Content $err -Raw } else { '' }
+              @("foto: $n", "modo: $modo", "codigo: $rc", "ms: $ms", "bytes: $bytes", "cajas: $cajas", '--- stderr ---', $stderr) | Set-Content "salida/$n$sufijo.log"
+              Remove-Item $err -ErrorAction SilentlyContinue
+              "$n [$modo] codigo=$rc  $ms ms  $bytes bytes  cajas=$cajas"
+              if ($rc -ne 0) {
+                $fallas++
+                '  stderr: ' + (($stderr -split "`n" | Select-Object -First 6) -join "`n          ")
+              }
+              $resumen += [pscustomobject]@{ foto = $n; modo = $modo; codigo = $rc; ms = $ms; bytes = $bytes; cajas = $cajas }
+            }
+          }
+          $resumen | ConvertTo-Json | Set-Content salida/resumen.json
+          "fallas: $fallas de $($resumen.Count)"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ocr-windows
+          path: salida/
+          retention-days: 1
+          if-no-files-found: warn
