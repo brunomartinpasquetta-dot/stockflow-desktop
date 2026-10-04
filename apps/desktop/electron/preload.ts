@@ -7,12 +7,28 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { createApiBridge, parseLanArgs, type BridgeIO } from './preload-bridge';
+import { createApiBridge, parseLanArgs, type BridgeIO, type IdentidadTerminal } from './preload-bridge';
 
 const { mode, lanCfg } = parseLanArgs(process.argv);
 
 const io: BridgeIO = {
   invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
+  // Quién es esta PC (machineId, nombre y, si es PC de sucursal emparejada,
+  // su token): lo pide el puente y lo manda en cada pedido al servidor. Lo
+  // responde el main (`lan:identidadTerminal`), que en una PC de sucursal
+  // antes comprueba que la dirección sea SU casa central; no se expone a la
+  // interfaz.
+  identidad: async (opciones) => {
+    if (mode !== 'client') return null;
+    const r = (await ipcRenderer.invoke('lan:identidadTerminal', opciones)) as
+      | { ok: true; data: IdentidadTerminal }
+      | { ok: false };
+    return r && r.ok ? r.data : null;
+  },
+  // Los encabezados de identidad viajan sólo si el servidor avisa que los
+  // admite: desde file:// pasan por la consulta previa de CORS y un servidor
+  // todavía sin actualizar los rechazaría (ver BridgeIO.sondearIdentidad).
+  sondearIdentidad: true,
   listeners: {
     on: (channel, listener) => {
       const wrapped = (_event: unknown, payload: unknown): void => listener(payload);

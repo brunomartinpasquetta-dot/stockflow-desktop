@@ -418,6 +418,12 @@ export interface CreateSaleInputDTO {
   discount?: string;
   notes?: string | null;
   lines: SaleLineDraftDTO[];
+  /**
+   * Clave única del intento de cobro (uuid). La misma clave dos veces = la
+   * misma venta: el servidor devuelve la ya registrada. Ver
+   * `src/lib/idempotencia.ts`.
+   */
+  idempotencyKey?: string | null;
 }
 
 export interface CreateSaleResultDTO {
@@ -649,6 +655,8 @@ export interface CreatePurchaseInputDTO {
   /** Origen del dinero (contado): 'daily' caja diaria (default) o 'general' Caja General. */
   fundingSource?: 'daily' | 'general';
   lines: PurchaseLineDraftDTO[];
+  /** Clave única del intento de guardado (ver `CreateSaleInputDTO.idempotencyKey`). */
+  idempotencyKey?: string | null;
 }
 
 export interface CreatePurchaseResultDTO {
@@ -738,6 +746,8 @@ export interface PaymentMethodBreakdownDTO {
 export interface HistoricalCashRegisterDTO {
   id: string;
   number: number;
+  /** PC que abrió la caja (hostname), si se sabe. */
+  terminalName?: string | null;
   openDate: number;
   closeDate: number | null;
   userId: string;
@@ -1087,6 +1097,8 @@ export interface SystemInfoDTO {
   machineId: string;
   dbPath: string;
   platform: string;
+  /** Nombre de la PC en el sistema operativo (sugerencia para nombrar una PC de sucursal). */
+  hostname?: string;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1143,7 +1155,58 @@ export interface LicenseStateDTO {
   tenantId: string | null;
   /** true si es una PRUEBA GRATIS (30 días); expiresAt = fin de la prueba. */
   trial?: boolean;
+  /**
+   * Edición de ESTA instalación (ausente = común). En una terminal no sirve:
+   * la terminal no tiene licencia propia. La interfaz pregunta la edición con
+   * `useFuncion` (canal `funciones:estado`, que va al servidor).
+   */
+  edicion?: EdicionDTO;
   lastError: string | null;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Edición de la licencia y sucursales (multisucursal)                      */
+/* ----------------------------------------------------------------------- */
+
+/** 'comun' = StockFlow de siempre; 'multisucursal' = habilita Sucursales. */
+export type EdicionDTO = 'comun' | 'multisucursal';
+
+/** Respuesta de `funciones:estado` (la edición del comercio, del servidor). */
+export interface FuncionesDTO {
+  edicion: EdicionDTO;
+  multisucursal: boolean;
+  /**
+   * ¿Cada PC tiene su caja? (opción del comercio, siempre activa con
+   * Multisucursal). Con false todo es como en la 1.12: una caja del local.
+   */
+  cajaPorPc?: boolean;
+}
+
+/**
+ * Interruptor "Edición Multisucursal (versión de prueba)"
+ * (`funciones:edicionPrueba`). `disponible` sólo con una versión de prueba
+ * (-alpha/-beta/-rc); en la definitiva es false y la edición la define la
+ * licencia. Sólo en la PC que tiene la base (una terminal no lo ve).
+ */
+export interface EdicionPruebaDTO {
+  disponible: boolean;
+  activa: boolean;
+  activadaEl: number | null;
+  /** La edición sin el interruptor: la de la licencia. */
+  edicionReal: EdicionDTO;
+  version: string;
+}
+
+export interface BranchDTO {
+  id: string;
+  name: string;
+  /** Código corto e invariable (CENTRAL, …). */
+  code: string;
+  active: boolean;
+  /** Sucursal principal ("Casa central"). */
+  isMain: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 /** Datos para arrancar la prueba gratis autoservicio. */
@@ -2312,6 +2375,18 @@ export interface ApiSurface {
     get(): Res<CompanyDTO>;
     upsert(payload: EntityPayload): Res<CompanyDTO>;
   };
+  /** Edición de la licencia del comercio (en una terminal, la del servidor). */
+  funciones: {
+    estado(): Res<FuncionesDTO>;
+    /** Interruptor de la edición Multisucursal en versiones de prueba (sólo la PC con la base). */
+    edicionPrueba(): Res<EdicionPruebaDTO>;
+    setEdicionPrueba(payload: { activa: boolean }): Res<EdicionPruebaDTO>;
+  };
+  /** Sucursales (multisucursal). Renombrar requiere la edición Multisucursal. */
+  branches: {
+    listar(): Res<BranchDTO[]>;
+    renombrar(payload: { id: string; name: string }): Res<BranchDTO>;
+  };
   sales: {
     create(payload: CreateSaleInputDTO): Res<CreateSaleResultDTO>;
     void(payload: IdPayload & { reason?: string | null }): Res<SaleDTO>;
@@ -2542,12 +2617,19 @@ export interface ApiSurface {
     getConfig(): Res<LanConfigDTO>;
     getLocalIp(): Res<{ ip: string | null }>;
     setMode(payload: LanSetModeInputDTO): Res<{ requiresRestart: true; config: LanConfigDTO }>;
-    testConnection(payload: { ip: string; port: number; token?: string }): Res<{ ok: boolean; latencyMs?: number; error?: string }>;
+    testConnection(payload: { ip?: string; port?: number; url?: string; token?: string }): Res<{ ok: boolean; latencyMs?: number; error?: string; sucursales?: boolean; aviso?: string }>;
     scanNetwork(): Res<{ supported: boolean; results: { ip: string; port: number; name?: string }[] }>;
     getConnectedClients(): Res<{
       ip: string; lastSeen: number; usuario: string | null;
       ultimaAccion: string | null; via: 'app' | 'navegador'; operaciones: number;
+      /** Nombre de la PC, si la terminal se identificó (versiones nuevas). */
+      nombre?: string | null;
     }[]>;
+    /** Multisucursal: código de un solo uso para emparejar una PC de sucursal. */
+    emparejarGenerarCodigo(): Res<CodigoEmparejamientoDTO>;
+    dispositivosListar(): Res<DispositivoSucursalDTO[]>;
+    dispositivoRevocar(payload: { id: string }): Res<{ ok: true }>;
+    setCajaPorPc(payload: { activa: boolean }): Res<{ cajaPorPc: boolean }>;
     openFirewall(): Res<{ ok: boolean; needsAdmin?: boolean; command?: string; error?: string }>;
     diagnose(): Res<{ checks: { id: string; label: string; ok: boolean; detail: string; fix?: 'openFirewall' }[]; allOk: boolean }>;
     applyAndRestart(): Res<{ ok: true }>;
@@ -2610,6 +2692,18 @@ export interface LanConfigDTO {
   token?: string;
   serverIp?: string;
   serverPort?: number;
+  /**
+   * Modo client por dirección web (multisucursal): origen completo del
+   * servidor (`https://comercio.mistockflow.com` o `http://IP:puerto`). Si
+   * está, manda sobre serverIp/serverPort.
+   */
+  serverUrl?: string;
+  /** Modo client: esta PC tiene guardado un token de PC de sucursal. */
+  emparejada?: boolean;
+  /** Modo server: ¿rige "Una caja por PC"? (apagada por defecto). */
+  cajaPorPc?: boolean;
+  /** Modo server: la caja por PC está forzada por la edición Multisucursal. */
+  cajaPorPcForzada?: boolean;
   /** true si ya existe lan.json (post-wizard). */
   configured?: boolean;
 }
@@ -2618,11 +2712,47 @@ export interface LanSetModeInputDTO {
   mode: LanModeDTO;
   serverIp?: string;
   serverPort?: number;
+  /** Modo client por dirección web (multisucursal). */
+  serverUrl?: string;
+  /**
+   * Modo client por dirección web: código de emparejamiento que generó el
+   * servidor. Se canjea ANTES de guardar; si falla, no se guarda nada.
+   */
+  codigoEmparejamiento?: string;
+  /**
+   * Con el código: nombre con que la casa central va a ver esta PC ("Caja 1
+   * San Carlos"). Sin él, el nombre de la PC en Windows.
+   */
+  nombrePc?: string;
   /** Modo client: PIN del servidor. Modo server: PIN nuevo si se quiere cambiar. */
   token?: string;
   port?: number;
   /** Sólo modo server: generar un PIN nuevo al azar (invalida las sesiones de las terminales). */
   regeneratePin?: boolean;
+}
+
+export interface CodigoEmparejamientoDTO {
+  /** Para mostrar y dictar: 10 caracteres legibles en dos grupos (ABCDE-FGH23). */
+  codigo: string;
+  /** Vencimiento (ms epoch): 15 minutos después de generado. */
+  venceEn: number;
+}
+
+export interface DispositivoSucursalDTO {
+  id: string;
+  nombre: string;
+  estado: 'activo' | 'revocado';
+  creadoEn: number;
+  ultimoUsoEn: number | null;
+  revocadoEn: number | null;
+  /** Primeros caracteres del id del dispositivo (para distinguir PC con el mismo nombre). */
+  idCorto: string;
+  /** Primeros caracteres del machineId que declaró la PC. */
+  pcCorta: string;
+  /** Desde dónde se canjeó el código ("200.1.2.0/24 por internet"). */
+  creadoDesde: string | null;
+  /** Red/IP del último uso. */
+  ultimaIp: string | null;
 }
 
 /* ----------------------------------------------------------------------- */

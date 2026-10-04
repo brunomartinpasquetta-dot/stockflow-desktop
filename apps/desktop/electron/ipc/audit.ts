@@ -52,6 +52,8 @@ const AREA_BY_GROUP: Record<string, string> = {
   priceUpdates: 'Precios',
   users: 'Usuarios',
   company: 'Configuración',
+  branches: 'Sucursales',
+  funciones: 'Licencia',
   license: 'Licencia',
   backup: 'Backup',
   import: 'Importación',
@@ -71,6 +73,11 @@ const DESCRIBE: Record<string, Describe> = {
     return `Venta ${s(g(sale, 'type'))} #${s(g(sale, 'number'))} por $${s(g(sale, 'total'))}`;
   },
   'sales:void': (_p, r) => `Anulación de venta ${s(g(r, 'type'))} #${s(g(r, 'number'))} por $${s(g(r, 'total'))}`,
+  'branches:renombrar': (_p, r) => `Sucursal renombrada: ${s(g(r, 'name'))} (${s(g(r, 'code'))})`,
+  'funciones:setEdicionPrueba': (_p, r) =>
+    g(r, 'activa') === true
+      ? `Edición Multisucursal (versión de prueba) activada en esta PC (versión ${s(g(r, 'version'))})`
+      : 'Edición Multisucursal (versión de prueba) desactivada: rige la edición de la licencia',
   'returns:createForSale': (_p, r) => {
     const ret = g(r, 'ret');
     return `Devolución de venta DEV #${s(g(ret, 'number'))} por $${s(g(ret, 'total'))} (${s(g(ret, 'refundMethod')) === 'cash' ? 'efectivo' : 'crédito en cuenta'})`;
@@ -149,6 +156,9 @@ export function isAuditable(channel: string): boolean {
   // Verbo en castellano que la regex no reconoce, y crea/vincula en bloque
   // todo el padrón del catálogo: tiene que quedar registrado.
   if (channel === 'catalogo:aplicarCargaTotal') return true;
+  // Verbo en castellano: cambiar el nombre de una sucursal queda registrado
+  // (y avisa a las demás ventanas que refresquen).
+  if (channel === 'branches:renombrar') return true;
   return MUTATING_VERBS.test(method);
 }
 

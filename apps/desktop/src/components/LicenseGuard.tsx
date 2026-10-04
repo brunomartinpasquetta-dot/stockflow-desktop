@@ -11,7 +11,22 @@ import { useLicenseStatus } from '@/contexts/LicenseContext'
  */
 export function LicenseGuard() {
   const status = useLicenseStatus()
-  const { mode, online, serverLicense } = useLanContext()
+  const { mode, online, serverLicense, configCargando } = useLanContext()
+
+  // Hasta saber el modo de red no se decide nada. Si la licencia LOCAL llegaba
+  // antes que la config, una terminal (que no tiene licencia propia) se tomaba
+  // por "1 PC sin licencia" y quedaba trabada en /activacion: Activación sólo
+  // sale de ahí con licencia local. Visto en el sandbox de dos locales
+  // (oct-2026) con la PC de sucursal recién emparejada; la misma carrera existe
+  // para cualquier terminal de red local sin licencia propia. Si la config
+  // falla (isPending pasa a false), se sigue como antes.
+  if (configCargando) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   // Un puesto conectado a un servidor NO tiene licencia propia: trabaja
   // amparado por la del servidor (una licencia por comercio). Mandarlo a

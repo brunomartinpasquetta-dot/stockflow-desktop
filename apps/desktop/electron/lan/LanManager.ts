@@ -27,7 +27,23 @@ const FILE_NAME = 'lan.json';
 interface SecretoFirma {
   jwtSecretEnc?: string;
   jwtSecret?: string;
+  /**
+   * Terminal de sucursal emparejada: token de dispositivo que entregó el
+   * servidor. Mismo trato que el secreto de firma (cifrado con la clave del
+   * SO cuando hay llavero) y nunca sale por `lan:getConfig`.
+   */
+  dispositivoTokenEnc?: string;
+  dispositivoToken?: string;
+  /** Opción del comercio "Una caja por PC" (no es secreta, pero sobrevive igual a `setConfig`). */
+  cajaPorPc?: boolean;
 }
+
+/**
+ * Claves de lan.json que no son configuración y sobreviven a `setConfig`.
+ * `cajaPorPc` (opción del comercio, ver ipc/caja-por-pc.ts) también: cambiar
+ * el PIN o el puerto no tiene por qué apagarla.
+ */
+const CLAVES_SECRETAS = ['jwtSecretEnc', 'jwtSecret', 'dispositivoTokenEnc', 'dispositivoToken', 'cajaPorPc'] as const;
 
 /** `safeStorage` de Electron, o null fuera de Electron (tsx / tests). */
 function cargarSafeStorage(): typeof import('electron').safeStorage | null {
@@ -96,6 +112,7 @@ export class LanManager {
         serverIp: typeof parsed.serverIp === 'string' ? parsed.serverIp : undefined,
         serverPort:
           typeof parsed.serverPort === 'number' ? parsed.serverPort : DEFAULT_LAN_PORT,
+        serverUrl: typeof parsed.serverUrl === 'string' && parsed.serverUrl ? parsed.serverUrl : undefined,
         remotoActivado: parsed.remotoActivado === true,
         remotoHostname:
           typeof parsed.remotoHostname === 'string' ? parsed.remotoHostname : undefined,
@@ -114,15 +131,73 @@ export class LanManager {
       token: next.token,
       serverIp: next.serverIp,
       serverPort: next.serverPort ?? DEFAULT_LAN_PORT,
+      serverUrl: next.mode === 'client' && next.serverUrl ? next.serverUrl : undefined,
       remotoActivado: next.remotoActivado === true,
       remotoHostname: next.remotoHostname,
     };
     // El secreto de firma sobrevive a cualquier cambio de config: si se
-    // perdiera al guardar, todas las terminales quedarían deslogueadas.
-    const { jwtSecretEnc, jwtSecret } = this.leerArchivo() as SecretoFirma;
-    this.escribirArchivo({ ...normalized, jwtSecretEnc, jwtSecret });
+    // perdiera al guardar, todas las terminales quedarían deslogueadas. El
+    // token de PC de sucursal también, salvo que la PC deje de ser terminal.
+    const actual = this.leerArchivo() as SecretoFirma;
+    const secretos: Record<string, unknown> = {};
+    for (const k of CLAVES_SECRETAS) if (actual[k] !== undefined) secretos[k] = actual[k];
+    if (normalized.mode !== 'client') {
+      delete secretos.dispositivoTokenEnc;
+      delete secretos.dispositivoToken;
+    }
+    this.escribirArchivo({ ...normalized, ...secretos });
     this.cache = normalized;
     return normalized;
+  }
+
+  /** Opción "Una caja por PC" (apagada por defecto). Ver ipc/caja-por-pc.ts. */
+  getCajaPorPc(): boolean {
+    return (this.leerArchivo() as { cajaPorPc?: unknown }).cajaPorPc === true;
+  }
+
+  setCajaPorPc(activa: boolean): void {
+    const actual = this.leerArchivo() as Record<string, unknown>;
+    if (activa) actual.cajaPorPc = true;
+    else delete actual.cajaPorPc;
+    this.escribirArchivo(actual);
+  }
+
+  /**
+   * Guarda (o borra, con null) el token de PC de sucursal. Cifrado con
+   * `safeStorage` cuando el SO ofrece llavero; en texto plano sólo donde no
+   * hay Electron (tests) o llavero, igual que el secreto de firma.
+   */
+  guardarTokenDispositivo(token: string | null): void {
+    const actual = this.leerArchivo();
+    delete actual.dispositivoTokenEnc;
+    delete actual.dispositivoToken;
+    if (token) {
+      const ss = cargarSafeStorage();
+      if (ss) actual.dispositivoTokenEnc = ss.encryptString(token).toString('base64');
+      else actual.dispositivoToken = token;
+    }
+    this.escribirArchivo(actual);
+  }
+
+  /** Token de PC de sucursal guardado, o null. */
+  leerTokenDispositivo(): string | null {
+    const guardado = this.leerArchivo() as SecretoFirma;
+    const ss = cargarSafeStorage();
+    if (guardado.dispositivoTokenEnc) {
+      if (!ss) return null;
+      try {
+        return ss.decryptString(Buffer.from(guardado.dispositivoTokenEnc, 'base64'));
+      } catch {
+        return null; // cambió la clave del SO: hay que emparejar de nuevo
+      }
+    }
+    return typeof guardado.dispositivoToken === 'string' && guardado.dispositivoToken ? guardado.dispositivoToken : null;
+  }
+
+  /** ¿Hay un token de PC de sucursal guardado? (sin descifrarlo) */
+  tieneTokenDispositivo(): boolean {
+    const g = this.leerArchivo() as SecretoFirma;
+    return Boolean(g.dispositivoTokenEnc || g.dispositivoToken);
   }
 
   /**

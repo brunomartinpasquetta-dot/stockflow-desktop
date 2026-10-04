@@ -19,13 +19,34 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import type { LicenseJwtPayload, LicensePlan, LicenseState, LicenseStatus, TrialInput } from './types';
+import {
+  edicionEfectiva,
+  type EntornoEdicion,
+  esVersionDePrueba,
+  guardarEdicionPrueba,
+  interruptorDePruebaActivo,
+  leerEdicionPrueba,
+  normalizarEdicion,
+} from './funciones';
+import type { EdicionPruebaEstado, LicenseJwtPayload, LicensePlan, LicenseState, LicenseStatus, TrialInput } from './types';
 
 interface LicenseManagerOptions {
   userDataDir: string;
   machineId: string;
   apiUrl: string;
   publicKeyPem: string;
+  /**
+   * `app.isPackaged`. Sólo con `false` se admite el override de desarrollo
+   * `STOCKFLOW_PLAN=multisucursal` (ver funciones.ts). Por defecto `true`:
+   * quien no lo pase (tests, herramientas) nunca activa el override.
+   */
+  empaquetada?: boolean;
+  /**
+   * `app.getVersion()`. Sólo con sufijo de prueba (-alpha/-beta/-rc) existe el
+   * interruptor "Edición Multisucursal (versión de prueba)" (ver funciones.ts).
+   * Sin versión (tests, herramientas) no existe.
+   */
+  version?: string;
 }
 
 interface ActivateResponse {
@@ -77,6 +98,8 @@ export class LicenseManager {
   private readonly machineId: string;
   private readonly apiUrl: string;
   private readonly publicKeyPem: string;
+  private readonly empaquetada: boolean;
+  private readonly version: string | undefined;
 
   /** Estado en runtime impuesto por el heartbeat (revocada / suspendida). */
   private runtimeStatus: LicenseStatus | null = null;
@@ -90,6 +113,8 @@ export class LicenseManager {
     this.machineId = opts.machineId;
     this.apiUrl = opts.apiUrl.replace(/\/+$/, '');
     this.publicKeyPem = opts.publicKeyPem ?? '';
+    this.empaquetada = opts.empaquetada !== false;
+    this.version = opts.version;
   }
 
   /* ------------------------------------------------------------------ */
@@ -236,9 +261,69 @@ export class LicenseManager {
   /* ------------------------------------------------------------------ */
 
   getState(): LicenseState {
+    const estado = this.estadoSegunToken();
+    // Edición: la del token (sin claim = común), salvo el override de
+    // desarrollo (sólo sin empaquetar) o el interruptor de prueba (sólo en
+    // una versión -alpha/-beta/-rc; nunca baja la del token).
+    return {
+      ...estado,
+      edicion: edicionEfectiva(estado.edicion, this.entornoEdicion(true)),
+    };
+  }
+
+  /**
+   * Lo que `edicionEfectiva` necesita de esta PC. El archivo del interruptor
+   * se lee SÓLO en una versión de prueba: en una final no se toca el disco y
+   * el archivo, exista o no, no cuenta.
+   */
+  private entornoEdicion(conInterruptor: boolean): EntornoEdicion {
+    return {
+      empaquetada: this.empaquetada,
+      env: process.env,
+      version: this.version,
+      edicionPrueba: conInterruptor && esVersionDePrueba(this.version) ? leerEdicionPrueba(this.userDataDir) : null,
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Interruptor "Edición Multisucursal (versión de prueba)"             */
+  /* ------------------------------------------------------------------ */
+
+  /** Estado del interruptor de prueba (ver funciones.ts). */
+  getEdicionPrueba(): EdicionPruebaEstado {
+    const disponible = esVersionDePrueba(this.version);
+    const archivo = disponible ? leerEdicionPrueba(this.userDataDir) : null;
+    const activa = interruptorDePruebaActivo(this.version, archivo);
+    return {
+      disponible,
+      activa,
+      activadaEl: activa ? (archivo?.activadaEl ?? null) : null,
+      edicionReal: edicionEfectiva(this.estadoSegunToken().edicion, this.entornoEdicion(false)),
+      version: this.version ?? '',
+    };
+  }
+
+  /**
+   * Prende o apaga el interruptor de prueba. Sólo en una versión de prueba:
+   * en una final tira, no escribe nada y la edición sigue siendo la del token.
+   */
+  setEdicionPrueba(activa: boolean): EdicionPruebaEstado {
+    if (!esVersionDePrueba(this.version)) {
+      throw new Error(
+        'La edición Multisucursal de prueba sólo existe en las versiones de prueba. En esta versión la edición la define la licencia.',
+      );
+    }
+    guardarEdicionPrueba(this.userDataDir, activa);
+    const estado = this.getEdicionPrueba();
+    console.info(`[license] edición de prueba ${estado.activa ? 'activada' : 'desactivada'} (versión ${this.version})`);
+    return estado;
+  }
+
+  private estadoSegunToken(): LicenseState {
     // En modo desarrollo, bypass: licencia 'pro' válida sin tocar license.dat.
-    // En producción (.app empaquetado) NODE_ENV no es 'development' → flujo normal.
-    if (process.env.NODE_ENV === 'development') {
+    // SÓLO sin empaquetar: en la app de los clientes, NODE_ENV=development
+    // puesto a mano daba una licencia pro sin pasar por el cloud.
+    if (process.env.NODE_ENV === 'development' && !this.empaquetada) {
       return {
         status: 'active',
         plan: 'pro',
@@ -247,6 +332,7 @@ export class LicenseManager {
         tenantName: 'Desarrollo',
         fullName: 'Desarrollo',
         tenantId: 'OWNER',
+        edicion: 'comun',
         lastError: null,
       };
     }
@@ -260,6 +346,7 @@ export class LicenseManager {
         tenantName: this.tenantName ?? 'Bruno Pasquetta — Master',
         fullName: this.clientName,
         tenantId: 'OWNER',
+        edicion: 'comun',
         lastError: null,
       };
     }
@@ -273,6 +360,7 @@ export class LicenseManager {
         tenantName: null,
         fullName: null,
         tenantId: null,
+        edicion: 'comun',
         lastError: 'No hay licencia válida',
       };
     }
@@ -295,6 +383,9 @@ export class LicenseManager {
           fullName: this.clientName,
           tenantId: payload.tid ?? null,
           trial: true,
+          // Firma válida, sólo vencido por estar sin conexión: la edición sigue
+          // siendo la que el cloud firmó (en sólo lectura no se escribe igual).
+          edicion: normalizarEdicion(payload.edicion),
           lastError: trialOver
             ? 'La prueba gratis de 30 días terminó. Escríbanos por WhatsApp para activar la licencia — los datos están intactos.'
             : 'No se pudo renovar la prueba (sin conexión). Conectate a internet para seguir operando.',
@@ -308,6 +399,8 @@ export class LicenseManager {
         tenantName: this.tenantName,
         fullName: this.clientName,
         tenantId: payload?.tid ?? null,
+        // Sin licencia válida no rige ninguna edición especial.
+        edicion: 'comun',
         lastError: expired ? 'La licencia expiró. Vuelva a conectarse para renovarla.' : 'No hay licencia válida',
       };
     }
@@ -326,6 +419,7 @@ export class LicenseManager {
         fullName: this.clientName,
         tenantId: payload.tid,
         trial: true,
+        edicion: normalizarEdicion(payload.edicion),
         lastError: trialOver
           ? 'La prueba gratis de 30 días terminó. Escríbanos por WhatsApp para activar la licencia — los datos están intactos.'
           : null,
@@ -339,6 +433,7 @@ export class LicenseManager {
       tenantName: this.tenantName,
       fullName: this.clientName,
       tenantId: payload.tid,
+      edicion: normalizarEdicion(payload.edicion),
       lastError: null,
     };
   }
@@ -409,6 +504,7 @@ export class LicenseManager {
         tenantName: null,
         fullName: null,
         tenantId: null,
+        edicion: 'comun',
         lastError: this.translateActivateError(res.status, serverMsg),
       };
     }
@@ -425,6 +521,7 @@ export class LicenseManager {
         tenantName: null,
         fullName: null,
         tenantId: null,
+        edicion: 'comun',
         lastError: 'Respuesta inválida del servidor de licencias.',
       };
     }

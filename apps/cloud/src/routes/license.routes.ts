@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { licenses, tenants } from '@stockflow/db';
 
 import { PLAN_FEATURES, type PlanId } from '../config';
-import { LicenseService } from '../services/LicenseService';
+import { edicionDe, LicenseService } from '../services/LicenseService';
 
 interface ActivateBody {
   licenseKey?: string;
@@ -110,6 +110,7 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
           user.exp * 1000,
           (p) => app.jwt.sign(p),
           user.kind,
+          user.edicion,
         );
         return reply.send(
           result.suspended ? { jwt: result.jwt, suspended: true } : { jwt: result.jwt },
@@ -126,10 +127,14 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
     const [tenant] = await app.cloudDb.select().from(tenants).where(eq(tenants.id, user.tid)).limit(1);
     if (!tenant) return reply.code(404).send({ error: 'Cuenta no encontrada' });
     const [license] = await app.cloudDb.select().from(licenses).where(eq(licenses.id, user.sub)).limit(1);
+    const edicion = edicionDe(tenant);
     return reply.send({
-      tenant: { name: tenant.companyName, fullName: tenant.fullName, plan: tenant.plan },
+      tenant: { name: tenant.companyName, fullName: tenant.fullName, plan: tenant.plan, edicion },
       license: { key: license?.licenseKey ?? user.lk, expiresAt: user.exp * 1000 },
-      features: PLAN_FEATURES[tenant.plan as PlanId] ?? PLAN_FEATURES.basic,
+      features: {
+        ...(PLAN_FEATURES[tenant.plan as PlanId] ?? PLAN_FEATURES.basic),
+        multisucursal: edicion === 'multisucursal',
+      },
     });
   });
 }

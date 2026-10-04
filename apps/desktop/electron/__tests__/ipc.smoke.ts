@@ -6,21 +6,24 @@
  * Arma los handlers con `buildAllHandlers` sobre una DB temporal y los invoca
  * manualmente con payloads de prueba, verificando el contrato `{ ok, ... }`.
  */
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Buffer } from 'node:buffer';
 
-import { closeLocalDb, createRepositories, initLocalDb } from '@stockflow/db';
+import { closeLocalDb, createRepositories, initLocalDb, SUCURSAL_CENTRAL_ID } from '@stockflow/db';
 
 import { BackupService } from '../backup/BackupService';
 import { HardwareManager } from '../hardware/HardwareManager';
 import { ExcelImportService } from '../import/ExcelImportService';
 import { LicenseManager } from '../license/LicenseManager';
+import { ARCHIVO_EDICION_PRUEBA, tieneMultisucursal } from '../license/funciones';
 import { buildAllHandlers } from '../ipc/index';
+import { lanServerAccepts, remotoAccepts, shouldRouteLan } from '../preload-bridge';
 import { SessionStore } from '../ipc/session-store';
+import { correrComoTerminal } from '../ipc/terminal-actual';
 import type { HandlerMap } from '../ipc/handler-context';
-import type { IpcResponse } from '../ipc/types';
+import type { EdicionPruebaDTO, IpcResponse } from '../ipc/types';
 
 let failures = 0;
 function check(label: string, ok: boolean, detail = ''): void {
@@ -180,6 +183,56 @@ async function main(): Promise<void> {
   const compUp = await invoke<{ priceMode: string }>(handlers, 'company:upsert', { name: 'Mi Empresa', priceMode: 'net' });
   check('company:upsert priceMode = net', compUp.ok && compUp.data.priceMode === 'net', JSON.stringify(compUp));
   await invoke(handlers, 'company:upsert', { name: 'Mi Empresa', priceMode: 'gross' }); // restaurar
+
+  // --- MULTISUCURSAL: edición de la licencia + sucursales ---------------------
+  {
+    const fun = await invoke<{ edicion: string; multisucursal: boolean }>(handlers, 'funciones:estado');
+    check('funciones:estado sin licencia multisucursal → común', fun.ok && fun.data.edicion === 'comun' && fun.data.multisucursal === false, JSON.stringify(fun));
+    const lista = await invoke<Array<{ id: string; name: string; isMain: boolean; code: string }>>(handlers, 'branches:listar');
+    check(
+      'branches:listar → sólo "Casa central" (id fijo, principal)',
+      lista.ok && lista.data.length === 1 && lista.data[0]?.id === SUCURSAL_CENTRAL_ID && lista.data[0]?.name === 'Casa central' && lista.data[0]?.isMain === true,
+      JSON.stringify(lista),
+    );
+    const renComun = await invoke(handlers, 'branches:renombrar', { id: SUCURSAL_CENTRAL_ID, name: 'Coronda' });
+    check('branches:renombrar con licencia común → BUSINESS_RULE', !renComun.ok && renComun.code === 'BUSINESS_RULE', JSON.stringify(renComun));
+
+    // Licencia con edición multisucursal (se simula el estado: la lectura del token la cubre license.smoke).
+    const getStateReal = licenseManager.getState.bind(licenseManager);
+    licenseManager.getState = () => ({ ...getStateReal(), edicion: 'multisucursal' as const });
+    try {
+      const fun2 = await invoke<{ edicion: string; multisucursal: boolean }>(handlers, 'funciones:estado');
+      check('funciones:estado con licencia multisucursal → multisucursal', fun2.ok && fun2.data.multisucursal === true && fun2.data.edicion === 'multisucursal', JSON.stringify(fun2));
+      const ren = await invoke<{ name: string; code: string }>(handlers, 'branches:renombrar', { id: SUCURSAL_CENTRAL_ID, name: 'Casa central Coronda' });
+      check('branches:renombrar con multisucursal + admin → ok', ren.ok && ren.data.name === 'Casa central Coronda' && ren.data.code === 'CENTRAL', JSON.stringify(ren));
+      const audit = db.$client
+        .prepare("SELECT description, area FROM audit_log WHERE channel = 'branches:renombrar' ORDER BY created_at DESC LIMIT 1")
+        .get() as { description: string; area: string } | undefined;
+      check('renombrar queda en la auditoría', !!audit && audit.description.includes('Casa central Coronda') && audit.area === 'Sucursales', JSON.stringify(audit));
+      const vacio = await invoke(handlers, 'branches:renombrar', { id: SUCURSAL_CENTRAL_ID, name: '  ' });
+      check('branches:renombrar con nombre vacío → VALIDATION', !vacio.ok && vacio.code === 'VALIDATION', JSON.stringify(vacio));
+
+      // Un vendedor (sin permiso de configurar la empresa) no puede renombrar.
+      const vend = await invoke<{ id: string }>(handlers, 'users:create', { username: 'vendsuc', password: 'vend1234', fullName: 'Vendedor Sucursal', role: 'seller' });
+      check('users:create vendedor para probar permisos', vend.ok, JSON.stringify(vend));
+      await invoke(handlers, 'auth:login', { username: 'vendsuc', password: 'vend1234' });
+      const listaVend = await invoke<unknown[]>(handlers, 'branches:listar');
+      check('branches:listar como vendedor → ok (lectura)', listaVend.ok && listaVend.data.length === 1, JSON.stringify(listaVend));
+      const renVend = await invoke(handlers, 'branches:renombrar', { id: SUCURSAL_CENTRAL_ID, name: 'Otra' });
+      check('branches:renombrar como vendedor → PERMISSION_DENIED', !renVend.ok && renVend.code === 'PERMISSION_DENIED', JSON.stringify(renVend));
+    } finally {
+      licenseManager.getState = getStateReal;
+      await invoke(handlers, 'auth:login', { username: 'admin', password: 'admin36724776' });
+    }
+
+    // Ruteo: los datos de sucursales y la edición van al SERVIDOR; renombrar no se hace desde internet.
+    check('funciones:estado viaja al servidor desde una terminal', shouldRouteLan('funciones:estado', 'client'));
+    check('branches:listar viaja al servidor desde una terminal', shouldRouteLan('branches:listar', 'client'));
+    check('branches:renombrar se acepta por la red local', lanServerAccepts('branches:renombrar'));
+    check('branches:renombrar se RECHAZA por internet', !remotoAccepts('branches:renombrar'));
+    check('branches:listar y funciones:estado sí por internet (lectura)', remotoAccepts('branches:listar') && remotoAccepts('funciones:estado'));
+    check('license:* sigue siendo local de cada PC', !shouldRouteLan('license:getState', 'client'));
+  }
 
   // supplierAccounts:listBalances (vacío al inicio, pero el canal debe responder ok)
   const supBal = await invoke<unknown[]>(handlers, 'supplierAccounts:listBalances');
@@ -690,6 +743,93 @@ async function main(): Promise<void> {
     voidRangeVacio.ok && voidRangeVacio.data.anuladas === 0,
     JSON.stringify(voidRangeVacio),
   );
+
+  // --- EDICIÓN MULTISUCURSAL (VERSIÓN DE PRUEBA): interruptor local de la PC con la base ---
+  // Sólo existe con una versión -alpha/-beta/-rc; en una final la casilla no
+  // está y el archivo no cuenta. Va al final porque usa la caja abierta de arriba.
+  {
+    console.log('\n[edición de prueba]');
+    const archivo = join(tmpDir, ARCHIVO_EDICION_PRUEBA);
+    const cajaServidorId = cashOpen.ok ? cashOpen.data.id : '';
+    const depsBase = { db, repos, sessionStore, machineId: 'test-machine', dbPath, userDataDir: tmpDir, hardware, backup, importService };
+    const abiertas = (): Array<{ id: string; terminal_id: string | null }> =>
+      db.$client.prepare("SELECT id, terminal_id FROM cash_registers WHERE status = 'open'").all() as Array<{ id: string; terminal_id: string | null }>;
+
+    // Versión FINAL (1.13.0): el canal contesta "no disponible" aunque el archivo exista.
+    writeFileSync(archivo, JSON.stringify({ edicion: 'multisucursal', activadaEl: Date.now() }));
+    const lmFinal = new LicenseManager({ userDataDir: tmpDir, machineId: 'test-machine', apiUrl: 'http://localhost:1', publicKeyPem: '', version: '1.13.0' });
+    const hFinal = buildAllHandlers({ ...depsBase, licenseManager: lmFinal, appVersion: '1.13.0', emit: () => {} });
+    const epFinal = await invoke<EdicionPruebaDTO>(hFinal, 'funciones:edicionPrueba');
+    check('versión final: funciones:edicionPrueba → disponible false aunque exista el archivo', epFinal.ok && epFinal.data.disponible === false && epFinal.data.activa === false, JSON.stringify(epFinal));
+    const estFinal = await invoke<{ edicion: string }>(hFinal, 'funciones:estado');
+    check('versión final: el archivo no cambia la edición (común)', estFinal.ok && estFinal.data.edicion === 'comun', JSON.stringify(estFinal));
+    const setFinal = await invoke(hFinal, 'funciones:setEdicionPrueba', { activa: true });
+    check('versión final: funciones:setEdicionPrueba → BUSINESS_RULE (la edición la define la licencia)', !setFinal.ok && setFinal.code === 'BUSINESS_RULE' && /licencia/.test(setFinal.message), JSON.stringify(setFinal));
+    rmSync(archivo);
+
+    // Versión DE PRUEBA (1.13.0-beta.1): misma base y misma sesión, otro LicenseManager.
+    const emitidos: string[] = [];
+    const lmBeta = new LicenseManager({ userDataDir: tmpDir, machineId: 'test-machine', apiUrl: 'http://localhost:1', publicKeyPem: '', version: '1.13.0-beta.1' });
+    const hBeta = buildAllHandlers({ ...depsBase, licenseManager: lmBeta, appVersion: '1.13.0-beta.1', emit: (ch) => { emitidos.push(ch); } });
+    const ep0 = await invoke<EdicionPruebaDTO>(hBeta, 'funciones:edicionPrueba');
+    check('versión de prueba: disponible, apagado, edicionReal común y la versión', ep0.ok && ep0.data.disponible && !ep0.data.activa && ep0.data.edicionReal === 'comun' && ep0.data.version === '1.13.0-beta.1', JSON.stringify(ep0));
+    const codAntes = await invoke(hBeta, 'lan:emparejarGenerarCodigo');
+    check('apagado: no se generan códigos de emparejamiento', !codAntes.ok && /Multisucursal/.test(codAntes.ok ? '' : codAntes.message), JSON.stringify(codAntes));
+    const antes = abiertas();
+    check('la caja abierta del servidor tiene su id (caja por PC apagada)', antes.length === 1 && antes[0]?.terminal_id === 'test-machine', JSON.stringify(antes));
+
+    const on = await invoke<EdicionPruebaDTO>(hBeta, 'funciones:setEdicionPrueba', { activa: true });
+    check('admin activa la casilla → activa, con activadaEl', on.ok && on.data.activa && typeof on.data.activadaEl === 'number', JSON.stringify(on));
+    const guardado = existsSync(archivo) ? (JSON.parse(readFileSync(archivo, 'utf8')) as { edicion?: string; activadaEl?: number }) : null;
+    check('queda userData/edicion-prueba.json {edicion: multisucursal, activadaEl}', guardado?.edicion === 'multisucursal' && typeof guardado.activadaEl === 'number', JSON.stringify(guardado));
+    check('se emite license:changed (la interfaz refresca sin reiniciar)', emitidos.includes('license:changed'), emitidos.join(','));
+    const est1 = await invoke<{ edicion: string; multisucursal: boolean; cajaPorPc?: boolean }>(hBeta, 'funciones:estado');
+    check('funciones:estado → multisucursal y caja por PC forzada', est1.ok && est1.data.multisucursal && est1.data.edicion === 'multisucursal' && est1.data.cajaPorPc === true, JSON.stringify(est1));
+    check('tieneMultisucursal(deps) lo refleja', tieneMultisucursal({ licenseManager: lmBeta }));
+    const cod = await invoke<{ codigo: string }>(hBeta, 'lan:emparejarGenerarCodigo');
+    check('encendido: se generan códigos de emparejamiento con los MISMOS handlers (sin reiniciar)', cod.ok && /^[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(cod.data.codigo), JSON.stringify(cod));
+    const despues = abiertas();
+    check('la caja abierta del servidor pasó a compartida (terminal_id NULL), como al prender la caja por PC', despues.length === 1 && despues[0]?.terminal_id === null, JSON.stringify(despues));
+    const cur = await invoke<{ id: string } | null>(hBeta, 'cash:getCurrent');
+    check('cash:getCurrent sigue encontrando esa caja', cur.ok && cur.data?.id === cajaServidorId, JSON.stringify(cur));
+    const aud = db.$client
+      .prepare("SELECT description, area FROM audit_log WHERE channel = 'funciones:setEdicionPrueba' ORDER BY created_at DESC LIMIT 1")
+      .get() as { description: string; area: string } | undefined;
+    check('queda en la auditoría (área Licencia)', !!aud && /activada/.test(aud.description) && aud.area === 'Licencia', JSON.stringify(aud));
+    const onDeNuevo = await invoke<EdicionPruebaDTO>(hBeta, 'funciones:setEdicionPrueba', { activa: true });
+    check('activar dos veces no cambia nada', onDeNuevo.ok && onDeNuevo.data.activa, JSON.stringify(onDeNuevo));
+
+    // Otra PC abre su caja → la casilla no se puede apagar hasta que la cierre.
+    const cierreServidor = await invoke(hBeta, 'cash:close', { registerId: cajaServidorId, closingAmount: '1000.0000' });
+    check('el servidor cierra la caja compartida', cierreServidor.ok, JSON.stringify(cierreServidor).slice(0, 160));
+    const otraPc = { id: 'otra-pc-0000000000000000', nombre: 'Otra PC', origen: 'lan' as const, dispositivoId: null, identificada: true };
+    const abreOtra = await correrComoTerminal(otraPc, () => invoke<{ id: string }>(hBeta, 'cash:open', { openingAmount: '0.0000' }));
+    check('otra PC abre su propia caja con la casilla encendida', abreOtra.ok, JSON.stringify(abreOtra).slice(0, 160));
+    const offMal = await invoke(hBeta, 'funciones:setEdicionPrueba', { activa: false });
+    check('con cajas abiertas de otras PC no se apaga (VALIDATION, manda al Historial de cajas)', !offMal.ok && offMal.code === 'VALIDATION' && /Historial de cajas/.test(offMal.message), JSON.stringify(offMal));
+    // Un vendedor no la toca (sí la ve).
+    await invoke(hBeta, 'auth:login', { username: 'vendsuc', password: 'vend1234' });
+    const offVend = await invoke(hBeta, 'funciones:setEdicionPrueba', { activa: false });
+    check('vendedor: funciones:setEdicionPrueba → PERMISSION_DENIED', !offVend.ok && offVend.code === 'PERMISSION_DENIED', JSON.stringify(offVend));
+    const epVend = await invoke<EdicionPruebaDTO>(hBeta, 'funciones:edicionPrueba');
+    check('vendedor: funciones:edicionPrueba → lectura ok', epVend.ok && epVend.data.activa === true, JSON.stringify(epVend));
+    await invoke(hBeta, 'auth:login', { username: 'admin', password: 'admin36724776' });
+    if (abreOtra.ok) {
+      const cierraOtra = await correrComoTerminal(otraPc, () => invoke(hBeta, 'cash:close', { registerId: abreOtra.data.id, closingAmount: '0.0000' }));
+      check('la otra PC cierra su caja', cierraOtra.ok, JSON.stringify(cierraOtra).slice(0, 160));
+    }
+    const off = await invoke<EdicionPruebaDTO>(hBeta, 'funciones:setEdicionPrueba', { activa: false });
+    check('admin apaga la casilla → común y el archivo se borra', off.ok && !off.data.activa && !existsSync(archivo), JSON.stringify(off));
+    const est2 = await invoke<{ edicion: string; cajaPorPc?: boolean }>(hBeta, 'funciones:estado');
+    check('funciones:estado vuelve a común (y la caja por PC a la opción del comercio: apagada)', est2.ok && est2.data.edicion === 'comun' && est2.data.cajaPorPc === false, JSON.stringify(est2));
+    const codDespues = await invoke(hBeta, 'lan:emparejarGenerarCodigo');
+    check('apagado de nuevo: no se generan códigos', !codDespues.ok, JSON.stringify(codDespues).slice(0, 120));
+
+    // Ruteo: es de la PC que tiene la base; ni la red local ni internet.
+    check('funciones:setEdicionPrueba se RECHAZA por la red local y por internet', !lanServerAccepts('funciones:setEdicionPrueba') && !remotoAccepts('funciones:setEdicionPrueba'));
+    check('funciones:edicionPrueba también (una terminal no lo necesita)', !lanServerAccepts('funciones:edicionPrueba') && !remotoAccepts('funciones:edicionPrueba'));
+    check('funciones:estado sigue cruzando la red (la terminal pregunta la edición al servidor)', lanServerAccepts('funciones:estado') && remotoAccepts('funciones:estado'));
+  }
 
   // logout → vuelve a UNAUTHENTICATED
   await invoke(handlers, 'auth:logout');

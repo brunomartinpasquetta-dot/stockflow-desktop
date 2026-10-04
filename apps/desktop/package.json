@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "1.12.1",
+  "version": "1.13.0-beta.1",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -46,7 +46,9 @@
     "test:backup": "tsx electron/__tests__/backup.smoke.ts",
     "test:seguridad-lan": "tsx electron/__tests__/seguridad-lan.smoke.ts",
     "test:pdv-caja": "tsx electron/__tests__/pdv-caja.smoke.ts",
+    "test:caja-terminal": "tsx electron/__tests__/caja-terminal.smoke.ts",
     "test:vuelto": "tsx electron/__tests__/vuelto.smoke.ts",
+    "test:publicacion": "tsx electron/__tests__/publicacion.smoke.ts",
     "test:facturas": "tsx electron/__tests__/facturas.smoke.ts",
     "test:facturas-parser": "tsx electron/__tests__/facturas-parser.smoke.ts",
     "test:facturas-reales": "tsx electron/__tests__/facturas-reales.smoke.ts",

@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Gift, KeyRound, Loader2 } from 'lucide-react'
 
+import { ENLACE_CONECTAR_PC } from '../../electron/lan/mensaje-sucursal'
 import { api, ApiError } from '@/lib/api'
 import { useLicenseStatus } from '@/contexts/LicenseContext'
 import { Button } from '@/components/ui/button'
@@ -56,7 +57,7 @@ export function Activacion() {
     mutationFn: (input: { fullName: string; companyName: string; phone: string }): Promise<LicenseStateDTO> =>
       api.license.activateTrial(input),
     onSuccess: (state) =>
-      onActivated(state, '¡Prueba gratis activada! Tenés 30 días con todo el sistema.', (m) => setTrialError(m)),
+      onActivated(state, '¡Prueba gratis activada! Tiene 30 días con todo el sistema.', (m) => setTrialError(m)),
     onError: (err) => {
       setTrialError(err instanceof ApiError ? err.message : 'No se pudo crear la prueba gratis.')
     },
@@ -94,17 +95,41 @@ export function Activacion() {
   }
 
   const busy = mutation.isPending || trialMutation.isPending
+  // En una pestaña del navegador no hay configuración de red que cambiar.
+  const esWeb = Boolean((window as { __stockflowWeb?: boolean }).__stockflowWeb)
 
   return (
-    <div className="flex h-full items-center justify-center overflow-y-auto bg-secondary/40 p-4">
-      <Card className="w-full max-w-md">
+    // `m-auto` en la tarjeta (y no items-center en el contenedor): centra
+    // cuando entra y, cuando no entra (1920×1080 al 150 %), se desplaza entera.
+    // Con items-center lo que sobraba arriba quedaba cortado sin poder subir.
+    <div className="flex h-full overflow-y-auto bg-secondary/40 p-4">
+      <Card className="m-auto w-full max-w-md">
         <CardHeader className="items-center gap-2 pt-6 text-center">
           <img
             src={BRANDING.logoFull}
             alt="StockFlow"
             className="mx-auto h-auto w-[280px]"
           />
-          <CardTitle className="text-lg">Empezá a usar StockFlow</CardTitle>
+          <CardTitle className="text-lg">Empiece a usar StockFlow</CardTitle>
+          {/* PC de sucursal: NO activa licencia (trabaja con la de la casa
+              central). Va arriba, antes de la prueba gratis: quien instala la
+              PC del otro local la tiene que ver antes de completar la prueba
+              con el nombre del comercio (eso crea un comercio aparte, con la
+              base vacía, y gasta la única prueba de esa PC). Una línea, sin
+              competirle a la prueba a un comercio nuevo. */}
+          {!esWeb && (
+            <p className="text-xs text-muted-foreground">
+              ¿Su comercio ya usa StockFlow en otro local?{' '}
+              <button
+                type="button"
+                className="font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50"
+                disabled={busy}
+                onClick={() => navigate('/bienvenida', { state: { paso: 'sucursal', desde: 'activacion' } })}
+              >
+                {ENLACE_CONECTAR_PC}
+              </button>
+            </p>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {status === 'revoked' && (
@@ -120,7 +145,8 @@ export function Activacion() {
               Prueba GRATIS por 30 días
             </div>
             <p className="text-xs text-muted-foreground">
-              Sistema completo, sin tarjeta y sin costo. Se activa al instante en esta PC (una prueba por computadora).
+              Para un comercio nuevo: sistema completo, sin tarjeta y sin costo. Se activa al instante en esta PC (una
+              prueba por computadora).
             </p>
             <div className="flex flex-col gap-1">
               <Label htmlFor="trial-name">Nombre y apellido</Label>

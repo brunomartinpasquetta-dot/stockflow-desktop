@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { CreatePurchaseLineInputSchema } from './purchaseLine.schema';
 import { PaymentInputSchema } from './paymentMethod.schema';
-import { idSchema, moneySchema, timestampSchema, voucherTypeSchema } from './common';
+import { idSchema, idempotencyKeySchema, moneySchema, timestampSchema, voucherTypeSchema } from './common';
 
 const purchasePaymentTypeSchema = z.enum(['cash', 'credit']);
 const purchaseStatusSchema = z.enum(['completed', 'voided', 'pending']);
@@ -37,6 +37,8 @@ export const CreatePurchaseSchema = z.object({
   updatedPricesOnSave: z.boolean().default(false),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),
+  /** Clave del intento de guardado (ver `idempotencyKeySchema`). */
+  idempotencyKey: idempotencyKeySchema.nullish(),
 });
 
 /** Compra + líneas (mínimo 1 línea) + pagos (N; sólo si es contado). */

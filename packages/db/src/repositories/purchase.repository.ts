@@ -34,13 +34,48 @@ import {
   type SupplierAccountPayable,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
-import { exigirCajaAbiertaEnTx } from './cajaAbierta';
+import { cajaAbiertaParaReverso, exigirCajaAbiertaEnTx } from './cajaAbierta';
 
 export interface PurchaseWithLines {
   purchase: Purchase;
   lines: PurchaseLine[];
   /** Cuenta por pagar abierta (sólo si es compra a cuenta), null en otro caso. */
   accountPayable: SupplierAccountPayable | null;
+}
+
+type Tx = Parameters<Parameters<LocalDatabase['transaction']>[0]>[0];
+
+/**
+ * La compra ya registrada con esa clave de intento, armada igual que la
+ * respuesta de `createWithLines`, o null. Clave de OTRA compra (otro
+ * proveedor u otro comprobante) = error de la pantalla: se rechaza.
+ */
+function compraConClave(
+  tx: Tx,
+  clave: string,
+  esperado: { supplierId?: string; type?: string } = {},
+): PurchaseWithLines | null {
+  const purchase = tx.select().from(purchases).where(eq(purchases.idempotencyKey, clave)).get();
+  if (!purchase) return null;
+  if (
+    (esperado.supplierId && purchase.supplierId !== esperado.supplierId) ||
+    (esperado.type && purchase.type !== esperado.type)
+  ) {
+    throw new ConstraintError(
+      'IDEMPOTENCY_KEY_REUSED',
+      'La clave de esta operación ya se usó para otra compra. Vuelva a intentar el guardado.',
+    );
+  }
+  const lines = tx
+    .select()
+    .from(purchaseLines)
+    .where(eq(purchaseLines.purchaseId, purchase.id))
+    .orderBy(purchaseLines.lineNumber)
+    .all();
+  const ap =
+    tx.select().from(supplierAccountsPayable).where(eq(supplierAccountsPayable.purchaseId, purchase.id)).get() ??
+    null;
+  return { purchase, lines, accountPayable: ap };
 }
 
 export class PurchaseRepository extends BaseRepository<
@@ -65,6 +100,21 @@ export class PurchaseRepository extends BaseRepository<
   }
 
   /**
+   * Compra ya registrada con esa clave de intento (ver `compraConClave`), o
+   * null. El servicio la consulta antes de validar caja y saldos.
+   */
+  async findByIdempotencyKey(
+    clave: string,
+    esperado: { supplierId?: string; type?: string } = {},
+  ): Promise<PurchaseWithLines | null> {
+    try {
+      return this.db.transaction((tx) => compraConClave(tx, clave, esperado));
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
    * Crea una compra de forma atómica: cabecera + líneas + incremento de stock +
    * (si es contado) un egreso de caja por cada pago. Si `updatedPricesOnSave`,
    * actualiza costo y lista 1 de cada artículo. Respeta el modo de precios:
@@ -81,6 +131,14 @@ export class PurchaseRepository extends BaseRepository<
       const paymentsIn = data.payments ?? [];
 
       return this.db.transaction((tx) => {
+        // COMPRA REPETIDA (misma clave de intento): se devuelve la que ya
+        // entró, sin sumar stock ni pagar de nuevo. Dentro de la transacción,
+        // igual que en ventas.
+        if (data.idempotencyKey) {
+          const previa = compraConClave(tx, data.idempotencyKey, { supplierId: data.supplierId, type: data.type });
+          if (previa) return previa;
+        }
+
         const numRow = tx
           .select({ value: max(purchases.number) })
           .from(purchases)
@@ -151,6 +209,7 @@ export class PurchaseRepository extends BaseRepository<
             status: 'completed',
             updatedPricesOnSave: data.updatedPricesOnSave ?? false,
             notes: data.notes ?? null,
+            idempotencyKey: data.idempotencyKey ?? null,
           })
           .returning()
           .all()[0];
@@ -357,7 +416,12 @@ export class PurchaseRepository extends BaseRepository<
    * Si la compra ya tuvo devoluciones al proveedor, sólo se descuenta y se
    * recupera lo que quedaba sin devolver.
    */
-  async voidPurchase(id: string): Promise<Purchase> {
+  /**
+   * `cajaReversoId`: caja abierta de la PC que anula (la resuelve el
+   * servicio); recibe el reverso en efectivo si la caja original ya cerró.
+   * Ver `cajaAbiertaParaReverso`.
+   */
+  async voidPurchase(id: string, opts: { cajaReversoId?: string | null } = {}): Promise<Purchase> {
     try {
       return this.db.transaction((tx) => {
         const purchase = tx.select().from(purchases).where(eq(purchases.id, id)).get();
@@ -484,13 +548,7 @@ export class PurchaseRepository extends BaseRepository<
           let openRegisterId: string | null | undefined;
           const resolveOpenRegisterId = (): string => {
             if (openRegisterId === undefined) {
-              openRegisterId =
-                tx
-                  .select({ id: cashRegisters.id })
-                  .from(cashRegisters)
-                  .where(eq(cashRegisters.status, 'open'))
-                  .limit(1)
-                  .get()?.id ?? null;
+              openRegisterId = cajaAbiertaParaReverso(tx, opts.cajaReversoId);
             }
             if (!openRegisterId) {
               throw new ConstraintError(

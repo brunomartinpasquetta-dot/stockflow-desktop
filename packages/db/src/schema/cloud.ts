@@ -43,11 +43,18 @@ export const tenants = pgTable(
     failedPayments: numeric('failed_payments', { precision: 4, scale: 0 }).notNull().default('0'),
     /** Cantidad máxima de licencias activas para este tenant (modo multi-caja). */
     licensesQuota: integer('licenses_quota').notNull().default(1),
+    /**
+     * Edición contratada (migración 0003): 'comun' (todos los clientes de hoy)
+     * o 'multisucursal'. Es del comercio, no de cada PC: todas sus licencias
+     * llevan la misma en el JWT (claim `edicion`, ausente = común).
+     */
+    edicion: varchar('edicion', { length: 16 }).notNull().default('comun'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (t) => ({
     planCheck: check('tenants_plan_check', sql`${t.plan} in ('basic', 'pro')`),
+    edicionCheck: check('tenants_edicion_check', sql`${t.edicion} in ('comun', 'multisucursal')`),
     statusCheck: check(
       'tenants_status_check',
       sql`${t.status} in ('pending', 'active', 'suspended', 'cancelled')`,
@@ -122,6 +129,10 @@ export const adminUsers = pgTable('admin_users', {
 /* ================================================================== */
 /* Tipos inferidos                                                     */
 /* ================================================================== */
+/** Ediciones de StockFlow que puede tener contratada un comercio. */
+export const EDICIONES = ['comun', 'multisucursal'] as const;
+export type Edicion = (typeof EDICIONES)[number];
+
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type License = typeof licenses.$inferSelect;

@@ -274,6 +274,41 @@
       "when": 1786725682791,
       "tag": "0039_codigo_proveedor_descripcion",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1786725682792,
+      "tag": "0040_sucursales",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1786725682793,
+      "tag": "0041_dispositivos_sucursal",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1786725682794,
+      "tag": "0042_caja_compartida_al_actualizar",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1786725682795,
+      "tag": "0043_ventas_compras_sin_duplicar",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1786725682796,
+      "tag": "0044_dispositivos_auditoria",
+      "breakpoints": true
     }
   ]
 }

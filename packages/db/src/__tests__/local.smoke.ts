@@ -7,11 +7,14 @@
  * verifica las tablas esperadas y los registros base, y limpia los archivos.
  * Sale con código 1 si algo falla.
  */
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { closeLocalDb, initLocalDb } from '../index';
+import { closeLocalDb, initLocalDb, SUCURSAL_CENTRAL_ID } from '../index';
+
+const MIGRACIONES_LOCALES = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'migrations', 'local');
 
 const EXPECTED_TABLES = [
   'companies',
@@ -58,6 +61,9 @@ const EXPECTED_TABLES = [
   'sale_points',
   'article_supplier_codes',
   'scanned_invoices',
+  'branches',
+  // 0041: PC de sucursal emparejadas (multisucursal).
+  'dispositivos_sucursal',
 ];
 
 let failures = 0;
@@ -136,6 +142,58 @@ try {
     .get() as { f: number } | undefined;
   check('4 medios de pago pre-cargados', pmRow.c === 4, `count=${pmRow.c}`);
   check('Efectivo es el medio de efectivo físico', efectivoRow?.f === 1);
+
+  // 6c) Sucursales (migración 0040): "Casa central" con el id FIJO, en toda base.
+  {
+    const filas = db.$client.prepare('SELECT * FROM branches').all() as Array<{
+      id: string; name: string; code: string; active: number; is_main: number; created_at: number; updated_at: number;
+    }>;
+    const central = filas[0];
+    check('una sola sucursal tras migrar', filas.length === 1, `count=${filas.length}`);
+    check(
+      'Casa central con id fijo, código CENTRAL, activa y principal',
+      !!central && central.id === SUCURSAL_CENTRAL_ID && central.name === 'Casa central' && central.code === 'CENTRAL' && central.active === 1 && central.is_main === 1,
+      JSON.stringify(central),
+    );
+    check(
+      'Casa central con fechas en milisegundos',
+      !!central && central.created_at > 1_700_000_000_000 && central.updated_at === central.created_at,
+      String(central?.created_at),
+    );
+    // A lo sumo una principal (índice único parcial); varias no principales sí.
+    let rechazada = false;
+    try {
+      db.$client
+        .prepare("INSERT INTO branches (id, name, code, active, is_main, created_at, updated_at) VALUES ('x-2', 'Otra', 'OTRA', 1, 1, 1, 1)")
+        .run();
+    } catch {
+      rechazada = true;
+    }
+    check('no puede haber dos sucursales principales', rechazada);
+    let codigoRepetido = false;
+    try {
+      db.$client
+        .prepare("INSERT INTO branches (id, name, code, active, is_main, created_at, updated_at) VALUES ('x-3', 'Otra', 'CENTRAL', 1, 0, 1, 1)")
+        .run();
+    } catch {
+      codigoRepetido = true;
+    }
+    check('el código de sucursal es único', codigoRepetido);
+    // Re-correr la migración (base restaurada, etc.) no pisa el nombre que le
+    // puso el comercio ni duplica la fila.
+    db.$client.prepare("UPDATE branches SET name = 'Coronda' WHERE id = ?").run(SUCURSAL_CENTRAL_ID);
+    const sqlMig = readFileSync(join(MIGRACIONES_LOCALES, '0040_sucursales.sql'), 'utf8');
+    for (const stmt of sqlMig.split('--> statement-breakpoint').map((s) => s.trim()).filter(Boolean)) {
+      db.$client.exec(stmt);
+    }
+    const tras = db.$client.prepare('SELECT name FROM branches').all() as Array<{ name: string }>;
+    check(
+      'migración 0040 repetida: no duplica ni pisa el nombre',
+      tras.length === 1 && tras[0]?.name === 'Coronda',
+      JSON.stringify(tras),
+    );
+    db.$client.prepare("UPDATE branches SET name = 'Casa central' WHERE id = ?").run(SUCURSAL_CENTRAL_ID);
+  }
 
   // 7) Idempotencia: re-ejecutar el seed no debe crear nada
   const { seedLocalDb } = await import('../seed');

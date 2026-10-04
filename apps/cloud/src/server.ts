@@ -30,6 +30,7 @@ import {
 } from './config';
 import { registerCronJobs } from './cron';
 import { registerDb } from './db-plugin';
+import { asegurarEsquema } from './esquema';
 import { getJwtKeys } from './jwt-keys';
 import { adminRoutes } from './routes/admin.routes';
 import { billingRoutes } from './routes/billing.routes';
@@ -53,6 +54,9 @@ declare module '@fastify/jwt' {
       tid?: string;
       plan?: string;
       lk?: string;
+      kind?: 'trial';
+      texp?: number;
+      edicion?: 'multisucursal';
       admin?: boolean;
       email?: string;
     };
@@ -62,6 +66,11 @@ declare module '@fastify/jwt' {
       tid: string;
       plan: string;
       lk: string;
+      /** 'trial' en una prueba gratis; ausente = paga. */
+      kind?: 'trial';
+      texp?: number;
+      /** 'multisucursal' si el comercio tiene esa edición; ausente = común. */
+      edicion?: string;
       admin?: boolean;
       email?: string;
       iat: number;
@@ -106,6 +115,10 @@ export async function buildServer(opts?: BuildServerOptions): Promise<FastifyIns
 
   // Base de datos (inyectada en tests, real en producción).
   await registerDb(app, opts?.db);
+  // Antes de atender: las columnas que suma esta versión tienen que existir
+  // (las migraciones se aplican a mano en el VPS). Si faltan se agregan (son
+  // aditivas); si no se puede, el servidor NO arranca (ver esquema.ts).
+  await asegurarEsquema(app.cloudDb, { info: (m) => app.log.info(m) });
 
   // Archivos estáticos (landing).
   await app.register(fastifyStatic, { root: publicDir, prefix: '/' });

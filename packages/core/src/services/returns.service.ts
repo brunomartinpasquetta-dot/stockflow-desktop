@@ -16,7 +16,7 @@ import type {
 } from '@stockflow/db';
 
 import { requirePermission } from '../auth/permissions';
-import type { ServiceContext } from '../context';
+import { type ServiceContext, cajaAbiertaDeTerminal } from '../context';
 import { BusinessRuleError } from '../errors';
 import { assertPhysicalCashAvailable } from './cash.service';
 
@@ -47,9 +47,8 @@ export class ReturnsService {
    * ventas ya resolvían esto mirando la base; las devoluciones no.
    */
   private async cajaAbierta() {
-    const c = this.ctx.currentCashRegister;
-    if (c && c.status === 'open') return c;
-    return this.ctx.repos.cashRegisters.getCurrentOpen();
+    // La caja de la PC que hace la devolución (caja por terminal).
+    return cajaAbiertaDeTerminal(this.ctx);
   }
 
   async createSaleReturn(input: SaleReturnDraft): Promise<SaleReturnResult> {

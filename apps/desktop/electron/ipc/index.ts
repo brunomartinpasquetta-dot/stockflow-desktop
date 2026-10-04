@@ -12,6 +12,8 @@ import { buildArticlesHandlers } from './handlers/articles.handlers';
 import { buildAssistantHandlers } from './handlers/assistant.handlers';
 import { buildAuthHandlers } from './handlers/auth.handlers';
 import { buildBackupHandlers } from './handlers/backup.handlers';
+import { buildBranchesHandlers } from './handlers/branches.handlers';
+import { buildFuncionesHandlers } from './handlers/funciones.handlers';
 import { buildCashHandlers } from './handlers/cash.handlers';
 import { buildCashGeneralHandlers } from './handlers/cashGeneral.handlers';
 import { buildAnalyticsHandlers } from './handlers/analytics.handlers';
@@ -69,6 +71,8 @@ const BUILDERS: HandlerBuilder[] = [
   buildUsersHandlers,
   buildRolesHandlers,
   buildCompanyHandlers,
+  buildFuncionesHandlers,
+  buildBranchesHandlers,
   buildSalesHandlers,
   buildPromotionsHandlers,
   buildReturnsHandlers,

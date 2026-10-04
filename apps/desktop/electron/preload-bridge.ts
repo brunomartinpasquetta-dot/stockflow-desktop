@@ -59,11 +59,151 @@ export interface LanClientConfig {
    * mixto. En la red local sigue sin usarse.
    */
   serverBaseUrl?: string;
+  /**
+   * App instalada conectada por dirección web (PC de sucursal): los errores
+   * hablan de "la casa central" (es como la pantalla la llama). Las terminales
+   * de red local y las de navegador siguen con los mensajes de siempre.
+   */
+  esSucursal?: boolean;
 }
+
+/** La PC de sucursal no llega a la casa central (Cloudflare 502/530 o respuesta que no es de StockFlow). */
+export const MENSAJE_CENTRAL_NO_RESPONDE =
+  'La casa central no responde: la PC puede estar apagada, con StockFlow cerrado o sin internet. Avise a la casa central y vuelva a intentar.';
+/** La PC de sucursal no tiene conexión (error de red o se agotó la espera). */
+export const MENSAJE_SIN_CONEXION_CENTRAL =
+  'Sin conexión con la casa central. Revise que esta PC tenga internet y vuelva a intentar.';
 
 /** Base contra la que se arman las llamadas al servidor. */
 export function baseDelServidor(cfg: LanClientConfig): string {
   return (cfg.serverBaseUrl ?? `http://${cfg.serverIp}:${cfg.serverPort}`).replace(/\/$/, '');
+}
+
+/* ------------------------------------------------------------------------ */
+/* Terminal por dirección web (multisucursal)                               */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * ¿Ese nombre de host es de la red local? Es la única situación en la que se
+ * acepta `http://` sin cifrar: por internet viajarían en claro la contraseña,
+ * la sesión y el token de la PC. Mismos rangos que `isLanRemote` del servidor
+ * (privadas, link-local, CGNAT de routers 4G/Tailscale, loopback, `.local`).
+ *
+ * Los rangos IPv6 (fc00::/7 y fe80::/10) se miran SÓLO en direcciones IPv6
+ * escritas como tales (llevan ':'). Antes se miraba si el texto empezaba con
+ * "fc"/"fd", y un NOMBRE como `fcia-del-centro.mistockflow.com` contaba como
+ * red local: la PC de sucursal se conectaba por http:// sin cifrar a través
+ * de internet.
+ */
+export function esHostDeRedLocal(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  if (h === 'localhost' || h.endsWith('.local') || h === '::1') return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 10 || a === 127) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    return false;
+  }
+  if (!h.includes(':')) return false;
+  // Primer grupo de 4 dígitos: fc00–fdff (ULA) o fe80–febf (link-local).
+  return /^f[cd][0-9a-f]{2}:/.test(h) || /^fe[89ab][0-9a-f]:/.test(h);
+}
+
+/**
+ * Normaliza la dirección que el usuario pega para conectar una terminal:
+ * `https://comercio.mistockflow.com`, `comercio.mistockflow.com` (se asume
+ * https), `192.168.1.10:7777` o `http://192.168.1.10:7777` (red local).
+ * Devuelve sólo el ORIGEN (esquema + host + puerto), sin barra final, o un
+ * mensaje de error para mostrar tal cual.
+ */
+export function normalizarUrlServidor(entrada: string): { ok: true; url: string } | { ok: false; error: string } {
+  const texto = (entrada ?? '').trim();
+  if (!texto) return { ok: false, error: 'Ingrese la dirección del servidor' };
+  if (texto.length > 300) return { ok: false, error: 'La dirección es demasiado larga' };
+  let conEsquema = texto;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(texto)) {
+    // Sin esquema: una IP (con o sin puerto) es la red local; un nombre, internet.
+    const host = texto.split(/[/:]/)[0] ?? '';
+    conEsquema = `${esHostDeRedLocal(host) ? 'http' : 'https'}://${texto}`;
+  }
+  let u: URL;
+  try {
+    u = new URL(conEsquema);
+  } catch {
+    return { ok: false, error: 'La dirección no es válida' };
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+    return { ok: false, error: 'La dirección debe empezar con https://' };
+  }
+  if (u.username || u.password) return { ok: false, error: 'La dirección no puede llevar usuario ni contraseña' };
+  if (!u.hostname) return { ok: false, error: 'La dirección no es válida' };
+  if (u.protocol === 'http:' && !esHostDeRedLocal(u.hostname)) {
+    return {
+      ok: false,
+      error: 'Por internet la dirección debe ser segura (https://). http:// sólo se admite dentro de la red del local.',
+    };
+  }
+  return { ok: true, url: u.origin };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Identidad de la terminal                                                 */
+/* ------------------------------------------------------------------------ */
+
+/** Encabezados con que cada pedido dice desde qué PC sale. */
+export const HDR_TERMINAL = 'x-stockflow-terminal';
+export const HDR_TERMINAL_NOMBRE = 'x-stockflow-terminal-nombre';
+/** Token de la PC de sucursal emparejada (ver electron/lan/dispositivos.ts). */
+export const HDR_DISPOSITIVO = 'x-stockflow-dispositivo';
+
+export interface IdentidadTerminal {
+  /** machineId de la PC (hash SHA-256 estable) o, en el navegador, un id propio de esa PC. */
+  terminalId: string;
+  /** Nombre de la PC (hostname) para mostrar en el servidor. */
+  terminalNombre: string;
+  /** Token de dispositivo si la PC fue emparejada como sucursal. */
+  dispositivoToken?: string | null;
+  /**
+   * PC de sucursal: ¿se comprobó que en la dirección guardada está SU casa
+   * central? (ver conexion-central.ts → `verificarCentral`). `rechazada` = no
+   * se manda NADA a esa dirección (ni el token ni una contraseña) y el pedido
+   * vuelve con `motivoCentral`. Ausente = no aplica (red local, navegador) o
+   * el main es de una versión que no lo hace.
+   */
+  central?: 'verificada' | 'rechazada';
+  motivoCentral?: string;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Tiempos de espera por canal                                              */
+/* ------------------------------------------------------------------------ */
+
+/** Tiempo de espera común de un pedido al servidor. */
+export const TIMEOUT_RPC_MS = 10_000;
+/**
+ * Pedidos que esperan a ARCA del lado del servidor: el web service tarda 20 a
+ * 30 s en un día malo. Con 10 s la terminal daba "sin conexión" mientras la
+ * factura se emitía igual en el servidor, y el cajero la reintentaba.
+ */
+export const TIMEOUT_RPC_LARGO_MS = 45_000;
+
+/** ¿Este pedido puede quedar esperando a ARCA en el servidor? */
+export function esPedidoLargo(channel: string, payload?: unknown): boolean {
+  if (channel.startsWith('fiscal:')) return true;
+  if (channel === 'sales:create') {
+    const tipo = (payload as { type?: unknown } | null | undefined)?.type;
+    return tipo === 'A' || tipo === 'B' || tipo === 'C';
+  }
+  return false;
+}
+
+/** Tiempo de espera de un pedido según el canal (nunca menos que el común). */
+export function timeoutDeCanal(channel: string, payload: unknown, baseMs: number, largoMs = TIMEOUT_RPC_LARGO_MS): number {
+  return esPedidoLargo(channel, payload) ? Math.max(baseMs, largoMs) : baseMs;
 }
 
 export interface BridgeListenerHandle {
@@ -78,6 +218,36 @@ export interface BridgeIO {
   fetch?: typeof fetch;
   /** Inyección del timeout (ms); default 10s. */
   httpTimeoutMs?: number;
+  /** Timeout de los pedidos que esperan a ARCA (ms); default 45 s. */
+  httpTimeoutLargoMs?: number;
+  /**
+   * Quién es esta PC. Se pide en la primera llamada al servidor, se recuerda
+   * `revisarCentralMs` y viaja en cada pedido, por la red local y por el
+   * túnel. Antes de iniciar sesión se pide con `verificarCentral: true`: la PC
+   * de sucursal vuelve a comprobar a su casa central antes de mandar la
+   * contraseña. Ausente o null = no se mandan los encabezados (el servidor
+   * trata la llamada como hoy).
+   */
+  identidad?: (
+    opciones?: { verificarCentral?: boolean },
+  ) => IdentidadTerminal | null | Promise<IdentidadTerminal | null>;
+  /** Cada cuánto se vuelve a pedir la identidad (y a comprobar a la central). Default 5 min; tests. */
+  revisarCentralMs?: number;
+  /**
+   * Antes de mandar los encabezados de identidad, preguntar al servidor si los
+   * admite (`GET /lan/ping`, un pedido simple que no dispara la consulta previa
+   * de CORS; los servidores nuevos contestan `identidad: true`).
+   *
+   * Lo usa la terminal INSTALADA: habla desde file:// (otro origen), así que
+   * cada pedido con encabezados propios pasa por la consulta previa, y un
+   * servidor de la 1.12 sólo admite `content-type,authorization`: Chromium
+   * bloquearía TODOS los pedidos y la terminal actualizada antes que el
+   * servidor quedaría sin poder iniciar sesión ni vender. El navegador servido
+   * por el propio servidor (mismo origen) no lo necesita.
+   */
+  sondearIdentidad?: boolean;
+  /** Cada cuánto se vuelve a preguntar si el servidor dijo que NO (default 60 s; tests). */
+  revisarIdentidadMs?: number;
   /**
    * Guardado del token de sesión. En Electron alcanza con tenerlo en memoria
    * porque todas las ventanas comparten el proceso; en el navegador cada
@@ -107,6 +277,10 @@ export const LAN_ROUTED_GROUPS = new Set([
   'users',
   'roles',
   'company',
+  // Multisucursal: la edición de la licencia y las sucursales son del
+  // comercio, o sea del SERVIDOR (la terminal no tiene licencia propia).
+  'funciones',
+  'branches',
   'sales',
   'quotes',
   'purchases',
@@ -173,6 +347,10 @@ export const LAN_SERVER_DENIED_CHANNELS = new Set([
   // descargar el lector se hacen sentado en la PC servidor.
   'facturas:configurar',
   'facturas:descargarLector',
+  // Interruptor "Edición Multisucursal (versión de prueba)": es de la PC que
+  // tiene la base y se maneja sentado ahí. Una terminal nunca lo necesita.
+  'funciones:edicionPrueba',
+  'funciones:setEdicionPrueba',
 ]);
 export const LAN_SERVER_DENIED_GROUPS = new Set(['maintenance']);
 
@@ -209,6 +387,11 @@ export const REMOTO_DENIED_CHANNELS = new Set([
   // Facturas por teléfono: activar y descargar el lector se hace en el local.
   'facturas:configurar',
   'facturas:descargarLector',
+  // Multisucursal: la configuración de sucursales se hace en el local.
+  'branches:renombrar',
+  // El interruptor de la edición de prueba, también (ver LAN_SERVER_DENIED_CHANNELS).
+  'funciones:edicionPrueba',
+  'funciones:setEdicionPrueba',
 ]);
 
 /** ¿El servidor atiende este canal cuando la visita entra por el acceso remoto? */
@@ -216,6 +399,45 @@ export function remotoAccepts(channel: string): boolean {
   if (!lanServerAccepts(channel)) return false;
   if (REMOTO_DENIED_GROUPS.has(getGroup(channel))) return false;
   return !REMOTO_DENIED_CHANNELS.has(channel);
+}
+
+/**
+ * Lo que una PC de sucursal EMPAREJADA suma, por internet, a la lista corta
+ * del acceso remoto: exactamente lo que motivó el emparejamiento.
+ *
+ * - Facturar ante ARCA (emitir factura y nota, y las lecturas que usan Ventas,
+ *   el detalle de venta y las devoluciones).
+ * - Cobrar con Mercado Pago QR (crear, verificar, cancelar y vincular la orden).
+ *
+ * NO suma la configuración fiscal (certificado, puntos de venta), la cuenta de
+ * Mercado Pago (`mpQr:setupCompany` cambiaría a dónde van los cobros), la
+ * ficha del comercio, la anulación en bloque, la importación ni los borrados:
+ * eso sigue haciéndose sentado en el local. Si la PC de la sucursal se
+ * compromete (o alguien se lleva su token con una contraseña de
+ * administrador), el daño queda acotado a vender y cobrar, como en el local.
+ */
+export const DISPOSITIVO_EXTRA_CHANNELS = new Set([
+  'fiscal:getConfigPublic',
+  'fiscal:listSalePoints',
+  'fiscal:getVoucherForSale',
+  'fiscal:listVouchers',
+  'fiscal:issueInvoice',
+  'fiscal:issueNote',
+  'mpQr:getConfig',
+  'mpQr:listPosDevices',
+  'mpQr:listOrders',
+  'mpQr:getQrForCashRegister',
+  'mpQr:createOrder',
+  'mpQr:verifyPayment',
+  'mpQr:cancelOrder',
+  'mpQr:getActiveOrder',
+  'mpQr:linkOrderToSale',
+]);
+
+/** ¿El servidor atiende este canal por el túnel cuando lo pide una PC de sucursal emparejada? */
+export function dispositivoAccepts(channel: string): boolean {
+  if (remotoAccepts(channel)) return true;
+  return lanServerAccepts(channel) && DISPOSITIVO_EXTRA_CHANNELS.has(channel);
 }
 
 /** ¿El servidor atiende este canal si llega por /lan/rpc? */
@@ -241,20 +463,40 @@ export function shouldRouteLan(channel: string, mode: LanBridgeMode): boolean {
 
 /**
  * Parsea `process.argv` buscando flags `--lan-mode=`, `--lan-server=IP:PORT`,
- * `--lan-token=PIN`. Devuelve `single` si no hay flags.
+ * `--lan-server-url=https://…` y `--lan-token=PIN`. Devuelve `single` si no
+ * hay flags. Con dirección web el PIN es opcional: por el túnel no se pide.
  */
 export function parseLanArgs(argv: readonly string[]): { mode: LanBridgeMode; lanCfg?: LanClientConfig } {
   let mode: LanBridgeMode = 'single';
   let server: string | undefined;
+  let serverUrl: string | undefined;
   let token: string | undefined;
   for (const a of argv) {
     if (a.startsWith('--lan-mode=')) {
       const v = a.slice('--lan-mode='.length);
       if (v === 'client' || v === 'server' || v === 'single') mode = v;
+    } else if (a.startsWith('--lan-server-url=')) {
+      serverUrl = a.slice('--lan-server-url='.length);
     } else if (a.startsWith('--lan-server=')) {
       server = a.slice('--lan-server='.length);
     } else if (a.startsWith('--lan-token=')) {
       token = a.slice('--lan-token='.length);
+    }
+  }
+  if (mode === 'client' && serverUrl) {
+    const n = normalizarUrlServidor(serverUrl);
+    if (n.ok) {
+      const u = new URL(n.url);
+      return {
+        mode,
+        lanCfg: {
+          serverIp: u.hostname,
+          serverPort: Number(u.port) || (u.protocol === 'https:' ? 443 : 80),
+          token: token ?? '',
+          serverBaseUrl: n.url,
+          esSucursal: true,
+        },
+      };
     }
   }
   if (mode === 'client' && server && token) {
@@ -280,29 +522,137 @@ export function createCaller(
     io.session?.save(t);
   };
   const doFetch: typeof fetch = io.fetch ?? (globalThis.fetch as typeof fetch);
-  const timeoutMs = io.httpTimeoutMs ?? 10_000;
+  const timeoutMs = io.httpTimeoutMs ?? TIMEOUT_RPC_MS;
+  const timeoutLargoMs = io.httpTimeoutLargoMs ?? TIMEOUT_RPC_LARGO_MS;
+
+  // IDENTIDAD DE ESTA PC. Se recuerda la PROMESA: dos pedidos simultáneos al
+  // abrir la app no la preguntan dos veces. Se vuelve a pedir cada
+  // `revisarCentralMs` y siempre antes de iniciar sesión: en una PC de sucursal
+  // el main comprueba ahí que del otro lado esté SU casa central. Si la
+  // comprobación falla, NO se manda nada (ni el token ni la contraseña) y la
+  // próxima llamada vuelve a preguntar.
+  interface IdentidadResuelta {
+    h: Record<string, string>;
+    /** El main comprobó que la dirección es la casa central de esta PC. */
+    verificada: boolean;
+    /** Motivo para no mandar nada a esa dirección (central no verificada). */
+    bloqueo: string | null;
+  }
+  const SIN_IDENTIDAD: IdentidadResuelta = { h: {}, verificada: false, bloqueo: null };
+  const revisarCentralMs = io.revisarCentralMs ?? 5 * 60_000;
+  let identidadCache: (IdentidadResuelta & { en: number }) | null = null;
+  let identidadP: Promise<IdentidadResuelta> | null = null;
+  const obtenerIdentidad = (verificarAhora: boolean): Promise<IdentidadResuelta> => {
+    if (!io.identidad) return Promise.resolve(SIN_IDENTIDAD);
+    const cache = identidadCache;
+    if (!verificarAhora && cache && !cache.bloqueo && Date.now() - cache.en < revisarCentralMs) {
+      return Promise.resolve(cache);
+    }
+    if (!verificarAhora && identidadP) return identidadP;
+    const p = (async (): Promise<IdentidadResuelta> => {
+      try {
+        const id = await io.identidad?.(verificarAhora ? { verificarCentral: true } : undefined);
+        if (!id) return SIN_IDENTIDAD;
+        if (id.central === 'rechazada') {
+          return { h: {}, verificada: false, bloqueo: id.motivoCentral || 'No se pudo comprobar que esa dirección sea la casa central de esta PC.' };
+        }
+        if (typeof id.terminalId !== 'string' || !id.terminalId) return SIN_IDENTIDAD;
+        const h: Record<string, string> = { [HDR_TERMINAL]: id.terminalId.slice(0, 128) };
+        // El nombre puede traer acentos o eñes: los encabezados HTTP sólo
+        // admiten ASCII, así que viaja codificado.
+        if (id.terminalNombre) h[HDR_TERMINAL_NOMBRE] = encodeURIComponent(id.terminalNombre.slice(0, 64));
+        if (id.dispositivoToken) h[HDR_DISPOSITIVO] = id.dispositivoToken;
+        return { h, verificada: id.central === 'verificada', bloqueo: null };
+      } catch {
+        return SIN_IDENTIDAD;
+      }
+    })();
+    identidadP = p;
+    void p
+      .then((r) => {
+        identidadCache = { ...r, en: Date.now() };
+      })
+      .finally(() => {
+        if (identidadP === p) identidadP = null;
+      });
+    return p;
+  };
+
+  // ¿El servidor admite los encabezados de identidad? (ver `sondearIdentidad`).
+  // Un "sí" se recuerda para siempre; un "no" se vuelve a preguntar cada
+  // `revisarIdentidadMs`, así la terminal empieza a identificarse sola cuando
+  // se actualiza el servidor. Si no se pudo preguntar, se mantiene lo último
+  // que se supo (y, sin dato, se mandan: es lo que pasa con un servidor nuevo).
+  const revisarMs = io.revisarIdentidadMs ?? 60_000;
+  let capacidad: { admite: boolean; en: number } | null = null;
+  let sondeoP: Promise<boolean> | null = null;
+  const servidorAdmiteIdentidad = (): Promise<boolean> => {
+    if (!io.sondearIdentidad || !lanCfg) return Promise.resolve(true);
+    if (capacidad && (capacidad.admite || Date.now() - capacidad.en < revisarMs)) {
+      return Promise.resolve(capacidad.admite);
+    }
+    sondeoP ??= (async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5_000);
+      try {
+        const res = await doFetch(`${baseDelServidor(lanCfg)}/lan/ping`, { method: 'GET', signal: controller.signal, redirect: 'error' });
+        const body = (await res.json().catch(() => null)) as { ok?: unknown; identidad?: unknown } | null;
+        if (!res.ok || !body || body.ok !== true) return capacidad?.admite ?? true;
+        capacidad = { admite: body.identidad === true, en: Date.now() };
+        return capacidad.admite;
+      } catch {
+        return capacidad?.admite ?? true;
+      } finally {
+        clearTimeout(timer);
+        sondeoP = null;
+      }
+    })();
+    return sondeoP;
+  };
 
   async function httpRpc(channel: string, payload: unknown): Promise<IpcResponse<unknown>> {
     if (!lanCfg) {
       return { ok: false, code: 'INTERNAL', message: 'Configuración LAN ausente' };
     }
     const url = `${baseDelServidor(lanCfg)}/lan/rpc`;
+    // Primero la identidad (es local: la contesta el main). En una PC de
+    // sucursal trae el resultado de comprobar a la casa central, y eso NO puede
+    // depender de lo que conteste la dirección (el sondeo de abajo lo contesta
+    // ella misma): si no está verificada, no sale nada.
+    const ident = await obtenerIdentidad(channel === 'auth:login');
+    if (ident.bloqueo) return { ok: false, code: 'UNAUTHENTICATED', message: ident.bloqueo };
+    // Los encabezados viajan si la central está verificada (una central que
+    // prueba su identidad es nueva y los admite) o si el servidor dice que los admite.
+    const identidad = ident.verificada || (await servidorAdmiteIdentidad()) ? ident.h : {};
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutDeCanal(channel, payload, timeoutMs, timeoutLargoMs));
     try {
-      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      const headers: Record<string, string> = { 'content-type': 'application/json', ...identidad };
       if (state.sessionToken) headers['authorization'] = `Bearer ${state.sessionToken}`;
       const res = await doFetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({ channel, payload, token: lanCfg.token }),
         signal: controller.signal,
+        // El servidor nunca redirige: una redirección se llevaría la sesión,
+        // el token de la PC o una contraseña a otro lado.
+        redirect: 'error',
       });
+      // PC de sucursal con la casa central apagada (o abriendo antes que ella):
+      // Cloudflare contesta 502–504 / 520–530 con texto o HTML. Antes salía
+      // "Respuesta inválida del servidor LAN", en cada pantalla y en el login.
+      if (lanCfg.esSucursal && (res.status === 502 || res.status === 503 || res.status === 504 || (res.status >= 520 && res.status <= 530))) {
+        return { ok: false, code: 'INTERNAL', message: MENSAJE_CENTRAL_NO_RESPONDE };
+      }
       let body: IpcResponse<unknown>;
       try {
         body = (await res.json()) as IpcResponse<unknown>;
       } catch {
-        return { ok: false, code: 'INTERNAL', message: 'Respuesta inválida del servidor LAN' };
+        return {
+          ok: false,
+          code: 'INTERNAL',
+          message: lanCfg.esSucursal ? MENSAJE_CENTRAL_NO_RESPONDE : 'Respuesta inválida del servidor LAN',
+        };
       }
       if (res.status === 401) {
         setToken(null);
@@ -325,6 +675,7 @@ export function createCaller(
       }
       return body;
     } catch (err) {
+      if (lanCfg.esSucursal) return { ok: false, code: 'INTERNAL', message: MENSAJE_SIN_CONEXION_CENTRAL };
       const aborted = (err as { name?: string })?.name === 'AbortError';
       return {
         ok: false,
@@ -494,6 +845,15 @@ export function createApiBridge(
     company: {
       get: () => c<never>('company:get'),
       upsert: (p) => c<never>('company:upsert', p),
+    },
+    funciones: {
+      estado: () => c<never>('funciones:estado'),
+      edicionPrueba: () => c<never>('funciones:edicionPrueba'),
+      setEdicionPrueba: (p) => c<never>('funciones:setEdicionPrueba', p),
+    },
+    branches: {
+      listar: () => c<never>('branches:listar'),
+      renombrar: (p) => c<never>('branches:renombrar', p),
     },
     fiscal: {
       getConfig: () => c<never>('fiscal:getConfig'),
@@ -705,6 +1065,10 @@ export function createApiBridge(
       remotoClavesDebiles: () => c<never>('lan:remotoClavesDebiles'),
       getConnectedClients: () => c<never>('lan:getConnectedClients'),
       applyAndRestart: () => c<never>('lan:applyAndRestart'),
+      emparejarGenerarCodigo: () => c<never>('lan:emparejarGenerarCodigo'),
+      dispositivosListar: () => c<never>('lan:dispositivosListar'),
+      dispositivoRevocar: (p) => c<never>('lan:dispositivoRevocar', p),
+      setCajaPorPc: (p) => c<never>('lan:setCajaPorPc', p),
     },
     mpQr: {
       getConfig: () => c<never>('mpQr:getConfig'),

@@ -21,6 +21,8 @@ import type { UserRole } from '@stockflow/shared';
 export interface ConsultaCtx {
   repos: Repositories;
   user: { role: UserRole };
+  /** PC que pregunta: "cuánto hay en caja" es SU caja (caja por terminal). */
+  terminalId?: string | null;
 }
 
 /** Mismo criterio que la UI: la lista efectiva de permisos del rol. */
@@ -92,8 +94,8 @@ const CONSULTAS: Consulta[] = [
       'cuanto hay en caja', 'cuanto tengo en caja', 'efectivo en caja',
       'cuanta plata hay en caja', 'saldo de caja', 'cuanto hay en el cajon',
     ],
-    async responder({ repos }) {
-      const caja = await repos.cashRegisters.getCurrentOpen();
+    async responder({ repos, terminalId }) {
+      const caja = await repos.cashRegisters.getCurrentOpen(terminalId ?? null);
       if (!caja) return 'No hay ninguna caja abierta en este momento.';
       const movs = await repos.cashMovements.findByRegister(caja.id);
       const pms = await repos.paymentMethods.byId();

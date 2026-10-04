@@ -9,7 +9,8 @@
     "build": "tsc --noEmit -p tsconfig.json",
     "start": "tsx src/server.ts",
     "type-check": "tsc --noEmit",
-    "test:smoke": "tsx src/__tests__/licensing.smoke.ts"
+    "test:smoke": "tsx src/__tests__/licensing.smoke.ts",
+    "test:remoto": "tsx src/__tests__/remoto.smoke.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

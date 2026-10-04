@@ -13,7 +13,7 @@ import { cmpDecimal, sumDecimals } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
 import { assertPhysicalCashAvailable } from './cash.service';
-import type { ServiceContext } from '../context';
+import { type ServiceContext, cajaAbiertaDeTerminal } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 import { type PriceMode, calculateSaleTotals } from '../pricing';
 
@@ -67,6 +67,11 @@ export interface CreatePurchaseInput {
    */
   fundingSource?: 'daily' | 'general';
   lines: PurchaseLineDraft[];
+  /**
+   * Clave única del intento de guardado (uuid de la pantalla): si la misma
+   * compra llega dos veces, se devuelve la ya registrada. Ver ventas.
+   */
+  idempotencyKey?: string | null;
 }
 
 export interface CreatePurchaseResult {
@@ -85,6 +90,16 @@ export class PurchasesService {
   async createPurchase(input: CreatePurchaseInput): Promise<CreatePurchaseResult> {
     const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'manage_purchases');
+
+    // COMPRA REPETIDA (respuesta perdida en la red): se devuelve la ya
+    // registrada antes de validar caja o saldos, que pudieron cambiar.
+    if (input.idempotencyKey) {
+      const previa = await repos.purchases.findByIdempotencyKey(input.idempotencyKey, {
+        supplierId: input.supplierId,
+        type: input.type,
+      });
+      if (previa) return previa;
+    }
 
     if (input.lines.length === 0) {
       throw new BusinessRuleError('empty_purchase', 'La compra debe tener al menos una línea');
@@ -186,9 +201,7 @@ export class PurchasesService {
     const cashRegisterId =
       !isAccountPurchase && fundingSource === 'daily'
         ? (input.cashRegisterId ??
-          (this.ctx.currentCashRegister?.status === 'open'
-            ? this.ctx.currentCashRegister.id
-            : (await repos.cashRegisters.getCurrentOpen())?.id) ??
+          (await cajaAbiertaDeTerminal(this.ctx))?.id ??
           null)
         : null;
 
@@ -228,6 +241,7 @@ export class PurchasesService {
       cashRegisterId,
       fundingSource,
       userId: currentUser.id,
+      idempotencyKey: input.idempotencyKey ?? null,
       payments: payments.map((p) => ({
         paymentMethodId: p.paymentMethodId,
         amount: p.amount,
@@ -274,7 +288,9 @@ export class PurchasesService {
       }
     }
 
-    const voided = await repos.purchases.voidPurchase(purchaseId);
+    // Reverso en efectivo de una caja ya cerrada: al cajón de la PC que anula.
+    const cajaReverso = await cajaAbiertaDeTerminal(this.ctx);
+    const voided = await repos.purchases.voidPurchase(purchaseId, { cajaReversoId: cajaReverso?.id ?? null });
     if (account) await repos.supplierAccountsPayable.delete(account.id);
     return voided;
   }

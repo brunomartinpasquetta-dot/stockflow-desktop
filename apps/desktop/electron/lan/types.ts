@@ -21,6 +21,12 @@ export interface LanConfig {
   /** Sólo en modo client (default 7777). */
   serverPort?: number;
   /**
+   * Sólo en modo client, MULTISUCURSAL: dirección completa del servidor
+   * (`https://comercio.mistockflow.com` o `http://IP:puerto`). Si está, manda
+   * sobre serverIp/serverPort. Las configs viejas no la tienen y siguen igual.
+   */
+  serverUrl?: string;
+  /**
    * ACCESO REMOTO: si el comercio lo quiere prendido. Se guarda la INTENCIÓN,
    * no el resultado: si al arrancar no hay internet, el interruptor sigue
    * prendido y el túnel reintenta hasta lograrlo.

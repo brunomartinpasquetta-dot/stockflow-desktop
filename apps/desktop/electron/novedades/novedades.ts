@@ -69,15 +69,31 @@ export function marcarVista(userDataDir: string, version: string): void {
   writeFileSync(join(userDataDir, STATE_FILE), JSON.stringify({ ultimaVersionVista: version }));
 }
 
-/** Comparación de versiones x.y.z (devuelve <0, 0, >0 como un comparator). */
+/**
+ * Comparación de versiones x.y.z (devuelve <0, 0, >0 como un comparator).
+ * Acepta versiones de prueba (1.13.0-beta.1): son MENORES que su versión final
+ * y entre ellas manda el número (misma regla que `compareVersions` del
+ * updater). Antes el sufijo daba NaN: en una PC que tuvo una beta, las
+ * novedades de la versión final no se mostraban nunca.
+ */
 export function cmpVersion(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+  const partes = (v: string) => {
+    const [nucleo = '', prueba] = v.split('-', 2);
+    return {
+      nums: nucleo.split('.').map((n) => Number(n) || 0),
+      prueba: prueba === undefined ? null : Number(prueba.replace(/[^0-9]/g, '')) || 0,
+    };
+  };
+  const pa = partes(a);
+  const pb = partes(b);
+  for (let i = 0; i < Math.max(pa.nums.length, pb.nums.length); i++) {
+    const d = (pa.nums[i] ?? 0) - (pb.nums[i] ?? 0);
     if (d !== 0) return d;
   }
-  return 0;
+  if (pa.prueba === null && pb.prueba === null) return 0;
+  if (pa.prueba === null) return 1; // final > prueba
+  if (pb.prueba === null) return -1;
+  return pa.prueba - pb.prueba;
 }
 
 export function computarPendientes(actual: string, vista: string | null, notas: VersionNotas[]): NovedadesPendientes {

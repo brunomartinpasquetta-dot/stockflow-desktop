@@ -7,7 +7,8 @@
 import Database from 'better-sqlite3';
 
 import { computarPendientes, leerNotas, marcarVista, versionVista, type NovedadesPendientes } from '../../novedades/novedades';
-import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
+import { type HandlerDeps, type HandlerMap } from '../handler-context';
+import { deSesionOPuesto } from '../sesion-de-puesto';
 
 /**
  * Versión de la app. `electron` se importa DENTRO de la función a propósito:
@@ -40,7 +41,7 @@ function hayEmpresa(dbPath: string): boolean {
 
 export function buildNovedadesHandlers(deps: HandlerDeps): HandlerMap {
   return {
-    'novedades:pendientes': withSession(deps, async (): Promise<NovedadesPendientes> => {
+    'novedades:pendientes': deSesionOPuesto(deps, async (): Promise<NovedadesPendientes> => {
       const actual = await versionApp(deps.appVersion);
       // Instalación virgen (sin empresa): no tiene sentido contarle "qué
       // cambió" a quien recién llega — se marca visto en silencio para que
@@ -52,7 +53,7 @@ export function buildNovedadesHandlers(deps: HandlerDeps): HandlerMap {
       return computarPendientes(actual, versionVista(deps.userDataDir), leerNotas());
     }),
 
-    'novedades:vistas': withSession(deps, async (): Promise<{ ok: true }> => {
+    'novedades:vistas': deSesionOPuesto(deps, async (): Promise<{ ok: true }> => {
       marcarVista(deps.userDataDir, await versionApp(deps.appVersion));
       return { ok: true };
     }),

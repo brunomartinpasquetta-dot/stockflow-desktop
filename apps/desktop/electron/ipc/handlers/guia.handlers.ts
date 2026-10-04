@@ -9,7 +9,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
+import { type HandlerDeps, type HandlerMap } from '../handler-context';
+import { deSesionOPuesto } from '../sesion-de-puesto';
 
 const STATE_FILE = 'guia-inicial.json';
 
@@ -31,15 +32,15 @@ function leer(userDataDir: string): GuiaEstado {
 
 export function buildGuiaHandlers(deps: HandlerDeps): HandlerMap {
   return {
-    'guia:estado': withSession(deps, async (): Promise<GuiaEstado> => leer(deps.userDataDir)),
+    'guia:estado': deSesionOPuesto(deps, async (): Promise<GuiaEstado> => leer(deps.userDataDir)),
 
-    'guia:progreso': withSession(deps, async (payload: { paso: number }): Promise<{ ok: true }> => {
+    'guia:progreso': deSesionOPuesto(deps, async (payload: { paso: number }): Promise<{ ok: true }> => {
       const st = leer(deps.userDataDir);
       writeFileSync(join(deps.userDataDir, STATE_FILE), JSON.stringify({ ...st, paso: payload.paso }));
       return { ok: true };
     }),
 
-    'guia:vista': withSession(deps, async (): Promise<{ ok: true }> => {
+    'guia:vista': deSesionOPuesto(deps, async (): Promise<{ ok: true }> => {
       writeFileSync(join(deps.userDataDir, STATE_FILE), JSON.stringify({ vista: true, paso: 0 }));
       return { ok: true };
     }),

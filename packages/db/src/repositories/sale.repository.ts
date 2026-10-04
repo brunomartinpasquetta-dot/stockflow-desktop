@@ -37,6 +37,7 @@ import {
   type SalePayment,
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
+import { cajaAbiertaParaReverso } from './cajaAbierta';
 
 export interface SaleWithLines {
   sale: Sale;
@@ -45,6 +46,41 @@ export interface SaleWithLines {
   payments: SalePayment[];
   /** Cuenta corriente abierta (sólo si es venta a cuenta), null en otro caso. */
   accountReceivable: AccountReceivable | null;
+}
+
+type Tx = Parameters<Parameters<LocalDatabase['transaction']>[0]>[0];
+
+/**
+ * La venta ya registrada con esa clave, armada igual que la respuesta de
+ * `createWithLines` (cabecera + líneas + pagos + cuenta corriente), o null.
+ * Si la clave existe pero es de OTRA venta (otro cliente u otro comprobante),
+ * es un error de la pantalla: se rechaza en vez de devolver algo ajeno.
+ */
+function ventaConClave(
+  tx: Tx,
+  clave: string,
+  esperado: { customerId?: string; type?: string } = {},
+): SaleWithLines | null {
+  const sale = tx.select().from(sales).where(eq(sales.idempotencyKey, clave)).get();
+  if (!sale) return null;
+  if (
+    (esperado.customerId && sale.customerId !== esperado.customerId) ||
+    (esperado.type && sale.type !== esperado.type)
+  ) {
+    throw new ConstraintError(
+      'IDEMPOTENCY_KEY_REUSED',
+      'La clave de esta operación ya se usó para otra venta. Vuelva a intentar el cobro.',
+    );
+  }
+  const lines = tx
+    .select()
+    .from(saleLines)
+    .where(eq(saleLines.saleId, sale.id))
+    .orderBy(saleLines.lineNumber)
+    .all();
+  const pays = tx.select().from(salePayments).where(eq(salePayments.saleId, sale.id)).all();
+  const ar = tx.select().from(accountsReceivable).where(eq(accountsReceivable.saleId, sale.id)).get() ?? null;
+  return { sale, lines, payments: pays, accountReceivable: ar };
 }
 
 export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInsert> {
@@ -61,6 +97,23 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         .where(eq(sales.type, type))
         .get();
       return (row?.value ?? 0) + 1;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Venta ya registrada con esa clave de intento (ver `ventaConClave`), o null.
+   * La usa el servicio ANTES de validar caja, precios y límite: un reintento de
+   * una venta que ya entró tiene que devolverla aunque la caja se haya cerrado
+   * en el medio.
+   */
+  async findByIdempotencyKey(
+    clave: string,
+    esperado: { customerId?: string; type?: string } = {},
+  ): Promise<SaleWithLines | null> {
+    try {
+      return this.db.transaction((tx) => ventaConClave(tx, clave, esperado));
     } catch (err) {
       return rethrowDbError(err);
     }
@@ -84,6 +137,16 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
       const paymentsIn = data.payments ?? [];
 
       return this.db.transaction((tx) => {
+        // VENTA REPETIDA (misma clave de intento): se devuelve la que ya
+        // entró, sin descontar stock ni cobrar de nuevo. Se mira DENTRO de la
+        // transacción: si dos pedidos con la misma clave pasaron juntos el
+        // chequeo del servicio, el segundo cae acá (la transacción es
+        // sincrónica) y el índice único es la última red.
+        if (data.idempotencyKey) {
+          const previa = ventaConClave(tx, data.idempotencyKey, { customerId: data.customerId, type: data.type });
+          if (previa) return previa;
+        }
+
         // Número de comprobante (dentro de la transacción para evitar carreras).
         const numRow = tx
           .select({ value: max(sales.number) })
@@ -192,6 +255,7 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
             total,
             status: 'completed',
             notes: data.notes ?? null,
+            idempotencyKey: data.idempotencyKey ?? null,
           })
           .returning()
           .all()[0];
@@ -429,7 +493,16 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
    */
   async voidSale(
     id: string,
-    opts: { reason?: string | null; userName?: string | null } = {},
+    opts: {
+      reason?: string | null;
+      userName?: string | null;
+      /**
+       * Caja abierta de la PC que anula (la resuelve el servicio). Recibe el
+       * reverso en efectivo si la caja original ya cerró. Ver
+       * `cajaAbiertaParaReverso`.
+       */
+      cajaReversoId?: string | null;
+    } = {},
   ): Promise<Sale & { reversoElectronico: string }> {
     try {
       return this.db.transaction((tx) => {
@@ -601,19 +674,14 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           const origenCerrada = originReg?.status !== 'open';
           let targetRegisterId = sale.cashRegisterId;
           if (hayFisico && origenCerrada) {
-            const openReg = tx
-              .select({ id: cashRegisters.id })
-              .from(cashRegisters)
-              .where(eq(cashRegisters.status, 'open'))
-              .limit(1)
-              .get();
-            if (!openReg) {
+            const openRegId = cajaAbiertaParaReverso(tx, opts.cajaReversoId);
+            if (!openRegId) {
               throw new ConstraintError(
                 'NO_OPEN_CASH_REGISTER',
                 'Abra una caja para poder anular esta operación (la caja original ya está cerrada)',
               );
             }
-            targetRegisterId = openReg.id;
+            targetRegisterId = openRegId;
           }
           const insertarReverso = (sp: (typeof sps)[number], cashRegisterId: string, desc: string) => {
             // BUG-S06: si el medio de pago ya no existe (isCash == null por el

@@ -12,7 +12,7 @@ import type {
 import { cmpDecimal, sumDecimals } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
-import type { ServiceContext } from '../context';
+import { type ServiceContext, cajaAbiertaDeTerminal } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 import {
   type PriceMode,
@@ -58,6 +58,13 @@ export interface CreateSaleInput {
   discount?: string;
   notes?: string | null;
   lines: SaleLineDraft[];
+  /**
+   * Clave única del intento de cobro (uuid que genera la pantalla). Si la
+   * misma venta llega dos veces —la respuesta se perdió en la red y el cajero
+   * volvió a cobrar el mismo carrito—, se devuelve la ya registrada en vez de
+   * crear otra. Ausente = sin protección (terminal vieja, procesos internos).
+   */
+  idempotencyKey?: string | null;
 }
 
 export interface CreateSaleResult {
@@ -92,10 +99,8 @@ export class SalesService {
   }
 
   private async resolveOpenRegister() {
-    const reg =
-      this.ctx.currentCashRegister && this.ctx.currentCashRegister.status === 'open'
-        ? this.ctx.currentCashRegister
-        : await this.ctx.repos.cashRegisters.getCurrentOpen();
+    // La caja de la PC que vende (caja por terminal), no la última abierta.
+    const reg = await cajaAbiertaDeTerminal(this.ctx);
     if (!reg) {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta');
     }
@@ -105,6 +110,18 @@ export class SalesService {
   async createSale(input: CreateSaleInput): Promise<CreateSaleResult> {
     const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'create_sale');
+
+    // VENTA REPETIDA: antes que cualquier otra validación. Si la primera vez
+    // entró y la respuesta se perdió, la caja pudo cerrarse o el stock cambiar
+    // en el medio: igual hay que devolver la venta que ya existe, no fallar ni
+    // crear otra.
+    if (input.idempotencyKey) {
+      const previa = await repos.sales.findByIdempotencyKey(input.idempotencyKey, {
+        customerId: input.customerId,
+        type: input.type,
+      });
+      if (previa) return previa;
+    }
 
     const draft = input;
     const lines = input.lines;
@@ -227,6 +244,7 @@ export class SalesService {
       creditLimit: customer.creditLimit,
       notes: draft.notes ?? null,
       lines: resolvedLines,
+      idempotencyKey: draft.idempotencyKey ?? null,
     });
 
     return { sale, lines: savedLines, payments: savedPayments, accountReceivable };
@@ -259,9 +277,13 @@ export class SalesService {
 
     // La cuenta corriente (si la hay) se cierra dentro de la misma transacción
     // del repositorio.
+    // Si la caja original ya cerró, el efectivo sale del cajón de la PC que
+    // anula (caja por terminal), no de la última caja abierta de cualquiera.
+    const cajaReverso = await cajaAbiertaDeTerminal(this.ctx);
     const { reversoElectronico, ...voided } = await repos.sales.voidSale(saleId, {
       reason,
       userName: currentUser.fullName,
+      cajaReversoId: cajaReverso?.id ?? null,
     });
     await this.reflejarReintegroElectronicoEnCajaGeneral(sale, reversoElectronico);
     return voided;

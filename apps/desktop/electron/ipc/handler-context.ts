@@ -14,6 +14,7 @@ import type { ExcelImportService } from '../import/ExcelImportService';
 import type { LicenseManager } from '../license/LicenseManager';
 import { serializeError, unauthenticated } from './errors';
 import type { SessionStore } from './session-store';
+import { terminalDelContexto } from './caja-por-pc';
 import type { IpcResponse } from './types';
 
 export interface HandlerDeps {
@@ -144,6 +145,10 @@ function buildContext(deps: HandlerDeps): ServiceContext | null {
     repos: deps.repos,
     currentUser: session.user,
     currentCashRegister: deps.sessionStore.getCurrentCashRegister(),
+    // La PC que hizo el pedido, SÓLO si rige la caja por PC (opción del
+    // comercio o edición Multisucursal). Apagada: null = la caja abierta del
+    // local, exactamente como en la 1.12 (ver caja-por-pc.ts).
+    terminalId: terminalDelContexto(deps),
   };
 }
 

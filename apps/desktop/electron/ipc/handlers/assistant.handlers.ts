@@ -152,7 +152,7 @@ export function buildAssistantHandlers(deps: HandlerDeps): HandlerMap {
         // explicar dónde mirarlo — respetando los permisos del rol.
         if (question.trim()) {
           try {
-            const dato = await responderConDatos({ repos: ctx.repos, user: ctx.currentUser }, question);
+            const dato = await responderConDatos({ repos: ctx.repos, user: ctx.currentUser, terminalId: ctx.terminalId ?? null }, question);
             if (dato) return { reply: dato, suggestions: [], image: null };
           } catch {
             /* si falla, sigue el motor de conocimiento */

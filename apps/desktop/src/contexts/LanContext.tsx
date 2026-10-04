@@ -20,11 +20,41 @@ interface LanContextValue {
   serverLicense?: string | null
   lastPingAt: number | null
   lastError: string | null
+  /**
+   * true mientras todavía no se leyó la config de red. Quien decide algo según
+   * el modo (p. ej. LicenseGuard) tiene que esperar: con `mode` undefined una
+   * terminal parece "1 PC" por un instante.
+   */
+  configCargando: boolean
 }
 
 const LanContext = createContext<LanContextValue | null>(null)
 
 const PING_INTERVAL_MS = 30_000
+
+/**
+ * Base del servidor de una terminal: la dirección web si la tiene (terminal de
+ * sucursal o navegador entrando por https://), si no `http://ip:puerto`.
+ */
+export function baseDelServidorDeConfig(cfg: LanConfigDTO | undefined): string | null {
+  if (!cfg) return null
+  if (cfg.serverUrl) return cfg.serverUrl.replace(/\/$/, '')
+  if (!cfg.serverIp || !cfg.serverPort) return null
+  return `http://${cfg.serverIp}:${cfg.serverPort}`
+}
+
+/** Para mostrar: `comercio.mistockflow.com` o `192.168.1.10:7777`. */
+export function destinoDeConfig(cfg: LanConfigDTO | undefined): string {
+  if (!cfg) return 'servidor'
+  if (cfg.serverUrl) {
+    try {
+      return new URL(cfg.serverUrl).host
+    } catch {
+      return cfg.serverUrl
+    }
+  }
+  return `${cfg.serverIp}:${cfg.serverPort}`
+}
 
 export function LanProvider({ children }: { children: ReactNode }) {
   const cfgQuery = useQuery<LanConfigDTO>({
@@ -36,6 +66,7 @@ export function LanProvider({ children }: { children: ReactNode }) {
 
   const cfg = cfgQuery.data
   const isClient = cfg?.mode === 'client'
+  const base = baseDelServidorDeConfig(cfg)
 
   const [online, setOnline] = useState<boolean>(true)
   const [serverLicense, setServerLicense] = useState<string | null>(null)
@@ -43,12 +74,13 @@ export function LanProvider({ children }: { children: ReactNode }) {
   const [lastError, setLastError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isClient || !cfg?.serverIp || !cfg?.serverPort) {
+    if (!isClient || !base) {
       return
     }
     let cancelled = false
     const doPing = async (): Promise<void> => {
-      const r = await api.lan.pingServer(cfg.serverIp!, cfg.serverPort!)
+      // Por internet (dirección web) el primer saludo tarda más que en la red.
+      const r = await api.lan.pingServer(base, cfg?.serverUrl ? 8000 : 3000)
       if (cancelled) return
       setOnline(r.ok)
       setServerLicense(r.ok ? (r.license ?? 'active') : null)
@@ -61,7 +93,7 @@ export function LanProvider({ children }: { children: ReactNode }) {
       cancelled = true
       clearInterval(t)
     }
-  }, [isClient, cfg?.serverIp, cfg?.serverPort])
+  }, [isClient, base, cfg?.serverUrl])
 
   const value = useMemo<LanContextValue>(
     () => ({
@@ -71,8 +103,9 @@ export function LanProvider({ children }: { children: ReactNode }) {
       serverLicense,
       lastPingAt,
       lastError,
+      configCargando: cfgQuery.isPending,
     }),
-    [cfg, isClient, online, serverLicense, lastPingAt, lastError],
+    [cfg, isClient, online, serverLicense, lastPingAt, lastError, cfgQuery.isPending],
   )
 
   return <LanContext.Provider value={value}>{children}</LanContext.Provider>

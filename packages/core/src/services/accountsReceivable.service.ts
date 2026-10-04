@@ -5,7 +5,7 @@ import type { AccountReceivable, Customer, Payment, Sale } from '@stockflow/shar
 import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { requirePermission } from '../auth/permissions';
-import type { ServiceContext } from '../context';
+import { type ServiceContext, cajaAbiertaDeTerminal } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 
 /** Una línea de cobranza (un medio de pago + monto). */
@@ -155,9 +155,7 @@ export class AccountsReceivableService {
 
     const cashRegisterId =
       input.cashRegisterId ??
-      (this.ctx.currentCashRegister?.status === 'open'
-        ? this.ctx.currentCashRegister.id
-        : (await repos.cashRegisters.getCurrentOpen())?.id);
+      (await cajaAbiertaDeTerminal(this.ctx))?.id;
     if (!cashRegisterId) {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el ingreso');
     }
@@ -215,9 +213,7 @@ export class AccountsReceivableService {
 
     const cashRegisterId =
       input.cashRegisterId ??
-      (this.ctx.currentCashRegister?.status === 'open'
-        ? this.ctx.currentCashRegister.id
-        : (await repos.cashRegisters.getCurrentOpen())?.id);
+      (await cajaAbiertaDeTerminal(this.ctx))?.id;
     if (!cashRegisterId) {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el ingreso');
     }

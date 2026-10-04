@@ -11,6 +11,15 @@ export const idSchema = z.string().min(1);
 /** Timestamp unix en milisegundos. */
 export const timestampSchema = z.number().int().nonnegative();
 
+/**
+ * Clave única de un intento de operación (venta, compra) que genera la
+ * pantalla: un uuid. Si la misma operación llega dos veces porque se perdió la
+ * respuesta, el servidor devuelve la ya registrada en vez de crear otra.
+ */
+export const idempotencyKeySchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{8,64}$/, 'Clave de operación inválida');
+
 /** Decimal de dinero: hasta 4 decimales. Ej. "1234.5000". */
 export const moneySchema = z
   .string()

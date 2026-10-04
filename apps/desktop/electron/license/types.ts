@@ -5,6 +5,12 @@
 export type LicensePlan = 'basic' | 'pro';
 
 /**
+ * Edición de StockFlow: 'comun' (todos los comercios de hoy) o
+ * 'multisucursal'. Sale del claim `edicion` del JWT; sin claim = común.
+ */
+export type Edicion = 'comun' | 'multisucursal';
+
+/**
  * Estado de la licencia:
  *  - 'unlicensed': no hay licencia válida (sin activar / token expirado / inválido).
  *  - 'active': licencia válida y al día → la app opera normalmente.
@@ -30,7 +36,26 @@ export interface LicenseState {
   tenantId: string | null;
   /** true si es una PRUEBA GRATIS (30 días). expiresAt = fin de la prueba. */
   trial?: boolean;
+  /**
+   * Edición vigente. 'comun' salvo que el token traiga edicion='multisucursal'
+   * (o el override de desarrollo, sólo sin empaquetar: ver funciones.ts).
+   */
+  edicion: Edicion;
   lastError: string | null;
+}
+
+/**
+ * Estado del interruptor "Edición Multisucursal (versión de prueba)"
+ * (ver funciones.ts). `disponible` sólo con una versión -alpha/-beta/-rc.
+ */
+export interface EdicionPruebaEstado {
+  disponible: boolean;
+  /** El archivo pide multisucursal Y la versión es de prueba. */
+  activa: boolean;
+  activadaEl: number | null;
+  /** La edición sin el interruptor: la de la licencia (o el override de desarrollo). */
+  edicionReal: Edicion;
+  version: string;
 }
 
 /** Datos que el usuario carga para arrancar la prueba gratis. */
@@ -50,6 +75,8 @@ export interface LicenseJwtPayload {
   kind?: 'trial';
   /** Fin de la PRUEBA en epoch-segundos (el exp del JWT es corto y renovable). */
   texp?: number;
+  /** 'multisucursal' si el comercio tiene esa edición. Ausente = común. */
+  edicion?: string;
   iat: number;
   exp: number;
 }

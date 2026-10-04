@@ -11,11 +11,12 @@ import { OllamaClient } from './assistant/ia/ollama';
 import { BackupService } from './backup/BackupService';
 import { DesktopWindowsManager } from './desktop-windows';
 import { getDatabasePath, initialize, shutdown, type DbHandle } from './bootstrap/db';
+import { puertoDeEntorno, sinMdns } from './bootstrap/entorno';
 import { getMachineId } from './bootstrap/machine';
 import { applySessionSecret } from './bootstrap/session';
 import { LectorSistema } from './facturas/lectorSistema';
 import { FacturasTelefono } from './facturas/servicio';
-import { atenderFotos, PUERTO_FOTOS, ServidorFotos } from './facturas/servidorFotos';
+import { atenderFotos, PUERTO_FOTOS as PUERTO_FOTOS_DEFECTO, ServidorFotos } from './facturas/servidorFotos';
 import { HardwareManager } from './hardware/HardwareManager';
 import { ExcelImportService } from './import/ExcelImportService';
 import { registerIpcHandlers, buildAllHandlers } from './ipc';
@@ -24,9 +25,10 @@ import { obtenerCatalogoSync } from './catalogo/CatalogoSync';
 import { LanManager } from './lan/LanManager';
 import { TunelManager } from './lan/TunelManager';
 import { LanServer } from './lan/LanServer';
+import { obtenerDispositivos, planMultisucursal } from './lan/dispositivos';
 import { DEFAULT_LAN_PORT } from './lan/types';
 import { LicenseManager } from './license/LicenseManager';
-import { CLOUD_API_URL_DEFAULT, CLOUD_PUBLIC_KEY_PEM } from './license/cloud-public-key';
+import { configCloud } from './license/cloud-public-key';
 import { setupLogger } from './logger';
 import { MpTokenStore } from './secure/MpTokenStore';
 import { MpQrService, createServiceContext } from '@stockflow/core';
@@ -35,6 +37,8 @@ import { checkForOutdatedVersion, setupAutoUpdater, type UpdaterController } fro
 const HEARTBEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const isDev = process.env.NODE_ENV === 'development';
+/** Escucha del teléfono. 7790 salvo STOCKFLOW_PUERTO_FOTOS (ver bootstrap/entorno.ts). */
+const PUERTO_FOTOS = puertoDeEntorno('STOCKFLOW_PUERTO_FOTOS', PUERTO_FOTOS_DEFECTO);
 const DEV_SERVER_URL = 'http://localhost:5173';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -256,7 +260,12 @@ function bootstrap(): { lanArgs: string[] } {
   const lanManager = new LanManager(userDataDir);
   const lanCfg = lanManager.getConfig();
   const lanArgs: string[] = [];
-  if (lanCfg.mode === 'client' && lanCfg.serverIp && lanCfg.token) {
+  if (lanCfg.mode === 'client' && lanCfg.serverUrl) {
+    // Terminal por dirección web (multisucursal): el PIN es opcional.
+    lanArgs.push(`--lan-mode=client`);
+    lanArgs.push(`--lan-server-url=${lanCfg.serverUrl}`);
+    if (lanCfg.token) lanArgs.push(`--lan-token=${lanCfg.token}`);
+  } else if (lanCfg.mode === 'client' && lanCfg.serverIp && lanCfg.token) {
     lanArgs.push(`--lan-mode=client`);
     lanArgs.push(`--lan-server=${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`);
     lanArgs.push(`--lan-token=${lanCfg.token}`);
@@ -267,8 +276,14 @@ function bootstrap(): { lanArgs: string[] } {
   licenseManager = new LicenseManager({
     userDataDir,
     machineId,
-    apiUrl: process.env.CLOUD_API_URL ?? CLOUD_API_URL_DEFAULT,
-    publicKeyPem: process.env.CLOUD_JWT_PUBLIC_KEY ?? CLOUD_PUBLIC_KEY_PEM,
+    // Empaquetada: clave pública embebida SIEMPRE; dirección del cloud sólo
+    // cambiable a esta misma PC (ver configCloud).
+    ...configCloud(app.isPackaged, process.env),
+    // Sólo sin empaquetar se admite STOCKFLOW_PLAN=multisucursal (desarrollo).
+    empaquetada: app.isPackaged,
+    // Sólo una versión -alpha/-beta/-rc tiene el interruptor "Edición
+    // Multisucursal (versión de prueba)" (ver license/funciones.ts).
+    version: app.getVersion(),
   });
   hardwareManager = new HardwareManager({ userDataDir });
   backupService = new BackupService({
@@ -526,7 +541,8 @@ function bootstrap(): { lanArgs: string[] } {
       // Puerta dedicada del acceso remoto (sólo 127.0.0.1): es a donde el
       // túnel entrega las visitas de internet.
       tunnelPort: PUERTO_TUNEL,
-      enableMdns: true,
+      // STOCKFLOW_SIN_MDNS=1 lo apaga (sandbox de dos locales en una misma PC).
+      enableMdns: !sinMdns(),
       sessionStore,
       licenseStatus: () => licenseManager?.getState().status ?? 'unlicensed',
       // La misma interfaz que usa la app, servida para que un puesto entre por
@@ -537,6 +553,11 @@ function bootstrap(): { lanArgs: string[] } {
       webRoot: path.join(app.getAppPath(), 'dist'),
       // Fotos de facturas desde el teléfono (también salen por el túnel).
       rutaExtra: rutaFotos,
+      // PC de sucursal emparejadas (multisucursal) y la identidad de esta PC
+      // para los pedidos que no se identifican (terminales viejas).
+      dispositivos: obtenerDispositivos(deps),
+      multisucursalActivo: () => planMultisucursal(licenseManager),
+      machineId,
       resolveUser: async (userId: string) => {
         const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
         if (!u) return null;
@@ -552,7 +573,7 @@ function bootstrap(): { lanArgs: string[] } {
     prepararAccesoRemoto();
   } else if (lanCfg.mode === 'client') {
     console.info(
-      `[LAN] modo=client server=${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`,
+      `[LAN] modo=client server=${lanCfg.serverUrl ?? `${lanCfg.serverIp}:${lanCfg.serverPort ?? DEFAULT_LAN_PORT}`}`,
     );
   } else {
     console.info('[LAN] modo=single (1 PC)');
@@ -578,6 +599,11 @@ function bootstrap(): { lanArgs: string[] } {
       webRoot: path.join(app.getAppPath(), 'dist'),
       // Fotos de facturas desde el teléfono (también salen por el túnel).
       rutaExtra: rutaFotos,
+      // PC de sucursal emparejadas (multisucursal) y la identidad de esta PC
+      // para los pedidos que no se identifican (terminales viejas).
+      dispositivos: obtenerDispositivos(deps),
+      multisucursalActivo: () => planMultisucursal(licenseManager),
+      machineId,
       resolveUser: async (userId: string) => {
         const u = (await dbHandle?.repos.users.findById(userId)) as { passwordHash?: string; id: string; username: string; fullName: string; role: 'admin' | 'manager' | 'seller'; active: boolean; createdAt: number; updatedAt: number } | null | undefined;
         if (!u) return null;
@@ -627,9 +653,10 @@ function bootstrap(): { lanArgs: string[] } {
  */
 /**
  * Puerto local por el que el túnel entrega las visitas de internet. No se
- * publica a la red: la escucha está atada a 127.0.0.1.
+ * publica a la red: la escucha está atada a 127.0.0.1. 7788 salvo
+ * STOCKFLOW_PUERTO_TUNEL (ver bootstrap/entorno.ts).
  */
-const PUERTO_TUNEL = 7788;
+const PUERTO_TUNEL = puertoDeEntorno('STOCKFLOW_PUERTO_TUNEL', 7788);
 
 function rutaCloudflared(): string {
   const nombre = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';

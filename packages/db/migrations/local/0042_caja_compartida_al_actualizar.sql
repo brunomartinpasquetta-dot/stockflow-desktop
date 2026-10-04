@@ -1,0 +1,27 @@
+-- CAJA POR PC: transición sin dejar a nadie sin poder vender (ítem 12 del plan
+-- multisucursal, docs/PLAN_MULTISUCURSAL.md §10).
+--
+-- Hasta esta versión, en una instalación en red TODAS las PC abrían la caja
+-- con el id del SERVIDOR (el handler usaba `deps.machineId`, que en un pedido
+-- de red es el de la PC servidor). O sea que la caja abierta de hoy es, en los
+-- hechos, una caja COMPARTIDA por todos los puestos (Leo Citzia: 3 PC).
+--
+-- Desde esta versión cada PC usa su propio id. Sin esta migración, al
+-- actualizar el servidor a mitad de turno, cada terminal preguntaría por "su"
+-- caja, no encontraría ninguna (la abierta tiene el id del servidor) y el
+-- cajero quedaría sin poder vender con la caja abierta delante.
+--
+-- Decisión: toda caja que esté ABIERTA al actualizar pasa a ser la caja
+-- compartida heredada (terminal_id NULL), la misma figura que ya existía desde
+-- la 0017. `getCurrentOpen` se la da a cualquier PC que no tenga una propia,
+-- así que todos los puestos siguen vendiendo en ella, exactamente como hasta
+-- ahora, hasta que alguien la cierre. Desde el cierre, cada PC abre la suya.
+--
+-- Es segura para todos:
+--   - Una sola PC: su caja abierta pasa a compartida; la sigue usando igual y
+--     al cerrarla abre la propia. Nada cambia en pantalla.
+--   - En red: las cajas abiertas al actualizar eran compartidas de hecho; esto
+--     lo hace explícito.
+--   - Las cajas CERRADAS no se tocan (el historial conserva su terminal).
+--   - terminal_name se conserva: sigue diciendo qué PC la abrió.
+UPDATE `cash_registers` SET `terminal_id` = NULL WHERE `status` = 'open' AND `terminal_id` IS NOT NULL;

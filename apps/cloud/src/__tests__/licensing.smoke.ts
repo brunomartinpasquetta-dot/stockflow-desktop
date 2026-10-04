@@ -36,9 +36,55 @@ function check(label: string, ok: boolean, detail?: unknown): void {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const migrationDir = path.resolve(here, '..', '..', '..', '..', 'packages', 'db', 'migrations', 'cloud');
-const MIGRATIONS = ['0000_cloud_init.sql', '0001_licenses_quota.sql', '0002_trial_licenses.sql'];
+const MIGRATIONS = [
+  '0000_cloud_init.sql',
+  '0001_licenses_quota.sql',
+  '0002_trial_licenses.sql',
+  '0003_tenant_edicion.sql',
+];
+
+function payloadDe(jwt: string | null | undefined): Record<string, unknown> {
+  return JSON.parse(Buffer.from((jwt ?? '..').split('.')[1] ?? '', 'base64url').toString() || '{}') as Record<string, unknown>;
+}
+
+/**
+ * Deploy del código ANTES que el SQL: una base con las migraciones hasta la
+ * 0002 (sin tenants.edicion). El cloud tiene que completar el esquema al
+ * arrancar y las licencias tienen que seguir andando.
+ */
+async function pruebaEsquemaAlArrancar(): Promise<void> {
+  console.log('\n[esquema] código nuevo sobre una base sin la 0003');
+  const pg = new PGlite();
+  for (const mig of MIGRATIONS.filter((m) => m < '0003')) {
+    const texto = readFileSync(path.join(migrationDir, mig), 'utf8');
+    for (const stmt of texto.split('--> statement-breakpoint').map((x) => x.trim()).filter(Boolean)) await pg.exec(stmt);
+  }
+  const antes = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name = 'tenants' AND column_name = 'edicion'`);
+  check('la base vieja no tiene tenants.edicion', antes.rows.length === 0);
+  const db = drizzle(pg, { schema: cloudSchema });
+  const { asegurarEsquema } = await import('../esquema');
+  const app = await buildServer({ db: db as never });
+  const despues = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name = 'tenants' AND column_name = 'edicion'`);
+  check('al arrancar, el cloud agregó tenants.edicion', despues.rows.length === 1);
+  const [t] = await db.insert(tenants).values({ email: 'e@test.com', fullName: 'E', companyName: 'E SA', plan: 'basic', status: 'active' }).returning();
+  check('los tenants existentes y nuevos quedan en edición común', t?.edicion === 'comun', t?.edicion);
+  await db.insert(licenses).values({ tenantId: t!.id, licenseKey: 'SF-ESQU-EMAA-BBBB-CCCC', status: 'pending' });
+  const act = await app.inject({ method: 'POST', url: '/api/licenses/activate', payload: { licenseKey: 'SF-ESQU-EMAA-BBBB-CCCC', machineId: 'm-esquema' } });
+  check('con el esquema completado, activar una licencia → 200', act.statusCode === 200, act.statusCode);
+  const otraVez = await asegurarEsquema(db as never);
+  check('el chequeo es idempotente (la segunda vez no aplica nada)', otraVez.aplicadas.length === 0, JSON.stringify(otraVez));
+  let rechazo = '';
+  try {
+    await pg.exec(`INSERT INTO tenants (email, full_name, company_name, plan, status, edicion) VALUES ('x@x.com','X','X','basic','active','otra')`);
+  } catch (err) {
+    rechazo = err instanceof Error ? err.message : String(err);
+  }
+  check('la restricción de valores de edicion quedó puesta', /tenants_edicion_check/.test(rechazo), rechazo);
+  await app.close();
+}
 
 async function main(): Promise<void> {
+  await pruebaEsquemaAlArrancar();
   const pg = new PGlite();
   for (const mig of MIGRATIONS) {
     const sql = readFileSync(path.join(migrationDir, mig), 'utf8');
@@ -305,6 +351,125 @@ async function main(): Promise<void> {
     Buffer.from((hb3Body.jwt ?? '..').split('.')[1]!, 'base64url').toString(),
   ) as { kind?: string; texp?: number };
   check('convertida: jwt limpio, sin kind ni texp', hb3Payload.kind === undefined && hb3Payload.texp === undefined, JSON.stringify(hb3Payload));
+
+  // ============ EDICIÓN MULTISUCURSAL ============
+  console.log('\n[edición multisucursal]');
+
+  // --- lógica pura del claim ---
+  {
+    const [lic] = await cloudDb.select().from(licenses).where(eq(licenses.licenseKey, 'SF-TEST-AAAA-BBBB-CCCC')).limit(1);
+    if (!lic) throw new Error('falta la licencia de prueba');
+    const pComun = LicenseService.jwtPayloadFor(lic, { ...tenant, edicion: 'comun' });
+    check('jwtPayloadFor común: SIN claim edicion (token igual al de siempre)', !('edicion' in pComun), JSON.stringify(pComun));
+    const pMulti = LicenseService.jwtPayloadFor(lic, { ...tenant, edicion: 'multisucursal' });
+    check("jwtPayloadFor multisucursal: edicion='multisucursal'", pMulti.edicion === 'multisucursal', JSON.stringify(pMulti));
+    const pRaro = LicenseService.jwtPayloadFor(lic, { ...tenant, edicion: 'otra-cosa' });
+    check('jwtPayloadFor con valor desconocido: se trata como común', !('edicion' in pRaro), JSON.stringify(pRaro));
+  }
+
+  // --- tenant existente: la migración lo dejó en común ---
+  const [tenantTrasMig] = await cloudDb.select().from(tenants).where(eq(tenants.id, tenant.id)).limit(1);
+  check("tenant existente nace con edicion='comun'", tenantTrasMig?.edicion === 'comun', tenantTrasMig?.edicion);
+
+  const actComun = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/activate',
+    payload: { licenseKey: 'SF-TEST-AAAA-BBBB-CCCC', machineId: 'machine-1' },
+  });
+  const jwtComun = (actComun.json() as { jwt?: string }).jwt ?? '';
+  check('activate común: el jwt NO lleva edicion', payloadDe(jwtComun).edicion === undefined, JSON.stringify(payloadDe(jwtComun)));
+
+  const meComun = (await app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${jwtComun}` } })).json() as {
+    tenant?: { edicion?: string };
+    features?: { multisucursal?: boolean; arca?: boolean };
+  };
+  check('/api/me común: edicion=comun y features.multisucursal=false', meComun.tenant?.edicion === 'comun' && meComun.features?.multisucursal === false && meComun.features?.arca === true, JSON.stringify(meComun));
+
+  // --- heartbeat sin cambios: no renueva (token con >24h) ---
+  const hbSinCambio = await app.inject({ method: 'POST', url: '/api/licenses/heartbeat', headers: { authorization: `Bearer ${jwtComun}` } });
+  check('heartbeat común sin cambios → jwt:null', (hbSinCambio.json() as { jwt?: string | null }).jwt === null, hbSinCambio.body);
+
+  // --- endpoint admin ---
+  const adminToken = app.jwt.sign({ admin: true, email: 'admin@stockflow.local' }, { expiresIn: '1h' });
+  const edSinAuth = await app.inject({ method: 'PATCH', url: `/api/admin/tenants/${tenant.id}/edicion`, payload: { edicion: 'multisucursal' } });
+  check('PATCH edicion sin auth → 401', edSinAuth.statusCode === 401, edSinAuth.statusCode);
+  const edConLicencia = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tenants/${tenant.id}/edicion`,
+    headers: { authorization: `Bearer ${jwtComun}` },
+    payload: { edicion: 'multisucursal' },
+  });
+  check('PATCH edicion con token de licencia (no admin) → 403', edConLicencia.statusCode === 403, edConLicencia.statusCode);
+  const edInvalida = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tenants/${tenant.id}/edicion`,
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { edicion: 'premium' },
+  });
+  check('PATCH edicion inválida → 400', edInvalida.statusCode === 400, edInvalida.statusCode);
+  const edInexistente = await app.inject({
+    method: 'PATCH',
+    url: '/api/admin/tenants/00000000-0000-0000-0000-000000000000/edicion',
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { edicion: 'multisucursal' },
+  });
+  check('PATCH edicion de cuenta inexistente → 404', edInexistente.statusCode === 404, edInexistente.statusCode);
+  const edOk = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tenants/${tenant.id}/edicion`,
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { edicion: 'multisucursal' },
+  });
+  check('PATCH edicion=multisucursal → 200', edOk.statusCode === 200 && (edOk.json() as { edicion?: string }).edicion === 'multisucursal', edOk.body);
+
+  // --- el desktop se entera en el PRÓXIMO heartbeat, aunque su token esté fresco ---
+  const hbMulti = await app.inject({ method: 'POST', url: '/api/licenses/heartbeat', headers: { authorization: `Bearer ${jwtComun}` } });
+  const jwtMulti = (hbMulti.json() as { jwt?: string | null }).jwt ?? null;
+  check('heartbeat tras pasar a multisucursal → renueva YA', typeof jwtMulti === 'string' && jwtMulti.split('.').length === 3, hbMulti.body);
+  check("jwt renovado lleva edicion='multisucursal'", payloadDe(jwtMulti).edicion === 'multisucursal', JSON.stringify(payloadDe(jwtMulti)));
+
+  const hbMulti2 = await app.inject({ method: 'POST', url: '/api/licenses/heartbeat', headers: { authorization: `Bearer ${jwtMulti}` } });
+  check('heartbeat con jwt ya multisucursal → jwt:null (sin renovar de más)', (hbMulti2.json() as { jwt?: string | null }).jwt === null, hbMulti2.body);
+
+  const actMulti = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/activate',
+    payload: { licenseKey: 'SF-TEST-AAAA-BBBB-CCCC', machineId: 'machine-1' },
+  });
+  check("activate multisucursal: el jwt lleva edicion", payloadDe((actMulti.json() as { jwt?: string }).jwt).edicion === 'multisucursal', actMulti.body.slice(0, 80));
+  // La otra licencia del mismo comercio (otra PC) también la recibe: es del comercio, no de la PC.
+  const actOtraPc = await app.inject({
+    method: 'POST',
+    url: '/api/licenses/activate',
+    payload: { licenseKey: 'SF-QQQQ-WWWW-EEEE-RRRR', machineId: 'machine-3' },
+  });
+  check('la otra PC del mismo comercio también recibe multisucursal', payloadDe((actOtraPc.json() as { jwt?: string }).jwt).edicion === 'multisucursal', actOtraPc.body.slice(0, 80));
+
+  const meMulti = (await app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${jwtMulti}` } })).json() as {
+    tenant?: { edicion?: string };
+    features?: { multisucursal?: boolean };
+  };
+  check('/api/me multisucursal: features.multisucursal=true', meMulti.tenant?.edicion === 'multisucursal' && meMulti.features?.multisucursal === true, JSON.stringify(meMulti));
+
+  // --- volver a común: el siguiente heartbeat limpia el claim ---
+  await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tenants/${tenant.id}/edicion`,
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { edicion: 'comun' },
+  });
+  const hbVuelta = await app.inject({ method: 'POST', url: '/api/licenses/heartbeat', headers: { authorization: `Bearer ${jwtMulti}` } });
+  const jwtVuelta = (hbVuelta.json() as { jwt?: string | null }).jwt ?? null;
+  check('volver a común: heartbeat renueva y el jwt ya no trae edicion', typeof jwtVuelta === 'string' && payloadDe(jwtVuelta).edicion === undefined, hbVuelta.body);
+
+  // --- la base rechaza valores fuera de la lista ---
+  let rechazo = false;
+  try {
+    await cloudDb.update(tenants).set({ edicion: 'cualquiera' }).where(eq(tenants.id, tenant.id));
+  } catch {
+    rechazo = true;
+  }
+  check('CHECK de la base rechaza una edición desconocida', rechazo);
 
   await app.close();
   await pg.close();

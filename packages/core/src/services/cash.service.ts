@@ -5,7 +5,7 @@ import type { CashMovement, CashRegister, PaymentMethod, PaymentMethodType } fro
 import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { hasPermission, requirePermission } from '../auth/permissions';
-import type { ServiceContext } from '../context';
+import { type ServiceContext, cajaAbiertaDeTerminal } from '../context';
 import { BusinessRuleError, NotFoundError, PermissionDeniedError } from '../errors';
 
 export interface AddMovementInput {
@@ -40,6 +40,8 @@ export interface PaymentMethodBreakdown {
 
 export interface HistoricalCashRegisterSummary {
   id: string;
+  /** PC que abrió la caja (hostname), si se sabe. Sirve para cerrar la de otra PC. */
+  terminalName?: string | null;
   openDate: number;
   closeDate: number | null;
   userId: string;
@@ -290,6 +292,7 @@ export class CashService {
       summaries.push({
         id: r.id,
         number: r.number,
+        terminalName: r.terminalName ?? null,
         openDate: r.openDate,
         closeDate: r.closeDate,
         userId: r.userId,
@@ -357,9 +360,7 @@ export class CashService {
 
     const registerId =
       input.cashRegisterId ??
-      (this.ctx.currentCashRegister?.status === 'open'
-        ? this.ctx.currentCashRegister.id
-        : (await repos.cashRegisters.getCurrentOpen())?.id);
+      (await cajaAbiertaDeTerminal(this.ctx))?.id;
     if (!registerId) {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta');
     }

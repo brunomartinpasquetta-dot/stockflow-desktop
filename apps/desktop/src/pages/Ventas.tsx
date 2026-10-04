@@ -23,6 +23,8 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
+import { IntentoDeOperacion } from '@/lib/idempotencia'
+import { elegirPuntoDeVenta, guardarPuntoDeVentaPC, leerPuntoDeVentaPC } from '@/lib/puntoDeVentaPC'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
@@ -692,8 +694,10 @@ function PDV() {
     () => (salePointsQuery.data ?? []).filter((p) => p.active),
     [salePointsQuery.data],
   )
-  const [salePoint, setSalePoint] = useState<number | null>(null)
-  const effectiveSalePoint = salePoint ?? activeSalePoints[0]?.number ?? null
+  // PV recordado en ESTA PC (ver lib/puntoDeVentaPC): con varios PV, cada
+  // puesto arranca con el último que usó. Con uno solo, es ese.
+  const [salePoint, setSalePoint] = useState<number | null>(() => leerPuntoDeVentaPC())
+  const effectiveSalePoint = elegirPuntoDeVenta(activeSalePoints, salePoint, null)
   const numberQuery = useQuery({
     queryKey: ['sales', 'nextNumber', voucherType],
     queryFn: () => api.sales.getNextNumber(voucherType),
@@ -1140,6 +1144,10 @@ function PDV() {
    */
   const [procesando, setProcesando] = useState(false)
   const procesandoRef = useRef(false)
+  // Clave del intento de cobro: si la respuesta se pierde en la red y se
+  // vuelve a cobrar el MISMO carrito, viaja la misma clave y el servidor
+  // devuelve la venta ya registrada en vez de duplicarla.
+  const intentoVentaRef = useRef(new IntentoDeOperacion())
   /** Orden de QR cuya venta está en curso: para no avisar dos veces por la misma. */
   const qrOrdenEnCursoRef = useRef<string | null>(null)
 
@@ -1412,7 +1420,7 @@ function PDV() {
         : null
     const paymentsToSend = accountSale ? [] : (monoPayments ?? split.payments)
     try {
-      const result = await createSale.mutateAsync({
+      const venta = {
         type: voucherType,
         customerId: effectiveCustomerId,
         isAccountSale: accountSale,
@@ -1427,7 +1435,9 @@ function PDV() {
           discount: parseCurrencyInput(l.discount),
           vatRate: l.vatRate,
         })),
-      })
+      }
+      const result = await createSale.mutateAsync({ ...venta, idempotencyKey: intentoVentaRef.current.clavePara(venta) })
+      intentoVentaRef.current.confirmar()
       // La venta YA quedó registrada y pegó en caja. Avisamos al operador y
       // reseteamos el form ANTES de imprimir: el aviso + el reset NO deben
       // depender del ticket. Si la impresión falla o se CUELGA (diálogo sin
@@ -1519,7 +1529,7 @@ function PDV() {
     qrOrdenEnCursoRef.current = orderId
     setProcesando(true)
     try {
-      const result = await createSale.mutateAsync({
+      const venta = {
         type: voucherType,
         customerId: effectiveCustomerId,
         isAccountSale: false,
@@ -1534,7 +1544,9 @@ function PDV() {
           discount: parseCurrencyInput(l.discount),
           vatRate: l.vatRate,
         })),
-      })
+      }
+      const result = await createSale.mutateAsync({ ...venta, idempotencyKey: intentoVentaRef.current.clavePara(venta) })
+      intentoVentaRef.current.confirmar()
       await api.mpQr.linkOrderToSale(orderId, result.sale.id).catch(() => {})
       if (pedidoWebId) {
         api.catalogo.pedidoVincularVenta(pedidoWebId, result.sale.id).catch((e: unknown) =>
@@ -1702,7 +1714,11 @@ function PDV() {
           {fiscalEnabled && voucherType !== 'X' && activeSalePoints.length > 1 && (
             <Select
               value={String(effectiveSalePoint ?? '')}
-              onChange={(e) => setSalePoint(Number(e.target.value))}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                setSalePoint(n)
+                guardarPuntoDeVentaPC(n)
+              }}
               className="mt-1"
             >
               {activeSalePoints.map((p) => (

@@ -19,11 +19,17 @@ import {
   baseDelServidor,
   createApiBridge,
   type BridgeIO,
+  type IdentidadTerminal,
   type LanClientConfig,
 } from '../../electron/preload-bridge';
 import type { IpcResponse } from '../../electron/ipc/types';
 
 const PIN_KEY = 'stockflow.web.pin';
+/**
+ * ID propio de ESTE navegador: hace de "machineId" de la terminal (no hay
+ * proceso de Electron que lo calcule). Se genera una vez y queda guardado.
+ */
+const TERMINAL_KEY = 'stockflow.web.terminal';
 const SESION_KEY = 'stockflow.web.sesion';
 /**
  * Marca de "esta corrida del navegador". Vive en sessionStorage, así que
@@ -83,6 +89,25 @@ function configDesdeUrl(): LanClientConfig {
   };
 }
 
+/**
+ * Identidad de esta terminal por navegador. Si el navegador no deja guardar
+ * nada, no se manda identidad y el servidor la trata como hasta ahora.
+ */
+function identidadNavegador(): IdentidadTerminal | null {
+  try {
+    let id = localStorage.getItem(TERMINAL_KEY);
+    if (!id || !/^[A-Za-z0-9._:-]{8,128}$/.test(id)) {
+      // crypto.getRandomValues existe también en http:// (randomUUID no).
+      const b = crypto.getRandomValues(new Uint8Array(16));
+      id = `web-${Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')}`;
+      localStorage.setItem(TERMINAL_KEY, id);
+    }
+    return { terminalId: id, terminalNombre: 'Navegador' };
+  } catch {
+    return null;
+  }
+}
+
 const ok = <T,>(data: T): IpcResponse<T> => ({ ok: true, data });
 const noAplica = (que: string): IpcResponse<never> => ({
   ok: false,
@@ -107,7 +132,11 @@ async function responderLocal(channel: string): Promise<IpcResponse<unknown>> {
   if (grupo === 'lan') {
     if (metodo === 'getConfig') {
       const cfg = configDesdeUrl();
-      return ok({ mode: 'client', serverIp: cfg.serverIp, serverPort: cfg.serverPort });
+      // `serverUrl`: la dirección por la que entró. El indicador de conexión
+      // hace ping ahí; armándola con IP y puerto, entrando por https:// el
+      // ping salía a http://<host>:7777, el navegador lo bloqueaba y la
+      // terminal quedaba en sólo lectura.
+      return ok({ mode: 'client', serverIp: cfg.serverIp, serverPort: cfg.serverPort, serverUrl: baseDelServidor(cfg) });
     }
     if (metodo === 'getLocalIp') return ok({ ip: null });
     // Idem: la pestaña Red las pide al abrirse. Las terminales conectadas las
@@ -280,6 +309,7 @@ export function instalarPuenteWeb(): void {
     listeners: crearListeners(),
     fetch: (input, init) => window.fetch(input, init),
     httpTimeoutMs: 15_000,
+    identidad: identidadNavegador,
     // La sesión se comparte entre pestañas: si no, cada módulo que se abre
     // pediría iniciar sesión otra vez. Pero NO sobrevive a cerrar el acceso:
     // al abrirlo de nuevo se pide usuario y contraseña. En un mostrador con

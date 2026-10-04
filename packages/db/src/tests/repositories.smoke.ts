@@ -13,6 +13,7 @@ import { join } from 'node:path';
 
 import {
   ConstraintError,
+  SUCURSAL_CENTRAL_ID,
   ValidationError,
   closeLocalDb,
   createRepositories,
@@ -454,6 +455,33 @@ async function main(): Promise<void> {
   const company1 = await repos.company.getOrCreate();
   const company2 = await repos.company.getOrCreate();
   check('company.getOrCreate idempotente', company1.id === company2.id, company1.name);
+
+  // --- branches (multisucursal) -----------------------------------------
+  console.log('\n[branches]');
+  {
+    const suc = repos.branches;
+    const lista = suc.listar();
+    check('branches.listar: sólo Casa central', lista.length === 1 && lista[0]?.id === SUCURSAL_CENTRAL_ID, JSON.stringify(lista.map((b) => b.name)));
+    const principal = suc.principal();
+    check('branches.principal = Casa central (id fijo, isMain)', principal.id === SUCURSAL_CENTRAL_ID && principal.isMain === true && principal.active === true && principal.name === 'Casa central');
+    check('branches.obtener por id', suc.obtener(SUCURSAL_CENTRAL_ID)?.code === 'CENTRAL');
+    check('branches.obtener de un id inexistente → null', suc.obtener('no-existe') === null);
+
+    const renombrada = suc.renombrar(SUCURSAL_CENTRAL_ID, '  Casa   central   Coronda ');
+    check('renombrar normaliza espacios', renombrada.name === 'Casa central Coronda', renombrada.name);
+    check('renombrar no cambia el código', renombrada.code === 'CENTRAL');
+    check('renombrar persiste', suc.principal().name === 'Casa central Coronda');
+    await expectThrows('renombrar con nombre vacío → ValidationError', async () => suc.renombrar(SUCURSAL_CENTRAL_ID, '   '), (e) => e instanceof ValidationError);
+    await expectThrows('renombrar con nombre de 61 caracteres → ValidationError', async () => suc.renombrar(SUCURSAL_CENTRAL_ID, 'x'.repeat(61)), (e) => e instanceof ValidationError);
+    await expectThrows('renombrar una sucursal inexistente → NotFound', async () => suc.renombrar('no-existe', 'Otra'), (e) => (e as { code?: string })?.code === 'NOT_FOUND');
+    check('tras los errores el nombre sigue igual', suc.principal().name === 'Casa central Coronda');
+
+    // Red de seguridad: si alguien vació la tabla a mano, vuelve "Casa central" con el mismo id.
+    db.$client.prepare('DELETE FROM branches').run();
+    const recreada = suc.principal();
+    check('principal() recrea Casa central si la tabla quedó vacía', recreada.id === SUCURSAL_CENTRAL_ID && recreada.name === 'Casa central' && recreada.isMain === true);
+    check('…y listar() vuelve a tener una sola', suc.listar().length === 1);
+  }
 
   closeLocalDb(db);
 }

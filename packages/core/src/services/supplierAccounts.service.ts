@@ -6,7 +6,7 @@ import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shar
 
 import { requirePermission } from '../auth/permissions';
 import { assertPhysicalCashAvailable } from './cash.service';
-import type { ServiceContext } from '../context';
+import { type ServiceContext, cajaAbiertaDeTerminal } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 
 /** Una línea de pago a proveedor (un medio de pago + monto). */
@@ -266,9 +266,7 @@ export class SupplierAccountsService {
     }
     const cashRegisterId =
       inputCashRegisterId ??
-      (this.ctx.currentCashRegister?.status === 'open'
-        ? this.ctx.currentCashRegister.id
-        : (await repos.cashRegisters.getCurrentOpen())?.id);
+      (await cajaAbiertaDeTerminal(this.ctx))?.id;
     if (!cashRegisterId) {
       throw new BusinessRuleError('no_open_cash_register', 'No hay una caja abierta para registrar el egreso');
     }

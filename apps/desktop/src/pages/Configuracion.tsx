@@ -7,9 +7,11 @@ import { Link } from 'react-router-dom'
 import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, RefreshCcw, AlertTriangle, Trash2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
+import { esHostDeRedLocal, normalizarUrlServidor } from '../../electron/preload-bridge'
 import { EspejoCatalogo } from './Empresa'
 import { FlowyIAConfig } from '@/components/FlowyIAConfig'
 import { FacturasTelefonoConfig } from '@/components/FacturasTelefonoConfig'
+import { DispositivosSucursalPanel } from '@/components/DispositivosSucursalPanel'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,6 +39,13 @@ import type {
   ScaleProtocolDTO,
   SystemPrinterDTO,
 } from '@/types/api'
+// Multisucursal: pestaña Sucursales (sólo con esa edición de la licencia, o
+// con el interruptor de las versiones de prueba a la vista).
+import type { BranchDTO, EdicionPruebaDTO } from '@/types/api'
+import { useEdicionPrueba, useFuncion } from '@/lib/useFuncion'
+import { usePermission } from '@/contexts/AuthContext'
+import { useLanContext } from '@/contexts/LanContext'
+import { Badge } from '@/components/ui/badge'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -1038,7 +1047,7 @@ function AccesoRemotoCard() {
 }
 
 /* ----------------------- Red local ----------------------- */
-function LanSection() {
+function LanSection({ irAAccesoRemoto }: { irAAccesoRemoto?: () => void } = {}) {
   const qc = useQueryClient()
   const cfgQuery = useQuery({ queryKey: ['lan', 'config'], queryFn: () => api.lan.getConfig() })
   const ipQuery = useQuery({ queryKey: ['lan', 'localIp'], queryFn: () => api.lan.getLocalIp() })
@@ -1048,8 +1057,29 @@ function LanSection() {
   const [token, setToken] = useState<string>('')
   const [clientIp, setClientIp] = useState<string>('')
   const [clientPort, setClientPort] = useState<number>(7777)
+  // MULTISUCURSAL: la terminal puede conectarse por dirección web (túnel).
+  // La licencia Multisucursal la tiene la CASA CENTRAL (genera los códigos y
+  // acepta los emparejamientos); la PC de sucursal no tiene licencia propia,
+  // así que "Por dirección web" no puede depender de la licencia de ESTA PC.
+  // Aparece sólo al elegir "Cliente" (un comercio de una PC no entra ahí) y
+  // la central sin la edición contesta con un mensaje claro al emparejar.
+  const planMultisucursal = useFuncion('multisucursal')
+  const esWeb = Boolean((window as { __stockflowWeb?: boolean }).__stockflowWeb)
+  const [conexion, setConexion] = useState<'ip' | 'url'>('ip')
+  const [serverUrl, setServerUrl] = useState<string>('')
+  const [codigoEmparejamiento, setCodigoEmparejamiento] = useState<string>('')
   const [seeded, setSeeded] = useState<unknown>(undefined)
   const [testing, setTesting] = useState(false)
+  // ¿Quedaron PC de sucursal activas de cuando el comercio tenía Multisucursal?
+  // Sólo se pregunta con la licencia común (con Multisucursal el panel ya se
+  // muestra); sin PC activas no aparece nada nuevo.
+  const pcSucursalRestantes = useQuery({
+    queryKey: ['lan', 'dispositivos'],
+    queryFn: () => api.lan.dispositivosListar(),
+    enabled: !planMultisucursal && !esWeb && cfgQuery.data !== undefined && cfgQuery.data.mode !== 'client',
+    retry: 0,
+  })
+  const hayPcDeSucursalActivas = (pcSucursalRestantes.data ?? []).some((d) => d.estado === 'activo')
   const terminales = useQuery({
     queryKey: ['lan', 'terminales'],
     queryFn: () => api.lan.getConnectedClients(),
@@ -1105,7 +1135,30 @@ function LanSection() {
     setToken(cfgQuery.data.token ?? '')
     setClientIp(cfgQuery.data.serverIp ?? '')
     setClientPort(cfgQuery.data.serverPort ?? 7777)
+    setServerUrl(cfgQuery.data.serverUrl ?? '')
+    setConexion(cfgQuery.data.mode === 'client' && cfgQuery.data.serverUrl && !esWeb ? 'url' : 'ip')
   }
+  const muestraPorDireccionWeb = !esWeb
+  const porUrl = mode === 'client' && conexion === 'url' && muestraPorDireccionWeb
+  // La dirección cargada, normalizada (o null si todavía no es válida).
+  const urlNormalizada = (() => {
+    const n = normalizarUrlServidor(serverUrl)
+    return n.ok ? n.url : null
+  })()
+  // El PIN sólo existe en la red del local: por internet (la dirección web de
+  // la casa central) no se pide. Mostrarlo ahí invitaba a escribir el código.
+  const urlEsDelLocal = (() => {
+    if (!urlNormalizada) return false
+    try {
+      return esHostDeRedLocal(new URL(urlNormalizada).hostname)
+    } catch {
+      return false
+    }
+  })()
+  // ¿Esta PC ya está emparejada con ESA central? (si cambia la dirección, el
+  // token viejo se borra al guardar: es de otro servidor).
+  const emparejadaConEsta = cfgQuery.data?.emparejada === true && urlNormalizada !== null && urlNormalizada === cfgQuery.data.serverUrl
+  const [confirmarSinCodigo, setConfirmarSinCodigo] = useState(false)
 
   // El PIN sólo viaja si el usuario lo cambió: mandarlo siempre haría que el
   // servidor rote el secreto de las sesiones en cada guardado y desloguee a
@@ -1116,6 +1169,14 @@ function LanSection() {
     mutationFn: () => {
       if (mode === 'single') return api.lan.setMode({ mode: 'single' })
       if (mode === 'server') return api.lan.setMode({ mode: 'server', port: serverPort, ...(pinCambiado ? { token } : {}) })
+      if (porUrl) {
+        return api.lan.setMode({
+          mode: 'client',
+          serverUrl,
+          ...(token && urlEsDelLocal ? { token } : {}),
+          ...(codigoEmparejamiento.trim() ? { codigoEmparejamiento: codigoEmparejamiento.trim() } : {}),
+        })
+      }
       return api.lan.setMode({ mode: 'client', serverIp: clientIp, serverPort: clientPort, token })
     },
     onSuccess: async () => {
@@ -1137,7 +1198,7 @@ function LanSection() {
     try {
       const r = await api.lan.scanNetwork()
       if (!r.supported) {
-        toast.info('Búsqueda automática no disponible — ingresá la IP a mano')
+        toast.info('Búsqueda automática no disponible: ingrese la IP a mano')
         return
       }
       if (r.results.length === 0) {
@@ -1154,6 +1215,22 @@ function LanSection() {
   }
 
   async function onTest(): Promise<void> {
+    if (porUrl) {
+      if (!serverUrl.trim()) {
+        toast.error('Ingrese la dirección del servidor')
+        return
+      }
+      setTesting(true)
+      setTestResult(null)
+      try {
+        const r = await api.lan.testConnectionUrl(serverUrl)
+        if (r.ok) setTestResult(r.aviso ? `Conectado: la casa central responde. ${r.aviso}` : 'Conectado: la casa central responde.')
+        else setTestResult(r.error ?? 'Sin conexión')
+      } finally {
+        setTesting(false)
+      }
+      return
+    }
     if (!clientIp) {
       toast.error('Ingrese la IP del servidor')
       return
@@ -1224,12 +1301,18 @@ function LanSection() {
                 </div>
               </div>
             </div>
+            {/* "URL para clientes" se leía como "lo que hay que pasar" (y, en un
+                comercio, cliente es el comprador): esa dirección sólo sirve
+                dentro del local; a una PC de otro local se le pasa la de «PC
+                de sucursal». */}
             <p className="text-xs text-muted-foreground">
               IP local: <span className="font-mono">{ipQuery.data?.ip ?? '—'}</span>
               {ipQuery.data?.ip && (
                 <>
                   {' '}
-                  · URL para clientes: <span className="font-mono">http://{ipQuery.data.ip}:{serverPort}</span>
+                  · Dirección para las cajas de este local:{' '}
+                  <span className="font-mono">http://{ipQuery.data.ip}:{serverPort}</span>
+                  {planMultisucursal && ' (desde otro local no funciona: use «PC de sucursal», más abajo)'}
                 </>
               )}
             </p>
@@ -1262,6 +1345,7 @@ function LanSection() {
                       <span className="text-muted-foreground">
                         {t.via === 'navegador' ? 'por navegador' : 'app instalada'}
                       </span>
+                      {planMultisucursal && t.nombre && <span className="truncate">{t.nombre}</span>}
                       <span className="flex-1 truncate text-muted-foreground">
                         {t.usuario ? `— ${t.usuario}` : '— sin sesión iniciada'}
                       </span>
@@ -1274,6 +1358,13 @@ function LanSection() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Una caja por PC: opción del comercio, apagada por defecto (una caja
+            del local para todas las PC, como siempre). Sólo en el servidor ya
+            guardado como tal; con Multisucursal está siempre encendida. */}
+        {!esWeb && cfgQuery.data?.mode === 'server' && (
+          <CajaPorPcOpcion activa={cfgQuery.data.cajaPorPc === true} forzada={cfgQuery.data.cajaPorPcForzada === true} />
         )}
 
         {/* Chequeo de red: dice qué falta para que los otros puestos conecten.
@@ -1311,7 +1402,73 @@ function LanSection() {
           )}
         </div>
 
-        {mode === 'client' && (
+        {/* PC de sucursal (multisucursal): en la PC que tiene la base. Con la
+            licencia común sólo aparece si quedaron PC activas (para revocarlas). */}
+        {(planMultisucursal || hayPcDeSucursalActivas) && !esWeb && mode !== 'client' && cfgQuery.data?.mode !== 'client' && (
+          <DispositivosSucursalPanel soloRevocar={!planMultisucursal} irAAccesoRemoto={irAAccesoRemoto} />
+        )}
+
+        {mode === 'client' && muestraPorDireccionWeb && (
+          <div className="flex flex-col gap-2">
+            <Label>Forma de conexión</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['ip', 'url'] as const).map((c) => (
+                <label
+                  key={c}
+                  className={`flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs ${conexion === c ? 'border-primary bg-primary/5' : ''}`}
+                >
+                  <input type="radio" name="lan-conexion" value={c} checked={conexion === c} onChange={() => setConexion(c)} />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">{c === 'ip' ? 'En este local' : 'Desde otro local (PC de sucursal)'}</span>
+                    <span className="text-muted-foreground">
+                      {c === 'ip' ? 'La caja principal está en este mismo local.' : 'La casa central está en otro local; se conecta por internet.'}
+                    </span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {porUrl && (
+          <div className="flex flex-col gap-2 rounded-md border p-3">
+            <div className="flex flex-col gap-1">
+              <Label>Dirección de la casa central</Label>
+              <Input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="Ej.: https://sucomercio.mistockflow.com" spellCheck={false} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label>Código de emparejamiento</Label>
+              <Input
+                value={codigoEmparejamiento}
+                onChange={(e) => setCodigoEmparejamiento(e.target.value.toUpperCase())}
+                placeholder="Ej.: ABCDE-FGH23"
+                className="font-mono"
+              />
+              <span className="text-xs text-muted-foreground">
+                {emparejadaConEsta
+                  ? 'Esta PC ya está emparejada. Cargue un código sólo para emparejarla de nuevo.'
+                  : 'Sin este código, esta PC no puede facturar ni cobrar con Mercado Pago. Lo genera el administrador en la casa central (Configuración → Red local → PC de sucursal).'}
+              </span>
+            </div>
+            {/* El PIN es de la red del local: con la dirección web de la casa
+                central no se usa (y su campo invitaba a escribir el código). */}
+            {urlEsDelLocal && (
+              <div className="flex flex-col gap-1">
+                <Label>PIN de seguridad</Label>
+                <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="6 dígitos" />
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={onTest} type="button" disabled={testing}>
+                {testing && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                Probar conexión
+              </Button>
+              {testResult && <span className="text-xs">{testResult}</span>}
+            </div>
+          </div>
+        )}
+
+        {mode === 'client' && !porUrl && (
           <div className="flex flex-col gap-2 rounded-md border p-3">
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2 flex flex-col gap-1">
@@ -1343,17 +1500,92 @@ function LanSection() {
         )}
 
         <div>
-          <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+          <Button
+            onClick={() => {
+              // Sin código la PC conecta igual, pero no factura ni cobra con
+              // Mercado Pago: se avisaba recién con el cliente en el mostrador.
+              if (porUrl && !codigoEmparejamiento.trim() && !emparejadaConEsta) setConfirmarSinCodigo(true)
+              else saveMut.mutate()
+            }}
+            disabled={saveMut.isPending}
+          >
             {saveMut.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
             Guardar y reiniciar
           </Button>
         </div>
       </CardContent>
+
+      <AlertDialog open={confirmarSinCodigo} onOpenChange={setConfirmarSinCodigo}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Guardar sin el código?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sin el código de emparejamiento esta PC va a poder vender, pero no facturar ni cobrar con Mercado Pago. El
+              código lo genera el administrador en la casa central (Configuración → Red local → PC de sucursal) y vence a
+              los 15 minutos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel autoFocus>Volver y cargar el código</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmarSinCodigo(false)
+                saveMut.mutate()
+              }}
+            >
+              Guardar sin código
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
 
 /* ----------------------- ACTUALIZACIONES ----------------------- */
+/**
+ * "Una caja por PC" (ver electron/ipc/caja-por-pc.ts). Apagada, todas las PC
+ * venden en la caja que se abre en el servidor: un cajón, un arqueo. Encendida,
+ * cada PC abre, vende y arquea la suya. El cambio rige al instante.
+ */
+function CajaPorPcOpcion({ activa, forzada }: { activa: boolean; forzada: boolean }) {
+  const qc = useQueryClient()
+  const cambiar = useMutation({
+    mutationFn: (v: boolean) => api.lan.setCajaPorPc(v),
+    onSuccess: async (r) => {
+      toast.success(r.cajaPorPc ? 'Cada PC abre y arquea su propia caja' : 'El local vuelve a trabajar con una caja única')
+      await qc.invalidateQueries({ queryKey: ['lan'] })
+      await qc.invalidateQueries({ queryKey: ['license'] })
+      await qc.invalidateQueries({ queryKey: ['cash'] })
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo cambiar la opción'),
+  })
+  return (
+    <div className="flex flex-col gap-2 rounded-md border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">Una caja por PC</span>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={activa}
+            disabled={forzada || cambiar.isPending}
+            onChange={(ev) => cambiar.mutate(ev.target.checked)}
+          />
+          <span>{activa ? 'Encendida' : 'Apagada'}</span>
+        </label>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {forzada
+          ? 'Con la licencia Multisucursal cada PC tiene siempre su propia caja.'
+          : activa
+            ? 'Cada PC abre, vende y arquea su propia caja. Las cajas abiertas de otras PC se cierran desde Caja → Historial de cajas.'
+            : 'Todas las PC venden en la caja que se abre en este servidor: un solo cajón y un solo arqueo. Enciéndala si cada puesto tiene su propio cajón.'}
+      </p>
+    </div>
+  )
+}
+
 function UpdatesSection() {
   const versionQuery = useQuery({ queryKey: ['system', 'version'], queryFn: () => api.system.getVersion() })
   const autoQuery = useQuery({ queryKey: ['updater', 'autoCheck'], queryFn: () => api.updater.getAutoCheck() })
@@ -1499,9 +1731,184 @@ function GeneralSection() {
   )
 }
 
+/* ----------------------- SUCURSALES (licencia Multisucursal) ----------------------- */
+
+/**
+ * Sólo se monta con la edición Multisucursal (ver `useFuncion`). Por ahora
+ * muestra "Casa central" con su nombre editable y lleva a conectar PC de otros
+ * locales (eso ya funciona: el administrador que acaba de pasar a
+ * Multisucursal entra acá primero, y con sólo "Próximamente" entendía que
+ * todavía no se podía). Dar de alta más sucursales, el stock por sucursal y
+ * las transferencias llegan en las etapas siguientes.
+ */
+function SucursalesSection({ irAPcDeSucursal }: { irAPcDeSucursal?: () => void } = {}) {
+  const qc = useQueryClient()
+  const puedeEditar = usePermission('manage_company')
+  const sucursalesQuery = useQuery({ queryKey: ['branches'], queryFn: api.branches.listar })
+  const [editando, setEditando] = useState<{ id: string; nombre: string } | null>(null)
+
+  const renombrarMut = useMutation({
+    mutationFn: (v: { id: string; nombre: string }) => api.branches.renombrar(v.id, v.nombre),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['branches'] })
+      setEditando(null)
+      toast.success('Nombre de la sucursal actualizado')
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo cambiar el nombre'),
+  })
+
+  const guardar = (): void => {
+    if (!editando || !editando.nombre.trim() || renombrarMut.isPending) return
+    renombrarMut.mutate(editando)
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Sucursales</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        {sucursalesQuery.isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        {sucursalesQuery.isError && (
+          <p className="text-destructive">No se pudieron cargar las sucursales.</p>
+        )}
+        {(sucursalesQuery.data ?? []).map((s: BranchDTO) => (
+          <div key={s.id} className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+            {editando?.id === s.id ? (
+              <>
+                <Input
+                  value={editando.nombre}
+                  onChange={(e) => setEditando({ id: s.id, nombre: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') guardar()
+                    if (e.key === 'Escape') setEditando(null)
+                  }}
+                  maxLength={60}
+                  autoFocus
+                  aria-label="Nombre de la sucursal"
+                  className="h-8 max-w-xs"
+                />
+                <Button size="sm" onClick={guardar} disabled={!editando.nombre.trim() || renombrarMut.isPending}>
+                  {renombrarMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditando(null)} disabled={renombrarMut.isPending}>
+                  Cancelar
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="font-medium">{s.name}</span>
+                {s.isMain && <Badge variant="outline">Principal</Badge>}
+                {puedeEditar && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto"
+                    onClick={() => setEditando({ id: s.id, nombre: s.name })}
+                  >
+                    Cambiar nombre
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            Las PC de otros locales ya se pueden conectar y trabajan como cajas de la casa central.
+          </span>
+          {irAPcDeSucursal && (
+            <Button size="sm" variant="outline" type="button" onClick={irAPcDeSucursal}>
+              Conectar una PC de otro local
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Próximamente: alta de más sucursales, stock por sucursal y transferencias.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Interruptor "Edición Multisucursal (versión de prueba)". Existe sólo si la
+ * versión instalada es de prueba (1.13.0-beta.N): en la definitiva el canal
+ * contesta "no disponible" y la edición la define la licencia (ver
+ * electron/license/funciones.ts). Sólo en la PC que tiene la base; una
+ * terminal de red o el navegador no lo ven (useEdicionPrueba devuelve null).
+ * El cambio rige al instante en todas las ventanas y en las PC conectadas
+ * (el main avisa `license:changed`): no hace falta reiniciar.
+ */
+function EdicionPruebaOpcion({ estado }: { estado: EdicionPruebaDTO }) {
+  const qc = useQueryClient()
+  const { currentUser } = useAuth()
+  const tienePermiso = usePermission('manage_company')
+  const puedeCambiar = currentUser?.role === 'admin' && tienePermiso
+  const porLicencia = estado.edicionReal === 'multisucursal'
+  const cambiar = useMutation({
+    mutationFn: (v: boolean) => api.funciones.setEdicionPrueba(v),
+    onSuccess: async (r) => {
+      toast.success(
+        r.activa
+          ? 'Edición Multisucursal activada en esta PC (versión de prueba)'
+          : 'Edición Multisucursal desactivada: rige la edición de la licencia',
+      )
+      await qc.invalidateQueries({ queryKey: ['license'] })
+      await qc.invalidateQueries({ queryKey: ['lan'] })
+      await qc.invalidateQueries({ queryKey: ['cash'] })
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'No se pudo cambiar la edición de prueba'),
+  })
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Edición Multisucursal (versión de prueba)</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        <p className="text-muted-foreground">
+          Versión de prueba{estado.version ? ` ${estado.version}` : ''}: puede activar la edición Multisucursal en esta PC para evaluarla.
+        </p>
+        <div className="flex flex-col gap-2 rounded-md border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">Edición Multisucursal (versión de prueba)</span>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={estado.activa}
+                disabled={!puedeCambiar || porLicencia || cambiar.isPending}
+                onChange={(ev) => cambiar.mutate(ev.target.checked)}
+                aria-label="Edición Multisucursal (versión de prueba)"
+              />
+              <span>{estado.activa ? 'Activada' : 'Desactivada'}</span>
+            </label>
+          </div>
+          <p className="flex items-start gap-1 text-xs text-muted-foreground">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            Sólo para pruebas. En la versión definitiva la edición la define la licencia.
+          </p>
+          {porLicencia && (
+            <p className="text-xs text-muted-foreground">
+              La licencia de este comercio ya incluye la edición Multisucursal: el interruptor no hace falta.
+            </p>
+          )}
+          {!puedeCambiar && !porLicencia && (
+            <p className="text-xs text-muted-foreground">Sólo un administrador puede cambiarlo.</p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          El cambio rige al instante en esta PC y en las conectadas, sin reiniciar. Al activarla, cada PC abre y
+          arquea su propia caja (la caja abierta de esta PC pasa a ser la compartida del local hasta que se cierre).
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 import { useWindowSelf } from '@/contexts/WindowManagerContext'
 
-const VALID_TABS = ['hardware', 'backup', 'lan', 'catalogo', 'remoto', 'flowy', 'facturas', 'updates', 'general', 'mantenimiento'] as const
+const VALID_TABS = ['hardware', 'backup', 'lan', 'catalogo', 'remoto', 'flowy', 'facturas', 'updates', 'general', 'sucursales', 'mantenimiento'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 function readInitialTab(extras: unknown): TabValue | null {
@@ -1620,11 +2027,20 @@ export function Configuracion() {
     const next = readInitialTab(self?.extras)
     if (next && next !== tab) setTab(next)
   }
+  // Licencia común: la pestaña Sucursales no existe (ni pidiéndola por initialTab).
+  // Excepción: una VERSIÓN DE PRUEBA en la PC con la base la muestra con el
+  // interruptor "Edición Multisucursal (versión de prueba)" (null en el resto).
+  const multisucursal = useFuncion('multisucursal')
+  const edicionPrueba = useEdicionPrueba()
+  const hayPestanaSucursales = multisucursal || edicionPrueba !== null
+  const tabVisible: TabValue = tab === 'sucursales' && !hayPestanaSucursales ? 'hardware' : tab
+  const modoRed = useLanContext().mode
+  const esWeb = Boolean((window as { __stockflowWeb?: boolean }).__stockflowWeb)
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
       <h1 className="text-lg font-semibold">Configuración</h1>
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)} className="flex flex-col gap-3">
+      <Tabs value={tabVisible} onValueChange={(v) => setTab(v as TabValue)} className="flex flex-col gap-3">
         {/* flex-wrap: con 9 pestañas la fila no entra en el ancho de la ventana y
             "Mantenimiento" quedaba afuera del recuadro; ahora pasa a otra línea. */}
         <TabsList className="flex-wrap">
@@ -1637,6 +2053,7 @@ export function Configuracion() {
           <TabsTrigger value="facturas">Facturas por teléfono</TabsTrigger>
           <TabsTrigger value="updates">Actualizaciones</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
+          {hayPestanaSucursales && <TabsTrigger value="sucursales">Sucursales</TabsTrigger>}
           {isAdmin && <TabsTrigger value="mantenimiento">Mantenimiento</TabsTrigger>}
         </TabsList>
         <TabsContent value="hardware" className="flex flex-col gap-3">
@@ -1647,7 +2064,7 @@ export function Configuracion() {
           <BackupSection />
         </TabsContent>
         <TabsContent value="lan">
-          <LanSection />
+          <LanSection irAAccesoRemoto={() => setTab('remoto')} />
         </TabsContent>
         <TabsContent value="catalogo">
           <CatalogoWebSection />
@@ -1667,6 +2084,26 @@ export function Configuracion() {
         <TabsContent value="general">
           <GeneralSection />
         </TabsContent>
+        {hayPestanaSucursales && (
+          <TabsContent value="sucursales" className="flex flex-col gap-3">
+            {multisucursal && (
+              <SucursalesSection
+                // Los códigos se generan en la PC que tiene la base: en una PC
+                // de sucursal o en el navegador el botón no lleva a ningún lado.
+                irAPcDeSucursal={
+                  modoRed === 'client' || esWeb
+                    ? undefined
+                    : () => {
+                        // A Red local y hasta el panel "PC de sucursal" (queda al final).
+                        setTab('lan')
+                        setTimeout(() => document.getElementById('pc-de-sucursal')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+                      }
+                }
+              />
+            )}
+            {edicionPrueba && <EdicionPruebaOpcion estado={edicionPrueba} />}
+          </TabsContent>
+        )}
         {isAdmin && (
           <TabsContent value="mantenimiento" className="flex flex-col gap-4">
             <MantenimientoSection />

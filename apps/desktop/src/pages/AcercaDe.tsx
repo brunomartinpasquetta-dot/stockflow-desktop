@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { BRANDING } from '@/assets/branding'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -16,9 +17,30 @@ export function AcercaDe() {
   const [deactivating, setDeactivating] = useState(false)
   const { state: license, refresh } = useLicense()
   const navigate = useNavigate()
+  const qc = useQueryClient()
 
   useEffect(() => {
     api.system.getVersion().then((r) => setVersion(r.version)).catch(() => undefined)
+  }, [])
+
+  // Al abrir "Acerca de" se renueva la licencia contra el cloud (heartbeat),
+  // sin mostrar nada. El heartbeat automático corre al arrancar y cada 24 h:
+  // así un cambio hecho en el cloud (p. ej. la edición Multisucursal de un
+  // comercio) se toma sin reiniciar StockFlow. Sin internet no pasa nada.
+  useEffect(() => {
+    let vigente = true
+    api.license
+      .heartbeat()
+      .then(() => {
+        if (!vigente) return
+        refresh()
+        void qc.invalidateQueries({ queryKey: ['license'] })
+      })
+      .catch(() => undefined)
+    return () => {
+      vigente = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function checkUpdates(): Promise<void> {

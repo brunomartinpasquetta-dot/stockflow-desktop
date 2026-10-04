@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Undo2, Loader2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
+import { elegirPuntoDeVenta } from '@/lib/puntoDeVentaPC'
 import { useCompany, useCustomers, usePaymentMethods } from '@/lib/hooks'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { ReturnSaleDialog } from '@/components/ReturnDialogs'
@@ -183,7 +184,7 @@ export function SaleDetailDialog({
     mutationFn: () =>
       api.fiscal.issueInvoice({
         saleId,
-        salePoint: issuePoint ?? activePoints[0]?.number ?? 1,
+        salePoint: elegirPuntoDeVenta(activePoints, issuePoint) ?? 1,
         letter: aDeMostrador ? 'A' : undefined,
         // Si la ficha no está en la lista (todavía no cargó, o el cliente está
         // inactivo) `docReceptor` cae a Consumidor Final sin documento; mandarlo
@@ -411,7 +412,7 @@ export function SaleDetailDialog({
                       {activePoints.length > 1 && (
                         <select
                           className="rounded border bg-background px-1 py-0.5 text-xs"
-                          value={String(issuePoint ?? activePoints[0]?.number ?? '')}
+                          value={String(elegirPuntoDeVenta(activePoints, issuePoint) ?? '')}
                           onChange={(e) => setIssuePoint(Number(e.target.value))}
                         >
                           {activePoints.map((p) => (

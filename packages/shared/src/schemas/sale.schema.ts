@@ -4,6 +4,7 @@ import { CreateSaleLineInputSchema } from './saleLine.schema';
 import { PaymentInputSchema } from './paymentMethod.schema';
 import {
   idSchema,
+  idempotencyKeySchema,
   moneySchema,
   timestampSchema,
   voucherTypeSchema,
@@ -56,6 +57,8 @@ export const CreateSaleSchema = z.object({
    * límite.
    */
   creditLimit: moneySchema.optional(),
+  /** Clave del intento de cobro (ver `idempotencyKeySchema`). */
+  idempotencyKey: idempotencyKeySchema.nullish(),
 });
 
 /** Venta + líneas (mínimo 1) + pagos (N; vacío sólo si es a cuenta corriente). */

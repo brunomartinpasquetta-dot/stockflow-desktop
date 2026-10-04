@@ -32,6 +32,23 @@
  *    AsyncLocalStorage: RPCs concurrentes nunca comparten `currentUser`, y la
  *    sesión local del proceso (caja servidor) queda intacta.
  *
+ * Multisucursal (etapa 1):
+ *  - `POST /lan/emparejar { codigo, nombre, machineId }`: una PC de sucursal
+ *    canjea un código de un solo uso por un token de dispositivo (ver
+ *    `dispositivos.ts`). Con ese token (`x-stockflow-dispositivo`) el túnel le
+ *    aplica la lista de la red local, los intentos fallidos se cuentan por PC
+ *    y su sesión queda atada a ella. Sin la edición Multisucursal, la ruta da
+ *    404 y el encabezado se ignora.
+ *  - `POST /lan/central { dispositivoId, nonce }`: la PC de sucursal comprueba
+ *    que del otro lado está SU casa central antes de mandar el token o una
+ *    contraseña (`{ prueba }` = HMAC del hash del secreto; ver dispositivos.ts).
+ *    No habilita nada: es sólo identidad.
+ *  - Identidad de la terminal (`x-stockflow-terminal`, `-nombre`): cada
+ *    handler corre dentro de `correrComoTerminal`, y `obtenerTerminalActual`
+ *    dice desde qué PC llegó el pedido (electron/ipc/terminal-actual.ts).
+ *  - Las respuestas de /lan/rpc de 8 KB o más viajan con gzip si el cliente
+ *    manda `Accept-Encoding: gzip` (fetch lo hace solo y descomprime solo).
+ *
  * Decisiones:
  *  - `node:http` (sin Fastify) para no inflar el bundle.
  *  - JWT inline (HS256) con `crypto.createHmac`. Cero deps nuevas.
@@ -41,14 +58,36 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, statSync, promises as fsp } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import path from 'node:path';
+import { promisify } from 'node:util';
+import { gzip as gzipCb } from 'node:zlib';
 
 import type { HandlerMap } from '../ipc/handler-context';
 import type { SessionStore } from '../ipc/session-store';
+import {
+  correrComoTerminal,
+  idTerminalDeDispositivo,
+  limpiarIdTerminal,
+  limpiarNombreTerminal,
+  type TerminalActual,
+} from '../ipc/terminal-actual';
 import type { IpcResponse } from '../ipc/types';
-import { lanServerAccepts, remotoAccepts } from '../preload-bridge';
+import {
+  dispositivoAccepts,
+  HDR_DISPOSITIVO,
+  HDR_TERMINAL,
+  HDR_TERMINAL_NOMBRE,
+  lanServerAccepts,
+  remotoAccepts,
+} from '../preload-bridge';
+import type { DispositivoVerificado, DispositivosLike, OrigenPedido } from './dispositivos';
+
+const gzip = promisify(gzipCb);
 
 interface InfoCliente {
+  /** Lo que se muestra: la IP en la red local; por el túnel, la red del visitante. */
+  ip?: string;
   lastSeen: number;
+  nombre?: string;
   usuario?: string;
   ultimaAccion?: string;
   via?: 'app' | 'navegador';
@@ -58,6 +97,8 @@ interface InfoCliente {
 export interface ClienteConectado {
   ip: string;
   lastSeen: number;
+  /** Nombre de la PC, si la terminal se identificó. */
+  nombre: string | null;
   usuario: string | null;
   ultimaAccion: string | null;
   via: 'app' | 'navegador';
@@ -111,6 +152,26 @@ export interface LanServerOptions {
    * contestó. Ausente = esas rutas dan 404 como siempre.
    */
   rutaExtra?: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>;
+  /**
+   * PC de sucursal emparejadas (multisucursal). Habilita `POST /lan/emparejar`
+   * y el encabezado `x-stockflow-dispositivo`. Ausente = esa ruta da 404 y el
+   * encabezado se ignora (comportamiento anterior).
+   */
+  dispositivos?: DispositivosLike;
+  /**
+   * ¿El comercio tiene la edición Multisucursal? Sin ella, `/lan/emparejar`
+   * da 404 y el encabezado de dispositivo se ignora: un comercio común queda
+   * exactamente como antes aunque alguna vez haya tenido PC emparejadas (si
+   * baja de edición, sus sucursales vuelven a la lista corta del túnel).
+   * Se consulta en cada pedido: la licencia puede cambiar con la app abierta.
+   * Ausente = activo (tests).
+   */
+  multisucursalActivo?: () => boolean;
+  /**
+   * machineId de ESTA PC: es la terminal que se informa a los handlers cuando
+   * un pedido remoto no se identificó (versiones viejas), igual que antes.
+   */
+  machineId?: string;
 }
 
 interface UserLite {
@@ -131,6 +192,23 @@ interface RpcBody {
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2 MB
 const PING_TTL_MS = 60_000;
+/**
+ * Respuestas de /lan/rpc desde este tamaño viajan comprimidas si el cliente
+ * lo pide (`Accept-Encoding: gzip`). El listado de artículos de un comercio
+ * con 5.000 artículos pesa ~3 MB en JSON y baja a ~10 %: por el túnel es la
+ * diferencia entre esperar y no esperar. Lo chico no vale el trabajo.
+ */
+const UMBRAL_GZIP_BYTES = 8 * 1024;
+/** Canjes de código de emparejamiento fallidos que se toleran por IP en la ventana. */
+const MAX_FALLOS_EMPAREJAR = 5;
+/**
+ * Tokens de PC de sucursal inventados o adulterados que se toleran por IP.
+ * Contador APARTE del canje de códigos: un encargado que tipea mal el código
+ * no tiene por qué cortar a nadie, y nada de esto frena a una PC con token
+ * válido (se verifica primero el token). Un token de una PC revocada que
+ * sigue prendida no cuenta: es una PC conocida, no alguien adivinando.
+ */
+const MAX_FALLOS_TOKEN = 5;
 
 /**
  * Fuerza bruta: fallos de PIN o de contraseña que se toleran por IP dentro de
@@ -202,8 +280,11 @@ export function signJwt(payload: object, secret: string): string {
   return `${header}.${body}.${sig}`;
 }
 
-/** Verifica firma + exp. Devuelve el payload decoded o null si inválido. */
-export function verifyJwt(token: string, secret: string): { sub: string; exp: number } | null {
+/**
+ * Verifica firma + exp. Devuelve el payload decoded o null si inválido.
+ * `dis` = PC de sucursal con la que se inició la sesión (si la hubo).
+ */
+export function verifyJwt(token: string, secret: string): { sub: string; exp: number; dis?: string } | null {
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const h = parts[0]!;
@@ -218,7 +299,7 @@ export function verifyJwt(token: string, secret: string): { sub: string; exp: nu
   }
   if (expected.length !== actual.length) return null;
   if (!timingSafeEqual(expected, actual)) return null;
-  let parsed: { sub?: unknown; exp?: unknown };
+  let parsed: { sub?: unknown; exp?: unknown; dis?: unknown };
   try {
     parsed = JSON.parse(b64urlDecode(p).toString('utf8'));
   } catch {
@@ -226,7 +307,9 @@ export function verifyJwt(token: string, secret: string): { sub: string; exp: nu
   }
   if (typeof parsed.sub !== 'string' || typeof parsed.exp !== 'number') return null;
   if (Date.now() / 1000 >= parsed.exp) return null;
-  return { sub: parsed.sub, exp: parsed.exp };
+  return typeof parsed.dis === 'string'
+    ? { sub: parsed.sub, exp: parsed.exp, dis: parsed.dis }
+    : { sub: parsed.sub, exp: parsed.exp };
 }
 
 /**
@@ -252,6 +335,17 @@ function ipDelVisitante(req: IncomingMessage, esTunel: boolean): string {
   if (v4) return `${v4[1]}.0/24`;
   const partes = limpia.split(':').filter(Boolean);
   return partes.length >= 4 ? `${partes.slice(0, 4).join(':')}::/64` : limpia;
+}
+
+/**
+ * ¿El pedido viene de la app instalada o de un navegador? El de la app
+ * (Chromium dentro de Electron) TAMBIÉN dice "Mozilla" en su user-agent: la
+ * PC de sucursal figuraba "por navegador". Electron agrega "Electron/x.y".
+ */
+export function viaDelPedido(req: Pick<IncomingMessage, 'headers'>): 'app' | 'navegador' {
+  const ua = String(req.headers['user-agent'] ?? '');
+  if (/Electron\//.test(ua)) return 'app';
+  return /Mozilla/i.test(ua) ? 'navegador' : 'app';
 }
 
 function isLanRemote(addr: string | undefined): boolean {
@@ -280,10 +374,51 @@ function sendJson(res: ServerResponse, status: number, body: unknown, extraHeade
     'content-type': 'application/json; charset=utf-8',
     'access-control-allow-origin': '*',
     'access-control-allow-methods': 'POST,GET,OPTIONS',
-    'access-control-allow-headers': 'content-type,authorization',
+    // Los encabezados de identidad tienen que figurar: la terminal instalada
+    // habla desde file:// (otro origen) y el navegador hace la consulta previa.
+    'access-control-allow-headers': `content-type,authorization,${HDR_TERMINAL},${HDR_TERMINAL_NOMBRE},${HDR_DISPOSITIVO}`,
     ...extraHeaders,
   });
   res.end(JSON.stringify(body));
+}
+
+/** ¿El cliente acepta gzip? Sin el encabezado (terminales viejas, curl) no se comprime. */
+export function aceptaGzip(req: IncomingMessage): boolean {
+  const ae = String(req.headers['accept-encoding'] ?? '').toLowerCase();
+  return ae.split(',').some((parte) => {
+    const [nombre, ...params] = parte.trim().split(';');
+    if (nombre?.trim() !== 'gzip' && nombre?.trim() !== '*') return false;
+    // `gzip;q=0` = "no me mandes gzip".
+    return !params.some((p) => /^\s*q\s*=\s*0(\.0*)?\s*$/.test(p));
+  });
+}
+
+/**
+ * Como `sendJson`, pero comprime con gzip las respuestas grandes si el cliente
+ * lo acepta. Si la compresión falla, sale sin comprimir.
+ */
+async function sendJsonRpc(req: IncomingMessage, res: ServerResponse, status: number, body: unknown): Promise<void> {
+  const texto = JSON.stringify(body);
+  const crudo = Buffer.from(texto, 'utf8');
+  const cabeceras: Record<string, string> = {
+    'content-type': 'application/json; charset=utf-8',
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'POST,GET,OPTIONS',
+    'access-control-allow-headers': `content-type,authorization,${HDR_TERMINAL},${HDR_TERMINAL_NOMBRE},${HDR_DISPOSITIVO}`,
+    vary: 'Accept-Encoding',
+  };
+  if (crudo.length >= UMBRAL_GZIP_BYTES && aceptaGzip(req)) {
+    try {
+      const comprimido = await gzip(crudo);
+      res.writeHead(status, { ...cabeceras, 'content-encoding': 'gzip', 'content-length': String(comprimido.length) });
+      res.end(comprimido);
+      return;
+    } catch {
+      /* sale sin comprimir */
+    }
+  }
+  res.writeHead(status, { ...cabeceras, 'content-length': String(crudo.length) });
+  res.end(crudo);
 }
 
 /** Comparación en tiempo constante: un PIN corto no tiene que filtrar ni eso. */
@@ -423,14 +558,15 @@ export class LanServer {
   getConnectedClients(): ClienteConectado[] {
     const now = Date.now();
     const result: ClienteConectado[] = [];
-    for (const [ip, info] of this.clients) {
+    for (const [clave, info] of this.clients) {
       if (now - info.lastSeen > PING_TTL_MS) {
-        this.clients.delete(ip);
+        this.clients.delete(clave);
         continue;
       }
       result.push({
-        ip,
+        ip: info.ip ?? clave,
         lastSeen: info.lastSeen,
+        nombre: info.nombre ?? null,
         usuario: info.usuario ?? null,
         ultimaAccion: info.ultimaAccion ?? null,
         via: info.via ?? 'app',
@@ -440,12 +576,21 @@ export class LanServer {
     return result.sort((a, b) => b.lastSeen - a.lastSeen);
   }
 
-  private touchClient(req: IncomingMessage, extra?: Partial<InfoCliente>): void {
+  /**
+   * Por la puerta del túnel TODO llega desde 127.0.0.1: con esa clave, cada
+   * PC de sucursal y cada visita pisaban la misma fila ("127.0.0.1"). Por el
+   * túnel se agrupa por la red del visitante (la de `X-Forwarded-For`): cada
+   * local, una fila.
+   */
+  private touchClient(req: IncomingMessage, extra?: Partial<InfoCliente>, esTunel = false): void {
     const remote = req.socket.remoteAddress ?? '';
     if (!remote || !isLanRemote(remote)) return;
-    const prev = this.clients.get(remote);
-    this.clients.set(remote, {
+    const clave = esTunel ? ipDelVisitante(req, true) : remote;
+    const prev = this.clients.get(clave);
+    this.clients.set(clave, {
+      ip: clave,
       lastSeen: Date.now(),
+      nombre: extra?.nombre ?? prev?.nombre,
       usuario: extra?.usuario ?? prev?.usuario,
       ultimaAccion: extra?.ultimaAccion ?? prev?.ultimaAccion,
       via: extra?.via ?? prev?.via ?? 'app',
@@ -457,7 +602,7 @@ export class LanServer {
    * Sirve la interfaz web. Cualquier ruta que no sea un archivo cae en
    * index.html, porque el ruteo lo hace la propia interfaz en el navegador.
    */
-  private async servirEstatico(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  private async servirEstatico(req: IncomingMessage, res: ServerResponse, esTunel = false): Promise<boolean> {
     const raiz = this.opts.webRoot;
     if (!raiz) return false;
     let pedido: string;
@@ -518,7 +663,7 @@ export class LanServer {
         'Access-Control-Allow-Origin': '*',
       });
       res.end(contenido);
-      this.touchClient(req, { via: 'navegador' });
+      this.touchClient(req, { via: 'navegador' }, esTunel);
       return true;
     } catch {
       return false;
@@ -549,10 +694,16 @@ export class LanServer {
   }
 
   private responderBloqueo(res: ServerResponse, segundos: number, que: string): void {
+    // En minutos: "Espere 587 segundos" obliga a hacer la cuenta.
+    const minutos = Math.max(1, Math.ceil(segundos / 60));
     sendJson(
       res,
       429,
-      { ok: false, code: 'PERMISSION_DENIED', message: `Demasiados intentos de ${que} fallidos. Espere ${segundos} segundos y vuelva a intentar.` },
+      {
+        ok: false,
+        code: 'PERMISSION_DENIED',
+        message: `Demasiados intentos de ${que} fallidos. Espere ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'} y vuelva a intentar.`,
+      },
       { 'retry-after': String(segundos) },
     );
   }
@@ -568,7 +719,7 @@ export class LanServer {
       return;
     }
     if (req.method === 'GET' && req.url === '/lan/ping') {
-      this.touchClient(req);
+      this.touchClient(req, undefined, esTunel);
       sendJson(res, 200, {
         ok: true,
         timestamp: Date.now(),
@@ -578,6 +729,14 @@ export class LanServer {
         // preguntarle, y el comercio necesita saber con qué versión trabaja
         // para reportar un problema.
         version: this.opts.appVersion ?? null,
+        // La terminal manda sus encabezados de identidad SÓLO si el servidor
+        // avisa que los admite: un servidor viejo los rechaza en la consulta
+        // previa de CORS y la terminal nueva quedaría sin poder trabajar.
+        identidad: true,
+        // ¿Este servidor acepta PC de sucursal (edición Multisucursal)? El
+        // diagnóstico de la terminal lo usa para no decir "emparejada" cuando
+        // el comercio ya bajó de edición.
+        sucursales: this.dispositivosVigentes() !== null,
       });
       return;
     }
@@ -585,7 +744,7 @@ export class LanServer {
     // refrescar la pantalla cuando otro puesto carga una venta (en la app
     // instalada eso llega por IPC, que en una pestaña no existe).
     if (req.method === 'GET' && req.url?.startsWith('/lan/changes')) {
-      this.touchClient(req, { via: 'navegador' });
+      this.touchClient(req, { via: 'navegador' }, esTunel);
       const desde = Number(new URL(req.url, 'http://x').searchParams.get('since') ?? 0);
       sendJson(res, 200, { changed: this.ultimoCambio > desde, at: this.ultimoCambio });
       return;
@@ -593,8 +752,21 @@ export class LanServer {
     // La interfaz servida al navegador. Permite que una PC vieja (Windows 7,
     // donde Electron ya no arranca) trabaje sin instalar nada.
     if (req.method === 'GET' && this.opts.webRoot) {
-      const servido = await this.servirEstatico(req, res);
+      const servido = await this.servirEstatico(req, res, esTunel);
       if (servido) return;
+    }
+    // IDENTIDAD DE LA CASA CENTRAL: va con o sin la edición Multisucursal. Si
+    // el comercio bajó de edición, su PC de sucursal tiene que poder seguir
+    // trabajando como acceso remoto (lista corta, con el aviso de siempre), y
+    // para eso primero comprueba que habla con su central.
+    if (req.method === 'POST' && req.url === '/lan/central' && this.opts.dispositivos?.probarIdentidad) {
+      await this.probarCentral(req, res, this.opts.dispositivos);
+      return;
+    }
+    const dispositivos = this.dispositivosVigentes();
+    if (req.method === 'POST' && req.url === '/lan/emparejar' && dispositivos) {
+      await this.emparejar(req, res, esTunel, dispositivos);
+      return;
     }
     if (req.method !== 'POST' || req.url !== '/lan/rpc') {
       sendJson(res, 404, { ok: false, code: 'NOT_FOUND', message: 'Ruta inexistente' });
@@ -603,13 +775,13 @@ export class LanServer {
     const directa = req.socket.remoteAddress ?? '';
     // Contra quién se cuentan los intentos fallidos: por el túnel, la IP real
     // del visitante; por la red local, la de la terminal.
-    const remote = ipDelVisitante(req, esTunel);
+    const ipRemota = ipDelVisitante(req, esTunel);
     if (!isLanRemote(directa)) {
       this.log.warn(`origen rechazado (no-LAN): ${directa}`);
       sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Origen no permitido' });
       return;
     }
-    this.touchClient(req);
+    this.touchClient(req, undefined, esTunel);
 
     let parsed: RpcBody;
     try {
@@ -619,6 +791,56 @@ export class LanServer {
       sendJson(res, 400, { ok: false, code: 'VALIDATION', message: 'Body inválido' });
       return;
     }
+
+    // PC DE SUCURSAL EMPAREJADA: si manda token, tiene que ser válido. Uno
+    // revocado o inventado NO cae a "visita sin token": se rechaza con un
+    // mensaje que dice qué hacer.
+    //
+    // Orden: PRIMERO se verifica el token. Uno válido pasa siempre, aunque
+    // desde esa IP pública (que comparten todas las PC de la sucursal) alguien
+    // haya fallado: si no, una PC revocada que reintenta, o un encargado que
+    // tipea mal el código, dejaba sin vender a la caja de al lado. Sólo los
+    // tokens inválidos suman al contador (`token:<ip>`, aparte del canje de
+    // códigos) y sólo a ellos los frena el bloqueo. Los tokens válidos son
+    // 32 bytes al azar: no hay fuerza bruta posible contra ellos.
+    let dispositivo: DispositivoVerificado | null = null;
+    const tokenDispositivo = req.headers[HDR_DISPOSITIVO];
+    const traeToken = typeof tokenDispositivo === 'string' && tokenDispositivo.length > 0;
+    const origen: OrigenPedido = { ip: ipRemota, via: esTunel ? 'tunel' : 'lan' };
+    if (dispositivos && traeToken) {
+      dispositivo = dispositivos.verificar(tokenDispositivo as string, origen);
+      if (!dispositivo) {
+        const revocado = dispositivos.esRevocado?.(tokenDispositivo as string) ?? false;
+        if (!revocado) {
+          const bloqueo = this.segundosBloqueada(`token:${ipRemota}`, MAX_FALLOS_TOKEN);
+          if (bloqueo > 0) {
+            this.responderBloqueo(res, bloqueo, 'emparejamiento');
+            return;
+          }
+          this.registrarFallo(`token:${ipRemota}`);
+          dispositivos.registrarIncidente?.(
+            `Token de PC de sucursal inválido (${ipRemota} ${esTunel ? 'por internet' : 'en la red local'})`,
+            `token:${ipRemota}`,
+          );
+        } else {
+          dispositivos.registrarIncidente?.(
+            `Pedido de una PC de sucursal revocada (${ipRemota} ${esTunel ? 'por internet' : 'en la red local'})`,
+            `revocado:${String(tokenDispositivo).split('.')[1] ?? ''}`,
+          );
+        }
+        this.log.warn(`token de PC de sucursal ${revocado ? 'revocado' : 'inválido'} desde ${ipRemota}`);
+        sendJson(res, 401, {
+          ok: false,
+          code: 'UNAUTHENTICATED',
+          message: 'Esta PC ya no está autorizada en el servidor. Pida al administrador un código de emparejamiento nuevo.',
+        });
+        return;
+      }
+    }
+    // Contador de intentos fallidos: con una PC emparejada se cuenta POR PC,
+    // así un cajero que se equivoca no bloquea a toda la sucursal (que por el
+    // túnel comparte IP pública). Sin token, por IP como siempre.
+    const remote = dispositivo ? `disp:${dispositivo.id}` : ipRemota;
 
     // ACCESO REMOTO: por la puerta del túnel no se pide PIN. El PIN existe
     // para emparejar las terminales de la red local —es un número compartido
@@ -656,11 +878,24 @@ export class LanServer {
     // Desde INTERNET la lista es más corta que desde la red local: mirar,
     // vender y cobrar sí; tocar la configuración, facturar ante ARCA o mover
     // datos en bloque, no. Limita el daño si alguien consigue una contraseña.
-    if (esTunel && !remotoAccepts(channel)) {
+    // Una PC de sucursal EMPAREJADA tiene la lista de la red local: es una
+    // caja del comercio, no una visita (para eso se emparejó).
+    // La lista de una PC emparejada es la corta MÁS facturar y cobrar con QR
+    // (`dispositivoAccepts`): la configuración fiscal, la cuenta de Mercado
+    // Pago, la ficha del comercio y lo que mueve datos en bloque siguen siendo
+    // sólo del local.
+    if (esTunel && (dispositivo ? !dispositivoAccepts(channel) : !remotoAccepts(channel))) {
+      // PC que fue de sucursal en un comercio que ya no tiene la edición:
+      // decirle por qué, para que soporte no busque la falla donde no está.
+      const exSucursal = !dispositivo && traeToken && !dispositivos;
       sendJson(res, 403, {
         ok: false,
         code: 'PERMISSION_DENIED',
-        message: 'Esa operación sólo puede hacerse desde el local, no por acceso remoto',
+        message: exSucursal
+          ? 'El comercio ya no tiene la licencia Multisucursal: esta PC trabaja como acceso remoto, sin facturación ni Mercado Pago'
+          : dispositivo
+            ? 'Esa operación sólo puede hacerse en el local, no desde una PC de sucursal'
+            : 'Esa operación sólo puede hacerse desde el local, no por acceso remoto',
       });
       return;
     }
@@ -701,6 +936,18 @@ export class LanServer {
         sendJson(res, 401, { ok: false, code: 'UNAUTHENTICATED', message: 'Sesión expirada o inválida' });
         return;
       }
+      // Una sesión iniciada desde una PC emparejada sólo vale desde ESA PC:
+      // copiada a otra máquina (o usada sin el token) no habilita nada.
+      if (verified.dis && verified.dis !== dispositivo?.id) {
+        sendJson(res, 401, {
+          ok: false,
+          code: 'UNAUTHENTICATED',
+          message: dispositivos
+            ? 'La sesión no corresponde a esta PC'
+            : 'El comercio ya no tiene la licencia Multisucursal. Inicie sesión de nuevo.',
+        });
+        return;
+      }
       if (this.opts.resolveUser) {
         try {
           const u = await this.opts.resolveUser(verified.sub);
@@ -719,30 +966,45 @@ export class LanServer {
 
     // Queda registrado quién trabaja en cada puesto y qué hizo último, para
     // que el panel de terminales sirva de verdad para diagnosticar.
-    this.touchClient(req, {
-      usuario: (jwtUser as { fullName?: string; username?: string } | null)?.fullName
-        ?? (jwtUser as { username?: string } | null)?.username,
-      ultimaAccion: channel,
-      via: /Mozilla/i.test(String(req.headers['user-agent'] ?? '')) ? 'navegador' : 'app',
-    });
+    const terminal = this.terminalDelPedido(req, esTunel, ipRemota, dispositivo);
+    this.touchClient(
+      req,
+      {
+        nombre: dispositivo?.nombre ?? limpiarNombreTerminal(req.headers[HDR_TERMINAL_NOMBRE]) ?? undefined,
+        usuario: (jwtUser as { fullName?: string; username?: string } | null)?.fullName
+          ?? (jwtUser as { username?: string } | null)?.username,
+        ultimaAccion: channel,
+        via: viaDelPedido(req),
+      },
+      esTunel,
+    );
 
     try {
       let response: IpcResponse<unknown>;
+      // Cada handler corre "como" la terminal que hizo el pedido: ver
+      // obtenerTerminalActual (electron/ipc/terminal-actual.ts).
+      const correr = (fn: () => Promise<IpcResponse<unknown>>): Promise<IpcResponse<unknown>> =>
+        correrComoTerminal(terminal, fn);
       if (needsAuth && jwtUser && this.opts.sessionStore) {
-        response = (await this.opts.sessionStore.runWith(
-          jwtUser as unknown as Parameters<SessionStore['runWith']>[0],
-          'lan-impersonation',
-          () => handler(parsed.payload) as Promise<IpcResponse<unknown>>,
-        )) as IpcResponse<unknown>;
+        const store = this.opts.sessionStore;
+        response = await correr(
+          () =>
+            store.runWith(
+              jwtUser as unknown as Parameters<SessionStore['runWith']>[0],
+              'lan-impersonation',
+              () => handler(parsed.payload) as Promise<IpcResponse<unknown>>,
+            ) as Promise<IpcResponse<unknown>>,
+        );
       } else if (this.opts.sessionStore) {
         // Canales sin JWT (auth:login/logout): también AISLADOS. Si corrieran
         // fuera del ALS, el setSession/clearSession de esos handlers escribiría
         // el singleton y pisaría la sesión del usuario del escritorio.
-        response = (await this.opts.sessionStore.runDetached(
-          () => handler(parsed.payload) as Promise<IpcResponse<unknown>>,
-        )) as IpcResponse<unknown>;
+        const store = this.opts.sessionStore;
+        response = await correr(
+          () => store.runDetached(() => handler(parsed.payload) as Promise<IpcResponse<unknown>>) as Promise<IpcResponse<unknown>>,
+        );
       } else {
-        response = (await handler(parsed.payload)) as IpcResponse<unknown>;
+        response = await correr(() => handler(parsed.payload) as Promise<IpcResponse<unknown>>);
       }
 
       // Si fue una escritura, avisar a los puestos web que refresquen.
@@ -758,18 +1020,177 @@ export class LanServer {
           if (data?.user?.id) {
             const expiresIn = this.opts.jwtExpiresInSec ?? 12 * 60 * 60;
             const exp = Math.floor(Date.now() / 1000) + expiresIn;
-            const jwt = signJwt({ sub: data.user.id, exp }, this.jwtSecret);
+            // Con PC emparejada, la sesión queda atada a ella (`dis`).
+            const jwt = signJwt(
+              dispositivo ? { sub: data.user.id, exp, dis: dispositivo.id } : { sub: data.user.id, exp },
+              this.jwtSecret,
+            );
             response = { ok: true, data: { ...data, _lanSessionToken: jwt } };
           }
         } else {
           this.registrarFallo(`login:${remote}`);
         }
       }
-      sendJson(res, 200, response);
+      await sendJsonRpc(req, res, 200, response);
     } catch (err) {
       this.log.error(`handler '${channel}' tiró: ${err instanceof Error ? err.message : String(err)}`);
       sendJson(res, 500, { ok: false, code: 'INTERNAL', message: 'Error interno del handler' });
     }
+  }
+
+  /** El servicio de PC de sucursal, si existe y la edición lo habilita. */
+  private dispositivosVigentes(): DispositivosLike | null {
+    if (!this.opts.dispositivos) return null;
+    try {
+      if (this.opts.multisucursalActivo && !this.opts.multisucursalActivo()) return null;
+    } catch {
+      return null;
+    }
+    return this.opts.dispositivos;
+  }
+
+  /**
+   * Quién hizo el pedido, para `obtenerTerminalActual`.
+   *  - PC emparejada: `disp:<machineId registrado>` (no lo que diga el
+   *    encabezado). El prefijo no lo puede declarar nadie más.
+   *  - Por el TÚNEL sin PC emparejada (dueño desde su casa o una contraseña
+   *    robada): el encabezado se ignora y opera como esta PC, igual que antes
+   *    de la caja por PC. Declarar el id de una caja ajena no sirve de nada.
+   *  - En la red local: lo que declara la terminal (el PIN es compartido; es
+   *    el mismo nivel de confianza de siempre).
+   *  - Sin declarar nada (versión vieja): esta PC, con `identificada: false`.
+   */
+  private terminalDelPedido(
+    req: IncomingMessage,
+    esTunel: boolean,
+    ipRemota: string,
+    dispositivo: DispositivoVerificado | null,
+  ): TerminalActual {
+    const origen = esTunel ? 'tunel' : 'lan';
+    if (dispositivo) {
+      return {
+        id: idTerminalDeDispositivo(dispositivo.machineId),
+        nombre: dispositivo.nombre,
+        origen,
+        dispositivoId: dispositivo.id,
+        identificada: true,
+      };
+    }
+    if (esTunel) {
+      return { id: this.opts.machineId ?? 'servidor', nombre: ipRemota, origen, dispositivoId: null, identificada: false };
+    }
+    const id = limpiarIdTerminal(req.headers[HDR_TERMINAL]);
+    if (id) {
+      const nombre = limpiarNombreTerminal(req.headers[HDR_TERMINAL_NOMBRE]) ?? ipRemota;
+      return { id, nombre, origen, dispositivoId: null, identificada: true };
+    }
+    return { id: this.opts.machineId ?? 'servidor', nombre: ipRemota, origen, dispositivoId: null, identificada: false };
+  }
+
+  /**
+   * `POST /lan/central { dispositivoId, nonce }` → `{ ok, prueba }`, o 404 con
+   * `motivo: 'desconocida'` si esa PC no figura en esta base (por ejemplo, la
+   * central volvió a una copia vieja de sus datos). La prueba no sirve para
+   * entrar ni para firmar pedidos: sólo dice "soy la central de esa PC".
+   */
+  private async probarCentral(req: IncomingMessage, res: ServerResponse, dispositivos: DispositivosLike): Promise<void> {
+    if (!isLanRemote(req.socket.remoteAddress ?? '')) {
+      sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Origen no permitido' });
+      return;
+    }
+    let body: { dispositivoId?: unknown; nonce?: unknown };
+    try {
+      const raw = await readBody(req);
+      body = raw ? (JSON.parse(raw) as typeof body) : {};
+    } catch {
+      sendJson(res, 400, { ok: false, code: 'VALIDATION', message: 'Body inválido' });
+      return;
+    }
+    let prueba: string | null = null;
+    try {
+      prueba = dispositivos.probarIdentidad?.(body?.dispositivoId, body?.nonce) ?? null;
+    } catch (err) {
+      this.log.error(`prueba de identidad: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    if (!prueba) {
+      sendJson(res, 404, { ok: false, code: 'NOT_FOUND', motivo: 'desconocida', message: 'Esta PC no figura en la casa central' });
+      return;
+    }
+    sendJson(res, 200, { ok: true, prueba });
+  }
+
+  /**
+   * `POST /lan/emparejar { codigo, nombre, machineId }` → `{ ok, data: { token, dispositivoId, nombre } }`.
+   * Lo llama la PC de sucursal una sola vez. El código es la credencial (no se
+   * pide PIN ni sesión); los canjes fallidos se cuentan por IP y a los 5 el
+   * servidor contesta 429 por 10 minutos: 50 bits de código no se adivinan así.
+   */
+  private async emparejar(
+    req: IncomingMessage,
+    res: ServerResponse,
+    esTunel: boolean,
+    dispositivos: DispositivosLike,
+  ): Promise<void> {
+    const directa = req.socket.remoteAddress ?? '';
+    if (!isLanRemote(directa)) {
+      sendJson(res, 403, { ok: false, code: 'PERMISSION_DENIED', message: 'Origen no permitido' });
+      return;
+    }
+    const ip = ipDelVisitante(req, esTunel);
+    const clave = `emparejar:${ip}`;
+    const bloqueo = this.segundosBloqueada(clave, MAX_FALLOS_EMPAREJAR);
+    if (bloqueo > 0) {
+      this.responderBloqueo(res, bloqueo, 'emparejamiento');
+      return;
+    }
+    let body: { codigo?: unknown; nombre?: unknown; machineId?: unknown };
+    try {
+      const raw = await readBody(req);
+      body = raw ? (JSON.parse(raw) as typeof body) : {};
+    } catch {
+      sendJson(res, 400, { ok: false, code: 'VALIDATION', message: 'Body inválido' });
+      return;
+    }
+    const r = dispositivos.canjear(
+      { codigo: body?.codigo, nombre: body?.nombre, machineId: body?.machineId },
+      { ip, via: esTunel ? 'tunel' : 'lan' },
+    );
+    if (!r.ok) {
+      if (r.motivo === 'datos') {
+        sendJson(res, 400, { ok: false, code: 'VALIDATION', message: 'Faltan el nombre o el identificador de la PC' });
+        return;
+      }
+      // Código bueno, pero esa PC ya tiene un emparejamiento activo. No es un
+      // intento de adivinar (el código era válido): no suma al bloqueo.
+      if (r.motivo === 'ocupado') {
+        sendJson(res, 409, {
+          ok: false,
+          code: 'CONFLICT',
+          message:
+            'Esta PC ya está emparejada con el servidor. Para emparejarla de nuevo, revóquela primero en el servidor (Configuración → Red local → PC de sucursal) y vuelva a cargar el mismo código.',
+        });
+        return;
+      }
+      this.registrarFallo(clave);
+      dispositivos.registrarIncidente?.(
+        `Canje de código de emparejamiento fallido (${r.motivo === 'vencido' ? 'vencido' : 'inválido'}) desde ${ip} ${esTunel ? 'por internet' : 'en la red local'}`,
+      );
+      this.log.warn(`canje de código de emparejamiento fallido (${r.motivo}) desde ${ip}`);
+      sendJson(res, 401, {
+        ok: false,
+        code: 'UNAUTHENTICATED',
+        // Para que la PC nueva diga cuál de los dos es sin depender del texto.
+        motivo: r.motivo === 'vencido' ? 'vencido' : 'invalido',
+        message:
+          r.motivo === 'vencido'
+            ? 'El código de emparejamiento venció. Genere uno nuevo en el servidor.'
+            : 'El código de emparejamiento no es válido o ya se usó.',
+      });
+      return;
+    }
+    this.fallos.delete(clave);
+    this.log.info(`PC de sucursal emparejada: ${r.nombre}`);
+    sendJson(res, 200, { ok: true, data: { token: r.token, dispositivoId: r.dispositivoId, nombre: r.nombre } });
   }
 
   private tryStartMdns(): void {

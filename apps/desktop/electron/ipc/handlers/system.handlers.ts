@@ -64,6 +64,7 @@ export function buildSystemHandlers(deps: HandlerDeps): HandlerMap {
       machineId: deps.machineId,
       dbPath: deps.dbPath,
       platform: os.platform(),
+      hostname: os.hostname(),
     })),
     'system:openExternal': unguarded(
       deps,

@@ -168,7 +168,14 @@ publish:
     # Repo público: el updater baja latest.yml/.exe por URL directa SIN token.
     # Con private:true el cliente necesitaría GH_TOKEN y el auto-download fallaba.
     private: false
-    # El workflow sobreescribe esto con EP_PRE_RELEASE=true cuando el tag lleva
-    # sufijo -beta. Un release marcado como prerelease queda EXCLUIDO de
-    # /releases/latest, así una beta nunca le llega a un cliente en canal estable.
+    # El workflow sobreescribe esto con EP_DRAFT=true cuando la VERSIÓN lleva
+    # sufijo (1.13.0-beta.1) y se publica desde su tag: la beta sale como
+    # BORRADOR, que no aparece en /releases/latest ni en la API sin token. (Como
+    # PRERELEASE les llegaba a los que eligieron el canal Beta: con GitHub,
+    # electron-builder escribe latest.yml también en las betas, y
+    # electron-updater con allowPrerelease toma la entrada más nueva del feed.)
+    # Ojo: el TAG de un borrador sí es público y puede figurar en releases.atom;
+    # por eso la vía preferida para una beta es "Run workflow" sobre la rama,
+    # que no crea tag ni release (queda como artefacto del run). Ver
+    # .github/workflows/release.yml y docs/RELEASE_PROCESS.md.
     releaseType: release

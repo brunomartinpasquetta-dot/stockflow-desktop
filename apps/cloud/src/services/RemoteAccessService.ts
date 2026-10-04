@@ -15,6 +15,14 @@
  *
  * Es IDEMPOTENTE: si el comercio vuelve a pedirlo (reinstaló, cambió de PC),
  * recibe lo mismo y no se duplica nada.
+ *
+ * UNA DIRECCIÓN NO SE LE QUITA A OTRO. Antes, si ya existía un registro con
+ * ese nombre, se lo reapuntaba sin mirar de quién era: una prueba gratis
+ * llamada como un comercio existente se quedaba con su dirección (y sus PC de
+ * sucursal le mandaban sus pedidos). Ahora sólo se reusa un registro que
+ * apunta a un túnel de ESTE comercio (`stockflow-<tenantId>`); si es de otro
+ * (o no es un túnel nuestro), se usa el mismo nombre con un sufijo del
+ * comercio (`coronda-1a2b.mistockflow.com`).
  */
 import { randomBytes } from 'node:crypto';
 
@@ -36,6 +44,20 @@ export interface AltaRemota {
 }
 
 const API = 'https://api.cloudflare.com/client/v4';
+
+/**
+ * Nombres que no se le dan a ningún comercio: son del sistema o se prestan a
+ * confusión. Con uno de estos, el comercio recibe el nombre con sufijo.
+ */
+const RESERVADOS = new Set([
+  'www', 'api', 'app', 'admin', 'mail', 'smtp', 'ftp', 'cloud', 'panel', 'status', 'blog',
+  'stockflow', 'soporte', 'ayuda', 'licencias', 'remoto', 'descargas', 'dl', 'bpsg',
+]);
+
+/** Sufijo estable del comercio para la dirección cuando el nombre ya es de otro. */
+function sufijoDeComercio(tenantId: string, largo: number): string {
+  return tenantId.replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, largo);
+}
 
 /** Nombre de dirección a partir del nombre del comercio: sin acentos ni espacios. */
 export function slugDeComercio(nombre: string, fallback: string): string {
@@ -90,12 +112,14 @@ export class RemoteAccessService {
   async alta(tenantId: string, nombreComercio: string): Promise<AltaRemota> {
     const nombreTunel = `stockflow-${tenantId}`;
     const existente = await this.buscarTunel(nombreTunel);
+    // Túneles de ESTE comercio: una dirección que apunta a uno de ellos es
+    // suya y se puede reapuntar (el viejo se borra abajo, pero su id sirve
+    // para reconocer la dirección que tenía).
+    const propios = new Set<string>(existente ? [existente.id.toLowerCase()] : []);
 
     // El secreto del túnel sólo se conoce al crearlo: si el túnel ya existía
     // pero el comercio perdió su credencial (reinstalación, PC nueva), se
     // borra y se recrea. Es la única forma de volver a entregarla.
-    let tunnelId: string;
-    let secreto: string;
     let reusado = false;
     if (existente) {
       await this.cf(`/accounts/${this.cfg.accountId}/cfd_tunnel/${existente.id}`, { method: 'DELETE' }).catch(
@@ -103,37 +127,80 @@ export class RemoteAccessService {
       );
       reusado = true;
     }
-    secreto = randomBytes(32).toString('base64');
+    const secreto = randomBytes(32).toString('base64');
     const creado = await this.cf<{ id: string }>(`/accounts/${this.cfg.accountId}/cfd_tunnel`, {
       method: 'POST',
       body: JSON.stringify({ name: nombreTunel, tunnel_secret: secreto, config_src: 'local' }),
     });
-    tunnelId = creado.id;
+    const tunnelId = creado.id;
+    propios.add(tunnelId.toLowerCase());
 
-    const hostname = `${slugDeComercio(nombreComercio, tenantId)}.${this.cfg.dominio}`;
-    await this.apuntarDns(hostname, tunnelId);
-
-    const credencial = JSON.stringify({
-      AccountTag: this.cfg.accountId,
-      TunnelID: tunnelId,
-      TunnelSecret: secreto,
-    });
-    return { hostname, tunnelId, credencial, reusado };
+    // El nombre del comercio; si ese ya es de otro, el mismo con un sufijo
+    // estable del comercio (así, al reinstalar, vuelve a recibir el mismo).
+    const slug = slugDeComercio(nombreComercio, tenantId);
+    const candidatos = [slug, `${slug}-${sufijoDeComercio(tenantId, 4)}`, `${slug}-${sufijoDeComercio(tenantId, 8)}`];
+    for (const nombre of candidatos) {
+      if (RESERVADOS.has(nombre)) continue;
+      const hostname = `${nombre}.${this.cfg.dominio}`;
+      if (await this.apuntarDnsSiEsPropia(hostname, tunnelId, nombreTunel, propios)) {
+        const credencial = JSON.stringify({
+          AccountTag: this.cfg.accountId,
+          TunnelID: tunnelId,
+          TunnelSecret: secreto,
+        });
+        return { hostname, tunnelId, credencial, reusado };
+      }
+    }
+    throw new Error(`No hay una dirección libre para el comercio ${tenantId} (probadas: ${candidatos.join(', ')})`);
   }
 
-  /** Crea o actualiza el CNAME que lleva la dirección del comercio al túnel. */
-  private async apuntarDns(hostname: string, tunnelId: string): Promise<void> {
+  /**
+   * ¿A quién pertenece el túnel `tunnelId`? Devuelve su nombre
+   * (`stockflow-<tenantId>` para los de los comercios) o null si Cloudflare no
+   * lo conoce. Los túneles borrados también se pueden consultar.
+   */
+  private async nombreDelTunel(tunnelId: string): Promise<string | null> {
+    try {
+      const t = await this.cf<{ id: string; name?: string }>(`/accounts/${this.cfg.accountId}/cfd_tunnel/${tunnelId}`);
+      return typeof t?.name === 'string' ? t.name : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Apunta `hostname` al túnel del comercio, SÓLO si la dirección está libre o
+   * ya es suya (un CNAME a un túnel `stockflow-<tenantId>` de este comercio).
+   * Un registro de otro comercio, de otra cosa (www, correo) o que no se puede
+   * comprobar NO se toca: devuelve false y se prueba con otro nombre.
+   */
+  private async apuntarDnsSiEsPropia(
+    hostname: string,
+    tunnelId: string,
+    nombreTunel: string,
+    propios: Set<string>,
+  ): Promise<boolean> {
     const destino = `${tunnelId}.cfargotunnel.com`;
-    const existentes = await this.cf<{ id: string; name: string }[]>(
+    const existentes = await this.cf<{ id: string; name: string; type?: string; content?: string }[]>(
       `/zones/${this.cfg.zoneId}/dns_records?name=${encodeURIComponent(hostname)}`,
     );
-    const ya = (existentes ?? [])[0];
+    const registros = existentes ?? [];
     const cuerpo = JSON.stringify({ type: 'CNAME', name: hostname, content: destino, proxied: true });
-    if (ya) {
-      await this.cf(`/zones/${this.cfg.zoneId}/dns_records/${ya.id}`, { method: 'PUT', body: cuerpo });
-    } else {
+    if (registros.length === 0) {
       await this.cf(`/zones/${this.cfg.zoneId}/dns_records`, { method: 'POST', body: cuerpo });
+      return true;
     }
+    // Más de un registro con ese nombre (A + AAAA, correo…): no es una
+    // dirección de comercio.
+    if (registros.length > 1) return false;
+    const ya = registros[0]!;
+    const m = /^([0-9a-f-]{36})\.cfargotunnel\.com$/i.exec(String(ya.content ?? ''));
+    if (String(ya.type ?? '').toUpperCase() !== 'CNAME' || !m) return false;
+    const destinoActual = m[1]!.toLowerCase();
+    const esPropia = propios.has(destinoActual) || (await this.nombreDelTunel(destinoActual)) === nombreTunel;
+    if (!esPropia) return false;
+    await this.cf(`/zones/${this.cfg.zoneId}/dns_records/${ya.id}`, { method: 'PUT', body: cuerpo });
+    return true;
   }
 
   /**

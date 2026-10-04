@@ -8,7 +8,7 @@
  */
 import crypto from 'node:crypto';
 import { and, eq, ne } from 'drizzle-orm';
-import { licenses, tenants, type License, type Tenant, type CloudDatabase } from '@stockflow/db';
+import { licenses, tenants, type Edicion, type License, type Tenant, type CloudDatabase } from '@stockflow/db';
 
 const KEY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O/1/I ambiguos
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -37,6 +37,18 @@ export interface JwtPayload {
   /** Fin de la PRUEBA en epoch-segundos (independiente del exp del JWT, que es
    *  corto y se renueva por heartbeat). El desktop lo verifica offline. */
   texp?: number;
+  /**
+   * Edición MULTISUCURSAL. Sólo viaja cuando el comercio la tiene: ausente =
+   * edición común. Así el token de un comercio común queda idéntico al de
+   * siempre y todos los desktops ya instalados (que no conocen el claim) lo
+   * leen como común.
+   */
+  edicion?: 'multisucursal';
+}
+
+/** Edición efectiva de un tenant (cualquier valor raro cuenta como común). */
+export function edicionDe(tenant: Pick<Tenant, 'edicion'>): Edicion {
+  return tenant.edicion === 'multisucursal' ? 'multisucursal' : 'comun';
 }
 
 export interface TrialInput {
@@ -64,6 +76,7 @@ export class LicenseService {
       base.kind = 'trial';
       base.texp = Math.floor(license.expiresAt.getTime() / 1000);
     }
+    if (edicionDe(tenant) === 'multisucursal') base.edicion = 'multisucursal';
     return base;
   }
 
@@ -220,6 +233,10 @@ export class LicenseService {
      *  en sólo-lectura hasta ~6 días después de cobrar (el JWT trial recién
      *  renovado no vencía y el heartbeat contestaba jwt:null). */
     jwtKind?: 'trial',
+    /** `edicion` que traía el JWT presentado (ausente = común). Si el admin
+     *  cambió la edición del comercio, se renueva YA: si no, la pestaña
+     *  Sucursales tardaba hasta ~6 días en aparecer (o en irse). */
+    jwtEdicion?: string,
   ): Promise<{ jwt: string | null; suspended?: boolean }> {
     await db.update(licenses).set({ lastHeartbeat: new Date() }).where(eq(licenses.id, licenseId));
 
@@ -245,7 +262,10 @@ export class LicenseService {
     // (la app sigue abierta en sólo-lectura). Y si el kind del JWT quedó
     // desactualizado (prueba convertida a paga), renovamos YA: es lo que
     // desbloquea la app del cliente en el próximo contacto tras el cobro.
-    const jwtDesactualizado = (jwtKind === 'trial') !== (license.kind === 'trial');
+    // Lo mismo si cambió la edición (común ↔ multisucursal).
+    const edicionDelJwt: Edicion = jwtEdicion === 'multisucursal' ? 'multisucursal' : 'comun';
+    const jwtDesactualizado =
+      (jwtKind === 'trial') !== (license.kind === 'trial') || edicionDelJwt !== edicionDe(tenant);
     if (suspended || jwtDesactualizado || currentExpMs - Date.now() < ONE_DAY_MS) {
       const jwt = signJwt(LicenseService.jwtPayloadFor(license, tenant));
       return suspended ? { jwt, suspended: true } : { jwt };

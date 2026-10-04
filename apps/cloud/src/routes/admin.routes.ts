@@ -4,7 +4,7 @@
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { eq } from 'drizzle-orm';
-import { licenses, tenants } from '@stockflow/db';
+import { EDICIONES, licenses, tenants, type Edicion } from '@stockflow/db';
 
 import { ADMIN_EMAIL, ADMIN_PASSWORD_HASH } from '../config';
 import type { EmailService } from '../services/EmailService';
@@ -120,6 +120,26 @@ export async function adminRoutes(app: FastifyInstance, opts?: { email?: EmailSe
         .returning();
       if (!t) return reply.code(404).send({ error: 'Cuenta no encontrada' });
       return reply.send({ ok: true, licensesQuota: t.licensesQuota });
+    },
+  );
+
+  // MULTISUCURSAL: cambia la edición del comercio. Llega a sus PC en el
+  // próximo heartbeat (el JWT con otra edición se renueva en el acto).
+  app.patch<{ Params: { id: string }; Body: { edicion?: string } }>(
+    '/api/admin/tenants/:id/edicion',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const edicion = req.body?.edicion;
+      if (!EDICIONES.includes(edicion as Edicion)) {
+        return reply.code(400).send({ error: `edicion debe ser una de: ${EDICIONES.join(', ')}.` });
+      }
+      const [t] = await app.cloudDb
+        .update(tenants)
+        .set({ edicion: edicion as Edicion, updatedAt: new Date() })
+        .where(eq(tenants.id, req.params.id))
+        .returning();
+      if (!t) return reply.code(404).send({ error: 'Cuenta no encontrada' });
+      return reply.send({ ok: true, edicion: t.edicion });
     },
   );
 

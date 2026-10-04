@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { destinoDeConfig, useLanContext } from '@/contexts/LanContext'
 import { api, ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,13 @@ export function Login() {
   const { login } = useAuth()
   const [submitting, setSubmitting] = useState(false)
   const versionQuery = useQuery({ queryKey: ['version'], queryFn: api.system.getVersion })
+  // PC DE SUCURSAL (app instalada conectada por dirección web): se ingresa con
+  // un usuario de la CASA CENTRAL, y eso hay que decirlo; si no, el empleado
+  // del otro local no sabe qué usuario poner. Las terminales de red local y
+  // las de navegador no ven nada nuevo.
+  const { mode, config, online } = useLanContext()
+  const esWeb = Boolean((window as { __stockflowWeb?: boolean }).__stockflowWeb)
+  const sucursal = mode === 'client' && Boolean(config?.serverUrl) && !esWeb
   const {
     register,
     handleSubmit,
@@ -84,6 +92,31 @@ export function Login() {
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             Ingresar
           </Button>
+          {sucursal && (
+            <div className="flex flex-col items-center gap-1 text-center text-xs">
+              {online ? (
+                <p className="text-muted-foreground">
+                  Esta PC trabaja con la casa central ({destinoDeConfig(config)}). Ingrese con el usuario y la contraseña
+                  que le dio la casa central.
+                </p>
+              ) : (
+                <p className="text-destructive">
+                  Sin conexión con la casa central: no se puede ingresar hasta que vuelva. Revise internet en esta PC y
+                  avise a la casa central.
+                </p>
+              )}
+              {/* Una PC revocada (o que la central ya no reconoce) no puede
+                  ingresar, y sin sesión no llega a Configuración: este es el
+                  único camino para cargar un código nuevo. */}
+              <button
+                type="button"
+                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                onClick={() => navigate('/bienvenida', { state: { paso: 'sucursal', desde: 'login' } })}
+              >
+                Conectar esta PC con un código nuevo
+              </button>
+            </div>
+          )}
           {import.meta.env.DEV && (
             <p className="text-center text-xs text-muted-foreground">
               Credenciales por defecto: <span className="font-mono">admin</span> / <span className="font-mono">admin</span>

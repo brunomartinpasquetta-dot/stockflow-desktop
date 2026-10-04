@@ -405,11 +405,18 @@ export const sales = sqliteTable(
      * Los filtros "por día" van por acá; lo fiscal, por la fecha del comprobante.
      */
     jornada: integer('jornada'),
+    /**
+     * Clave única del intento de cobro (la genera la pantalla). Si la misma
+     * venta llega dos veces (respuesta perdida en la red), se devuelve la ya
+     * registrada. NULL = venta sin clave (histórico, terminal vieja). 0043.
+     */
+    idempotencyKey: text('idempotency_key'),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },
   (t) => ({
     dateIdx: index('idx_sales_date').on(t.date),
+    idempotencyIdx: uniqueIndex('idx_sales_idempotency_key').on(t.idempotencyKey),
     jornadaIdx: index('idx_sales_jornada').on(t.jornada),
     customerIdx: index('idx_sales_customer').on(t.customerId),
     sellerIdx: index('idx_sales_seller').on(t.sellerId),
@@ -755,11 +762,14 @@ export const purchases = sqliteTable(
       .notNull()
       .default(false),
     notes: text('notes'),
+    /** Clave única del intento de guardado (ver `sales.idempotencyKey`). 0043. */
+    idempotencyKey: text('idempotency_key'),
     createdAt: createdAtCol(),
     updatedAt: updatedAtCol(),
   },
   (t) => ({
     dateIdx: index('idx_purchases_date').on(t.date),
+    idempotencyIdx: uniqueIndex('idx_purchases_idempotency_key').on(t.idempotencyKey),
     supplierIdx: index('idx_purchases_supplier').on(t.supplierId),
     typeCheck: check(
       'purchases_type_check',
@@ -1109,6 +1119,45 @@ export const scannedInvoices = sqliteTable(
   }),
 );
 export type ScannedInvoiceRow = typeof scannedInvoices.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* SUCURSALES (multisucursal, migración 0040)                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Id FIJO de "Casa central": la crea la migración 0040 con este mismo id en
+ * TODAS las bases, así el código (y la etapa 2, que le asigna el stock
+ * existente) la encuentra sin buscarla por nombre.
+ */
+export const SUCURSAL_CENTRAL_ID = '01a10435-d800-7000-8000-000000000001';
+export const SUCURSAL_CENTRAL_CODIGO = 'CENTRAL';
+export const SUCURSAL_CENTRAL_NOMBRE = 'Casa central';
+
+/**
+ * Sucursales del comercio. Todas las bases tienen al menos "Casa central"
+ * (`isMain`). Ninguna otra tabla la referencia todavía: las columnas
+ * `branch_id` llegan con el stock por sucursal (etapa 2) y la caja/ARCA por
+ * sucursal (etapa 3). La pantalla sólo se ve con la licencia Multisucursal.
+ */
+export const branches = sqliteTable(
+  'branches',
+  {
+    id: pk(),
+    name: text('name').notNull(),
+    /** Código corto e invariable (CENTRAL, SC…): no cambia al renombrar. */
+    code: text('code').notNull(),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    /** Sucursal principal (a lo sumo una: índice único parcial). */
+    isMain: integer('is_main', { mode: 'boolean' }).notNull().default(false),
+    createdAt: createdAtCol(),
+    updatedAt: updatedAtCol(),
+  },
+  (t) => ({
+    codeIdx: uniqueIndex('idx_branches_code').on(t.code),
+    mainIdx: uniqueIndex('idx_branches_main').on(t.isMain).where(sql`is_main = 1`),
+  }),
+);
+export type Branch = typeof branches.$inferSelect;
 
 /* ------------------------------------------------------------------ */
 /* FACTURACIÓN ELECTRÓNICA ARCA (ex AFIP)                              */
@@ -1680,6 +1729,7 @@ export const localSchema = {
   catalogoPedidos,
   articleSupplierCodes,
   scannedInvoices,
+  branches,
   fiscalConfig,
   salePoints,
   fiscalVouchers,

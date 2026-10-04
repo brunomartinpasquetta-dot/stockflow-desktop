@@ -321,6 +321,19 @@ export const api = {
     get: (): Promise<CompanyDTO> => unwrap(sf().company.get()),
     upsert: (data: EntityPayload): Promise<CompanyDTO> => unwrap(sf().company.upsert(data)),
   },
+  /** Edición de la licencia del comercio. En la interfaz se usa vía `useFuncion`. */
+  funciones: {
+    estado: (): Promise<import('@/types/api').FuncionesDTO> => unwrap(sf().funciones.estado()),
+    /** Interruptor "Edición Multisucursal (versión de prueba)": sólo en la PC con la base y en una versión de prueba. */
+    edicionPrueba: (): Promise<import('@/types/api').EdicionPruebaDTO> => unwrap(sf().funciones.edicionPrueba()),
+    setEdicionPrueba: (activa: boolean): Promise<import('@/types/api').EdicionPruebaDTO> =>
+      unwrap(sf().funciones.setEdicionPrueba({ activa })),
+  },
+  branches: {
+    listar: (): Promise<import('@/types/api').BranchDTO[]> => unwrap(sf().branches.listar()),
+    renombrar: (id: string, name: string): Promise<import('@/types/api').BranchDTO> =>
+      unwrap(sf().branches.renombrar({ id, name })),
+  },
   sales: {
     create: (input: CreateSaleInputDTO): Promise<CreateSaleResultDTO> => unwrap(sf().sales.create(input)),
     void: (id: string, reason?: string | null): Promise<SaleDTO> => unwrap(sf().sales.void({ id, reason: reason ?? null })),
@@ -650,6 +663,12 @@ export const api = {
     setMode: (payload: import('@/types/api').LanSetModeInputDTO) => unwrap(sf().lan.setMode(payload)),
     testConnection: (ip: string, port: number, token?: string) =>
       unwrap(sf().lan.testConnection({ ip, port, token })),
+    /** Multisucursal: probar la conexión contra una dirección web. */
+    testConnectionUrl: (url: string) => unwrap(sf().lan.testConnection({ url })),
+    emparejarGenerarCodigo: () => unwrap(sf().lan.emparejarGenerarCodigo()),
+    dispositivosListar: () => unwrap(sf().lan.dispositivosListar()),
+    dispositivoRevocar: (id: string) => unwrap(sf().lan.dispositivoRevocar({ id })),
+    setCajaPorPc: (activa: boolean) => unwrap(sf().lan.setCajaPorPc({ activa })),
     scanNetwork: () => unwrap(sf().lan.scanNetwork()),
     openFirewall: () => unwrap(sf().lan.openFirewall()),
     diagnose: () => unwrap(sf().lan.diagnose()),
@@ -664,13 +683,15 @@ export const api = {
     /**
      * Ping directo desde el renderer (HTTP GET /lan/ping al server LAN).
      * No usa IPC: el renderer puede hacer fetch sin CORS issues (server permite *).
+     * Recibe la BASE del servidor (`http://ip:puerto` o la dirección web):
+     * ver `baseDelServidorDeConfig`.
      */
-    pingServer: async (ip: string, port: number, timeoutMs = 3000): Promise<{ ok: boolean; latencyMs?: number; license?: string }> => {
+    pingServer: async (base: string, timeoutMs = 3000): Promise<{ ok: boolean; latencyMs?: number; license?: string }> => {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), timeoutMs)
       const start = Date.now()
       try {
-        const res = await fetch(`http://${ip}:${port}/lan/ping`, { signal: controller.signal })
+        const res = await fetch(`${base.replace(/\/$/, '')}/lan/ping`, { signal: controller.signal })
         if (!res.ok) return { ok: false }
         // El servidor informa su licencia: el puesto no tiene una propia y
         // trabaja amparado por ella (una licencia por comercio).

@@ -16,6 +16,7 @@ desktop y un panel de administración mínimo. Multi-tenant sobre Postgres.
 | `POST` | `/api/admin/login` | Login del admin → token (`admin: true`, 12h). |
 | `GET`  | `/api/admin/tenants` | Lista de tenants + sus licencias. |
 | `POST` | `/api/admin/tenants/:id/suspend` · `/reactivate` · `/license/release` · `/regenerate-license` | Acciones admin. |
+| `PATCH` | `/api/admin/tenants/:id/edicion` | Edición del comercio: `{ "edicion": "comun" \| "multisucursal" }` (migración `0003_tenant_edicion.sql`). Llega a sus PC en el próximo heartbeat (claim `edicion` del JWT; ausente = común): al arrancar StockFlow, cada 24 h, o al abrir **Acerca de** en la PC servidor. **Después del PATCH: abrir Acerca de (o reiniciar StockFlow) en la PC servidor del comercio.** Una baja tarda lo mismo (hasta 7 días si esa PC está sin internet: período de gracia del JWT). |
 | `GET`  | `/health` | Healthcheck. |
 | `GET`  | `/landing.html` | Landing pública de alta. |
 
@@ -60,6 +61,11 @@ pnpm --filter @stockflow/cloud run test:smoke   # usa pglite en memoria, no requ
 - **Claves JWT**: o bien montar un volumen persistente en `apps/cloud/.keys/`, o
   —recomendado— setear `JWT_PRIVATE_KEY` y `JWT_PUBLIC_KEY` (PEM con `\n`
   escapados) para que los tokens emitidos sigan siendo válidos entre redeploys.
+- **Migraciones primero**: antes de reiniciar con código nuevo, correr con
+  `psql "$DATABASE_URL" -f …` las de `packages/db/migrations/cloud/` que
+  falten (la última: `0003_tenant_edicion.sql`). El servidor igual verifica
+  al arrancar las columnas nuevas (`src/esquema.ts`): si falta
+  `tenants.edicion` la agrega, y si no puede **no arranca** y dice qué correr.
 - Build/start: `pnpm --filter @stockflow/cloud build` y luego
   `pnpm --filter @stockflow/cloud start` (o `node dist/server.js`).
 - Exponer el puerto de `PORT` (3009 por defecto). Configurar el healthcheck en

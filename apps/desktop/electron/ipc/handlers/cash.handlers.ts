@@ -1,6 +1,8 @@
 import { CashService } from '@stockflow/core';
 
 import { type HandlerDeps, type HandlerMap, withSession } from '../handler-context';
+import { cajaPorPcActiva, idDeCajaDelPedido } from '../caja-por-pc';
+import { obtenerTerminalActual } from '../terminal-actual';
 import type {
   AddMovementInputDTO,
   CashMovementDTO,
@@ -18,11 +20,16 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
         payload: { openingAmount: string; terminalName?: string | null },
         ctx,
       ): Promise<CashRegisterDTO> => {
-        // Cada PC es una terminal: se identifica con su machineId, así en una
-        // instalación en red cada puesto abre y arquea su propia caja.
+        // Con la caja por PC (opción del comercio o Multisucursal) cada PC
+        // abre SU caja: la que hizo el pedido. Apagada, todas las PC abren con
+        // el id del servidor y comparten la caja del local, como en la 1.12
+        // (ver caja-por-pc.ts). Una terminal vieja que no se identifica cae en
+        // el id del servidor en los dos casos.
+        const porPc = cajaPorPcActiva(deps);
+        const terminal = obtenerTerminalActual(deps);
         const register = await new CashService(ctx).openCashRegister(payload.openingAmount, {
-          id: deps.machineId,
-          name: payload.terminalName ?? null,
+          id: porPc ? terminal.id : deps.machineId,
+          name: payload.terminalName ?? (porPc ? terminal.nombre : null),
         });
         deps.sessionStore.setCurrentCashRegister(register);
         return register;
@@ -59,8 +66,10 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
       },
     ),
     'cash:getCurrent': withSession(deps, async (_payload, ctx): Promise<CashRegisterDTO | null> => {
-      // La caja de ESTA terminal (o la compartida heredada, si no hay por puesto).
-      const open = await ctx.repos.cashRegisters.getCurrentOpen(deps.machineId);
+      // La caja de la PC que pregunta (o la compartida heredada, si esa PC no
+      // tiene una propia: ver migración 0042). Sin caja por PC: la del
+      // servidor, que es la del local (como en la 1.12).
+      const open = await ctx.repos.cashRegisters.getCurrentOpen(idDeCajaDelPedido(deps));
       deps.sessionStore.setCurrentCashRegister(open);
       return open;
     }),

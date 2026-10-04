@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2, ScanLine, Search, ShoppingCart, Smartphone, Trash2, Wallet, X } from 'lucide-react'
 
 import { api } from '@/lib/api'
+import { IntentoDeOperacion } from '@/lib/idempotencia'
 import { cargaTelefonoVisible, intervaloEstadoCompras, type PrefillDeFactura } from '@/lib/facturaACompra'
 import { CargaTelefonoCompras } from '@/components/CargaTelefonoCompras'
 import {
@@ -451,6 +452,8 @@ export function Compras() {
     barcodeRef.current?.focus()
   }
 
+  // Clave del intento de guardado (ver src/lib/idempotencia.ts).
+  const intentoCompraRef = useRef(new IntentoDeOperacion())
   const createMutation = useMutation({
     mutationFn: () => {
       const monoPayments =
@@ -458,7 +461,7 @@ export function Compras() {
           ? [{ paymentMethodId: selectedMethod.id, amount: totalNum.toFixed(4) }]
           : null
       const paymentsToSend = isAccountPurchase ? [] : (monoPayments ?? split.payments)
-      return api.purchases.create({
+      const compra = {
         type: voucherType,
         supplierId: supplierId!,
         supplierInvoiceNumber: invoiceNumber.trim() || null,
@@ -502,9 +505,13 @@ export function Compras() {
             vatRate: l.vatRate,
           }
         }),
-      })
+      }
+      // Misma compra reintentada (respuesta perdida en la red) = misma clave:
+      // el servidor devuelve la ya registrada en vez de duplicarla.
+      return api.purchases.create({ ...compra, idempotencyKey: intentoCompraRef.current.clavePara(compra) })
     },
     onSuccess: (result) => {
+      intentoCompraRef.current.confirmar()
       void qc.invalidateQueries({ queryKey: ['articles'] })
       void qc.invalidateQueries({ queryKey: ['cash'] })
       void qc.invalidateQueries({ queryKey: ['cashGeneral'] })

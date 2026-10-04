@@ -7,6 +7,7 @@ import type { LocalDatabase } from '../local/client';
 import { AccountsReceivableRepository } from './accountsReceivable.repository';
 import { ArticleRepository } from './article.repository';
 import { BaseRepository } from './base.repository';
+import { BranchRepository } from './branch.repository';
 import { CashGeneralRepository } from './cashGeneral.repository';
 import { CashMovementRepository } from './cashMovement.repository';
 import { CashRegisterRepository } from './cashRegister.repository';
@@ -39,6 +40,7 @@ import { UserRepository } from './user.repository';
 export { BaseRepository };
 export { AccountsReceivableRepository } from './accountsReceivable.repository';
 export { ArticleRepository } from './article.repository';
+export { BranchRepository, SUCURSAL_NOMBRE_MAX } from './branch.repository';
 export {
   CashGeneralRepository,
   type AddCashGeneralMovementInput,
@@ -135,6 +137,8 @@ export interface Repositories {
   priceUpdates: PriceUpdateRepository;
   company: CompanyRepository;
   rolePermissions: RolePermissionRepository;
+  /** Sucursales (multisucursal). Toda base tiene al menos "Casa central". */
+  branches: BranchRepository;
 }
 
 /** Crea el conjunto completo de repositorios sobre una conexión dada. */
@@ -171,5 +175,6 @@ export function createRepositories(db: LocalDatabase): Repositories {
     priceUpdates: new PriceUpdateRepository(db),
     company: new CompanyRepository(db),
     rolePermissions: new RolePermissionRepository(db),
+    branches: new BranchRepository(db),
   };
 }

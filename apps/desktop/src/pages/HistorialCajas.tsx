@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useWindowNav } from '@/lib/useWindowNav'
 import { toast } from 'sonner'
 import { Loader2, Printer, History } from 'lucide-react'
@@ -7,9 +8,11 @@ import {
   useHistoricalCashRegisters,
   useHistoricalCashReport,
   useCompany,
+  useCurrentCash,
   useUsers,
 } from '@/lib/hooks'
-import { useAuth } from '@/contexts/AuthContext'
+import { useCajaPorPc } from '@/lib/useFuncion'
+import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { api } from '@/lib/api'
 import { usePrintHistoricalCashReport, usePrintCashClose } from '@/lib/usePrint'
@@ -571,6 +574,83 @@ function DepositarCierreDialog({
   )
 }
 
+/**
+ * CAJA POR PC: cerrar la caja que quedó abierta en OTRA PC (ver
+ * electron/ipc/caja-por-pc.ts). Pasa cuando esa PC se apagó o se reinstaló,
+ * cuando un navegador perdió sus datos, o cuando hay que volver a la caja
+ * única. Es el mismo cierre de siempre (`cash:close`, permiso close_cash):
+ * se declara el efectivo contado en ese cajón y queda el arqueo; después se
+ * ingresa a Caja General desde esta misma grilla, como cualquier cierre.
+ */
+function CerrarCajaDeOtraPcDialog({
+  register,
+  onClose,
+}: {
+  register: HistoricalCashRegisterDTO
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [contado, setContado] = useState('')
+  const [notas, setNotas] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function submit(): Promise<void> {
+    const monto = parseCurrencyInput(contado)
+    if (contado.trim() === '' || Number(monto) < 0) {
+      toast.error('Ingrese el efectivo contado en ese cajón')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.cash.close(register.id, Number(monto).toFixed(4), notas.trim() || 'Cerrada desde el Historial (caja de otra PC)')
+      toast.success(`Caja #${register.number} cerrada`)
+      await qc.invalidateQueries({ queryKey: ['cash'] })
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo cerrar la caja')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cerrar caja de otra PC</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Caja #{register.number}
+            {register.terminalName ? ` de ${register.terminalName}` : ''}, abierta el {formatDateTime(register.openDate)} por{' '}
+            {register.userName}. Efectivo esperado: {register.expectedAmount ? formatCurrency(register.expectedAmount) : '—'}.
+          </p>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="cierre-otra-pc">Efectivo contado</Label>
+            <CurrencyInput id="cierre-otra-pc" value={contado} onChange={setContado} autoFocus />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="cierre-otra-pc-notas">Observaciones</Label>
+            <Input id="cierre-otra-pc-notas" value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={() => void submit()} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Cerrar caja
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Días enteros desde que se abrió (para avisar de una caja olvidada). */
+function diasAbierta(openDate: number): number {
+  return Math.floor((Date.now() - openDate) / 86_400_000)
+}
+
 export function HistorialCajas() {
   const { currentUser } = useAuth()
   const isAdmin = currentUser?.role === 'admin'
@@ -581,7 +661,13 @@ export function HistorialCajas() {
   const [turnoFiltro, setTurnoFiltro] = useState<Turno | ''>('')
   const [detailId, setDetailId] = useState<string | null>(null)
   const [depositRegId, setDepositRegId] = useState<string | null>(null)
+  const [cerrarRegId, setCerrarRegId] = useState<string | null>(null)
   const canWrite = useCanWrite()
+  // Caja por PC: las cajas abiertas de OTRAS PC se pueden cerrar desde acá.
+  // Con la opción apagada (licencia común) la grilla queda como siempre.
+  const cajaPorPc = useCajaPorPc()
+  const puedeCerrarCajas = usePermission('close_cash')
+  const cajaActual = useCurrentCash()
   const [appliedRange, setAppliedRange] = useState({
     from: dayStart(isoDaysAgo(30)),
     to: dayEnd(todayIso()),
@@ -728,7 +814,24 @@ export function HistorialCajas() {
                       <TableCell><StatusBadge r={r} /></TableCell>
                       <TableCell>
                         {r.status !== 'closed' ? (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          cajaPorPc && canWrite && puedeCerrarCajas && r.id !== cajaActual.data?.id ? (
+                            <div className="flex items-center gap-2">
+                              {diasAbierta(r.openDate) >= 1 && (
+                                <span className="text-xs text-amber-700">hace {diasAbierta(r.openDate)} d</span>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                title={r.terminalName ? `Caja abierta en ${r.terminalName}` : 'Caja abierta en otra PC'}
+                                onClick={(e) => { e.stopPropagation(); setCerrarRegId(r.id) }}
+                              >
+                                Cerrar
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )
                         ) : r.depositedToGeneral ? (
                           <Badge variant="success">Ingresado</Badge>
                         ) : (
@@ -788,6 +891,11 @@ export function HistorialCajas() {
         return reg ? (
           <DepositarCierreDialog register={reg} onClose={() => setDepositRegId(null)} />
         ) : null
+      })()}
+
+      {cerrarRegId && (() => {
+        const reg = list.find((r) => r.id === cerrarRegId)
+        return reg ? <CerrarCajaDeOtraPcDialog register={reg} onClose={() => setCerrarRegId(null)} /> : null
       })()}
 
       {detailId && (
