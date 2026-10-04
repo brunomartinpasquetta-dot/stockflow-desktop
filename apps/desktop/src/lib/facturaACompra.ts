@@ -105,7 +105,7 @@ export interface PasajeACompras {
   subtotal: number
 }
 
-const r2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100
+export const r2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100
 const r4 = (n: number): number => Math.round((n + Number.EPSILON) * 10000) / 10000
 
 /** Factura A: precios netos. El resto: precios finales. */
@@ -155,14 +155,14 @@ export function estadoDelRenglon(r: {
     : { estado: 'revisar', motivo: 'La cuenta no cierra: cantidad × precio ≠ importe' }
 }
 
-/** `1234.5` → `1.234,50` (para los avisos). */
-function enPesos(n: number): string {
+/** `1234.5` → `1.234,50` (para los avisos y los motivos del lector). */
+export function enPesos(n: number): string {
   const [ent, dec] = Math.abs(n).toFixed(2).split('.') as [string, string]
   return `${n < 0 ? '-' : ''}${ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`
 }
 const enPorciento = (n: number): string => String(n).replace('.', ',')
 
-const sinAcentos = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+export const sinAcentos = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 /**
  * ¿La descripción dice que el producto viene en un bulto de N? ("X 1L X 12",
@@ -621,7 +621,7 @@ export function datosArticuloNuevo(
   }
 }
 
-/** CUIT bien formado: 11 dígitos, prefijo que existe y dígito verificador (el mismo control que electron/facturas/encabezado.ts). */
+/** CUIT bien formado: 11 dígitos, prefijo que existe y dígito verificador (módulo 11). Lo usan la revisión y el encabezado leído del texto. */
 export function cuitValido(cuit: string): boolean {
   if (!/^\d{11}$/.test(cuit) || !['20', '23', '24', '25', '26', '27', '30', '33', '34'].includes(cuit.slice(0, 2))) return false
   const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]

@@ -44,7 +44,6 @@ export async function billingRoutes(
   opts: { mp: MercadoPagoService; email: EmailService },
 ): Promise<void> {
   const { mp, email } = opts;
-  const licenseService = new LicenseService();
 
   /* ---------------------------------------------------------------- */
   /* POST /api/billing/subscribe                                       */

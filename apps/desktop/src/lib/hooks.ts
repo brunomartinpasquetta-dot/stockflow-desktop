@@ -405,13 +405,6 @@ export function useBottomProducts(input: DR & { limit?: number }, enabled = true
     enabled,
   })
 }
-export function usePaymentMethodsRanking(input: DR, enabled = true) {
-  return useQuery({
-    queryKey: ['analytics', 'paymentMethodsRanking', input.from, input.to, !!input.porCaja],
-    queryFn: () => api.analytics.getPaymentMethodsRanking(input),
-    enabled,
-  })
-}
 export function useVentasPorFormaPago(input: DR, enabled = true) {
   return useQuery({
     queryKey: ['analytics', 'ventasPorFormaPago', input.from, input.to, !!input.porCaja],

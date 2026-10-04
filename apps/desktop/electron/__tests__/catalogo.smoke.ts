@@ -79,7 +79,7 @@ const main = async () => {
     lines: [{ articleId: art.id, quantity: '2.000' }],
   });
   recibido.length = 0;
-  r = await sync.correr();
+  await sync.correr();
   const tras = (recibido[0]?.body?.articulos ?? []).find((a: any) => a.codigo === '7790000000001');
   check('tras vender 2, publica 18', tras?.stock === 18, `stock enviado: ${tras?.stock}`);
   check('publica SOLO el artículo que cambió', recibido[0]?.body?.articulos?.length === 1, `${recibido[0]?.body?.articulos?.length}`);
@@ -94,7 +94,7 @@ const main = async () => {
   check('NO avanza el cursor', repos.catalogo.getState().cursor === antes);
   responder = 200;
   recibido.length = 0;
-  r = await sync.correr();
+  await sync.correr();
   const reintento = (recibido[0]?.body?.articulos ?? []).find((a: any) => a.codigo === '7790000000001');
   check('al volver el catálogo, reintenta y manda el precio nuevo', reintento?.precio === 9900, `precio: ${reintento?.precio}`);
 
@@ -172,7 +172,7 @@ const main = async () => {
     segundaValor = repos.catalogoPedidos.guardar(pedido);
     segundaOk = true;
   } catch {
-    segundaOk = false;
+    // tiró una excepción: segundaOk queda en false
   }
   check('la primera vez guarda', primera === true);
   check(

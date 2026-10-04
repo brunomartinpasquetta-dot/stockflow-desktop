@@ -41,7 +41,7 @@ export class MpTokenStore {
   private readonly safeStorage: SafeStorageLike | null;
   private readonly aesKey: Buffer | null;
 
-  constructor(private readonly machineId: string) {
+  constructor(machineId: string) {
     this.safeStorage = loadElectronSafeStorage();
     // Clave AES derivada del machineId — fallback determinístico.
     this.aesKey = createHash('sha256').update(`stockflow:mp:${machineId}`).digest();

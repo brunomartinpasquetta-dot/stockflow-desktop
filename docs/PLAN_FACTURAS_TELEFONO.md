@@ -1,11 +1,13 @@
 # Facturas de compra por teléfono — diseño (2-oct-2026)
 
-Estado: **en desarrollo, sólo en la Mac de Bruno. NO se taggea ni se sube la versión.** Opción **apagada por defecto**.
+Estado: **publicada en la 1.12.0 (3-oct-2026)**. Opción **apagada por defecto**.
+
+Documento histórico por secciones: cada sección corrige a la anterior y lo que existe hoy está descrito recién en las últimas («Revisión final» y «Qué lector usa cada plataforma»). Las primeras describen el diseño original (sólo Ollama, sin nativos), que no es el publicado.
 
 ## Qué hace
 
 1. En StockFlow se toca **"Vincular teléfono"**: aparece un QR. El teléfono lo escanea y abre una página web (servida por la PC) con la cámara.
-2. Se sacan las fotos de las hojas de UNA factura y se envían. La PC las guarda y las **lee de fondo** con un lector de documentos local (Ollama, modelo `glm-ocr:q8_0`, 1,6 GB; ~30 s por hoja con GPU, ~2 min sin).
+2. Se sacan las fotos de las hojas de UNA factura y se envían. La PC las guarda y las **lee de fondo** con el lector de texto del sistema (Apple Vision en Mac; PaddleOCR sobre ONNX Runtime en Windows y Linux; ver «Qué lector usa cada plataforma»). GLM-OCR por Ollama (`glm-ocr:q8_0`, 1,6 GB; ~30 s por hoja con GPU, ~2 min sin) quedó como respaldo opcional («Mejorar lectura»).
 3. El texto leído se pasa a renglones **con código** (sin otra IA) y se controla por aritmética: cantidad × unidades por bulto × precio = importe.
 4. En **Compras → Facturas escaneadas** se revisa (renglones dudosos en rojo, foto al lado), se vincula cada renglón con un artículo y se **carga en Compras** (el formulario de compra queda precargado; la compra la confirma el usuario como siempre).
 5. El vínculo código-del-proveedor → artículo se recuerda (`article_supplier_codes`): la segunda factura del mismo proveedor sale vinculada sola.
@@ -19,18 +21,18 @@ Mediciones previas: `tools/ocr-facturas/RESULTADOS.md` (GLM-OCR 97–99 % de ren
 - Un solo modelo de IA en memoria: el lector se pide con `keep_alive: '2m'` y de a UNA hoja por vez (la Mac de Bruno tiene 8 GB).
 - Textos de UI: tono formal (usted, sin tutear), estados en una palabra.
 - Código y comentarios en castellano, como el resto del repo. Tests = scripts `tsx` con `check()`, como `electron/__tests__/catalogo.smoke.ts`.
-- No agregar dependencias nativas. Dependencias nuevas permitidas (JS puro): `jsqr`, `jpeg-js`.
+- Dependencias nuevas: `jsqr` y `jpeg-js` (JS puro) y, desde la integración de PaddleOCR, `onnxruntime-node` (nativa; viaja en `app.asar.unpacked`, un binario por plataforma).
 
 ## Piezas
 
 ### A. Base de datos (`packages/db`)
 Migración `0037_facturas_escaneadas.sql` (+ entrada en `meta/_journal.json`, idx 37, when = último + 1) y schema en `local.ts` (+ `localSchema`):
 
-- `article_supplier_codes`: `id`, `article_id` (FK articles, ON DELETE CASCADE), `supplier_id` (FK suppliers), `code` (text), `created_at`, `updated_at`. Único `(supplier_id, code)`; índice por `article_id`.
+- `article_supplier_codes`: `id`, `article_id` (FK articles, ON DELETE CASCADE), `supplier_id` (FK suppliers), `code` (text), `created_at`, `updated_at`. Único `(supplier_id, code)`; índice por `article_id`. Después se sumaron `units_per_pack` (migración 0038) y `description` (migración 0039).
 - `scanned_invoices`: `id`, `status` (text: `recibiendo` | `en_cola` | `leyendo` | `lista` | `error` | `cargada` | `descartada`), `supplier_id` (nullable), `photos` (JSON: nombres de archivo), `pages_text` (JSON: texto leído por hoja), `header` (JSON), `lines` (JSON), `error` (text), `pages_done` (int), `created_by` (user id, nullable), `created_at`, `updated_at`.
 
 Repositorios (síncronos, estilo `audit.repository.ts`), registrados en `repositories/index.ts`:
-- `ArticleSupplierCodeRepository`: `buscar(supplierId, code)`, `listarPorProveedor(supplierId)`, `guardar(supplierId, code, articleId)` (upsert por el único), `borrar(id)`.
+- `ArticleSupplierCodeRepository`: `buscar(supplierId, code)`, `listarPorProveedor(supplierId)`, `guardar(supplierId, code, articleId, unitsPerPack?, description?)` (upsert por el único).
 - `ScannedInvoiceRepository`: `crear({createdBy})`, `obtener(id)`, `listar({estados?, limite?})`, `actualizar(id, cambios)` (serializa JSON), `siguienteEnCola()`.
 - `SupplierRepository.findByCuit(cuit)`: compara sólo dígitos.
 
@@ -91,7 +93,7 @@ Cambian lo escrito arriba en estos puntos:
 - **Revisión**: el tipo elegido se guarda en `header.tipo` (A/B/C/X); avisos por IVA de la factura ≠ IVA del artículo y por costo leído a más del doble o menos de la mitad del costo actual; las notas de crédito no se cargan; aviso de comprobante repetido (otra factura escaneada o compra ya registrada con ese proveedor y número).
 - **`marcarCargada` lo llama Compras al REGISTRAR la compra**, no la revisión al abrir el formulario: hasta entonces la factura sigue `lista`.
 - `estado()` trae `listas` (contador de Compras) y apagado no llama a Ollama. Las fotos y el texto de las facturas `cargada` se borran a los 90 días.
-- `lectorSistema.ts` y `native/` (lector del sistema operativo) NO están integrados ni se empaquetan: el servicio lee sólo con GLM-OCR. Su prueba es `test:facturas-sistema`.
+- `lectorSistema.ts` y `native/` (lector del sistema operativo) se integraron y empaquetaron después de esta auditoría (ver «Qué lector usa cada plataforma»). Su prueba es `test:facturas-sistema`.
 
 ## Carga desde Compras y vinculador (2-oct-2026, tarde)
 

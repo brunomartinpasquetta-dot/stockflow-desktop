@@ -398,13 +398,6 @@ export function programaDeLector(nombre: NombreLector): string {
   return join('ocr-paddle', 'leer.mjs');
 }
 
-/** Programa del lector del SISTEMA OPERATIVO de cada plataforma (null = esa plataforma no tiene). */
-export function programaPorPlataforma(plataforma: NodeJS.Platform = process.platform): string | null {
-  if (plataforma === 'darwin') return programaDeLector('vision');
-  if (plataforma === 'win32') return programaDeLector('windows-ocr');
-  return null;
-}
-
 /**
  * Un lector concreto: cómo saber si anda en esta PC y cómo leer una foto.
  * Interno; se expone para probar la cadena de `LectorSistema` con lectores falsos.
@@ -439,11 +432,6 @@ export interface OpcionesLectorSistema {
   nombres?: NombreLector[];
   /** Lectores ya armados (para pruebas); reemplaza a `nombres`/`baseNativa`. */
   lectores?: LectorDeHoja[];
-  /**
-   * Compatibilidad: ruta del programa del lector del sistema operativo de esta
-   * plataforma (vision-ocr / leer.ps1) y nada más (sin PaddleOCR).
-   */
-  programa?: string;
   /** Por defecto, la plataforma actual. */
   plataforma?: NodeJS.Platform;
   /** Tope por hoja y por lector. La primera lectura en Mac puede tardar ~45 s (el sistema carga el motor). */
@@ -526,11 +514,6 @@ function lectorReal(nombre: NombreLector, programa: string, o: OpcionesLectorSis
 /** Los lectores reales que piden las opciones, en orden. */
 function crearLectores(o: OpcionesLectorSistema, plataforma: NodeJS.Platform): LectorDeHoja[] {
   if (o.lectores) return o.lectores;
-  if (o.baseNativa === undefined && o.programa !== undefined) {
-    // Compatibilidad: sólo el lector del sistema operativo, con esa ruta.
-    const nombre: NombreLector | null = plataforma === 'darwin' ? 'vision' : plataforma === 'win32' ? 'windows-ocr' : null;
-    return nombre ? [lectorReal(nombre, o.programa, o)] : [];
-  }
   const base = o.baseNativa ?? '';
   return (o.nombres ?? lectoresPorPlataforma(plataforma)).map((n) => lectorReal(n, join(base, programaDeLector(n)), o));
 }

@@ -9,6 +9,7 @@ import { useCustomers } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { dayEnd, dayStart, todayIso } from '@/lib/periodPresets'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { SaleDetailDialog } from '@/components/SaleDetailDialog'
@@ -22,16 +23,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { SaleDTO, VoucherType } from '@/types/api'
 
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function dayStart(iso: string): number {
-  return new Date(`${iso}T00:00:00`).getTime()
-}
-function dayEnd(iso: string): number {
-  return new Date(`${iso}T23:59:59.999`).getTime()
-}
 const PAGE_SIZE = 50
 
 /**

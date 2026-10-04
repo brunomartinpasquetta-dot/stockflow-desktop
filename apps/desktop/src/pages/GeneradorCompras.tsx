@@ -13,6 +13,7 @@ import { FileSpreadsheet, PackagePlus, Printer, ShoppingCart } from 'lucide-reac
 import { useFamilies, useLowStockReport, useSuppliers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { formatCurrency } from '@/lib/format'
+import { todayIso } from '@/lib/periodPresets'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,10 +24,6 @@ import { SinPermiso } from '@/components/SinPermiso'
 
 type Criterio = 'min' | 'ideal'
 
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 export function GeneradorCompras() {
   const canView = usePermission('view_reports')

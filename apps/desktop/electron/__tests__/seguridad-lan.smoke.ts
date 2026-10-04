@@ -254,7 +254,7 @@ async function parteServidor(): Promise<void> {
       await fetch(`http://127.0.0.1:${PUERTO_LAN}/lan/ping`, { signal: AbortSignal.timeout(1500) });
       escuchaEnLaRed = true;
     } catch {
-      escuchaEnLaRed = false;
+      // no contesta: no escucha en la red
     }
     check('soloTunel: NO escucha en el puerto de la red local', !escuchaEnLaRed);
 

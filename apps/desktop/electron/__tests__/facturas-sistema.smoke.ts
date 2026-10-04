@@ -19,7 +19,6 @@ import {
   armarRenglones,
   calidadDeFoto,
   interpretarLectura,
-  programaPorPlataforma,
   type LecturaSistema,
 } from '../facturas/lectorSistema';
 import { aLineas, MOTIVO_ILEGIBLE, MOTIVO_PEGADO, parsearTexto, totalesDelTexto, type RenglonLeido } from '../facturas/parser';
@@ -487,10 +486,9 @@ async function main(): Promise<void> {
       tiro = true;
     }
     check(tiro, 'interpretarLectura: salida sin JSON → error');
-    check(programaPorPlataforma('darwin') === join('ocr-mac', 'vision-ocr') && programaPorPlataforma('win32') === join('ocr-win', 'leer.ps1') && programaPorPlataforma('linux') === null, 'programaPorPlataforma');
 
-    const falso = new LectorSistema({ programa: join(dirNative, 'no-existe') });
-    check((await falso.disponible()) === false, 'LectorSistema: sin programa auxiliar → no disponible');
+    const falso = new LectorSistema({ baseNativa: join(dirNative, 'no-existe') });
+    check((await falso.disponible()) === false, 'LectorSistema: sin programas auxiliares → no disponible');
     let msg = '';
     try {
       await falso.leerHoja(Buffer.from('no soy un jpeg'));
@@ -505,12 +503,10 @@ async function main(): Promise<void> {
       msg = (e as Error).message;
     }
     check(/lector de texto del sistema/.test(msg), 'LectorSistema: programa que no arranca → error claro', msg);
-    check((await new LectorSistema({ programa: 'x', plataforma: 'linux' }).disponible()) === false, 'LectorSistema: plataforma sin lector → no disponible');
+    check((await new LectorSistema({ lectores: [] }).disponible()) === false, 'LectorSistema: sin lectores → no disponible');
 
     // De verdad, en esta máquina (si está el binario compilado y están las muestras).
-    const rel = programaPorPlataforma();
-    const programa = rel ? join(dirNative, rel) : '';
-    const real = new LectorSistema({ programa });
+    const real = new LectorSistema({ baseNativa: dirNative, nombres: ['vision'] });
     if (process.platform === 'darwin' && (await real.disponible()) && existsSync(join(dirMuestras, 'vital-13.jpg'))) {
       for (const h of hojas) {
         const t0 = Date.now();

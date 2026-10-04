@@ -21,8 +21,9 @@
 // decodifica con jpeg-js y la reducción, el gris, los contornos y los recortes son
 // JavaScript puro.
 //
-// Pipeline (el de PaddleOCR, sin el clasificador de ángulo), igual al prototipo
-// tools/ocr-facturas/paddle-ocr.mjs que midió 140/140 renglones en las 8 fotos reales:
+// Pipeline (el de PaddleOCR, sin el clasificador de ángulo), igual al prototipo con
+// sharp + OpenCV que midió 140/140 renglones en las 8 fotos reales (la medición está
+// en tools/ocr-facturas/RESULTADOS.md; el prototipo ya no está en el repo):
 //   foto → EXIF → gris "canal más claro" max(R,G,B) (borra birome y resaltador, como
 //   en la Mac) → reducir a 2000 px de lado (múltiplo de 32) → DB (detección) → umbral
 //   → componentes conexas → rectángulo mínimo girado + puntaje + agrandar (unclip)

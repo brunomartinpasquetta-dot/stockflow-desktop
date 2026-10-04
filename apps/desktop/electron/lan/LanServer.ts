@@ -320,7 +320,6 @@ export class LanServer {
   /** Puerta dedicada al acceso remoto: sólo la usa el túnel (ver `start`). */
   private serverTunel: Server | null = null;
   private bonjour: { unpublishAll: (cb?: () => void) => void } | null = null;
-  private bonjourService: { stop: (cb?: () => void) => void } | null = null;
   private readonly log: NonNullable<LanServerOptions['log']>;
   /** ip -> lastSeen ms; ping y rpc actualizan. */
   private readonly clients = new Map<string, InfoCliente>();
@@ -779,14 +778,13 @@ export class LanServer {
       const mod = require('bonjour-service') as { Bonjour?: new () => { publish: (opts: object) => unknown; unpublishAll: (cb?: () => void) => void } };
       if (!mod.Bonjour) return;
       const instance = new mod.Bonjour();
-      const service = instance.publish({
+      instance.publish({
         name: 'StockFlow',
         type: 'http',
         port: this.opts.port,
         txt: { app: 'stockflow' },
-      }) as { stop: (cb?: () => void) => void };
+      });
       this.bonjour = instance;
-      this.bonjourService = service;
       this.log.info('mDNS publicado como stockflow._http._tcp');
     } catch {
       this.log.warn('mDNS no disponible (bonjour-service no instalado); seguimos sin broadcast');

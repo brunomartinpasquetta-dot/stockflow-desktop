@@ -17,7 +17,6 @@ import { createRepositories, initLocalDb, closeLocalDb } from '@stockflow/db';
 
 import {
   AuthService,
-  BusinessRuleError,
   createServiceContext,
   createServices,
 } from '../index';

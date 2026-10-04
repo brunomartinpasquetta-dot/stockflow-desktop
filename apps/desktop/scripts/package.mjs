@@ -1,15 +1,18 @@
 /**
  * Wrapper de electron-builder que sortea el ciclo de symlinks pnpm
- * (packages/shared/node_modules/@stockflow/db ↔ packages/db/node_modules/@stockflow/shared)
- * que hace que `app-builder` recurse infinitamente.
+ * (packages/shared/node_modules/@stockflow/db ↔ packages/db/node_modules/@stockflow/shared,
+ * y packages/core/node_modules/@stockflow/{db,shared}) que hace que `app-builder`
+ * recurse infinitamente o copie al asar los node_modules anidados de cada package
+ * (core → db → better-sqlite3 otra vez: 73 MB de copias en la 1.12.1).
  *
  * Uso:
  *   node scripts/package.mjs --mac --dir     → .app sin firma
  *   node scripts/package.mjs --mac dmg       → .dmg sin firma
  *   node scripts/package.mjs --win           → .exe (requiere Windows o wine)
  *
- * Los workspace packages ya están bundleados en dist-electron/main.mjs por esbuild,
- * por lo que esos symlinks no se usan en runtime — sólo molestan al collector.
+ * Los workspace packages ya están bundleados en dist-electron/main.mjs por esbuild
+ * (en el renderer los bundlea Vite) y son devDependencies de apps/desktop, así que
+ * el collector ni los recorre; mover los symlinks aparte queda como segunda defensa.
  */
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
@@ -23,6 +26,7 @@ const desktopDir = resolve(here, '..');
 const symlinkDirs = [
   join(repoRoot, 'packages', 'shared', 'node_modules', '@stockflow'),
   join(repoRoot, 'packages', 'db', 'node_modules', '@stockflow'),
+  join(repoRoot, 'packages', 'core', 'node_modules', '@stockflow'),
 ];
 
 // Deps transitivas que el collector de electron-builder NO encuentra en el layout

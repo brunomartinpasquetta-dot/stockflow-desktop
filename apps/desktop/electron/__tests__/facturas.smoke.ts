@@ -30,7 +30,6 @@ import type { DatosQr } from '../facturas/qrFiscal';
 import type { CajaTexto, LecturaSistema } from '../facturas/lectorSistema';
 import {
   elegirIpLocal,
-  esCodigoDeBarras,
   FacturasTelefono,
   mismoNumeroDeFactura,
   type EncabezadoFactura,
@@ -44,6 +43,7 @@ import {
   cuitParaGuardar,
   datosArticuloNuevo,
   decidirAtajo,
+  esCodigoDeBarras,
   proximoCodigoInterno,
   textoDeSeguimiento,
 } from '../../src/lib/facturaACompra';

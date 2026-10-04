@@ -9,6 +9,7 @@ import { BarChart3, FileSpreadsheet, Printer } from 'lucide-react'
 import { useSalesByVendorReport, useUsers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { formatCurrency } from '@/lib/format'
+import { dayEnd, dayStart, firstOfMonthIso, todayIso } from '@/lib/periodPresets'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,21 +18,6 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SinPermiso } from '@/components/SinPermiso'
-
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function firstOfMonthIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
-function dayStart(iso: string): number {
-  return new Date(`${iso}T00:00:00`).getTime()
-}
-function dayEnd(iso: string): number {
-  return new Date(`${iso}T23:59:59.999`).getTime()
-}
 
 export function VentasPorVendedor() {
   const canView = usePermission('view_reports')

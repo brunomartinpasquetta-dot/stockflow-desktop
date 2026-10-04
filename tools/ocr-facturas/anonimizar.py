@@ -29,7 +29,7 @@ archivos = sorted(
     glob.glob(f'{RAIZ}/apps/desktop/electron/__tests__/fixtures/facturas/**/*.txt', recursive=True)
     + glob.glob(f'{RAIZ}/apps/desktop/electron/__tests__/fixtures/facturas/**/*.json', recursive=True)
     + glob.glob(f'{RAIZ}/apps/desktop/electron/__tests__/facturas*.smoke.ts')
-    + [f'{RAIZ}/tools/ocr-facturas/{n}' for n in ('hallazgos-r2.json', 'RESULTADOS.md', 'verdad.py')]
+    + [f'{RAIZ}/tools/ocr-facturas/{n}' for n in ('hallazgos-r2.json', 'RESULTADOS.md')]
 )
 
 total = {}

@@ -158,10 +158,6 @@ export interface CustomerDTO {
   updatedAt: number;
 }
 
-export interface CustomerWithBalanceDTO extends CustomerDTO {
-  balance: string;
-}
-
 export interface SupplierDTO {
   id: string;
   code: string;
@@ -180,15 +176,6 @@ export interface FamilyDTO {
   id: string;
   name: string;
   parentId: string | null;
-  createdAt: number;
-}
-
-export interface CardDTO {
-  id: string;
-  name: string;
-  commissionPct: string;
-  discountPct: string;
-  active: boolean;
   createdAt: number;
 }
 
@@ -403,14 +390,6 @@ export interface PaymentInputDTO {
 /* ----------------------------------------------------------------------- */
 /* Resultados compuestos / reportes                                         */
 /* ----------------------------------------------------------------------- */
-
-export interface SessionPayloadDTO {
-  sub: string;
-  username: string;
-  role: Role;
-  iat: number;
-  exp: number;
-}
 
 export interface LoginResultDTO {
   user: UserDTO;
@@ -2016,7 +1995,6 @@ export interface FacturaEscaneadaResumenDTO {
   /** Hay otra factura escaneada con el mismo comprobante. */
   repetida: boolean;
   creadaEl: number;
-  actualizadaEl: number;
 }
 
 export interface FacturaEscaneadaDetalleDTO extends FacturaEscaneadaResumenDTO {

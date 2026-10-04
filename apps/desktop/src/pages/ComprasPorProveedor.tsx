@@ -14,7 +14,7 @@ import { useCompany, useSuppliers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { PERIOD_PRESETS, dayEnd, dayStart, toIso } from '@/lib/periodPresets'
+import { PERIOD_PRESETS, dayEnd, dayStart, firstOfMonthIso, toIso } from '@/lib/periodPresets'
 import { exportComprasPorProveedorToExcel } from '@/lib/excelExport'
 import {
   agruparPorProveedor,
@@ -38,11 +38,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { VoucherType } from '@/types/api'
 
 type Vista = 'proveedor' | 'fecha'
-
-function firstOfMonthIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
 
 function EstadoBadge({ status }: { status: CompraProveedorFila['status'] }) {
   if (status === 'voided') return <Badge variant="destructive">Anulada</Badge>

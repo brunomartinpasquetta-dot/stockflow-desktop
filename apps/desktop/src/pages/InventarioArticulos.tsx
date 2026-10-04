@@ -9,6 +9,7 @@ import { Boxes, FileSpreadsheet, Printer } from 'lucide-react'
 import { useArticles, useFamilies, useInventoryReport, useSuppliers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { formatCurrency } from '@/lib/format'
+import { todayIso } from '@/lib/periodPresets'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -16,10 +17,6 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SinPermiso } from '@/components/SinPermiso'
 
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 export function InventarioArticulos() {
   const canView = usePermission('view_reports')

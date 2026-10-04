@@ -8,11 +8,11 @@
  *
  * La API pública de `useWindowManager()` se mantiene para no romper los callers
  * (MenuBar, QuickAccessToolbar, useMdiShortcuts, useDeepLinkRouter, useWindowNav,
- * Taskbar). Las operaciones que ya no aplican al modelo nativo (mover/redimensionar
- * desde JS, z-index, ciclar foco) quedan como no-ops o se delegan al SO.
+ * Taskbar). Mover, redimensionar, minimizar y ciclar el foco lo maneja el SO.
  *
- * `WindowSelfProvider` / `useWindowSelf` / `useWindowParam` siguen vivos: los usa
- * `EmbeddedWindow` para entregarle a cada página sus `params` + `extras`.
+ * `WindowSelfProvider` / `useWindowSelf` siguen vivos: los usa `EmbeddedWindow`
+ * para entregarle a cada página sus `extras` (los params planos de la URL las
+ * páginas los leen con `useSearchParams`).
  */
 import {
   createContext,
@@ -30,16 +30,15 @@ import { router } from '@/router'
 import { api } from '@/lib/api'
 import { WINDOWS } from '@/windows/registry'
 
-export type WindowState = 'normal' | 'minimized' | 'maximized'
-
-/** Param reservado donde viajan los `extras` no-triviales (JSON-encodeados). */
-const EXTRAS_PARAM = '__extras'
+/**
+ * Param reservado donde viajan los `extras` no-triviales (JSON-encodeados).
+ * El main process usa el mismo nombre (`electron/desktop-windows.ts`).
+ */
+export const EXTRAS_PARAM = '__extras'
 
 export interface OpenWindowInput {
-  id?: string
   pageKey: string
   title?: string
-  iconName?: string
   params?: Record<string, string | number | undefined>
   /** Objetos serializables (initialTab, prefilledLines, ...) — viajan a la ventana nativa. */
   extras?: unknown
@@ -63,17 +62,7 @@ export interface WindowManagerApi {
   focusedId: string | null
   openWindow(input: OpenWindowInput): void
   closeWindow(id: string): void
-  minimizeWindow(id: string): void
-  toggleMaximize(id: string): void
   focusWindow(id: string): void
-  /** No-op: el SO maneja la posición de las ventanas nativas. */
-  moveWindow(id: string, position: { x: number; y: number }): void
-  /** No-op: el SO maneja el tamaño de las ventanas nativas. */
-  resizeWindow(id: string, size: { width: number; height: number }): void
-  /** No-op: el ciclado de foco lo maneja el SO (Alt+Tab / Cmd+`). */
-  cycleFocus(direction: 1 | -1): void
-  /** Refresca la lista de ventanas nativas desde el main process. */
-  refresh(): void
 }
 
 const WindowManagerContext = createContext<WindowManagerApi | null>(null)
@@ -177,36 +166,14 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
     void api.desktopWindow.focus(id).then(() => refresh()).catch(() => undefined)
   }, [refresh])
 
-  const minimizeWindow = useCallback((id: string) => {
-    // El SO no expone "minimizar otra ventana" desde acá; si es la enfocada
-    // se minimiza vía atajo. Como fallback, sólo refrescamos.
-    void api.desktopWindow.focus(id).then(() => refresh()).catch(() => undefined)
-  }, [refresh])
-
-  const noop = useCallback(() => {
-    /* el SO maneja posición / tamaño / z-order de las ventanas nativas */
-  }, [])
-
   const focusedId = useMemo(
     () => windows.find((w) => w.focused)?.windowKey ?? null,
     [windows],
   )
 
   const value = useMemo<WindowManagerApi>(
-    () => ({
-      windows,
-      focusedId,
-      openWindow,
-      closeWindow,
-      minimizeWindow,
-      toggleMaximize: noop,
-      focusWindow,
-      moveWindow: noop,
-      resizeWindow: noop,
-      cycleFocus: noop,
-      refresh,
-    }),
-    [windows, focusedId, openWindow, closeWindow, minimizeWindow, focusWindow, noop, refresh],
+    () => ({ windows, focusedId, openWindow, closeWindow, focusWindow }),
+    [windows, focusedId, openWindow, closeWindow, focusWindow],
   )
 
   return <WindowManagerContext.Provider value={value}>{children}</WindowManagerContext.Provider>
@@ -219,14 +186,11 @@ export function useWindowManager(): WindowManagerApi {
 }
 
 /* ------------------------------------------------------------------------ */
-/* WindowSelf: params/extras/close de la ventana embedded actual              */
+/* WindowSelf: extras de la ventana embedded actual                           */
 /* ------------------------------------------------------------------------ */
 
 interface WindowSelfContextValue {
-  windowId: string
-  params: Record<string, string | number | undefined>
   extras: unknown
-  close: () => void
 }
 
 const WindowSelfContext = createContext<WindowSelfContextValue | null>(null)
@@ -243,14 +207,4 @@ export function WindowSelfProvider({
 
 export function useWindowSelf(): WindowSelfContextValue | null {
   return useContext(WindowSelfContext)
-}
-
-/**
- * Lee un param de la ventana actual (si existe). En el modelo de ventanas
- * nativas siempre hay un `WindowSelfProvider` cuando la página corre embedded.
- */
-export function useWindowParam(key: string): string | null {
-  const self = useContext(WindowSelfContext)
-  if (self && self.params[key] != null) return String(self.params[key])
-  return null
 }

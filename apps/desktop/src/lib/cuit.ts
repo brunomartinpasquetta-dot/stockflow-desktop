@@ -4,7 +4,7 @@
  */
 const WEIGHTS = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
 
-export function normalizeCUIT(cuit: string): string {
+function normalizeCUIT(cuit: string): string {
   return cuit.replace(/[^0-9]/g, '')
 }
 
@@ -20,10 +20,4 @@ export function validateCUIT(cuit: string): boolean {
   if (check === 11) check = 0
   if (check === 10) check = 9
   return check === Number(clean.charAt(10))
-}
-
-export function formatCUIT(cuit: string): string {
-  const clean = normalizeCUIT(cuit)
-  if (clean.length !== 11) return cuit
-  return `${clean.slice(0, 2)}-${clean.slice(2, 10)}-${clean.slice(10)}`
 }

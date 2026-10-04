@@ -1,7 +1,7 @@
 /**
  * Facturas por teléfono — asociación automática renglón → artículo (sin Electron, sin base).
  * Catálogo SINTÉTICO (nombres genéricos de kiosco/almacén, al estilo de un comerciante): no hay datos de clientes.
- * Renglones: los 40 del prototipo (tools/ocr-facturas/asociar.py), los de almacén de vital-12 y vital-14
+ * Renglones: los 40 del prototipo en Python del que se portó asociador.ts, los de almacén de vital-12 y vital-14
  * (fixtures/facturas/esperado.json), trampas agregadas a mano y los sondeos contra el catálogo real
  * (tools/ocr-facturas/RESULTADOS.md, 3-oct-2026: cerveza 0.0, "330 X 24", rubro en el medio, SIN/CON GAS, ORIG).
  *   pnpm --filter @stockflow/desktop test:facturas-asociador

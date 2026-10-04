@@ -657,16 +657,6 @@ export const promotionItems = sqliteTable(
   }),
 );
 
-export const promotionsRelations = relations(promotions, ({ one, many }) => ({
-  article: one(articles, { fields: [promotions.articleId], references: [articles.id] }),
-  items: many(promotionItems),
-}));
-
-export const promotionItemsRelations = relations(promotionItems, ({ one }) => ({
-  promotion: one(promotions, { fields: [promotionItems.promotionId], references: [promotions.id] }),
-  article: one(articles, { fields: [promotionItems.articleId], references: [articles.id] }),
-}));
-
 /* ------------------------------------------------------------------ */
 /* quotes — presupuestos (cabecera). NO es comprobante fiscal: tiene su */
 /* propia numeración secuencial. No toca stock hasta convertirse en venta. */
@@ -1062,7 +1052,7 @@ export const articleSupplierCodes = sqliteTable(
      * Descripción con que el proveedor imprimió ese código la vez que se
      * vinculó (migración 0039). La próxima factura la compara con la suya antes
      * de confiar en el código: un dígito mal leído cae en el código de OTRO
-     * producto. null = aprendido antes de la columna.
+     * producto. null = sin descripción conocida al vincular.
      */
     description: text('description'),
     createdAt: createdAtCol(),

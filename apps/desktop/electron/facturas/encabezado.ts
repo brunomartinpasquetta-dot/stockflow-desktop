@@ -12,6 +12,7 @@
  *
  * Sin Electron ni base de datos: se prueba con tsx (facturas-reales.smoke.ts).
  */
+import { cuitValido } from '../../src/lib/facturaACompra';
 import { detectarFormato, totalesDelTexto } from './parser';
 
 export interface EncabezadoLeido {
@@ -52,19 +53,6 @@ interface Linea {
 }
 
 const soloDigitos = (s: string): string => s.replace(/\D/g, '');
-
-const PREFIJOS_CUIT = new Set(['20', '23', '24', '25', '26', '27', '30', '33', '34']);
-
-/** CUIT bien formado: 11 dígitos, prefijo que existe y dígito verificador (módulo 11). */
-export function cuitValido(cuit: string): boolean {
-  if (!/^\d{11}$/.test(cuit) || !PREFIJOS_CUIT.has(cuit.slice(0, 2))) return false;
-  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
-  let suma = 0;
-  for (let i = 0; i < 10; i++) suma += Number(cuit[i]) * pesos[i]!;
-  const resto = 11 - (suma % 11);
-  const dv = resto === 11 ? 0 : resto === 10 ? -1 : resto;
-  return dv === Number(cuit[10]);
-}
 
 function aLineas(textos: string[]): Linea[] {
   const out: Linea[] = [];

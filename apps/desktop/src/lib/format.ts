@@ -1,13 +1,9 @@
 /**
  * Helpers de formato del renderer Electron.
  *
- * Las primitivas monetarias replican el contrato de
- * `@stockflow/shared/utils/currency` para no romper renderer + desktop ↔
- * shared/cloud. Mantenemos esta copia local en `apps/desktop/src` para
- * que el tsconfig del renderer (`erasableSyntaxOnly`, `verbatimModuleSyntax`)
- * no tenga que crawlear las re-exports `export type ... from '@stockflow/db'`.
- *
- * Si necesitás tocar la fórmula, sincronizá ambos lados.
+ * Las primitivas monetarias viven acá (y no en `@stockflow/shared`) para que
+ * el tsconfig del renderer (`erasableSyntaxOnly`, `verbatimModuleSyntax`) no
+ * tenga que crawlear las re-exports `export type ... from '@stockflow/db'`.
  */
 import { format, formatDistanceToNowStrict } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -89,11 +85,6 @@ export function parseCurrencyInput(input: string | number | null | undefined): s
   // ceros/punto sobrantes a la derecha ("12.3400"→"12.34", "12.0000"→"12").
   const fixed = Math.abs(n).toFixed(4)
   return fixed.replace(/\.?0+$/, '')
-}
-
-/** Versión numérica útil para cálculos derivados en vivo. */
-export function parseCurrencyToNumber(input: string | number | null | undefined): number {
-  return Number(parseCurrencyInput(input))
 }
 
 /**

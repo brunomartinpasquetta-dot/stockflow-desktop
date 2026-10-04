@@ -17,7 +17,7 @@ import {
   useSuppliers,
 } from '@/lib/hooks'
 import { useAuth, usePermission } from '@/contexts/AuthContext'
-import { useWindowSelf } from '@/contexts/WindowManagerContext'
+import { EXTRAS_PARAM, useWindowSelf } from '@/contexts/WindowManagerContext'
 import { useWindowNav } from '@/lib/useWindowNav'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
@@ -807,7 +807,7 @@ function PDV() {
     // de un pedido que quizás ya se cobró (auditoría sep-2026).
     const [ruta, qs = ''] = window.location.hash.slice(1).split('?')
     const sp = new URLSearchParams(qs)
-    sp.delete('__extras')
+    sp.delete(EXTRAS_PARAM)
     window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#${ruta}${sp.size > 0 ? `?${sp.toString()}` : ''}`)
     const pedidoId = extras.pedidoWebId
     const lineas = extras.prefilledLines

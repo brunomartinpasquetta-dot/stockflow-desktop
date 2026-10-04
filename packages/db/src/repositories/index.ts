@@ -7,7 +7,6 @@ import type { LocalDatabase } from '../local/client';
 import { AccountsReceivableRepository } from './accountsReceivable.repository';
 import { ArticleRepository } from './article.repository';
 import { BaseRepository } from './base.repository';
-import { CardRepository } from './card.repository';
 import { CashGeneralRepository } from './cashGeneral.repository';
 import { CashMovementRepository } from './cashMovement.repository';
 import { CashRegisterRepository } from './cashRegister.repository';
@@ -40,7 +39,6 @@ import { UserRepository } from './user.repository';
 export { BaseRepository };
 export { AccountsReceivableRepository } from './accountsReceivable.repository';
 export { ArticleRepository } from './article.repository';
-export { CardRepository } from './card.repository';
 export {
   CashGeneralRepository,
   type AddCashGeneralMovementInput,
@@ -135,8 +133,6 @@ export interface Repositories {
   supplierPayments: SupplierPaymentRepository;
   paymentMethods: PaymentMethodRepository;
   priceUpdates: PriceUpdateRepository;
-  /** Tabla `cards` heredada: queda en DB sin uso activo desde P07.2. */
-  cards: CardRepository;
   company: CompanyRepository;
   rolePermissions: RolePermissionRepository;
 }
@@ -173,7 +169,6 @@ export function createRepositories(db: LocalDatabase): Repositories {
     supplierPayments: new SupplierPaymentRepository(db),
     paymentMethods: new PaymentMethodRepository(db),
     priceUpdates: new PriceUpdateRepository(db),
-    cards: new CardRepository(db),
     company: new CompanyRepository(db),
     rolePermissions: new RolePermissionRepository(db),
   };

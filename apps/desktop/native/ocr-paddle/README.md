@@ -38,6 +38,8 @@ variantes medidas en `tools/ocr-facturas/RESULTADOS.md` (3-oct-2026); copiados d
 - `pnpm test:facturas-paddle` (`electron/__tests__/facturas-paddle.smoke.ts`): corre
   `leer.mjs` con el Electron del repo sobre dos fotos reales y pasa el resultado por el
   pipeline de la app (`armarRenglones` → `parsearTexto`).
-- `tools/ocr-facturas/evaluar.mts` evalúa una carpeta de JSON contra las 8 fotos reales;
-  `tools/ocr-facturas/paddle-ocr.mjs` es el prototipo (con sharp + OpenCV, `--dibujar`)
-  del que se portó este script.
+- `tools/ocr-facturas/medir-paddle.sh <variante> [opciones]` corre este script con el
+  Electron del repo sobre las 8 fotos reales de `tools/ocr-facturas/muestras/` y evalúa
+  el resultado con `tools/ocr-facturas/evaluar.mts` (el mismo pipeline de la app). Las
+  mediciones del prototipo del que se portó (sharp + OpenCV, ya fuera del repo) están
+  en `tools/ocr-facturas/RESULTADOS.md`.

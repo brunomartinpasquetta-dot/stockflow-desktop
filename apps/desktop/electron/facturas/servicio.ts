@@ -36,11 +36,13 @@ import {
   controlDeTotal,
   costoParaCompras,
   cuentaCierra,
+  enPesos,
   esCodigoDeBarras,
   esRenglonDeGasto,
   nombreDeProveedorNormalizado,
   PREFIJO_CLAVE_DESCRIPCION,
   proveedoresParecidos,
+  sinAcentos,
   type ModoPrecios,
 } from '../../src/lib/facturaACompra';
 
@@ -49,9 +51,9 @@ import { prepararCatalogo, proponerArticulo, tamanosDistintos, type CatalogoPrep
 import { leerEncabezado, type EncabezadoLeido } from './encabezado';
 import { LectorFacturas, MODELO_LECTOR_POR_DEFECTO } from './lector';
 import { armarRenglones, calidadDeFoto, type LecturaSistema } from './lectorSistema';
-import { detectarFormato, enPesos, MOTIVO_PEGADO, parsearTexto, totalesDelTexto, unirHojas, type RenglonLeido } from './parser';
+import { detectarFormato, MOTIVO_PEGADO, parsearTexto, totalesDelTexto, unirHojas, type RenglonLeido } from './parser';
 import { leerQrFiscal, type DatosQr } from './qrFiscal';
-import type { PuertaFotos } from './servidorFotos';
+import { MAX_FOTO_BYTES, type PuertaFotos } from './servidorFotos';
 
 /* ─────────────────────────────── tipos ─────────────────────────────── */
 
@@ -66,7 +68,7 @@ export interface ConfigFacturas {
   mejorLectura: boolean;
 }
 
-export const CONFIG_FACTURAS_POR_DEFECTO: ConfigFacturas = { activo: false, modelo: MODELO_LECTOR_POR_DEFECTO, mejorLectura: false };
+const CONFIG_FACTURAS_POR_DEFECTO: ConfigFacturas = { activo: false, modelo: MODELO_LECTOR_POR_DEFECTO, mejorLectura: false };
 
 /**
  * Lo que el servicio necesita del lector de texto del sistema (`LectorSistema`
@@ -122,7 +124,7 @@ export interface EncabezadoFactura extends DatosQr {
  *  4 = artículos sugeridos por parecido de descripción (asociador.ts).
  *  5 = el código leído en una línea aparte queda dudoso: se ofrece, no vincula solo.
  */
-export const VERSION_LECTURA = 5;
+const VERSION_LECTURA = 5;
 
 /** Renglón guardado: lo leído + el artículo que eligió (o se le encontró) al vincular. */
 export interface RenglonFactura extends RenglonLeido {
@@ -284,7 +286,6 @@ export interface FacturaResumen {
   /** Hay otra factura escaneada con el mismo comprobante (emisor + punto de venta + número, o CAE). */
   repetida: boolean;
   creadaEl: number;
-  actualizadaEl: number;
 }
 
 export interface FacturaDetalle extends FacturaResumen {
@@ -348,8 +349,6 @@ export interface OpcionesFacturasTelefono {
   /** Lector de texto del sistema operativo (el principal). Sin él se lee con Ollama. */
   lectorSistema?: LectorDeHojas | null;
   log?: Log;
-  /** Tiempo máximo de lectura por hoja (tests). */
-  timeoutHojaMs?: number;
   /** Lector del QR fiscal (tests). Por defecto, `leerQrFiscal`. */
   leerQr?: (jpeg: Buffer) => DatosQr | null;
   /**
@@ -378,15 +377,14 @@ export interface LimitesFacturas {
   lecturasALaVez: number;
 }
 
-export const MAX_HOJAS = 12;
-export const MAX_FOTO_BYTES = 12 * 1024 * 1024;
+const MAX_HOJAS = 12;
 const VIDA_SESION_MS = 30 * 60_000;
 /**
  * Un enlace no es eterno ni sin fondo: quien lo tenga (viaja sin cifrar por la
  * Wi-Fi del local y queda en el historial del teléfono) no puede llenar el
  * disco de la PC ni dejar la cola de lectura ocupada por horas.
  */
-export const LIMITES_POR_DEFECTO: LimitesFacturas = {
+const LIMITES_POR_DEFECTO: LimitesFacturas = {
   vidaMaximaSesionMs: 2 * 60 * 60_000,
   facturasPorSesion: 20,
   bytesPorSesion: 300 * 1024 * 1024,
@@ -476,10 +474,6 @@ export function elegirIpLocal(ifaces: NodeJS.Dict<os.NetworkInterfaceInfo[]> = o
   return mejor?.ip ?? null;
 }
 
-function sinAcentos(s: string): string {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
-
 /** Palabras que sirven para comparar descripciones (sin medidas ni números). */
 function palabras(texto: string): string[] {
   return sinAcentos(texto)
@@ -542,9 +536,6 @@ function textoONull(v: unknown, max: number): string | null {
   const t = texto(v, max).trim();
   return t ? t : null;
 }
-
-/** La cuenta vive en src/lib/facturaACompra.ts (la usa también el alta de artículos de la revisión). */
-export { esCodigoDeBarras };
 
 /** ¿El número de factura escrito en una compra (`0001-00012345`, `1-12345`, `12345`) es este comprobante? */
 export function mismoNumeroDeFactura(escrito: string | null | undefined, ptoVta: number | null, nroCmp: number | null): boolean {
@@ -727,7 +718,6 @@ export class FacturasTelefono implements PuertaFotos {
   private readonly dirFotos: string;
   private readonly clienteDe: () => OllamaClient;
   private readonly lectorSistema: LectorDeHojas | null;
-  private readonly timeoutHojaMs: number | undefined;
   private readonly leerQr: (jpeg: Buffer) => DatosQr | null;
   private readonly licenciaActiva: () => boolean;
   private readonly limites: LimitesFacturas;
@@ -786,7 +776,6 @@ export class FacturasTelefono implements PuertaFotos {
     };
     const cliente = opts.cliente;
     this.clienteDe = typeof cliente === 'function' ? cliente : () => cliente;
-    this.timeoutHojaMs = opts.timeoutHojaMs;
     this.lectorSistema = opts.lectorSistema ?? null;
     this.leerQr = opts.leerQr ?? leerQrFiscal;
     this.licenciaActiva = opts.licenciaActiva ?? (() => true);
@@ -1257,7 +1246,7 @@ export class FacturasTelefono implements PuertaFotos {
     sesion.bytes += jpeg.length;
     sesion.recibiendo = true;
     try {
-      return await this.recibirFotoValidada(token, jpeg, opciones, validar, sesion);
+      return await this.recibirFotoValidada(jpeg, opciones, validar, sesion);
     } finally {
       sesion.recibiendo = false;
     }
@@ -1276,7 +1265,6 @@ export class FacturasTelefono implements PuertaFotos {
   }
 
   private async recibirFotoValidada(
-    token: string,
     jpeg: Buffer,
     opciones: { forzar?: boolean },
     validar: () => Sesion,
@@ -1441,11 +1429,6 @@ export class FacturasTelefono implements PuertaFotos {
   /* ------------------------------ cola de lectura ------------------------------ */
 
   /**
-   * Al arrancar la app: lo que quedó a medio leer vuelve a la cola (se
-   * conservan las hojas ya leídas) y lo que quedó a medio recibir se cierra
-   * (los enlaces no sobreviven a un reinicio).
-   */
-  /**
    * La limpieza es para lo que quedó de la sesión ANTERIOR de la app: main.ts
    * la llama en el arranque, antes de que pueda existir un enlace o una
    * lectura (`arrancar: false`), y recién después de unos segundos arranca la
@@ -1535,7 +1518,7 @@ export class FacturasTelefono implements PuertaFotos {
     const estaLectura = { id: f.id, hoja: textos.length + 1, hojas: f.photos.length, lento: false, corte };
     this.leyendo = estaLectura;
     repo.actualizar(f.id, { status: 'leyendo', pagesDone: textos.length, error: null });
-    const lector = new LectorFacturas({ cliente: this.clienteDe(), modelo: this.config.modelo, timeoutMs: this.timeoutHojaMs });
+    const lector = new LectorFacturas({ cliente: this.clienteDe(), modelo: this.config.modelo });
     // Lector principal: el de texto del sistema (al instante). El de Ollama
     // sólo con "Mejorar lectura" o si esta PC no tiene lector del sistema.
     let conSistema = await this.leeConSistema();
@@ -2118,7 +2101,6 @@ export class FacturasTelefono implements PuertaFotos {
       fecha: f.header?.fecha ?? null,
       repetida,
       creadaEl: f.createdAt,
-      actualizadaEl: f.updatedAt,
     };
   }
 

@@ -18,7 +18,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, ScanLine } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
+import { mensajeError } from '@/lib/mensajeError'
 import { useWindowManager } from '@/contexts/WindowManagerContext'
 import { useArticles, useCompany } from '@/lib/hooks'
 import { useWindowNav } from '@/lib/useWindowNav'
@@ -43,11 +44,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { ArticleDTO, FacturaEscaneadaDetalleDTO, FacturasSeguimientoItemDTO, PriceMode } from '@/types/api'
-
-function mensajeError(e: unknown): string {
-  if (e instanceof ApiError) return e.message
-  return e instanceof Error ? e.message : 'No se pudo completar la operación.'
-}
 
 /** Estados en los que la factura todavía se está mandando o leyendo. */
 const EN_CAMINO = new Set(['recibiendo', 'en_cola', 'leyendo'])

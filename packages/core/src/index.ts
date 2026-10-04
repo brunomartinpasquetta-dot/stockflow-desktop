@@ -28,7 +28,6 @@ export {
   hasPermission,
   requirePermission,
   applyAreaConfig,
-  resetEffectiveMatrix,
   effectivePermissionsFor,
 } from './auth/permissions';
 export {

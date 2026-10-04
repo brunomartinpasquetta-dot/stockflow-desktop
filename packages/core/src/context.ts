@@ -35,11 +35,3 @@ export function createServiceContext(
     currentCashRegister,
   };
 }
-
-/** Devuelve una copia del contexto con otra caja activa. */
-export function withCashRegister(
-  ctx: ServiceContext,
-  cashRegister: CashRegister | null,
-): ServiceContext {
-  return { ...ctx, currentCashRegister: cashRegister };
-}

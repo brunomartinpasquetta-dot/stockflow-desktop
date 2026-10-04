@@ -13,7 +13,6 @@ import { printNode, widthFromPaperFormat, type PrintOptions, type PrintWidth } f
 import { CashCloseReport, type CashCloseReportData } from '@/print/CashCloseReport'
 import { FormalDocA4, type FormalDocData } from '@/print/FormalDocA4'
 import { HistoricalCashReport, type HistoricalCashReportData } from '@/print/HistoricalCashReport'
-import { SaleTicket, type SaleTicketData } from '@/print/SaleTicket'
 import { AccountingSummaryReport, type AccountingSummaryReportData } from '@/print/AccountingSummaryReport'
 import { VatBookReport, type VatBookReportData } from '@/print/VatBookReport'
 
@@ -42,14 +41,6 @@ function usePrintConfig(): { width: PrintWidth; opts: PrintOptions } {
   return { width, opts: { width } }
 }
 
-export function usePrintSaleTicket() {
-  const { opts } = usePrintConfig()
-  return useCallback(
-    (data: SaleTicketData) => printNode(createElement(SaleTicket, { data }), opts),
-    [opts],
-  )
-}
-
 export function usePrintCashClose() {
   const { opts } = usePrintConfig()
   // Los reportes de cierre son extensos: si la impresora es térmica
@@ -60,9 +51,6 @@ export function usePrintCashClose() {
     [opts],
   )
 }
-
-/** Alias para que el código nuevo de historial use un nombre consistente. */
-export const usePrintCashCloseReport = usePrintCashClose
 
 export function usePrintHistoricalCashReport() {
   const { opts } = usePrintConfig()

@@ -17,6 +17,7 @@ import {
 } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { dayEnd, dayStart, isoDaysAgo, todayIso } from '@/lib/periodPresets'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,22 +30,6 @@ import { CurrencyInput } from '@/components/ui/currency-input'
 import type { CashGeneralCategoryDTO, CashGeneralMovementDTO } from '@/types/api'
 import { SinPermiso } from '@/components/SinPermiso'
 import { HistorialCajas } from './HistorialCajas'
-
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function isoDaysAgo(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function dayStart(iso: string): number {
-  return new Date(`${iso}T00:00:00`).getTime()
-}
-function dayEnd(iso: string): number {
-  return new Date(`${iso}T23:59:59.999`).getTime()
-}
 
 export function CajaGeneral() {
   const canView = usePermission('view_cash_general')

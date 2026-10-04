@@ -6,17 +6,23 @@ directories:
   buildResources: build
   output: release
 
-files:
-  - dist/**/*
-  - dist-electron/**/*
-  - package.json
-  # Los workspace packages (@stockflow/*) ya están bundleados en dist-electron/main.mjs;
-  # excluirlos del traversal de node_modules para evitar el bucle de symlinks de pnpm.
-  - "!**/node_modules/@stockflow/**"
-  # onnxruntime-node (lector PaddleOCR de "Facturas por teléfono") trae los binarios
-  # de TODAS las plataformas (~290 MB): a cada paquete va sólo el suyo (ver
-  # mac/win/linux.files más abajo). Su script de instalación no se usa.
-  - "!**/node_modules/onnxruntime-node/script/**"
+# Qué va adentro de app.asar: la lista COMPLETA está en `files` de cada plataforma
+# (mac/win/linux, más abajo) y a propósito NO hay un bloque `files` global.
+# electron-builder 24 convierte el `files` global en un FileSet aparte y manda los
+# patrones de la plataforma al matcher principal; si ese matcher trae sólo
+# negaciones (como pasaba con los filtros de onnxruntime-node) le antepone `**/*`
+# y empaqueta TODO apps/desktop (src, manual-src, electron con sus tests…: +30 MB
+# en la 1.12.0/1.12.1). Al tocar estas listas, comprobar con `package:dry` que en
+# `release/builder-debug.yml` → `firstOrDefaultFilePatterns` empiece con `dist/**/*`
+# y que el asar tenga en la raíz sólo package.json, dist, dist-electron y node_modules.
+#
+# Patrones comunes a las tres plataformas:
+#  - dist/**/*, dist-electron/**/*, package.json
+#  - "!**/node_modules/@stockflow/**": los workspace packages van bundleados en
+#    dist-electron/main.mjs (y son devDependencies, así que ni se recorren).
+#  - "!**/node_modules/onnxruntime-node/script/**": onnxruntime-node (lector PaddleOCR
+#    de "Facturas por teléfono") trae los binarios de TODAS las plataformas (~290 MB)
+#    y un script de instalación que no se usa; a cada paquete va sólo el suyo.
 
 extraResources:
   - from: ../../packages/db/migrations/local
@@ -54,8 +60,6 @@ asarUnpack:
   - "**/*.node"
   - "**/jpeg-js/**"
   - "**/onnxruntime-common/**"
-# Nota: SumatraPDF.exe NO se desempaqueta acá (el asarUnpack con pnpm no funcionó,
-# v0.1.39). Se copia a resources/ vía extraResources en electron-builder.win.yml.
 
 mac:
   category: public.app-category.business
@@ -77,6 +81,11 @@ mac:
         - arm64
   icon: build/icon.icns
   files:
+    - dist/**/*
+    - dist-electron/**/*
+    - package.json
+    - "!**/node_modules/@stockflow/**"
+    - "!**/node_modules/onnxruntime-node/script/**"
     # onnxruntime-node: sólo el binario de esta plataforma y arquitectura.
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/{linux,win32}/**"
     # Intel: onnxruntime-node 1.30 no trae binario darwin/x64 (en esas Mac lee sólo Vision).
@@ -103,6 +112,11 @@ win:
         - x64
   icon: build/icon.ico
   files:
+    - dist/**/*
+    - dist-electron/**/*
+    - package.json
+    - "!**/node_modules/@stockflow/**"
+    - "!**/node_modules/onnxruntime-node/script/**"
     # onnxruntime-node: sólo win32/x64. Van también DirectML.dll, dxcompiler.dll y
     # dxil.dll (37 MB): el lector usa sólo CPU y no deberían hacer falta, pero no
     # se probó en una PC con Windows que onnxruntime.dll cargue sin ellas.
@@ -138,6 +152,12 @@ linux:
   category: Office
   icon: build/icon.png
   files:
+    - dist/**/*
+    - dist-electron/**/*
+    - package.json
+    - "!**/node_modules/@stockflow/**"
+    - "!**/node_modules/onnxruntime-node/script/**"
+    # onnxruntime-node: sólo linux/x64.
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/{darwin,win32}/**"
     - "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/!(${arch})/**"
 

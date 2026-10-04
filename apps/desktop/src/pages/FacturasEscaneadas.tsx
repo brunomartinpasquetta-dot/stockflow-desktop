@@ -24,6 +24,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Plus, Search, Smartphone
 import { toast } from 'sonner'
 
 import { api, ApiError } from '@/lib/api'
+import { mensajeError } from '@/lib/mensajeError'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWindowManager, useWindowSelf } from '@/contexts/WindowManagerContext'
 import { hasPermissionFor } from '@/lib/permissions'
@@ -51,7 +52,6 @@ import {
   proximoCodigoInterno,
   tipoDeEncabezado,
   type ModoPrecios,
-  type PasajeACompras,
   type TipoComprobante,
 } from '@/lib/facturaACompra'
 import { CurrencyInput } from '@/components/ui/currency-input'
@@ -89,11 +89,6 @@ import type {
   SupplierDTO,
 } from '@/types/api'
 
-function mensajeError(e: unknown): string {
-  if (e instanceof ApiError) return e.message
-  return e instanceof Error ? e.message : 'No se pudo completar la operación.'
-}
-
 const ESTADOS: Record<FacturaEscaneadaEstadoDTO, { etiqueta: string; variante: 'default' | 'primary' | 'success' | 'destructive' | 'outline' }> = {
   recibiendo: { etiqueta: 'Recibiendo', variante: 'default' },
   en_cola: { etiqueta: 'Pendiente', variante: 'default' },
@@ -117,29 +112,6 @@ function comprobante(f: { letra: string | null; tipoCmp?: number | null; ptoVta:
   const numero = numeroDeFactura(f.ptoVta, f.nroCmp)
   if (!f.letra && !numero) return '—'
   return `${CLASES[claseDeComprobante(f.tipoCmp)]} ${f.letra ?? ''} ${numero}`.trim()
-}
-
-/**
- * Tipo de comprobante con el que se abre la factura: el que eligió el usuario
- * (el comprobante X no tiene letra); si no eligió, la letra leída (la Factura
- * M se trata como A: precios netos). null = no se sabe.
- */
-const tipoLeido = (h: FacturaEscaneadaEncabezadoDTO | null): TipoComprobante | null => tipoDeEncabezado(h)
-
-/** Lo que recibe la ventana de Compras para precargar el formulario (ver Compras.tsx). */
-function extrasParaCompras(
-  id: string,
-  d: {
-    supplierId: string | null
-    tipo: TipoComprobante
-    ptoVta: number | null
-    nroCmp: number | null
-    fecha: string | null
-    yaCargada?: { fecha: number } | null
-  },
-  pasaje: PasajeACompras,
-): Record<string, unknown> {
-  return { ...prefillDeFactura(id, d, pasaje) }
 }
 
 /** Qué aviso de «ya cargada» vio el usuario (para volver a avisar si aparece otro al guardar). */
@@ -283,7 +255,7 @@ function Lista({ onAbrir }: { onAbrir: (id: string) => void }) {
         return onAbrir(f.id)
       }
       openInWindow('compras', {
-        extras: extrasParaCompras(
+        extras: prefillDeFactura(
           f.id,
           {
             supplierId: d.supplierId,
@@ -362,13 +334,13 @@ function Lista({ onAbrir }: { onAbrir: (id: string) => void }) {
             ) : (
               filas.map((f) => {
                 const est = ESTADOS[f.estado]
-                const sePuedeAbrir = f.estado === 'lista' || f.estado === 'cargada'
+                // Leída = con renglones para mostrar y para abrir en la revisión.
                 const leida = f.estado === 'lista' || f.estado === 'cargada'
                 return (
                   <tr
                     key={f.id}
-                    className={cn('border-t', sePuedeAbrir && 'cursor-pointer hover:bg-muted/50')}
-                    onClick={sePuedeAbrir ? () => onAbrir(f.id) : undefined}
+                    className={cn('border-t', leida && 'cursor-pointer hover:bg-muted/50')}
+                    onClick={leida ? () => onAbrir(f.id) : undefined}
                   >
                     <td className="px-3 py-2 align-top">
                       <Badge variant={est.variante} title={f.error ?? undefined}>{est.etiqueta}</Badge>
@@ -656,7 +628,7 @@ function Revision({
     // El tipo que eligió el usuario manda (el comprobante X no tiene letra).
     // Si todavía no eligió: la letra leída; la Factura M se trata como A
     // (precios netos). Sin letra queda sin elegir: lo elige el usuario.
-    setTipoElegido(tipoLeido(d.header))
+    setTipoElegido(tipoDeEncabezado(d.header))
     setTotal(aTexto(d.header?.importe ?? null))
     // Con los ceros de adelante, como se imprime en la factura ("0004-00019142").
     setPtoVta(d.header?.ptoVta != null ? String(d.header.ptoVta).padStart(4, '0') : '')
@@ -974,7 +946,7 @@ function Revision({
           openInWindow('compras')
         } else {
           openInWindow('compras', {
-            extras: extrasParaCompras(
+            extras: prefillDeFactura(
               id,
               {
                 supplierId,

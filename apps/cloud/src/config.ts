@@ -60,8 +60,5 @@ export const SMTP_USER = process.env.SMTP_USER;
 export const SMTP_PASS = process.env.SMTP_PASS;
 export const SMTP_FROM = process.env.SMTP_FROM ?? 'StockFlow <no-reply@stockflow.local>';
 
-/** URL pública de la landing (para enlaces en emails / redirects). */
-export const LANDING_URL = process.env.LANDING_URL ?? 'http://localhost:3009/landing.html';
-
 /** Orígenes permitidos para CORS (coma-separados). Si vacío → `true` (cualquiera). */
 export const CORS_ORIGINS = process.env.CORS_ORIGINS;

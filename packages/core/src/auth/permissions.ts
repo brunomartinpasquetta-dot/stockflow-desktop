@@ -232,13 +232,6 @@ export function applyAreaConfig(rows: readonly RoleAreaAccessRow[]): void {
   effectiveMatrix.admin = new Set(PERMISSION_ACTIONS);
 }
 
-/** Restaura `effectiveMatrix` a la matriz DEFAULT (útil para tests). */
-export function resetEffectiveMatrix(): void {
-  effectiveMatrix.admin = new Set(PERMISSION_MATRIX.admin);
-  effectiveMatrix.manager = new Set(PERMISSION_MATRIX.manager);
-  effectiveMatrix.seller = new Set(PERMISSION_MATRIX.seller);
-}
-
 /** Permisos EFECTIVOS de un rol (admin = todos). Pensado para el UserDTO. */
 export function effectivePermissionsFor(role: UserRole): PermissionAction[] {
   if (role === 'admin') return [...PERMISSION_ACTIONS];

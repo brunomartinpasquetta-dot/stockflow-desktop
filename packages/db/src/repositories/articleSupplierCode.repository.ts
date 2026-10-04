@@ -88,8 +88,4 @@ export class ArticleSupplierCodeRepository {
       .run();
     return this.buscar(supplierId, codigo)!;
   }
-
-  borrar(id: string): void {
-    this.db.delete(articleSupplierCodes).where(eq(articleSupplierCodes.id, id)).run();
-  }
 }

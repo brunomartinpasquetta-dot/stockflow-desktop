@@ -7,7 +7,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cuitValido, leerEncabezado } from '../facturas/encabezado';
+import { cuitValido } from '../../src/lib/facturaACompra';
+import { leerEncabezado } from '../facturas/encabezado';
 import { parsearTexto, totalesDelTexto, unirHojas, type RenglonLeido } from '../facturas/parser';
 
 const here = dirname(fileURLToPath(import.meta.url));

@@ -40,7 +40,7 @@ const run = async (): Promise<void> => {
   check('… y el flujo quedó cerrado', flowStateOf('c2') === null);
 
   /* Respuesta por número */
-  r = await startFlow('c3', 'impresora-no-imprime', CON_HARDWARE);
+  await startFlow('c3', 'impresora-no-imprime', CON_HARDWARE);
   r = await handleFlowAnswer('c3', '2', CON_HARDWARE);
   check('responder "2" elige la segunda opción', r != null && r.done && /ese suele ser el motivo/i.test(r?.reply ?? ''), r?.reply.slice(0, 60));
 

@@ -7,7 +7,7 @@
  *   ingresos/egresos manuales; `close_cash` para transferir desde caja diaria.
  */
 import { addDecimal, subDecimal } from '@stockflow/shared';
-import type { CashGeneralCategory, CashGeneralMovement, CashGeneralMovementType } from '@stockflow/db';
+import type { CashGeneralCategory, CashGeneralMovementType } from '@stockflow/db';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -101,7 +101,7 @@ export class CashGeneralService {
     if (!Number.isFinite(n) || n < 0) {
       throw new ValidationError('cashAmount', 'El efectivo declarado no puede ser negativo');
     }
-    return repos.cashGeneral.adjustBreakdown(input.cashAmount, currentUser.id);
+    return repos.cashGeneral.adjustBreakdown(input.cashAmount);
   }
 
   async listMovements(input: ListCashGeneralMovementsInput = {}): Promise<CashGeneralMovementDTO[]> {

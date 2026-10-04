@@ -22,7 +22,6 @@ import {
   interpretarLectura,
   lectoresPorPlataforma,
   programaDeLector,
-  programaPorPlataforma,
   type LectorDeHoja,
   type LecturaSistema,
 } from '../facturas/lectorSistema';
@@ -257,12 +256,8 @@ async function main(): Promise<void> {
     check(lectoresPorPlataforma('darwin').join() === 'vision,paddle', 'darwin: vision y después paddle');
     check(lectoresPorPlataforma('linux').join() === 'paddle', 'linux: sólo paddle');
     check(programaDeLector('paddle') === join('ocr-paddle', 'leer.mjs') && programaDeLector('vision') === join('ocr-mac', 'vision-ocr') && programaDeLector('windows-ocr') === join('ocr-win', 'leer.ps1'), 'programaDeLector');
-    check(programaPorPlataforma('darwin') === join('ocr-mac', 'vision-ocr') && programaPorPlataforma('win32') === join('ocr-win', 'leer.ps1') && programaPorPlataforma('linux') === null, 'programaPorPlataforma (lector del sistema operativo) sigue igual');
     check(new LectorSistema({ baseNativa: '/x', plataforma: 'win32' }).nombres.join() === 'paddle,windows-ocr', 'LectorSistema arma la cadena de la plataforma');
     check(new LectorSistema({ baseNativa: '/x', plataforma: 'darwin', nombres: ['paddle'] }).nombres.join() === 'paddle', '`nombres` elige los lectores');
-    const viejoMac = new LectorSistema({ programa: '/x/vision-ocr', plataforma: 'darwin' });
-    const viejoLinux = new LectorSistema({ programa: 'x', plataforma: 'linux' });
-    check(viejoMac.nombres.join() === 'vision' && viejoLinux.nombres.length === 0 && (await viejoLinux.disponible()) === false, 'compatibilidad: `programa` solo = el lector del sistema operativo');
     const noExiste = new LectorSistema({ baseNativa: join(dirNative, 'no-existe'), plataforma: 'win32', electronPath: electron });
     check((await noExiste.disponible()) === false, 'sin programas auxiliares → no disponible (sin ejecutar nada)');
     const lecturaTipada: LecturaSistema = { ancho: 1, alto: 1, textos: [] };

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
 
 import { useWindowSelf } from '@/contexts/WindowManagerContext'
 import { useWindowNav } from '@/lib/useWindowNav'
@@ -23,6 +22,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calculateSaleTotals, lineTotal, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
+import { todayIso } from '@/lib/periodPresets'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -52,7 +52,6 @@ interface CompraLine {
   quantity: string
   costPrice: string
   vatRate: string
-  /** Nuevo precio de venta (vacío = no cambia listPrice1). */
   /**
    * Precio nuevo POR LISTA, editable en pantalla. En modo manual arranca con
    * el precio vigente; en modo utilidad, con costo × margen (redondeado). El
@@ -117,10 +116,6 @@ const VAT_OPTIONS = [
   { value: '27.00', label: '27%' },
 ]
 
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 function isoToTs(iso: string): number | undefined {
   if (!iso) return undefined
   const ts = new Date(`${iso}T12:00:00`).getTime()
@@ -224,7 +219,6 @@ export function Compras() {
       activeMethods.find((m) => m.type === 'cash') ??
       activeMethods.find((m) => m.isPhysicalCash) ??
       activeMethods[0]
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedMethodId(fallback?.id ?? null)
   }
 
@@ -393,12 +387,9 @@ export function Compras() {
   // (`header`) y un `lote` distinto en cada pasaje, para poder recibir otra
   // factura con la ventana ya abierta (los `extras` llegan sin recargarla:
   // `extrasEnVivo` en el registry).
-  const location = useLocation()
   const prefillAppliedRef = useRef<string | null>(null)
   useEffect(() => {
-    const fromExtras = windowSelf?.extras as Prefill | undefined
-    const fromState = location.state as Prefill | null
-    const st = fromExtras ?? fromState
+    const st = windowSelf?.extras as Prefill | undefined
     if (!st || !Array.isArray(st.prefilledLines) || st.prefilledLines.length === 0) return
     const clave = String(st.lote ?? 'unico')
     if (prefillAppliedRef.current === clave) return
@@ -411,10 +402,8 @@ export function Compras() {
       return
     }
     aplicarPrefillAvisando(st)
-    // Limpiar el state de la ruta para que un refresco no reaplique.
-    window.history.replaceState({}, '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, allArticles, windowSelf?.extras, cartLength])
+  }, [allArticles, windowSelf?.extras, cartLength])
 
   function aplicarPrefillAvisando(st: Prefill): void {
     if (aplicarPrefill(st) && st.header && st.from === 'facturaEscaneada') {

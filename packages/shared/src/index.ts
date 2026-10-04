@@ -1,18 +1,13 @@
-import { z } from 'zod';
-
 /**
  * Contratos compartidos entre desktop y cloud.
  *
  * Exporta:
  *  - Schemas Zod de dominio (validación runtime de inputs/outputs), en `./schemas`.
- *  - Helpers (`./utils`): aritmética decimal sobre strings, validación de CUIT.
+ *  - Helpers (`./utils`): aritmética decimal sobre strings, validación de CUIT, IVA.
  *  - Tipos TypeScript derivados de las tablas Drizzle de `@stockflow/db` (re-export),
  *    para tipar entidades sin acoplar las apps al ORM.
- *  - Un placeholder de licencia (los schemas de licenciamiento llegan más adelante).
+ *  - Reglas y constantes de facturación electrónica ARCA (`./fiscal`).
  */
-export const LicenseSchema = z.object({});
-export type License = z.infer<typeof LicenseSchema>;
-
 export * from './utils';
 export * from './schemas';
 

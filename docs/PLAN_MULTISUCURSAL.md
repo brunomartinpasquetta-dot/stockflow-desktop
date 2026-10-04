@@ -116,3 +116,40 @@ Se decide cuando haya fecha. Opciones:
 - Tener las respuestas de la reunión (sección 3), sobre todo las ⚠.
 - Conseguir copias de bases reales para la prueba de la etapa 2 (al menos una con varias PC, ej. Leo, y una de una sola PC).
 - Igual que siempre: se desarrolla y prueba en la Mac de Bruno; **nada se taggea hasta que Bruno lo diga**.
+
+---
+
+## 9. Plan de ejecución con agentes (preparado 3-oct-2026, NO arrancado)
+
+Se arranca SOLO con las respuestas de la reunión (sección 3) y el OK de Bruno. Todo en la Mac de Bruno, sin tag hasta que él diga. Cada etapa termina con: baterías completas, typecheck, build, package:dry y revisión de expertos.
+
+### Etapa 0 — Preparación (1 agente, sólo lectura, ~1 h)
+- **Agente "mapa"**: inventario exacto de cada lugar que escribe/lee stock, caja, numeración y PV (ya hay un primer relevamiento en la sección 4); lista de pruebas existentes que tocan esas partes.
+- Conseguir **copias de bases reales** (Leo con 3 PC y Denver de 1 PC) para la prueba de migración.
+
+### Etapa 1 — Conexión y arreglos que sirven a todos (~1 semana)
+En paralelo, áreas separadas:
+- **Agente "red/seguridad"**: terminal por URL https (túnel), emparejamiento de PC de sucursal con código revocable, canales completos para PC emparejadas, bloqueo por dispositivo.
+- **Agente "caja por PC"**: identidad de la terminal enviada al servidor; cada PC abre su caja (arregla el bug actual de caja compartida en red).
+- **Agente "robustez"**: clave de idempotencia en `sales:create` (sin ventas duplicadas por timeout), timeout fiscal, compresión, no bajar el catálogo completo tras cada venta, PV por PC.
+- **Revisores**: seguridad (superficie expuesta por internet) y regresión LAN (Leo).
+
+### Etapa 2 — Stock por sucursal (~2 semanas, la delicada)
+Secuencial, un solo dueño del código de stock:
+- **Agente "modelo de datos"**: migración aditiva (`branches`, `article_stock`, `stock_movements`), Casa central automática, `articles.stock` = total.
+- **Agente "moverStock"**: un único punto que mueve stock; reemplazar los ~10 lugares (ventas, anulación, compras, devoluciones, ajustes, importación, reset, herramientas de migración); conservar `updated_at` para el catálogo.
+- **Agente "transferencias"**: remito interno entre sucursales (con confirmación de recepción si el cliente la pide) + pantalla.
+- **Agente "prueba con bases reales"**: migrar copias de Leo y Denver y comparar artículo por artículo que el stock no cambie; repetir ventas/compras/devoluciones/anulaciones contra la versión anterior.
+- **Revisores**: dinero/stock (contador experto en comercios) y adversarial (buscar caminos donde el total y la suma por sucursal diverjan).
+
+### Etapa 3 — Caja, ARCA, reportes y licencia (~1 semana)
+En paralelo:
+- **Agente "caja/ARCA"**: `branch_id` en caja, ventas, compras, PV por sucursal; Caja General global o por sucursal según la reunión.
+- **Agente "reportes"**: filtro de sucursal común en ~50 consultas + comparación entre sucursales; "Facturas emitidas/compra" por sucursal.
+- **Agente "licencia/UI"**: marca `multisucursal` en la licencia (cloud), Configuración → Sucursales, nada visible con una sola sucursal.
+- **Agente "Flowy y manual"**: fichas y sección nueva.
+- **Revisor UX/regresión**: un comercio de 1 PC no debe ver ningún cambio.
+
+### Cierre
+- Prueba de punta a punta en la Mac con 2 instancias (Coronda + San Carlos por el túnel).
+- Beta en Novo-Hogar; publicación general recién después.

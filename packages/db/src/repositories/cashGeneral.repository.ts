@@ -116,7 +116,7 @@ export class CashGeneralRepository {
    * en la caja fuerte, así que lo declara y a partir de ahí el sistema lo
    * sigue llevando bien.
    */
-  async adjustBreakdown(cashAmount: string, userId: string): Promise<CashGeneralBalance> {
+  async adjustBreakdown(cashAmount: string): Promise<CashGeneralBalance> {
     try {
       return this.db.transaction((tx) => {
         const row = tx.select().from(cashGeneral).where(eq(cashGeneral.id, SINGLETON_ID)).get();

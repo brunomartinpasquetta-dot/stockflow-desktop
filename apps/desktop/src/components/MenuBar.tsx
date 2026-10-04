@@ -5,8 +5,9 @@
  *   Archivo · Gestión · Operaciones · Cobros y Pagos · Precios ·
  *   Consultas · Contabilidad · Ayuda
  *
- * Cada grupo es un DropdownMenu de shadcn. Items deshabilitados (no ocultos)
- * cuando el usuario no tiene permisos o el rol requerido.
+ * Cada grupo es un DropdownMenu de shadcn. Los ítems sin permiso o sin el rol
+ * requerido quedan visibles y clickeables: al tocarlos se avisa por qué no se
+ * puede entrar (ver el comentario del `onSelect`).
  *
  * Altura del bar: h-9 (más compacto).
  */

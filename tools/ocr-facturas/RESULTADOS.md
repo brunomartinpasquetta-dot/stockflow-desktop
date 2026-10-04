@@ -148,3 +148,16 @@ Mismo pipeline de la app (interpretarLectura → armarRenglones → parsearTexto
 | Windows.Media.Ocr (Server, motor inglés) | 122/140 | 37 | 0 | 1/4 |
 
 Elegido para Windows: **det v5 + rec latin v5** (único con 0 mal sin aviso). Lo que se pierde frente a la Mac son renglones de Vital con resaltador que quedan marcados para revisar, nunca perdidos. Tiempo en M2 (CPU): 1,6–3,8 s por hoja; RSS 500–800 MB mientras lee (proceso aparte que termina con cada hoja).
+
+## Limpieza de esta carpeta (3-oct-2026)
+
+Los prototipos que ya se portaron a la app se borraron del repo; queda lo que hace falta para repetir una medición (`evaluar.mts`, `medir-paddle.sh`, `anonimizar.py`, `hallazgos-r2.json` y este archivo). Las secciones de arriba son historia y nombran a los scripts que se fueron; dónde vive hoy cada cosa:
+
+- `leer.mjs` (Tesseract), `puntuar.py` y `glm.py` (GLM-OCR por Ollama): borrados. Tesseract quedó descartado (40 %) y la medición de GLM no se puede repetir (se perdió la carpeta temporal). `package.json`/`package-lock.json` (tesseract.js, sharp, @gutenye/ocr-node) se fueron con ellos: nada de lo que queda necesita `npm install`.
+- `verdad.py` (planilla a mano de vital-12/13/14/15, 90 renglones) → `apps/desktop/electron/__tests__/fixtures/facturas/esperado.json` (es lo que lee `evaluar.mts`).
+- `vision.swift`, `vision-v2.swift`, `vision-v3.swift` → `apps/desktop/native/ocr-mac/vision.swift` (dos pasadas, gris max(R,G,B); se compila con `native/ocr-mac/compilar.sh`).
+- `filas.py` (agrupador de filas) → `armarRenglones` en `apps/desktop/electron/facturas/lectorSistema.ts`.
+- `asociar.py` → `apps/desktop/electron/facturas/asociador.ts`; sus 40 casos están en `electron/__tests__/facturas-asociador.smoke.ts`.
+- `paddle-ocr.mjs` (sharp + OpenCV WASM + js-clipper) → `apps/desktop/native/ocr-paddle/leer.mjs` (mismas opciones, sin `--dibujar`). `medir-paddle.sh` corre ahora ese port con el Electron del repo.
+
+Cómo repetir una medición: `./medir-paddle.sh <variante> [opciones de leer.mjs]` lee las 8 fotos de `muestras/` con PaddleOCR y evalúa; `./medir-paddle.sh mac` sólo evalúa los JSON de `vision-ocr` guardados en `salida-paddle/mac/` (se generan con `native/ocr-mac/vision-ocr <foto> > <nombre>.json`). En los dos casos la evaluación es `evaluar.mts` con el pipeline de la app.

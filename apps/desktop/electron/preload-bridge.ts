@@ -90,6 +90,13 @@ export interface BridgeIO {
   };
 }
 
+/**
+ * Grupos de canales que un puesto manda al servidor por /lan/rpc. Lo que no
+ * está acá se resuelve en CADA máquina (system, lan, updater, hardware,
+ * license, print, desktopWindow; también novedades y guia: la versión
+ * instalada, el "ya lo vi" y los primeros pasos son de cada puesto, porque
+ * cada máquina se actualiza por separado).
+ */
 export const LAN_ROUTED_GROUPS = new Set([
   'articles',
   'customers',
@@ -217,21 +224,6 @@ export function lanServerAccepts(channel: string): boolean {
   if (!LAN_ROUTED_GROUPS.has(group) || LAN_SERVER_DENIED_GROUPS.has(group)) return false;
   return !LAN_SERVER_DENIED_CHANNELS.has(channel);
 }
-
-export const LOCAL_GROUPS = new Set([
-  'system',
-  'lan',
-  'updater',
-  'hardware',
-  'license',
-  'print',
-  'desktopWindow',
-  // Novedades post-update: la versión instalada y el "ya lo vi" son de CADA
-  // puesto (cada máquina se actualiza por separado), no del servidor.
-  'novedades',
-  // Guía de primeros pasos: one-shot por máquina, como novedades.
-  'guia',
-]);
 
 interface LanState {
   sessionToken: string | null;

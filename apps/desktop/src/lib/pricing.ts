@@ -72,11 +72,6 @@ export function vatBreakdown(
   return { net: a - vat, vat, gross: a }
 }
 
-/** IVA contenido en un importe que ya lo incluye (atajo de `vatBreakdown(..., 'gross').vat`). */
-export function vatContained(grossAmount: string | number, vatRate: string | number): number {
-  return vatBreakdown(grossAmount, vatRate, 'gross').vat
-}
-
 export interface SaleLineInput {
   quantity: string | number
   unitPrice: string | number

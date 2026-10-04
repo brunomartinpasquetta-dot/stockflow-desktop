@@ -8,7 +8,7 @@ import { BookOpen, FileSpreadsheet, Printer } from 'lucide-react'
 import { useCompany, useSuppliers, useVatBookPurchases } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { PERIOD_PRESETS, dayEnd, dayStart, toIso } from '@/lib/periodPresets'
+import { PERIOD_PRESETS, dayEnd, dayStart, firstOfMonthIso, toIso } from '@/lib/periodPresets'
 import { exportVatBookPurchasesToExcel } from '@/lib/excelExport'
 import { usePrintVatBook } from '@/lib/usePrint'
 import { Badge } from '@/components/ui/badge'
@@ -21,10 +21,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { VatBookPurchaseRowDTO } from '@/types/api'
 import { SinPermiso } from '@/components/SinPermiso'
 
-function firstOfMonthIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
 
 function sumActive(rows: VatBookPurchaseRowDTO[], field: keyof VatBookPurchaseRowDTO): string {
   let s = 0

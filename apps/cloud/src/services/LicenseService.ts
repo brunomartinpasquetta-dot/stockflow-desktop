@@ -214,9 +214,6 @@ export class LicenseService {
     db: CloudDatabase,
     licenseId: string,
     currentExpMs: number,
-    plan: string,
-    lk: string,
-    tid: string,
     signJwt: (payload: object) => string,
     /** `kind` que traía el JWT presentado: si difiere del de la fila (una
      *  prueba convertida a paga), se renueva YA — sin esto el desktop quedaba

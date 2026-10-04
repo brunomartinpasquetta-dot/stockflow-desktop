@@ -17,17 +17,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
+import { mensajeError } from '@/lib/mensajeError'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useLanMode } from '@/contexts/LanContext'
 import type { EstadoFacturasDTO } from '@/types/api'
-
-function mensajeError(e: unknown): string {
-  if (e instanceof ApiError) return e.message
-  return e instanceof Error ? e.message : 'No se pudo completar la operación.'
-}
 
 function Barra({ fraccion }: { fraccion: number | null }) {
   return (

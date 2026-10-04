@@ -365,8 +365,6 @@ async function main(): Promise<void> {
     codigos.guardar(prov.id, '000777', artA.id);
     const lista = codigos.listarPorProveedor(prov.id);
     check('codigos.listarPorProveedor sólo los de ese proveedor, por código', lista.length === 2 && lista[0]!.code === '000777' && lista[1]!.code === '123456', lista.map((c) => c.code).join(','));
-    codigos.borrar(lista[0]!.id);
-    check('codigos.borrar', codigos.buscar(prov.id, '000777') === null && codigos.listarPorProveedor(prov.id).length === 1);
     let lanzo = false;
     try { codigos.guardar(prov.id, '   ', artA.id); } catch { lanzo = true; }
     check('codigos.guardar con código vacío lanza', lanzo);

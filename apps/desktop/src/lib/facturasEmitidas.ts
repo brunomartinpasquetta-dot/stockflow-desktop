@@ -17,8 +17,8 @@
  */
 import type { CustomerDTO, FiscalVoucherDTO, SaleDTO, VoucherType } from '@/types/api'
 
-export type EstadoFactura = 'completed' | 'voided' | 'pending'
-export type ClaseComprobante = FiscalVoucherDTO['kind']
+type EstadoFactura = 'completed' | 'voided' | 'pending'
+type ClaseComprobante = FiscalVoucherDTO['kind']
 
 export interface FacturaEmitidaFila {
   /** Clave única de la fila: id de la venta, o `nota:<id>` para NC/ND. */
@@ -47,7 +47,7 @@ export interface FacturaEmitidaFila {
   sinCae: boolean
 }
 
-export interface TotalesFacturas {
+interface TotalesFacturas {
   /** Comprobantes que suman (no anulados). */
   cantidad: number
   anuladas: number
@@ -64,14 +64,14 @@ export interface GrupoCliente extends TotalesFacturas {
   filas: FacturaEmitidaFila[]
 }
 
-export interface FiltrosFacturas {
+interface FiltrosFacturas {
   /** Vacío = todos. */
   customerId?: string
   type?: VoucherType | 'all'
   incluirAnuladas?: boolean
 }
 
-export interface OpcionesArmado {
+interface OpcionesArmado {
   from: number
   to: number
   /** Facturación electrónica activa: una A/B/C sin CAE queda "Pendiente". */
@@ -88,7 +88,7 @@ function fix4(n: number): string {
 }
 
 /** La ficha genérica del mostrador: ventas sin cliente asignado. */
-export function esConsumidorFinal(c: Pick<CustomerDTO, 'lastName'>): boolean {
+function esConsumidorFinal(c: Pick<CustomerDTO, 'lastName'>): boolean {
   return c.lastName.trim().toUpperCase() === 'CONSUMIDOR FINAL'
 }
 
@@ -98,14 +98,14 @@ export function nombreCliente(c: CustomerDTO | undefined, alternativo = '—'): 
   return c.firstName ? `${c.lastName}, ${c.firstName}` : c.lastName
 }
 
-export function documentoCliente(c: CustomerDTO | undefined): string | null {
+function documentoCliente(c: CustomerDTO | undefined): string | null {
   if (!c || !c.docType || c.docType === 'CF') return null
   const nro = c.docNumber?.trim()
   if (!nro) return null
   return `${c.docType === 'PASS' ? 'Pasaporte' : c.docType} ${nro}`
 }
 
-export function documentoVoucher(
+function documentoVoucher(
   v: Pick<FiscalVoucherDTO, 'customerDocType' | 'customerDocNumber'>,
 ): string | null {
   const etiqueta = DOC_ARCA[v.customerDocType]
@@ -114,7 +114,7 @@ export function documentoVoucher(
 }
 
 /** Numeración de ARCA: punto de venta a 5 dígitos y número a 8. */
-export function numeroFiscal(salePoint: number, number: number): string {
+function numeroFiscal(salePoint: number, number: number): string {
   return `${String(salePoint).padStart(5, '0')}-${String(number).padStart(8, '0')}`
 }
 

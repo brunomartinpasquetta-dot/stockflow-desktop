@@ -178,7 +178,6 @@ const NEXT_PH = ['y despues', 'y ahora', 'que sigue', 'siguiente', 'y luego', 'c
 const GUIDE_PH = ['guiame', 'guia me', 'guiar', 'llevame paso', 'paso a paso', 'de a uno', 'uno por uno', 'acompaname', 'guiado', 'llevame de la mano'];
 const WALK_DONE_PH = ['listo', 'ya lo hice', 'hecho', 'ya esta', 'lo hice', 'ya', 'ok'];
 const AFFIRM = new Set(['si', 'sii', 'dale', 'ok', 'oka', 'okey', 'obvio', 'correcto', 'exacto', 'claro', 'sisi', 'buenisimo']);
-const DENY_PH = ['no era eso', 'nada que ver', 'no es eso', 'no, ', 'tampoco'];
 const HUMAN_PH = ['hablar con una persona', 'con un humano', 'llamar al tecnico', 'un tecnico', 'una persona real', 'atencion humana', 'hablar con alguien'];
 const WHOAREYOU_PH = ['sos un robot', 'sos un bot', 'quien sos', 'que sos', 'con quien hablo', 'sos una maquina', 'sos real', 'sos humana'];
 const WHATCANDO_PH = ['que sabes hacer', 'que podes hacer', 'en que me ayudas', 'para que servis', 'que haces', 'ayuda', 'que puedo preguntar'];
@@ -875,36 +874,7 @@ export function temaActual(convId: string): TemaKB | null {
   return temaPorGidx(c.lastIntentIdx);
 }
 
-/** Registra en la charla que la respuesta vino de otro lado (p. ej. la IA dijo que no sabe). */
-export function soltarTemaCharla(convId: string): void {
-  const c = SESSIONS.get(convId);
-  if (!c) return;
-  c.clarify = [];
-  c.offeredIdx = [];
-  c.walkIdx = -1;
-}
-
 /* --------------------------- utilidades test --------------------------- */
-
-/** Sólo para tests: id del intent que resolvería (o 'meta:*'/'clarify'/'manual'/'fallback'). */
-export function resolveIntentId(question: string, convId = 'default'): string {
-  const before = SESSIONS.get(convId);
-  const idx = getIndex();
-  const c = convo(convId);
-  // Snapshot para no romper el estado real si se usa en assert.
-  const ans = answerQuestion(question, convId);
-  const cur = SESSIONS.get(convId);
-  void before;
-  if (cur?.clarify.length === 2) return 'clarify';
-  if (cur?.lastIntentIdx != null && !ans.reply.startsWith('Uy,') && !ans.reply.startsWith('Se me perdió'))
-    return idx.intents[cur.lastIntentIdx]!.id;
-  if (ans.reply.startsWith('Uy, eso no')) return 'fallback';
-  return 'meta-or-manual';
-}
-
-export function newConvId(): string {
-  return 'test-' + Math.round(performance.now()) + '-' + INDEX!.intents.length;
-}
 
 /** Sólo para tests: área e id del último intent resuelto en la charla. */
 export function lastResolved(convId: string): { area: string; id: string } | null {

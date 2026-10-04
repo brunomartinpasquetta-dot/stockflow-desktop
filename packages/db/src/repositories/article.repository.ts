@@ -1,4 +1,4 @@
-import { and, eq, inArray, like, lt, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, or, sql } from 'drizzle-orm';
 import {
   CreateArticleSchema,
   UpdateArticleSchema,

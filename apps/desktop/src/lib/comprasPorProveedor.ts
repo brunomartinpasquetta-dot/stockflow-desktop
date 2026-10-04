@@ -9,7 +9,7 @@
  */
 import type { PurchaseDTO, SupplierDTO, VoucherType } from '@/types/api'
 
-export type EstadoCompra = PurchaseDTO['status']
+type EstadoCompra = PurchaseDTO['status']
 
 export interface CompraProveedorFila {
   purchaseId: string
@@ -30,7 +30,7 @@ export interface CompraProveedorFila {
   status: EstadoCompra
 }
 
-export interface TotalesCompras {
+interface TotalesCompras {
   /** Comprobantes que suman (no anulados). */
   cantidad: number
   anuladas: number
@@ -48,7 +48,7 @@ export interface GrupoProveedor extends TotalesCompras {
   filas: CompraProveedorFila[]
 }
 
-export interface FiltrosCompras {
+interface FiltrosCompras {
   /** Vacío = todos. */
   supplierId?: string
   type?: VoucherType | 'all'

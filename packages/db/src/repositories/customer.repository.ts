@@ -1,4 +1,4 @@
-import { eq, like, or, sql } from 'drizzle-orm';
+import { eq, like, or } from 'drizzle-orm';
 import { CreateCustomerSchema, UpdateCustomerSchema, sumDecimals } from '@stockflow/shared';
 
 import { rethrowDbError } from '../errors';

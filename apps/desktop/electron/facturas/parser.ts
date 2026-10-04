@@ -21,7 +21,7 @@
  *
  * Sin Electron ni base de datos: se prueba con tsx (facturas-parser.smoke.ts).
  */
-import { packEnDescripcion } from '../../src/lib/facturaACompra';
+import { enPesos, packEnDescripcion, r2 } from '../../src/lib/facturaACompra';
 
 export interface RenglonLeido {
   codigo: string | null;
@@ -269,8 +269,6 @@ const ALICUOTAS = new Set([2.5, 5, 10.5, 21, 27]);
 const RE_PIE =
   /^(sub\s?-?\s?total|total(es)?\b|importe\s+(neto|total|final)|neto\s+(gravado|no\s+gravado)|exento|i\.?\s?v\.?\s?a\.?(\s|$)|percep|impuestos?\b|ing(resos)?\.?\s+brutos|ii\.?bb|bonif(icaci[oó]n)?\.?\s+(gral|general)|descuento\s+(gral|general)|son\s+pesos|transporte\b|saldo\b|vuelto\b|su\s+pago|de?s?c(uen)?tos?\.?\s*:)/i;
 
-const r2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
-
 /**
  * ¿cantidad × UxB × precio da el importe? Tolerancia: 5 centavos, o el redondeo
  * del precio a centavos (medio centavo por unidad: en un descuento de 24
@@ -282,12 +280,6 @@ function cierra(q: number, u: number, p: number, importe: number): boolean {
   const unidades = Math.abs(q * u);
   const tol = Math.max(0.05, unidades * 0.005 + 0.005);
   return Math.abs(q * u * p - importe) <= tol + 1e-9;
-}
-
-/** `2253.72` → `2.253,72` (para los motivos y los avisos al teléfono). */
-export function enPesos(n: number): string {
-  const [ent, dec] = Math.abs(n).toFixed(2).split('.') as [string, string];
-  return `${n < 0 ? '-' : ''}${ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`;
 }
 
 /** ¿Los dos importes difieren en UN dígito (cambiado, de más o de menos)? */
@@ -742,7 +734,7 @@ function partir(tokens: string[], formato: FormatoNumeros): LineaPartida {
   let ilegible: string | null = null;
   if (corrida.length === 0) {
     // Sin números: la cola era el final de la descripción.
-    fin = ini = tokens.length;
+    ini = tokens.length;
   } else {
     const conDigitos = cola.map((t, k) => (/\d/.test(t) ? k : -1)).filter((k) => k >= 0);
     if (conDigitos.length > 0) ilegible = cola.slice(conDigitos[0]!, conDigitos[conDigitos.length - 1]! + 1).join(' ');
@@ -816,7 +808,7 @@ interface Interno {
 }
 const internos = new WeakMap<RenglonLeido, Interno>();
 
-export const MOTIVO_SIN_DESCRIPCION = 'Sin descripción: léala de la foto';
+const MOTIVO_SIN_DESCRIPCION = 'Sin descripción: léala de la foto';
 export const MOTIVO_PEGADO = 'Posible renglón pegado: dos productos en una línea';
 export const MOTIVO_ILEGIBLE = 'Renglón ilegible: léalo de la foto';
 export const MOTIVO_SIGNO_DESCUENTO = 'Signo recuperado: renglón de descuento';

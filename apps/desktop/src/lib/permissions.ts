@@ -39,39 +39,6 @@ export type PermissionAction =
   | 'manage_promotions'
   | 'view_cash_general'
 
-export const ALL_ACTIONS: readonly PermissionAction[] = [
-  'manage_users',
-  'manage_company',
-  'manage_articles',
-  'manage_suppliers',
-  'manage_families',
-  'manage_cards',
-  'manage_payment_methods',
-  'manage_purchases',
-  'manage_supplier_accounts',
-  'void_sale',
-  'close_cash',
-  'add_cash_movement',
-  'adjust_stock',
-  'view_reports',
-  'create_sale',
-  'view_articles',
-  'open_cash',
-  'receive_payment',
-  'manage_hardware',
-  'manage_backup',
-  'import_data',
-  'manage_prices',
-  'manage_mp_qr',
-  'view_accounting',
-  'manage_cash_general',
-  'manage_customers',
-  'view_quotes',
-  'manage_quotes',
-  'manage_promotions',
-  'view_cash_general',
-]
-
 /**
  * Check de permiso contra la lista de acciones EFECTIVAS del usuario logueado
  * (`UserDTO.permissions`, resuelta por el backend). Es la única fuente de verdad

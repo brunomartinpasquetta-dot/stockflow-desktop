@@ -13,6 +13,7 @@ import { ScrollText } from 'lucide-react'
 import { useAuditLog, useAuditAreas, useUsers } from '@/lib/hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDateTime } from '@/lib/format'
+import { dayEnd, dayStart, isoDaysAgo, todayIso } from '@/lib/periodPresets'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,22 +21,6 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SinPermiso } from '@/components/SinPermiso'
-
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function isoDaysAgo(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function dayStart(iso: string): number {
-  return new Date(`${iso}T00:00:00`).getTime()
-}
-function dayEnd(iso: string): number {
-  return new Date(`${iso}T23:59:59.999`).getTime()
-}
 
 export function Auditoria() {
   const { currentUser } = useAuth()

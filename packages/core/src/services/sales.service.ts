@@ -4,7 +4,6 @@
  */
 import type {
   AccountReceivable,
-  Customer,
   Sale,
   SaleLine,
   SalePayment,

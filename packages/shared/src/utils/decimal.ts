@@ -9,8 +9,6 @@
 
 /** Cantidad de decimales por defecto para montos de dinero. */
 export const MONEY_DECIMALS = 4;
-/** Cantidad de decimales por defecto para cantidades/stock. */
-export const QTY_DECIMALS = 3;
 
 function toNumber(value: string | number): number {
   const n = typeof value === 'string' ? Number(value) : value;

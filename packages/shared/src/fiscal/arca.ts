@@ -36,13 +36,6 @@ export const VAT_IDS = {
   '27.00': 6,
 } as const;
 
-/** Conceptos: qué se factura (ARCA `Concepto`). */
-export const CONCEPTS = {
-  PRODUCTOS: 1,
-  SERVICIOS: 2,
-  PRODUCTOS_Y_SERVICIOS: 3,
-} as const;
-
 export type VoucherLetter = 'A' | 'B' | 'C';
 export type VoucherKind = 'invoice' | 'credit_note' | 'debit_note';
 /** Condición del emisor frente al IVA. */
@@ -246,23 +239,6 @@ export function validateForLetter(
   // Factura B a consumidor final sin identificar es válida; ARCA exige
   // identificar al receptor sólo cuando el total supera el tope vigente.
   return { ok: true };
-}
-
-/** Fecha en el formato que pide ARCA: YYYYMMDD. */
-export function toArcaDate(date: Date | number): string {
-  const d = typeof date === 'number' ? new Date(date) : date;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}${m}${day}`;
-}
-
-/** Convierte una fecha ARCA (YYYYMMDD) a timestamp local. */
-export function fromArcaDate(value: string): number {
-  const y = Number(value.slice(0, 4));
-  const m = Number(value.slice(4, 6)) - 1;
-  const d = Number(value.slice(6, 8));
-  return new Date(y, m, d).getTime();
 }
 
 /** Endpoints de ARCA por entorno. */

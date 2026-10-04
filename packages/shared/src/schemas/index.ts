@@ -4,7 +4,6 @@ export * from './customer.schema';
 export * from './supplier.schema';
 export * from './user.schema';
 export * from './family.schema';
-export * from './card.schema';
 export * from './paymentMethod.schema';
 export * from './company.schema';
 export * from './cashRegister.schema';

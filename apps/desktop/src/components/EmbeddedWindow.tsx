@@ -6,9 +6,10 @@
  * BrowserWindow nativa: la ruta `#/embedded/:pageKey` la monta.
  *
  * - `:pageKey` → busca el componente en `WINDOWS[pageKey]`.
- * - searchParams → se exponen como `params` vía `WindowSelfProvider`, igual que
- *   hacía el viejo MDI. Los `extras` (objetos como `initialTab` / `prefilledLines`)
- *   viajan JSON-encodeados en el param reservado `__extras`.
+ * - Los `extras` (objetos como `initialTab` / `prefilledLines`) viajan
+ *   JSON-encodeados en el param reservado `__extras` y se entregan a la página
+ *   vía `WindowSelfProvider`; los params planos los lee cada página de la
+ *   querystring con `useSearchParams`.
  * - Gating de sesión: si no hay usuario logueado, muestra "Sesión cerrada" y un
  *   botón para cerrar la ventana (el login vive en la ventana principal).
  *
@@ -24,15 +25,12 @@ import { AssistantLauncher } from '@/components/AssistantLauncher'
 import { AssistantPanel } from '@/components/AssistantPanel'
 import { AssistantProvider } from '@/contexts/AssistantContext'
 import { PageSpinner } from '@/components/PageSpinner'
-import { WindowManagerProvider, WindowSelfProvider } from '@/contexts/WindowManagerContext'
+import { EXTRAS_PARAM, WindowManagerProvider, WindowSelfProvider } from '@/contexts/WindowManagerContext'
 import { api } from '@/lib/api'
-import { hasPermissionFor, type PermissionAction } from '@/lib/permissions'
+import { hasPermissionFor } from '@/lib/permissions'
 import { useDemoActive } from '@/lib/useDemoActive'
 import { useEmbeddedShortcuts } from '@/lib/useEmbeddedShortcuts'
 import { WINDOWS } from '@/windows/registry'
-
-/** Param reservado donde viajan los `extras` no-triviales (JSON-encodeados). */
-const EXTRAS_PARAM = '__extras'
 
 function decodeExtras(raw: string | null): unknown {
   if (!raw) return undefined
@@ -57,34 +55,21 @@ export function EmbeddedWindow() {
     if (def?.title) document.title = `${def.title} - StockFlow`
   }, [def?.title])
 
-  // Params planos de la querystring (excluyendo el param reservado de extras).
-  const paramsDeUrl = useMemo<Record<string, string>>(() => {
-    const out: Record<string, string> = {}
-    for (const [k, v] of searchParams.entries()) {
-      if (k === EXTRAS_PARAM) continue
-      out[k] = v
-    }
-    return out
-  }, [searchParams])
-
   const extrasDeUrl = useMemo(() => decodeExtras(searchParams.get(EXTRAS_PARAM)), [searchParams])
 
   // `extras` que llegan con la ventana YA abierta, sin recargarla: sólo para
   // las páginas que lo declaran (`extrasEnVivo` en el registry; el main
   // process los manda por IPC en vez de recargar). Pisan los de la URL.
-  const [enVivo, setEnVivo] = useState<{ params: Record<string, string>; extras: unknown } | null>(null)
+  const [enVivo, setEnVivo] = useState<{ extras: unknown } | null>(null)
   const extrasEnVivo = def?.extrasEnVivo === true
   useEffect(() => {
     if (!extrasEnVivo || !pageKey) return
     return api.desktopWindow.onExtras((p) => {
       if (p.pageKey !== pageKey) return
-      const planos: Record<string, string> = {}
-      for (const [k, v] of Object.entries(p.params ?? {})) if (k !== EXTRAS_PARAM && v != null) planos[k] = String(v)
       const crudo = p.params?.[EXTRAS_PARAM]
-      setEnVivo({ params: planos, extras: decodeExtras(typeof crudo === 'string' ? crudo : null) })
+      setEnVivo({ extras: decodeExtras(typeof crudo === 'string' ? crudo : null) })
     })
   }, [extrasEnVivo, pageKey])
-  const params = enVivo?.params ?? paramsDeUrl
   const extras = enVivo ? enVivo.extras : extrasDeUrl
 
   if (loading) {
@@ -129,7 +114,7 @@ export function EmbeddedWindow() {
   // se convertiría en OTRO panel principal (bug "sistema duplicado"). Cortamos
   // antes de montar la página.
   const roleOk = !def.roles || (currentUser.role && def.roles.includes(currentUser.role))
-  const permOk = !def.requires || hasPermissionFor(currentUser.permissions, def.requires as PermissionAction)
+  const permOk = !def.requires || hasPermissionFor(currentUser.permissions, def.requires)
   if (!roleOk || !permOk) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background px-8 text-center">
@@ -201,16 +186,7 @@ export function EmbeddedWindow() {
           sale del `minWidth` declarado en el registry (1000 si no declara). */}
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="h-full" style={{ minWidth: (def.minWidth ?? 1000) - 32 }}>
-        <WindowSelfProvider
-          value={{
-            windowId: pageKey,
-            params,
-            extras,
-            close: () => {
-              void api.desktopWindow.closeSelf()
-            },
-          }}
-        >
+        <WindowSelfProvider value={{ extras }}>
           <Suspense fallback={<PageSpinner />}>
             <Component />
           </Suspense>

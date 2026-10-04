@@ -105,7 +105,7 @@ export function detectFlow(question: string): string | null {
   return best?.id ?? null;
 }
 
-function render(flow: Flow, node: Exclude<FlowNode, FlowNodeCheck>, convId: string): FlowReply {
+function render(node: Exclude<FlowNode, FlowNodeCheck>, convId: string): FlowReply {
   if (node.kind === 'ask') {
     return {
       reply: node.text + '\n\n(Tocá una opción o escribime la respuesta. Si querés dejarlo, decime "salir".)',
@@ -132,7 +132,7 @@ async function advance(flow: Flow, nodeId: string, convId: string, checks: FlowC
   let hops = 0;
   while (cur && cur.kind === 'check' && hops < 10) {
     hops++;
-    let ok = false;
+    let ok: boolean;
     try {
       ok = checks[cur.check] ? await checks[cur.check]!() : false;
     } catch {
@@ -148,7 +148,7 @@ async function advance(flow: Flow, nodeId: string, convId: string, checks: FlowC
   }
   FLOW_SESSIONS.set(convId, { flowId: flow.id, nodeId: curId });
   prune();
-  return render(flow, cur, convId);
+  return render(cur, convId);
 }
 
 export async function startFlow(convId: string, flowId: string, checks: FlowChecks): Promise<FlowReply | null> {

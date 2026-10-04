@@ -108,9 +108,6 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
           app.cloudDb,
           user.sub,
           user.exp * 1000,
-          user.plan,
-          user.lk,
-          user.tid,
           (p) => app.jwt.sign(p),
           user.kind,
         );

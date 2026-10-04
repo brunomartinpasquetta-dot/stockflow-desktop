@@ -1,11 +1,4 @@
-*.swift.bak
 modelos/
 muestras/
-node_modules/
 salida-paddle/
 salida-windows/
-salida/
-tessdata/
-vision-ocr
-vision-v2
-vision-v3

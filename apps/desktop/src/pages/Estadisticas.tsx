@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import { formatCurrency } from '@/lib/format'
+import { dayEnd, dayStart, isoDaysAgo, todayIso } from '@/lib/periodPresets'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCompany } from '@/lib/hooks'
 import { SinPermiso } from '@/components/SinPermiso'
@@ -62,16 +63,6 @@ import {
 } from '@/lib/hooks'
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899', '#0ea5e9', '#f97316']
-
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function isoDaysAgo(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 /* Rangos en hora local de la máquina (misma zona que usa el resto de la
    pantalla y que 'localtime' en las consultas). */
@@ -104,12 +95,6 @@ function rangosDeMes(): {
     diasTranscurridos: ahora.getDate(),
     diasDelMes: new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).getDate(),
   }
-}
-function dayStart(iso: string): number {
-  return new Date(`${iso}T00:00:00`).getTime()
-}
-function dayEnd(iso: string): number {
-  return new Date(`${iso}T23:59:59.999`).getTime()
 }
 
 const DOW_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']

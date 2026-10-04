@@ -54,11 +54,3 @@ export function addRecent(entry: Omit<RecentSearch, 'ts'>): void {
     /* ignore quota errors */
   }
 }
-
-export function clearRecents(): void {
-  try {
-    localStorage.removeItem(KEY)
-  } catch {
-    /* ignore */
-  }
-}

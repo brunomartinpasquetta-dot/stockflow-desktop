@@ -25,7 +25,7 @@ Reglas de la capa:
 - Funciones **puras** para cálculos (`pricing`: precios, IVA, totales).
 - **Permisos chequeados en cada método que muta datos** (`requirePermission`).
 - Errores **tipados** (`PermissionDeniedError`, `BusinessRuleError`, + los de la capa
-  de datos: `NotFoundError`, `ConstraintError`, `ValidationError`, `DatabaseError`).
+  de datos: `NotFoundError`, `ConstraintError`, `ValidationError`).
 
 ## Uso
 

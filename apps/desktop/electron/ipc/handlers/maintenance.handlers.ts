@@ -41,7 +41,7 @@ export function buildMaintenanceHandlers(deps: HandlerDeps): HandlerMap {
         }
 
         // 1) Backup automático (nunca reiniciar sin red de seguridad).
-        let backup: BackupEntry | null = null;
+        let backup: BackupEntry | null;
         try {
           const cfg = deps.hardware.getConfig().backup;
           deps.backup.setBackupDir(cfg.destination);

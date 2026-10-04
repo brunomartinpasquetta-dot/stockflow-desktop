@@ -42,7 +42,6 @@ import {
   cashGeneralMovements,
   cashMovements,
   cashRegisters,
-  catalogoPedidos,
   fiscalVouchers,
   mpOrders,
   mpPosDevices,
@@ -58,8 +57,6 @@ import {
   sales,
   supplierAccountsPayable,
 } from '../schema/local';
-
-const SINGLETON_ID = 'singleton';
 
 export interface ResetOperationalResult {
   salesDeleted: number;

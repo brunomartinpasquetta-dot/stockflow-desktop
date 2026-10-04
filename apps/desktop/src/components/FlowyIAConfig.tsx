@@ -16,7 +16,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
+import { mensajeError } from '@/lib/mensajeError'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -38,11 +39,6 @@ const MODOS: { valor: ModoIADTO; titulo: string; detalle: string }[] = [
       'Además, la IA redacta la respuesta con sus palabras. En una PC sin placa de video tarda entre 20 y 60 segundos por respuesta, y a veces inventa pasos o nombres de botones. No se recomienda para el uso diario. Descarga adicional: 1,4 GB.',
   },
 ]
-
-function mensajeError(e: unknown): string {
-  if (e instanceof ApiError) return e.message
-  return e instanceof Error ? e.message : 'No se pudo completar la operación.'
-}
 
 function Barra({ fraccion }: { fraccion: number | null }) {
   return (

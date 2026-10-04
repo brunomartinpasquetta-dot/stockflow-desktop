@@ -9,7 +9,7 @@ import { useCompany, useFinancialSummary } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { useWindowNav } from '@/lib/useWindowNav'
 import { formatCurrency } from '@/lib/format'
-import { PERIOD_PRESETS, dayEnd, dayStart, toIso } from '@/lib/periodPresets'
+import { PERIOD_PRESETS, dayEnd, dayStart, firstOfMonthIso, toIso } from '@/lib/periodPresets'
 import { usePrintAccountingSummary } from '@/lib/usePrint'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,11 +18,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SinPermiso } from '@/components/SinPermiso'
 
-function firstOfMonthIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
-
 export function Contabilidad() {
   const canView = usePermission('view_accounting')
   const openWindow = useWindowNav()
@@ -30,12 +25,12 @@ export function Contabilidad() {
 
   const [fromIso, setFromIso] = useState(() => firstOfMonthIso())
   const [toIsoVal, setToIsoVal] = useState(() => toIso(new Date()))
-  const [applied, setApplied] = useState<{ from: number; to: number } | null>(() => ({
+  const [applied, setApplied] = useState(() => ({
     from: dayStart(firstOfMonthIso()),
     to: dayEnd(toIso(new Date())),
   }))
 
-  const summaryQuery = useFinancialSummary(applied ?? { from: 0, to: 0 }, applied != null)
+  const summaryQuery = useFinancialSummary(applied)
   const printSummary = usePrintAccountingSummary()
 
   function calcular(): void {

@@ -181,7 +181,6 @@ async function partePagina(): Promise<void> {
   let compila = false;
   let detalle = '';
   try {
-    // eslint-disable-next-line no-new-func
     new Function(script);
     compila = script.length > 1000;
   } catch (err) {
@@ -369,7 +368,7 @@ async function parteServidor(): Promise<void> {
     await fetch(base, { signal: AbortSignal.timeout(1500) });
     sigue = true;
   } catch {
-    sigue = false;
+    // no contesta: dejó de escuchar
   }
   check('stop: el puerto ya no contesta', !sigue);
 

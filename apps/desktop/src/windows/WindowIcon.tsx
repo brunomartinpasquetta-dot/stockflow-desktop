@@ -3,7 +3,6 @@
  * Usa un switch explícito para satisfacer la regla `react-hooks/static-components`.
  */
 import {
-  ArrowLeftRight,
   BadgePercent,
   BarChart3,
   Boxes,
@@ -34,7 +33,6 @@ import {
 
 export function WindowIcon({ name, className }: { name: string | undefined; className?: string }) {
   switch (name) {
-    case 'ArrowLeftRight': return <ArrowLeftRight className={className} />
     case 'BadgePercent': return <BadgePercent className={className} />
     case 'BarChart3': return <BarChart3 className={className} />
     case 'Boxes': return <Boxes className={className} />

@@ -183,7 +183,7 @@ function recorte(g: Gris, x: number, y: number, w: number, h: number, escala: nu
  * hoja completa el QR es chico: de cerca se lee mejor). `filtro` descarta QR que
  * no interesan (p. ej. el de una promoción impresa en la misma hoja).
  */
-export function leerTextoQr(jpegBuf: Buffer, filtro: (texto: string) => boolean = () => true): string | null {
+function leerTextoQr(jpegBuf: Buffer, filtro: (texto: string) => boolean = () => true): string | null {
   const g = aGris(jpegBuf);
   if (!g) return null;
   const mayor = Math.max(g.ancho, g.alto);

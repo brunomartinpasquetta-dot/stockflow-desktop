@@ -14,7 +14,7 @@ import { useCompany, useCustomers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { PERIOD_PRESETS, dayEnd, dayStart, toIso } from '@/lib/periodPresets'
+import { PERIOD_PRESETS, dayEnd, dayStart, firstOfMonthIso, toIso } from '@/lib/periodPresets'
 import { exportFacturasEmitidasToExcel } from '@/lib/excelExport'
 import {
   agruparPorCliente,
@@ -40,11 +40,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { VoucherType } from '@/types/api'
 
 type Vista = 'cliente' | 'fecha'
-
-function firstOfMonthIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
 
 /** Las notas de crédito van en negativo: "-$1.000,00" en vez de "$-1.000,00". */
 function importe(v: string): string {

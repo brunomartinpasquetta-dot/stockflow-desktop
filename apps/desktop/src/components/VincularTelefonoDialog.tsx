@@ -14,18 +14,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 
-import { api, ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
+import { mensajeError } from '@/lib/mensajeError'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { FacturasVincularDTO } from '@/types/api'
 
 type Via = 'local' | 'internet'
-
-function mensajeError(e: unknown): string {
-  if (e instanceof ApiError) return e.message
-  return e instanceof Error ? e.message : 'No se pudo generar el enlace.'
-}
 
 function restante(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000))
@@ -91,7 +87,7 @@ export function VincularTelefonoDialog({
         avisarEnlace.current?.(r)
       })
       .catch((e: unknown) => {
-        if (vivo) setError(mensajeError(e))
+        if (vivo) setError(mensajeError(e, 'No se pudo generar el enlace.'))
       })
       .finally(() => {
         if (vivo) setCargando(false)

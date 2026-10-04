@@ -2,7 +2,7 @@
  * Errores de dominio de la capa de servicios.
  *
  * Se complementan con los errores de datos de `@stockflow/db` (re-exportados acá):
- *  - NotFoundError / ConstraintError / ValidationError / DatabaseError (capa de datos)
+ *  - NotFoundError / ConstraintError / ValidationError (capa de datos)
  *  - PermissionDeniedError / BusinessRuleError (capa de aplicación)
  *
  * Todos discriminables por `instanceof` o por la propiedad `code`.
@@ -44,13 +44,5 @@ export class BusinessRuleError extends CoreError {
   }
 }
 
-// Re-export de los errores de la capa de datos.
-export {
-  DomainError,
-  NotFoundError,
-  ConstraintError,
-  ValidationError,
-  DatabaseError,
-  rethrowDbError,
-} from '@stockflow/db';
-export type { DomainErrorCode } from '@stockflow/db';
+// Re-export de los errores de la capa de datos que los servicios lanzan.
+export { NotFoundError, ConstraintError, ValidationError } from '@stockflow/db';
