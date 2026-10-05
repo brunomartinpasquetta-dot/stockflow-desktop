@@ -377,11 +377,12 @@ def inspeccionar() -> None:
     print("=" * 62)
     # El código de barras puede estar en CODIGO2 (Leo Citzia) o en CODIGO
     # (Denver): se cuenta como "sin código" sólo el que no lo tiene en NINGUNO
-    # de los dos. De CODIGO valen los numéricos de 8 dígitos para arriba.
+    # de los dos. De CODIGO vale todo lo numérico (también los códigos cortos
+    # que tipean los cajeros), salvo los que son sólo ceros.
     sin_cb = qn(con, """SELECT COUNT(*) FROM ARTICULO
         WHERE (CODIGO2 IS NULL OR TRIM(CODIGO2) = '')
-          AND (CODIGO IS NULL OR CHAR_LENGTH(TRIM(CODIGO)) < 8
-               OR TRIM(CODIGO) SIMILAR TO '%[^0-9]%')""")
+          AND (CODIGO IS NULL OR TRIM(CODIGO) = ''
+               OR TRIM(CODIGO) SIMILAR TO '%[^0-9]%' OR TRIM(CODIGO) SIMILAR TO '0+')""")
     print(f"  Artículos sin código de barras: {sin_cb}  -> se les genera uno interno")
     # OJO: el stock vive en STOCK. CANTIDAD1 existe pero está vacía en las bases
     # reales (Leo Citzia: 0 filas con valor) — leerla daba un tranquilizador
@@ -696,17 +697,21 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
         # Código de barras: se respeta el del fabricante si lo tiene. DÓNDE lo
         # guarda StockFácil VARÍA entre instalaciones: en Leo Citzia está en
         # CODIGO2 y en Denver Drugstore en CODIGO (543 de 604 artículos, con
-        # CODIGO2 entero vacío). Se prueban los dos, y de CODIGO sólo se acepta
-        # lo que tenga pinta de código de barras —numérico y de 8 dígitos para
-        # arriba— porque ahí también viven códigos internos del comercio
-        # ('PROMO04', '0000'). Si no hay ninguno se genera un EAN-13 interno
-        # válido, para que igual pueda imprimir etiquetas y usar el lector.
+        # CODIGO2 entero vacío). Se prueban los dos, y de CODIGO se acepta todo
+        # lo NUMÉRICO: los códigos de fábrica y también los códigos cortos que
+        # los cajeros tipean de memoria (en una base real, 124 de esos
+        # códigos). Antes sólo valían los de 8 dígitos para arriba y esos
+        # artículos quedaban con un EAN interno: el cajero ya no podía venderlos
+        # como siempre (regla de Bruno, 4-oct-2026: la migración es un espejo).
+        # Lo no numérico ('PROMO04', '7.62221E+12' roto por Excel) y los que son
+        # sólo ceros siguen afuera. Si no hay ninguno se genera un EAN-13
+        # interno válido, para que igual pueda imprimir etiquetas y usar el lector.
         cand = ""
-        for campo, exigir_ean in (("CODIGO2", False), ("CODIGO", True)):
+        for campo, solo_numeros in (("CODIGO2", False), ("CODIGO", True)):
             v = txt(r[campo])
             if not v or set(v) <= {"0"} or v in barcodes_usados:
                 continue
-            if exigir_ean and not (v.isdigit() and len(v) >= 8):
+            if solo_numeros and not v.isdigit():
                 continue
             cand = v
             break
@@ -1012,11 +1017,22 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
     for t_, n_ in sq.execute("SELECT type, MAX(number) FROM sales GROUP BY type"):
         tope[t_] = int(n_ or 0)
 
+    # Los repetidos van DETRÁS del mayor NUMERO de todo el origen. Antes recibían
+    # "el mayor visto hasta ahora + 1", que era el número de una venta posterior:
+    # esa también se renumeraba y seguía en cascada (en Nemesis, 23.953 ventas
+    # con otro número por unos 60 repetidos). Así cambian sólo los repetidos.
+    try:
+        mayor_origen = int(qn(con, "SELECT MAX(NUMERO) FROM VENTA") or 0) if "VENTA" in hay else 0
+    except (TypeError, ValueError):
+        mayor_origen = 0
+    siguiente_libre = [max(mayor_origen, max(tope.values(), default=0)) + 1]
+
     def numero_libre(tipo_: str, pedido: int) -> int:
         vistos = usados.setdefault(tipo_, set())
         n_ = int(pedido or 0)
         if n_ <= 0 or n_ in vistos:
-            n_ = max(tope.get(tipo_, 0), max(vistos) if vistos else 0) + 1
+            n_ = siguiente_libre[0]
+            siguiente_libre[0] += 1
             rep.suma("Ventas renumeradas por número repetido", 1)
         vistos.add(n_)
         tope[tipo_] = max(tope.get(tipo_, 0), n_)
@@ -1296,10 +1312,41 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
         rep.aviso(f"{descuadradas} venta(s) cuyo detalle no suma su subtotal: abrir algunas en "
                   "Historial de ventas y compararlas con StockFácil antes de entregar")
 
+    # ---- MEDIOS DE PAGO QUE SE USAN HOY ----
+    # Nacen inactivos (ver medio_de_pago), pero los que el comercio usó de
+    # verdad en el último año tienen que quedar ACTIVOS: en Nemesis Mercado Pago
+    # fue el 41 % de las ventas y el cajero no podía cobrar con él al día
+    # siguiente. El mínimo de 100 usos deja afuera la basura tipeada
+    # ("Mercadopago 7790895000454", "Ç").
+    hace_un_anio = ahora - 365 * 24 * 3600 * 1000
+    activados = sq.execute(
+        "UPDATE payment_methods SET active = 1 WHERE active = 0 AND id IN ("
+        "  SELECT payment_method_id FROM sale_payments WHERE created_at >= ?"
+        "  GROUP BY payment_method_id HAVING COUNT(*) >= 100)", (hace_un_anio,)).rowcount
+    if activados:
+        nombres = [n for (n,) in sq.execute(
+            "SELECT name FROM payment_methods WHERE active = 1 AND id IN ("
+            "  SELECT payment_method_id FROM sale_payments WHERE created_at >= ?"
+            "  GROUP BY payment_method_id HAVING COUNT(*) >= 100)", (hace_un_anio,))]
+        rep.aviso(f"medios de pago activos porque se usaron en el último año: {', '.join(nombres)}")
+
     # ---- COMPRAS ----
     compra_map: dict[int, str] = {}
     compra_fecha: dict[int, int] = {}
-    algun_prov = next(iter(prov_id.values()), None)
+    prov_generico: list[str] = []
+
+    def proveedor_generico() -> str:
+        """Compras con PROVEEDOR = 0 o que apunta a nada. Antes iban al PRIMER
+        proveedor de la lista, que no tenía nada que ver con esas compras.
+        Ahora van a uno genérico, visible."""
+        if not prov_generico:
+            pid_ = uuid7()
+            sq.execute(
+                "INSERT INTO suppliers (id,code,name,created_at,updated_at) VALUES (?,?,?,?,?)",
+                (pid_, codigo_libre("PROV-0001", 0), "Proveedor sin identificar (de StockFácil)", ahora, ahora))
+            prov_generico.append(pid_)
+            rep.aviso("hay compras sin proveedor: quedaron en 'Proveedor sin identificar (de StockFácil)'")
+        return prov_generico[0]
     # Donde existen VDESC/VIVA, son los IMPORTES y DESCUENTO/IVA los
     # PORCENTAJES (DESCUENTO 1,5 = 1,5 %; VDESC, la plata descontada).
     cols_compra = set(columnas(con, "COMPRA")) if "COMPRA" in hay else set()
@@ -1308,18 +1355,9 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
                                   "SUBTOTAL", "IVA", "VIVA", "DESCUENTO", "VDESC", "TOTAL",
                                   "FORMAPAGO", "ESTADO"] + percepciones,
                   "ORDER BY IDCOMPRA") if "COMPRA" in hay else []:
-        prov = prov_id.get(r["PROVEEDOR"]) or prov_por_persona.get(r["PROVEEDOR"]) or algun_prov
-        if not prov:
-            # El comercio puede no haber cargado nunca proveedores (le pasa a
-            # quien sólo usa el módulo de ventas). Se crea uno genérico para no
-            # perder las compras: después las reasigna si quiere.
-            prov = uuid7()
-            sq.execute(
-                "INSERT INTO suppliers (id,code,name,created_at,updated_at) VALUES (?,?,?,?,?)",
-                (prov, codigo_libre("PROV-0001", 0), "Proveedor sin identificar (de StockFácil)", ahora, ahora))
-            prov_id[-1] = prov
-            algun_prov = prov
-            rep.aviso("las compras no tenían proveedor: se les asignó uno genérico")
+        # Sin proveedor reconocible (también si el comercio nunca cargó
+        # proveedores): uno genérico, para no perder la compra.
+        prov = prov_id.get(r["PROVEEDOR"]) or prov_por_persona.get(r["PROVEEDOR"]) or proveedor_generico()
         cid = uuid7()
         fecha = ms(r["FECHA"])
         nro_txt = txt(r["NUMERO"])
@@ -1359,6 +1397,37 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
         compra_map[r["IDCOMPRA"]] = cid
         compra_fecha[r["IDCOMPRA"]] = fecha
         rep.suma("Compras", 1)
+
+    # ---- LO QUE SE LES DEBE A LOS PROVEEDORES ----
+    # CUENTASP es la cuenta corriente de cada proveedor (IDCLIENTE = el
+    # IDEMPRESA del proveedor) y SALDO, lo que se le debe hoy. Antes no se
+    # migraba y la deuda desaparecía.
+    # Va como en StockFlow: una compra a cuenta corriente "saldo anterior" con su
+    # cuenta por pagar, así figura en Cuentas Corrientes — Proveedores y se paga
+    # desde ahí. Los renglones viejos ya están en las compras de arriba.
+    if "CUENTASP" in hay:
+        nro_saldo = (sq.execute("SELECT COALESCE(MAX(number),0) FROM purchases").fetchone()[0] or 0)
+        for r in leer(con, "CUENTASP", ["IDCUENTA", "IDCLIENTE", "SALDO", "ESTADO"]):
+            saldo = Decimal(dec(r["SALDO"] or 0))
+            if saldo < 1:                       # milésimos de redondeo: no es deuda
+                continue
+            prov = prov_id.get(r["IDCLIENTE"]) or proveedor_generico()
+            nro_saldo += 1
+            pid_ = uuid7()
+            try:
+                sq.execute(
+                    "INSERT INTO purchases (id,number,type,supplier_invoice_number,date,supplier_id,"
+                    "payment_type,subtotal,discount,vat_amount,total,status,notes,created_at,updated_at) "
+                    "VALUES (?,?,'X',?,?,?,'credit',?,'0.0000','0.0000',?,'completed',?,?,?)",
+                    (pid_, nro_saldo, f"Saldo anterior (cuenta {r['IDCUENTA']})", ahora, prov,
+                     dec(saldo), dec(saldo), "Saldo de cuenta corriente traído de StockFácil", ahora, ahora))
+                sq.execute(
+                    "INSERT INTO supplier_accounts_payable (id,supplier_id,purchase_id,total,balance,"
+                    "status,created_at,updated_at) VALUES (?,?,?,?,?,'open',?,?)",
+                    (uuid7(), prov, pid_, dec(saldo), dec(saldo), ahora, ahora))
+                rep.suma("Deudas con proveedores (saldo de cuenta corriente)", 1)
+            except sqlite3.Error as e:
+                rep.aviso(f"deuda con el proveedor de la cuenta {r['IDCUENTA']} no migrada: {e}")
 
     renglones_por_compra: dict[str, int] = {}
     for r in leer(con, "LINEACOMPRA",
