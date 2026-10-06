@@ -14,7 +14,7 @@ import { useCompany, useSuppliers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { PERIOD_PRESETS, dayEnd, dayStart, firstOfMonthIso, toIso } from '@/lib/periodPresets'
+import { PERIOD_PRESETS, dayEnd, dayStart } from '@/lib/periodPresets'
 import { exportComprasPorProveedorToExcel } from '@/lib/excelExport'
 import {
   agruparPorProveedor,
@@ -55,6 +55,11 @@ function NumeroCell({ fila }: { fila: CompraProveedorFila }) {
   )
 }
 
+/** Compras por tanda en la vista por fecha ("Mostrar más"). */
+const POR_PAGINA = 200
+/** "Hasta" cuando no hay fecha: sin límite. */
+const HASTA_SIEMPRE = 8_640_000_000_000_000
+
 export function ComprasPorProveedor() {
   const canView = usePermission('view_accounting')
   const canWrite = useCanWrite()
@@ -62,12 +67,13 @@ export function ComprasPorProveedor() {
   const companyQuery = useCompany()
   const suppliersQuery = useSuppliers()
 
-  const [fromIso, setFromIso] = useState(() => firstOfMonthIso())
-  const [toIsoVal, setToIsoVal] = useState(() => toIso(new Date()))
-  const [applied, setApplied] = useState(() => ({
-    from: dayStart(firstOfMonthIso()),
-    to: dayEnd(toIso(new Date())),
-  }))
+  // Abre con TODAS (pedido de Bruno, 4-oct-2026): las fechas son un filtro;
+  // vacías = sin límite. Las compras son pocas (Nemesis: 4.310 en años), así
+  // que se traen todas y la lista muestra de a POR_PAGINA.
+  const [fromIso, setFromIso] = useState('')
+  const [toIsoVal, setToIsoVal] = useState('')
+  const [applied, setApplied] = useState<{ from: number | null; to: number | null }>({ from: null, to: null })
+  const [mostrar, setMostrar] = useState(POR_PAGINA)
   const [supplierId, setSupplierId] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | VoucherType>('all')
   const [vista, setVista] = useState<Vista>('proveedor')
@@ -78,11 +84,18 @@ export function ComprasPorProveedor() {
   // desde el detalle invalida ese prefijo y esta pantalla se refresca sola.
   const purchasesQuery = useQuery({
     queryKey: ['purchasesHistory', applied.from, applied.to],
-    queryFn: () => api.purchases.listByDateRange(applied.from, applied.to),
+    queryFn: () => api.purchases.listByDateRange(applied.from ?? 0, applied.to ?? HASTA_SIEMPRE),
   })
 
   function calcular(): void {
-    setApplied({ from: dayStart(fromIso), to: dayEnd(toIsoVal) })
+    setApplied({ from: fromIso ? dayStart(fromIso) : null, to: toIsoVal ? dayEnd(toIsoVal) : null })
+    setMostrar(POR_PAGINA)
+  }
+  function todas(): void {
+    setFromIso('')
+    setToIsoVal('')
+    setApplied({ from: null, to: null })
+    setMostrar(POR_PAGINA)
   }
   function aplicarPreset(key: string): void {
     const preset = PERIOD_PRESETS.find((p) => p.key === key)
@@ -91,6 +104,7 @@ export function ComprasPorProveedor() {
     setFromIso(range.fromIso)
     setToIsoVal(range.toIso)
     setApplied({ from: dayStart(range.fromIso), to: dayEnd(range.toIso) })
+    setMostrar(POR_PAGINA)
   }
 
   const filas = useMemo(
@@ -103,7 +117,9 @@ export function ComprasPorProveedor() {
     [purchasesQuery.data, suppliersQuery.data, supplierId, typeFilter, incluirAnuladas],
   )
   const grupos = useMemo(() => (vista === 'proveedor' ? agruparPorProveedor(filas) : []), [filas, vista])
-  const planas = useMemo(() => (vista === 'fecha' ? ordenarPorFecha(filas) : []), [filas, vista])
+  // Plano: de la más nueva a la más vieja, de a POR_PAGINA ("Mostrar más").
+  const planasTodas = useMemo(() => (vista === 'fecha' ? [...ordenarPorFecha(filas)].reverse() : []), [filas, vista])
+  const planas = useMemo(() => planasTodas.slice(0, mostrar), [planasTodas, mostrar])
   const totales = useMemo(() => sumarFilas(filas), [filas])
   const cantidadProveedores = useMemo(() => new Set(filas.map((r) => r.supplierId)).size, [filas])
 
@@ -115,7 +131,9 @@ export function ComprasPorProveedor() {
     if (filas.length === 0) return
     // Mismo orden que la pantalla: agrupado (proveedor → fecha) o plano por fecha.
     const enOrden = vista === 'proveedor' ? grupos.flatMap((g) => g.filas) : planas
-    exportComprasPorProveedorToExcel(enOrden, applied, companyQuery.data?.name ?? 'Empresa')
+    const fechas = filas.map((r) => r.date)
+    const periodo = { from: applied.from ?? Math.min(...fechas), to: applied.to ?? Math.max(...fechas) }
+    exportComprasPorProveedorToExcel(enOrden, periodo, companyQuery.data?.name ?? 'Empresa')
   }
 
   const columnas = vista === 'proveedor' ? 8 : 9
@@ -196,6 +214,13 @@ export function ComprasPorProveedor() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-muted-foreground">Atajos:</span>
+              <Button
+                variant={applied.from == null && applied.to == null ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={todas}
+              >
+                Todas
+              </Button>
               {PERIOD_PRESETS.map((p) => (
                 <Button key={p.key} variant="ghost" size="sm" onClick={() => aplicarPreset(p.key)}>
                   {p.label}
@@ -239,7 +264,9 @@ export function ComprasPorProveedor() {
                 ) : filas.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={columnas} className="py-10 text-center text-muted-foreground">
-                      Sin compras en el rango seleccionado.
+                      {applied.from == null && applied.to == null
+                        ? 'Todavía no hay compras cargadas.'
+                        : 'Sin compras en el rango seleccionado.'}
                     </TableCell>
                   </TableRow>
                 ) : vista === 'proveedor' ? (
@@ -248,6 +275,15 @@ export function ComprasPorProveedor() {
                   ))
                 ) : (
                   planas.map((r) => filaCompra(r, true))
+                )}
+                {vista === 'fecha' && planasTodas.length > mostrar && (
+                  <TableRow>
+                    <TableCell colSpan={columnas} className="py-3 text-center">
+                      <Button variant="outline" size="sm" onClick={() => setMostrar((n) => n + POR_PAGINA)}>
+                        Mostrar {POR_PAGINA} más
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>

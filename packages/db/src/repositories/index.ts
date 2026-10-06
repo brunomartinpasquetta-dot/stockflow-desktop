@@ -90,7 +90,7 @@ export {
 } from './fiscal.repository';
 export { ReturnRepository, type CreateSaleReturnInput, type CreatePurchaseReturnInput, type SaleReturnResult, type PurchaseReturnResult, type ReturnLineDraft, type PurchaseReturnLineDraft } from './return.repository';
 export { QuoteRepository, type QuoteWithLines } from './quote.repository';
-export { SaleRepository, type SaleWithLines } from './sale.repository';
+export { SaleRepository, type SaleWithLines, type FiltroFacturasEmitidas } from './sale.repository';
 export { SaleLineRepository } from './saleLine.repository';
 export { SalePaymentRepository, type SalePaymentInput } from './salePayment.repository';
 export { SupplierRepository } from './supplier.repository';

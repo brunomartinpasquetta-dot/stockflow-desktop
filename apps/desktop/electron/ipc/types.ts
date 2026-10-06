@@ -759,6 +759,8 @@ export interface HistoricalCashRegisterDTO {
   depositedElectronicAmount: string;
   /** Cuánto podía ingresarse en total (efectivo contado + neto electrónico). */
   depositableAmount: string;
+  /** Caja importada del sistema anterior: no se ingresa a Caja General. */
+  importada: boolean;
   /** Ingresos de esa caja separados por forma de pago. */
   incomeByPaymentMethod: { paymentMethodId: string | null; name: string; income: string }[];
 }
@@ -2069,6 +2071,34 @@ export interface SalePointDTO {
   updatedAt: number;
 }
 
+/** Filtros de "Facturas emitidas" (Contabilidad). Sin fechas = todas. */
+export interface FiltroFacturasEmitidasDTO {
+  from?: number | null;
+  to?: number | null;
+  customerId?: string | null;
+  type?: VoucherType | null;
+  incluirAnuladas?: boolean;
+}
+
+/** Una página de "Facturas emitidas": ventas (más nuevas primero) y sus facturas aprobadas. */
+export interface FacturasEmitidasPaginaDTO {
+  ventas: SaleDTO[];
+  vouchers: FiscalVoucherDTO[];
+  hayMas: boolean;
+}
+
+/** Totales de todo lo filtrado (no sólo lo cargado) + las notas de crédito/débito. */
+export interface FacturasEmitidasTotalesDTO {
+  cantidad: number;
+  anuladas: number;
+  net: string;
+  vat: string;
+  total: string;
+  clientes: number;
+  /** Notas de crédito/débito con los mismos filtros (son pocas: viajan todas). */
+  notas: FiscalVoucherDTO[];
+}
+
 export interface FiscalVoucherDTO {
   id: string;
   voucherCode: number;
@@ -2321,6 +2351,10 @@ export interface ApiSurface {
     ): Res<{ anuladas: number; conCAE: number; omitidas: { number: number; motivo: string }[] }>;
     get(payload: IdPayload): Res<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }>;
     listByDateRange(payload: DateRangeDTO): Res<SaleDTO[]>;
+    facturasEmitidasPagina(
+      payload: FiltroFacturasEmitidasDTO & { antesDe?: { date: number; id: string } | null; limite?: number },
+    ): Res<FacturasEmitidasPaginaDTO>;
+    facturasEmitidasTotales(payload: FiltroFacturasEmitidasDTO): Res<FacturasEmitidasTotalesDTO>;
     getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;
   };
   returns: {

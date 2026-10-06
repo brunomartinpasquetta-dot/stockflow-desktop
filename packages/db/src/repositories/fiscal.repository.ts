@@ -436,6 +436,48 @@ export class FiscalRepository {
   }
 
   /** Comprobantes emitidos, para el Libro IVA Ventas y consultas. */
+  /** Facturas aprobadas de estas ventas (una página de "Facturas emitidas"). */
+  facturasDeVentas(saleIds: string[]): FiscalVoucher[] {
+    if (saleIds.length === 0) return [];
+    try {
+      return this.db
+        .select()
+        .from(fiscalVouchers)
+        .where(
+          and(
+            inArray(fiscalVouchers.saleId, saleIds),
+            eq(fiscalVouchers.kind, 'invoice'),
+            eq(fiscalVouchers.status, 'approved'),
+          ),
+        )
+        .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /** Notas de crédito y débito aprobadas con los filtros de "Facturas emitidas". */
+  notasEmitidas(f: { from?: number | null; to?: number | null; customerId?: string | null; letter?: 'A' | 'B' | 'C' | null }): FiscalVoucher[] {
+    try {
+      const conds: SQL[] = [
+        inArray(fiscalVouchers.kind, ['credit_note', 'debit_note']),
+        eq(fiscalVouchers.status, 'approved'),
+      ];
+      if (f.from != null) conds.push(gte(fiscalVouchers.date, f.from));
+      if (f.to != null) conds.push(lte(fiscalVouchers.date, f.to));
+      if (f.customerId) conds.push(eq(fiscalVouchers.customerId, f.customerId));
+      if (f.letter) conds.push(eq(fiscalVouchers.letter, f.letter));
+      return this.db
+        .select()
+        .from(fiscalVouchers)
+        .where(and(...conds))
+        .orderBy(desc(fiscalVouchers.date))
+        .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   listVouchers(input: ListVouchersInput = {}): FiscalVoucher[] {
     try {
       const conds: SQL[] = [];

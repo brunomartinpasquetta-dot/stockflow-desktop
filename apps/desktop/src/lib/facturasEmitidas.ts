@@ -224,6 +224,19 @@ export function ordenarPorFecha(filas: FacturaEmitidaFila[]): FacturaEmitidaFila
   })
 }
 
+/**
+ * Plano, de la más nueva a la más vieja. La lista abre con TODAS y se carga por
+ * páginas (las más nuevas primero): "Mostrar más" agrega abajo las anteriores.
+ */
+export function ordenarRecientesPrimero(filas: FacturaEmitidaFila[]): FacturaEmitidaFila[] {
+  return [...filas].sort((a, b) => {
+    if (a.date !== b.date) return b.date - a.date
+    const porFiscal = (b.numeroFiscal ?? '').localeCompare(a.numeroFiscal ?? '')
+    if (porFiscal !== 0) return porFiscal
+    return b.number - a.number
+  })
+}
+
 export function sumarFilas(filas: FacturaEmitidaFila[]): TotalesFacturas {
   let net = 0
   let vat = 0

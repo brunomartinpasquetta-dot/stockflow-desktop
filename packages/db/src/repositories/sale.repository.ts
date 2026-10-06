@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, like, lte, max, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, like, lt, lte, max, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   CreateSaleWithLinesSchema,
   type CreateSaleWithLinesInput,
@@ -45,6 +45,25 @@ export interface SaleWithLines {
   payments: SalePayment[];
   /** Cuenta corriente abierta (sólo si es venta a cuenta), null en otro caso. */
   accountReceivable: AccountReceivable | null;
+}
+
+/** Filtros de "Facturas emitidas" (Contabilidad). Todos opcionales: sin fechas = todas. */
+export interface FiltroFacturasEmitidas {
+  from?: number | null;
+  to?: number | null;
+  customerId?: string | null;
+  type?: 'A' | 'B' | 'C' | 'X' | null;
+  incluirAnuladas?: boolean;
+}
+
+function condicionesFacturasEmitidas(f: FiltroFacturasEmitidas): SQL[] {
+  const conds: SQL[] = [];
+  if (f.from != null) conds.push(gte(sales.date, f.from));
+  if (f.to != null) conds.push(lte(sales.date, f.to));
+  if (f.customerId) conds.push(eq(sales.customerId, f.customerId));
+  if (f.type) conds.push(eq(sales.type, f.type));
+  if (!f.incluirAnuladas) conds.push(ne(sales.status, 'voided'));
+  return conds;
 }
 
 export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInsert> {
@@ -736,6 +755,69 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         .from(sales)
         .where(and(gte(sales.date, from), lte(sales.date, to)))
         .all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Una página de "Facturas emitidas": de la venta más nueva a la más vieja, con
+   * los filtros EN LA CONSULTA. Con bases grandes (Nemesis: 287 mil ventas) no
+   * se puede traer todo y filtrar en la pantalla. `antesDe` es el cursor (la
+   * última venta de la página anterior); `limite` tope 1000.
+   */
+  async paginaFacturasEmitidas(
+    f: FiltroFacturasEmitidas & { antesDe?: { date: number; id: string } | null; limite?: number },
+  ): Promise<{ ventas: Sale[]; hayMas: boolean }> {
+    try {
+      const conds = condicionesFacturasEmitidas(f);
+      if (f.antesDe) {
+        conds.push(
+          or(lt(sales.date, f.antesDe.date), and(eq(sales.date, f.antesDe.date), lt(sales.id, f.antesDe.id)))!,
+        );
+      }
+      const limite = Math.max(1, Math.min(1000, Math.floor(f.limite ?? 200)));
+      const filas = this.db
+        .select()
+        .from(sales)
+        .where(conds.length ? and(...conds) : undefined)
+        .orderBy(desc(sales.date), desc(sales.id))
+        .limit(limite + 1)
+        .all();
+      return { ventas: filas.slice(0, limite), hayMas: filas.length > limite };
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Totales de "Facturas emitidas" con los mismos filtros, sumados en la base.
+   * Mismo criterio que la pantalla: lo anulado no suma (se cuenta aparte, y sólo
+   * si se pidió incluirlo); neto = total − IVA.
+   */
+  async totalesFacturasEmitidas(
+    f: FiltroFacturasEmitidas,
+  ): Promise<{ cantidad: number; anuladas: number; total: number; vat: number; clientes: number }> {
+    try {
+      const conds = condicionesFacturasEmitidas(f);
+      const r = this.db
+        .select({
+          cantidad: sql<number>`coalesce(sum(case when ${sales.status} <> 'voided' then 1 else 0 end), 0)`,
+          anuladas: sql<number>`coalesce(sum(case when ${sales.status} = 'voided' then 1 else 0 end), 0)`,
+          total: sql<number>`coalesce(sum(case when ${sales.status} <> 'voided' then cast(${sales.total} as real) else 0 end), 0)`,
+          vat: sql<number>`coalesce(sum(case when ${sales.status} <> 'voided' then cast(${sales.vatAmount} as real) else 0 end), 0)`,
+          clientes: sql<number>`count(distinct ${sales.customerId})`,
+        })
+        .from(sales)
+        .where(conds.length ? and(...conds) : undefined)
+        .get();
+      return {
+        cantidad: Number(r?.cantidad ?? 0),
+        anuladas: Number(r?.anuladas ?? 0),
+        total: Number(r?.total ?? 0),
+        vat: Number(r?.vat ?? 0),
+        clientes: Number(r?.clientes ?? 0),
+      };
     } catch (err) {
       return rethrowDbError(err);
     }

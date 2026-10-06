@@ -54,7 +54,9 @@
     "test:facturas-compra": "tsx electron/__tests__/facturas-compra.smoke.ts",
     "test:facturas-sistema": "tsx electron/__tests__/facturas-sistema.smoke.ts",
     "test:facturas-paddle": "tsx electron/__tests__/facturas-paddle.smoke.ts",
-    "test:facturas-asociador": "tsx electron/__tests__/facturas-asociador.smoke.ts"
+    "test:facturas-asociador": "tsx electron/__tests__/facturas-asociador.smoke.ts",
+    "test:ventanas": "tsx electron/__tests__/ventanas.smoke.ts",
+    "test:contabilidad-listados": "tsx electron/__tests__/contabilidad-listados.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

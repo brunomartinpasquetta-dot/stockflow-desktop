@@ -1,12 +1,14 @@
 /**
  * P-CONTABLE: Facturas emitidas.
- * Todos los comprobantes de venta de un período (facturas A, B y C con CAE,
+ * Abre con TODOS los comprobantes de venta (más nuevos primero, por páginas;
+ * las fechas son un filtro): facturas A, B y C con CAE,
  * comprobantes X y notas de crédito/débito — no sólo los que van al Libro IVA),
  * agrupados por cliente y ordenados por fecha, con neto, IVA, total y estado.
  * Pedido del dueño: la misma vista que "Facturas de compra", del lado de Ventas.
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { FileSpreadsheet, Receipt } from 'lucide-react'
 
 import { api } from '@/lib/api'
@@ -14,7 +16,7 @@ import { useCompany, useCustomers } from '@/lib/hooks'
 import { usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { PERIOD_PRESETS, dayEnd, dayStart, firstOfMonthIso, toIso } from '@/lib/periodPresets'
+import { PERIOD_PRESETS, dayEnd, dayStart } from '@/lib/periodPresets'
 import { exportFacturasEmitidasToExcel } from '@/lib/excelExport'
 import {
   agruparPorCliente,
@@ -22,8 +24,7 @@ import {
   etiquetaTipo,
   filtrarFilas,
   nombreCliente,
-  ordenarPorFecha,
-  sumarFilas,
+  ordenarRecientesPrimero,
   type FacturaEmitidaFila,
   type GrupoCliente,
 } from '@/lib/facturasEmitidas'
@@ -37,9 +38,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { VoucherType } from '@/types/api'
+import type { FacturasEmitidasPaginaDTO, FiscalVoucherDTO, SaleDTO, VoucherType } from '@/types/api'
 
 type Vista = 'cliente' | 'fecha'
+
+/** Comprobantes por página: la lista abre con TODAS y trae de a tantas (las más nuevas primero). */
+const POR_PAGINA = 200
+/** Tope para exportar a Excel de una vez (con más, se pide filtrar por fechas). */
+const TOPE_EXCEL = 100_000
+
+/** Fecha del campo "Desde"/"Hasta"; vacío = sin límite (todas). */
+function aDesde(iso: string): number | null { return iso ? dayStart(iso) : null }
+function aHasta(iso: string): number | null { return iso ? dayEnd(iso) : null }
 
 /** Las notas de crédito van en negativo: "-$1.000,00" en vez de "$-1.000,00". */
 function importe(v: string): string {
@@ -79,31 +89,49 @@ export function FacturasEmitidas() {
   const companyQuery = useCompany()
   const customersQuery = useCustomers()
 
-  const [fromIso, setFromIso] = useState(() => firstOfMonthIso())
-  const [toIsoVal, setToIsoVal] = useState(() => toIso(new Date()))
-  const [applied, setApplied] = useState(() => ({
-    from: dayStart(firstOfMonthIso()),
-    to: dayEnd(toIso(new Date())),
-  }))
+  // Abre con TODAS (pedido de Bruno, 4-oct-2026: a principio de mes la lista
+  // arrancaba casi vacía y parecía que las facturas se habían perdido). Las
+  // fechas quedan como filtro; vacías = sin límite.
+  const [fromIso, setFromIso] = useState('')
+  const [toIsoVal, setToIsoVal] = useState('')
+  const [applied, setApplied] = useState<{ from: number | null; to: number | null }>({ from: null, to: null })
   const [customerId, setCustomerId] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | VoucherType>('all')
-  const [vista, setVista] = useState<Vista>('cliente')
+  // Plano por fecha (más nuevas primero) por defecto: con la lista por páginas,
+  // agrupar por cliente sólo puede sumar lo que ya se cargó.
+  const [vista, setVista] = useState<Vista>('fecha')
   const [incluirAnuladas, setIncluirAnuladas] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [exportando, setExportando] = useState(false)
 
-  // Misma raíz de clave que Historial de Ventas ('salesHistory'): anular desde
-  // el detalle invalida ese prefijo y esta pantalla se refresca sola. Fiscal:
-  // por la fecha del comprobante, no por día de caja (igual que el Libro IVA).
-  const salesQuery = useQuery({
-    queryKey: ['salesHistory', applied.from, applied.to],
-    queryFn: () => api.sales.listByDateRange(applied.from, applied.to),
+  const filtro = useMemo(
+    () => ({
+      from: applied.from,
+      to: applied.to,
+      customerId: customerId || null,
+      type: typeFilter === 'all' ? null : typeFilter,
+      incluirAnuladas,
+    }),
+    [applied, customerId, typeFilter, incluirAnuladas],
+  )
+
+  // Raíz 'salesHistory' (como Historial de Ventas): anular desde el detalle
+  // invalida ese prefijo y esta pantalla se refresca sola. Los filtros van a la
+  // consulta: con 287 mil ventas (Nemesis) no se puede traer todo y filtrar acá.
+  const paginasQuery = useInfiniteQuery({
+    queryKey: ['salesHistory', 'facturasEmitidas', filtro],
+    queryFn: ({ pageParam }) =>
+      api.sales.facturasEmitidasPagina({ ...filtro, antesDe: pageParam, limite: POR_PAGINA }),
+    initialPageParam: null as { date: number; id: string } | null,
+    getNextPageParam: (ultima: FacturasEmitidasPaginaDTO) => {
+      const v = ultima.ventas[ultima.ventas.length - 1]
+      return ultima.hayMas && v ? { date: v.date, id: v.id } : undefined
+    },
   })
-  // El comprobante lleva la fecha en que ARCA lo autorizó, que puede ser
-  // posterior a la venta ("facturar después"): se piden hasta hoy para no
-  // mostrar como pendiente una venta del período facturada días más tarde.
-  const vouchersQuery = useQuery({
-    queryKey: ['fiscal', 'vouchers', applied.from, applied.to],
-    queryFn: () => api.fiscal.listVouchers({ from: applied.from, to: Math.max(applied.to, Date.now()) }),
+  // Totales de TODO lo filtrado (no sólo lo cargado) y las notas de crédito/débito.
+  const totalesQuery = useQuery({
+    queryKey: ['salesHistory', 'facturasEmitidasTotales', filtro],
+    queryFn: () => api.sales.facturasEmitidasTotales(filtro),
   })
   const fiscalCfgQuery = useQuery({
     queryKey: ['fiscal', 'configPublic'],
@@ -112,7 +140,12 @@ export function FacturasEmitidas() {
   })
 
   function calcular(): void {
-    setApplied({ from: dayStart(fromIso), to: dayEnd(toIsoVal) })
+    setApplied({ from: aDesde(fromIso), to: aHasta(toIsoVal) })
+  }
+  function todas(): void {
+    setFromIso('')
+    setToIsoVal('')
+    setApplied({ from: null, to: null })
   }
   function aplicarPreset(key: string): void {
     const preset = PERIOD_PRESETS.find((p) => p.key === key)
@@ -131,33 +164,74 @@ export function FacturasEmitidas() {
     [customersQuery.data],
   )
 
-  const filas = useMemo(
-    () =>
-      filtrarFilas(
-        armarFilas(salesQuery.data ?? [], vouchersQuery.data ?? [], customersQuery.data ?? [], {
-          from: applied.from,
-          to: applied.to,
-          fiscalHabilitada: fiscalCfgQuery.data?.enabled === true,
-        }),
-        { customerId, type: typeFilter, incluirAnuladas },
-      ),
-    [salesQuery.data, vouchersQuery.data, customersQuery.data, fiscalCfgQuery.data, applied, customerId, typeFilter, incluirAnuladas],
-  )
+  const hayMas = paginasQuery.hasNextPage === true
+
+  /** Arma las filas de la pantalla (o del Excel) con las ventas, sus facturas y las notas. */
+  function construirFilas(ventas: SaleDTO[], facturas: FiscalVoucherDTO[], completo: boolean): FacturaEmitidaFila[] {
+    // Notas: viajan todas con los totales. Mientras falten páginas, sólo las de
+    // la ventana ya cargada, para que no aparezcan fuera de lugar.
+    const masVieja = ventas.length ? ventas[ventas.length - 1]!.date : Number.POSITIVE_INFINITY
+    const notas = (totalesQuery.data?.notas ?? []).filter((n) => completo || n.date >= masVieja)
+    return filtrarFilas(
+      armarFilas(ventas, [...facturas, ...notas], customersQuery.data ?? [], {
+        from: applied.from ?? 0,
+        to: applied.to ?? Number.MAX_SAFE_INTEGER,
+        fiscalHabilitada: fiscalCfgQuery.data?.enabled === true,
+      }),
+      { customerId, type: typeFilter, incluirAnuladas },
+    )
+  }
+
+  const filas = useMemo(() => {
+    const paginas = paginasQuery.data?.pages ?? []
+    return construirFilas(
+      paginas.flatMap((p) => p.ventas),
+      paginas.flatMap((p) => p.vouchers),
+      !hayMas,
+    )
+    // construirFilas lee estas mismas dependencias.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginasQuery.data, totalesQuery.data, customersQuery.data, fiscalCfgQuery.data, applied, customerId, typeFilter, incluirAnuladas, hayMas])
   const grupos = useMemo(() => (vista === 'cliente' ? agruparPorCliente(filas) : []), [filas, vista])
-  const planas = useMemo(() => (vista === 'fecha' ? ordenarPorFecha(filas) : []), [filas, vista])
-  const totales = useMemo(() => sumarFilas(filas), [filas])
-  const cantidadClientes = useMemo(() => new Set(filas.map((r) => r.customerId)).size, [filas])
+  const planas = useMemo(() => (vista === 'fecha' ? ordenarRecientesPrimero(filas) : []), [filas, vista])
+  const totales = totalesQuery.data
 
   if (!canView) return <SinPermiso area="Facturas emitidas" />
 
   const detalle = detailId ? filas.find((r) => r.saleId === detailId) : undefined
-  const cargando = salesQuery.isLoading || vouchersQuery.isLoading
+  const cargando = paginasQuery.isLoading
 
-  function onExcel(): void {
-    if (filas.length === 0) return
-    // Mismo orden que la pantalla: agrupado (cliente → fecha) o plano por fecha.
-    const enOrden = vista === 'cliente' ? grupos.flatMap((g) => g.filas) : planas
-    exportFacturasEmitidasToExcel(enOrden, applied, companyQuery.data?.name ?? 'Empresa')
+  /** Excel con TODO lo filtrado (no sólo lo cargado), trayendo las páginas que falten. */
+  async function onExcel(): Promise<void> {
+    const cantidad = (totales?.cantidad ?? 0) + (totales?.anuladas ?? 0)
+    if (cantidad > TOPE_EXCEL) {
+      toast.warning(`Son ${cantidad.toLocaleString('es-AR')} comprobantes: filtre por fechas para exportar (hasta ${TOPE_EXCEL.toLocaleString('es-AR')}).`)
+      return
+    }
+    setExportando(true)
+    try {
+      const ventas: SaleDTO[] = []
+      const facturas: FiscalVoucherDTO[] = []
+      let cursor: { date: number; id: string } | null = null
+      for (;;) {
+        const pag: FacturasEmitidasPaginaDTO = await api.sales.facturasEmitidasPagina({ ...filtro, antesDe: cursor, limite: 1000 })
+        ventas.push(...pag.ventas)
+        facturas.push(...pag.vouchers)
+        const v = pag.ventas[pag.ventas.length - 1]
+        if (!pag.hayMas || !v) break
+        cursor = { date: v.date, id: v.id }
+      }
+      const todas = construirFilas(ventas, facturas, true)
+      if (todas.length === 0) return
+      const enOrden = vista === 'cliente' ? agruparPorCliente(todas).flatMap((g) => g.filas) : ordenarRecientesPrimero(todas)
+      const fechas = todas.map((r) => r.date)
+      const periodo = { from: applied.from ?? Math.min(...fechas), to: applied.to ?? Math.max(...fechas) }
+      exportFacturasEmitidasToExcel(enOrden, periodo, companyQuery.data?.name ?? 'Empresa')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo exportar')
+    } finally {
+      setExportando(false)
+    }
   }
 
   const columnas = vista === 'cliente' ? 8 : 9
@@ -232,14 +306,21 @@ export function FacturasEmitidas() {
               </Select>
             </div>
             <Button onClick={calcular}>Calcular</Button>
-            <Button variant="outline" onClick={onExcel} disabled={filas.length === 0}>
+            <Button variant="outline" onClick={() => void onExcel()} disabled={filas.length === 0 || exportando}>
               <FileSpreadsheet className="h-4 w-4" />
-              Excel
+              {exportando ? 'Exportando…' : 'Excel'}
             </Button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-muted-foreground">Atajos:</span>
+              <Button
+                variant={applied.from == null && applied.to == null ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={todas}
+              >
+                Todas
+              </Button>
               {PERIOD_PRESETS.map((p) => (
                 <Button key={p.key} variant="ghost" size="sm" onClick={() => aplicarPreset(p.key)}>
                   {p.label}
@@ -283,7 +364,9 @@ export function FacturasEmitidas() {
                 ) : filas.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={columnas} className="py-10 text-center text-muted-foreground">
-                      Sin comprobantes en el rango seleccionado.
+                      {applied.from == null && applied.to == null
+                        ? 'Todavía no hay comprobantes emitidos.'
+                        : 'Sin comprobantes en el rango seleccionado.'}
                     </TableCell>
                   </TableRow>
                 ) : vista === 'cliente' ? (
@@ -293,21 +376,43 @@ export function FacturasEmitidas() {
                 ) : (
                   planas.map((r) => filaFactura(r, true))
                 )}
+                {!cargando && hayMas && (
+                  <TableRow>
+                    <TableCell colSpan={columnas} className="py-3 text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={paginasQuery.isFetchingNextPage}
+                        onClick={() => void paginasQuery.fetchNextPage()}
+                      >
+                        {paginasQuery.isFetchingNextPage ? 'Cargando…' : `Mostrar ${POR_PAGINA} más`}
+                      </Button>
+                      {vista === 'cliente' && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Los grupos suman lo que ya se mostró. Los totales de abajo son de todo lo filtrado.
+                        </p>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
-          {filas.length > 0 && (
+          {totales && totales.cantidad + totales.anuladas > 0 && (
             <div className="grid shrink-0 grid-cols-5 gap-2 border-t bg-muted/30 px-3 py-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Comprobantes: </span>
-                <span className="font-medium tabular-nums">{totales.cantidad}</span>
+                <span className="font-medium tabular-nums">{totales.cantidad.toLocaleString('es-AR')}</span>
                 {totales.anuladas > 0 && (
-                  <span className="text-muted-foreground"> · Anuladas: <span className="tabular-nums">{totales.anuladas}</span></span>
+                  <span className="text-muted-foreground"> · Anuladas: <span className="tabular-nums">{totales.anuladas.toLocaleString('es-AR')}</span></span>
+                )}
+                {hayMas && (
+                  <span className="text-muted-foreground"> · mostrando <span className="tabular-nums">{filas.length.toLocaleString('es-AR')}</span></span>
                 )}
               </div>
               <div>
                 <span className="text-muted-foreground">Clientes: </span>
-                <span className="font-medium tabular-nums">{cantidadClientes}</span>
+                <span className="font-medium tabular-nums">{totales.clientes.toLocaleString('es-AR')}</span>
               </div>
               <div className="text-right tabular-nums">Neto: <span className="font-semibold">{importe(totales.net)}</span></div>
               <div className="text-right tabular-nums">IVA: <span className="font-semibold">{importe(totales.vat)}</span></div>

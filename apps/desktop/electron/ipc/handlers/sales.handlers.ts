@@ -5,6 +5,10 @@ import { type HandlerDeps, type HandlerMap, withSession } from '../handler-conte
 import type {
   CreateSaleInputDTO,
   CreateSaleResultDTO,
+  FacturasEmitidasPaginaDTO,
+  FacturasEmitidasTotalesDTO,
+  FiltroFacturasEmitidasDTO,
+  FiscalVoucherDTO,
   SaleDTO,
   SaleLineDTO,
   SalePaymentDTO,
@@ -46,6 +50,59 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
         ctx,
       ): Promise<{ sale: SaleDTO; lines: SaleLineDTO[]; payments: SalePaymentDTO[] }> =>
         new SalesService(ctx).getSale(payload.id),
+    ),
+    /**
+     * "Facturas emitidas" (Contabilidad) abre con TODAS (pedido de Bruno,
+     * 4-oct-2026: a principio de mes la lista arrancaba casi vacía). Con bases
+     * grandes no se puede traer todo: va por páginas de la más nueva a la más
+     * vieja, con los filtros en la consulta, y los totales aparte.
+     */
+    'sales:facturasEmitidasPagina': withSession(
+      deps,
+      async (
+        payload: FiltroFacturasEmitidasDTO & { antesDe?: { date: number; id: string } | null; limite?: number },
+        ctx,
+      ): Promise<FacturasEmitidasPaginaDTO> => {
+        requirePermission(ctx.currentUser, 'view_accounting');
+        const { ventas, hayMas } = await ctx.repos.sales.paginaFacturasEmitidas(payload ?? {});
+        const vouchers = ctx.repos.fiscal.facturasDeVentas(ventas.map((v) => v.id));
+        return { ventas: ventas as unknown as SaleDTO[], vouchers: vouchers as unknown as FiscalVoucherDTO[], hayMas };
+      },
+    ),
+    'sales:facturasEmitidasTotales': withSession(
+      deps,
+      async (payload: FiltroFacturasEmitidasDTO, ctx): Promise<FacturasEmitidasTotalesDTO> => {
+        requirePermission(ctx.currentUser, 'view_accounting');
+        const f = payload ?? {};
+        const t = await ctx.repos.sales.totalesFacturasEmitidas(f);
+        // Las notas suman con su signo (la de crédito resta), igual que la pantalla.
+        // El filtro de tipo X no tiene notas (son siempre A/B/C).
+        const notas =
+          f.type === 'X'
+            ? []
+            : ctx.repos.fiscal.notasEmitidas({
+                from: f.from,
+                to: f.to,
+                customerId: f.customerId,
+                letter: f.type ?? null,
+              });
+        let total = t.total;
+        let vat = t.vat;
+        for (const n of notas) {
+          const signo = n.kind === 'credit_note' ? -1 : 1;
+          total += signo * Number(n.total);
+          vat += signo * Number(n.vatAmount);
+        }
+        return {
+          cantidad: t.cantidad + notas.length,
+          anuladas: t.anuladas,
+          net: (total - vat).toFixed(4),
+          vat: vat.toFixed(4),
+          total: total.toFixed(4),
+          clientes: t.clientes,
+          notas: notas as unknown as FiscalVoucherDTO[],
+        };
+      },
     ),
     'sales:listByDateRange': withSession(
       deps,

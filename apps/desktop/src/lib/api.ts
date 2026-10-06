@@ -3,6 +3,9 @@
  * uniforme `{ ok, data } | { ok:false, code, ... }` y, en error, lanza `ApiError`.
  */
 import type {
+  FacturasEmitidasPaginaDTO,
+  FacturasEmitidasTotalesDTO,
+  FiltroFacturasEmitidasDTO,
   AssistantAskResultDTO,
   AssistantMessageDTO,
   AssistantSeguirResultDTO,
@@ -334,6 +337,11 @@ export const api = {
     listByDateRange: (from: number, to: number, porCaja = false): Promise<SaleDTO[]> =>
       unwrap(sf().sales.listByDateRange({ from, to, porCaja })),
     getNextNumber: (type: VoucherType): Promise<{ number: number }> => unwrap(sf().sales.getNextNumber({ type })),
+    facturasEmitidasPagina: (
+      f: FiltroFacturasEmitidasDTO & { antesDe?: { date: number; id: string } | null; limite?: number },
+    ): Promise<FacturasEmitidasPaginaDTO> => unwrap(sf().sales.facturasEmitidasPagina(f)),
+    facturasEmitidasTotales: (f: FiltroFacturasEmitidasDTO): Promise<FacturasEmitidasTotalesDTO> =>
+      unwrap(sf().sales.facturasEmitidasTotales(f)),
   },
   fiscal: {
     getConfig: (): Promise<FiscalConfigDTO | null> => unwrap(sf().fiscal.getConfig()),
