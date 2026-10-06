@@ -1625,9 +1625,9 @@ function PDV() {
   })
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex h-full flex-col gap-2">
       {/* ── Zona superior: encabezado de la venta ── */}
-      <div className="grid grid-cols-5 gap-3 rounded-lg border bg-card p-3">
+      <div className="grid grid-cols-5 gap-3 rounded-lg border bg-card p-2">
         <div className="col-span-2 flex flex-col gap-1">
           <Label>Cliente</Label>
           <Button variant="outline" className="w-full justify-between" onClick={() => setCustomerPickerOpen(true)}>
@@ -1776,13 +1776,13 @@ function PDV() {
       </div>
 
       {/* ── Zona central: carrito ── */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 rounded-lg border bg-card p-2">
         <div className="flex items-center gap-2">
           <div className="relative w-1/2" ref={buscadorRef}>
             <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               ref={barcodeRef}
-              className="h-11 pl-10 text-base"
+              className="h-10 pl-10 text-base"
               placeholder="Código o nombre del producto — escanear o escribir y Enter"
               value={barcode}
               onFocus={() => setListaAbierta(true)}
@@ -1860,7 +1860,7 @@ function PDV() {
           <Button
             type="button"
             variant="outline"
-            className="h-11"
+            className="h-10"
             onClick={() => setArticlePickerOpen(true)}
           >
             <List className="mr-2 h-4 w-4" />
@@ -1869,7 +1869,7 @@ function PDV() {
           <Button
             type="button"
             variant="outline"
-            className="h-11 border-primary/30 text-primary hover:bg-primary/10"
+            className="h-10 border-primary/30 text-primary hover:bg-primary/10"
             onClick={() => setPromoPickerOpen(true)}
             title="Agregar una promoción al carrito"
           >
@@ -1879,7 +1879,7 @@ function PDV() {
           <Button
             type="button"
             variant="outline"
-            className="h-11"
+            className="h-10"
             onClick={() => setRapidoOpen(true)}
             title="Cobrar algo que no está en el catálogo (F10)"
           >
@@ -1890,7 +1890,7 @@ function PDV() {
             <Button
               type="button"
               variant="outline"
-              className="h-11"
+              className="h-10"
               onClick={() => setDevolucionPickerOpen(true)}
               title="Registrar la devolución de una venta reciente"
             >
@@ -1927,46 +1927,51 @@ function PDV() {
                   const overStock = l.article ? Number(l.quantity) > Number(l.article.stock) : false
                   return (
                     <tr key={l.article?.id ?? `rapido-${i}`} className="border-t">
-                      <td className="px-2 py-1">
-                        <div className="font-medium">{cartLineLabel(l)}</div>
-                        <div className="font-mono text-xs text-muted-foreground">
+                      {/* UNA línea por renglón (Nemesis, 6-oct-2026): con el código
+                          abajo del nombre cada renglón medía el doble y en una
+                          pantalla común entraban dos productos y medio. El código
+                          va al lado, chico y gris; el nombre se corta con "…" y
+                          completo en el recuadro del mouse. */}
+                      <td className="max-w-0 px-2 py-0.5">
+                        <div className="flex min-w-0 items-baseline gap-2" title={cartLineLabel(l)}>
+                          <span className="truncate font-medium">{cartLineLabel(l)}</span>
                           {l.article ? (
-                            l.article.barcode
+                            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{l.article.barcode}</span>
                           ) : (
-                            <span className="rounded bg-amber-500/15 px-1 py-0.5 text-amber-700 dark:text-amber-400">
+                            <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[11px] text-amber-700 dark:text-amber-400">
                               artículo rápido
                             </span>
                           )}
                           {overStock && l.article && (
-                            <span className="ml-2 text-destructive">Stock: {formatQty(l.article.stock)}</span>
+                            <span className="shrink-0 text-[11px] text-destructive">Stock: {formatQty(l.article.stock)}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-2 py-1 text-sm text-muted-foreground">{l.article?.brand ?? ''}</td>
-                      <td className="px-2 py-1">
+                      <td className="truncate px-2 py-0.5 text-sm text-muted-foreground">{l.article?.brand ?? ''}</td>
+                      <td className="px-2 py-0.5">
                         <Input
-                          className="h-8 text-right tabular-nums"
+                          className="h-7 text-right tabular-nums"
                           inputMode="decimal"
                           value={l.quantity}
                           onChange={(e) => setLineQty(i, e.target.value)}
                           onBlur={() => setLineQty(i, parseCurrencyInput(l.quantity))}
                         />
                       </td>
-                      <td className="px-2 py-1">
+                      <td className="px-2 py-0.5">
                         <CurrencyInput
-                          className="h-8 text-right tabular-nums"
+                          className="h-7 text-right tabular-nums"
                           value={l.unitPrice}
                           onChange={(v) => setLinePrice(i, v)}
                         />
                       </td>
-                      <td className="px-2 py-1">
+                      <td className="px-2 py-0.5">
                         <CurrencyInput
-                          className="h-8 text-right tabular-nums"
+                          className="h-7 text-right tabular-nums"
                           value={l.discount}
                           onChange={(v) => setLineDiscount(i, v)}
                         />
                       </td>
-                      <td className="px-2 py-1 text-right tabular-nums font-medium">
+                      <td className="px-2 py-0.5 text-right tabular-nums font-medium">
                         {formatCurrency(lineTotal(l))}
                         {priceMode === 'net' && (
                           <div className="text-[10px] font-normal text-muted-foreground">
@@ -1974,8 +1979,8 @@ function PDV() {
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeLine(i)} title="Quitar producto de la venta">
+                      <td className="px-2 py-0.5">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeLine(i)} title="Quitar producto de la venta">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </td>
@@ -1989,7 +1994,7 @@ function PDV() {
       </div>
 
       {/* ── Zona inferior: totales + pago ── */}
-      <div className="grid grid-cols-3 gap-3 rounded-lg border bg-card p-3">
+      <div className="grid grid-cols-3 gap-3 rounded-lg border bg-card p-2">
         {/* totales */}
         <div className="flex flex-col gap-1 text-sm">
           <div className="flex justify-between">
@@ -2141,11 +2146,14 @@ function PDV() {
           )}
         </div>
 
-        {/* confirmar */}
-        <div className="flex flex-col justify-end gap-2">
+        {/* confirmar — compacto (Nemesis, 6-oct-2026): esta columna marcaba la
+            altura de todo el panel y dejaba huecos en las otras dos; la lista de
+            productos se quedaba sin lugar. Opciones en una línea, botón un poco
+            más bajo y los dos secundarios en una sola fila. */}
+        <div className="flex flex-col justify-end gap-1.5">
           {canCobrarQr && (
             <Button
-              className="h-11 bg-sky-500 text-white hover:bg-sky-600"
+              className="h-10 bg-sky-500 text-white hover:bg-sky-600"
               onClick={() => setQrModalOpen(true)}
             >
               <QrCode className="mr-2 h-5 w-5" />
@@ -2154,60 +2162,63 @@ function PDV() {
           )}
           {/* Opciones de venta: preferencias de esta caja, juntas en un recuadro
               (pedido de Bruno, 1-oct-2026). */}
-          <fieldset className="flex flex-col gap-1 rounded-md border px-2.5 pb-1.5 pt-0.5">
+          <fieldset className="rounded-md border px-2.5 pb-1 pt-0">
             <legend className="px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Opciones de venta</legend>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-input"
-                checked={autoPrintOnSale}
-                onChange={(e) => toggleAutoPrint(e.target.checked)}
-              />
-              <span>Imprimir ticket automáticamente</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm" title="Al confirmar una venta en efectivo se abre la pantalla de cobro con el vuelto">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-input"
-                checked={calcularVueltoOn}
-                onChange={(e) => toggleCalcularVuelto(e.target.checked)}
-              />
-              <span>Calcular vuelto</span>
-            </label>
-            {/* Tildada, dice qué va a pasar (al tildarla sola no se ve ningún cambio). */}
-            {calcularVueltoOn && (
-              <p className="pl-6 text-[11px] leading-tight text-muted-foreground">
-                {cobraEnEfectivo
-                  ? 'Al confirmar se abre la pantalla del vuelto.'
-                  : 'Se calcula cuando se cobra en efectivo.'}
-              </p>
-            )}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input"
+                  checked={autoPrintOnSale}
+                  onChange={(e) => toggleAutoPrint(e.target.checked)}
+                />
+                <span>Imprimir ticket</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm" title="Al confirmar una venta en efectivo se abre la pantalla de cobro con el vuelto">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input"
+                  checked={calcularVueltoOn}
+                  onChange={(e) => toggleCalcularVuelto(e.target.checked)}
+                />
+                <span>Calcular vuelto</span>
+              </label>
+              {/* Tildada, dice qué va a pasar (al tildarla sola no se ve ningún cambio). */}
+              {calcularVueltoOn && (
+                <span className="text-[11px] leading-tight text-muted-foreground">
+                  {cobraEnEfectivo ? 'Al confirmar se abre el vuelto.' : 'Se calcula al cobrar en efectivo.'}
+                </span>
+              )}
+            </div>
           </fieldset>
           <Button
             variant="success"
-            className="h-14 text-lg"
+            className="h-12 text-lg"
             disabled={!canConfirm}
             onClick={() => void confirmar()}
           >
             {createSale.isPending || procesando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
             Confirmar venta (F2) — {formatCurrency(totals.total)}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!lastSaleResult}
-            onClick={() => void imprimirUltimoTicket()}
-            title={lastSaleResult ? undefined : 'Todavía no hay ninguna venta confirmada en esta sesión'}
-          >
-            <Printer className="h-4 w-4" />
-            Imprimir último ticket
-          </Button>
-          {cart.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearSale} disabled={createSale.isPending || procesando}>
-              <X className="h-4 w-4" />
-              Vaciar venta
+          <div className="flex gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 flex-1"
+              disabled={!lastSaleResult}
+              onClick={() => void imprimirUltimoTicket()}
+              title={lastSaleResult ? undefined : 'Todavía no hay ninguna venta confirmada en esta sesión'}
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir último ticket
             </Button>
-          )}
+            {cart.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-8 flex-1" onClick={clearSale} disabled={createSale.isPending || procesando}>
+                <X className="h-4 w-4" />
+                Vaciar venta
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
