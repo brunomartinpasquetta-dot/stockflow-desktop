@@ -56,7 +56,10 @@
     "test:facturas-paddle": "tsx electron/__tests__/facturas-paddle.smoke.ts",
     "test:facturas-asociador": "tsx electron/__tests__/facturas-asociador.smoke.ts",
     "test:ventanas": "tsx electron/__tests__/ventanas.smoke.ts",
-    "test:contabilidad-listados": "tsx electron/__tests__/contabilidad-listados.smoke.ts"
+    "test:contabilidad-listados": "tsx electron/__tests__/contabilidad-listados.smoke.ts",
+    "test:fiscal-pv": "tsx electron/__tests__/fiscal-pv.smoke.ts",
+    "test:ventas-enter": "tsx electron/__tests__/ventas-enter.smoke.ts",
+    "test:devolucion-items": "tsx electron/__tests__/devolucion-items.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

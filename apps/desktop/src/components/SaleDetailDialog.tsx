@@ -178,6 +178,10 @@ export function SaleDetailDialog({
   const letraAEmitir: 'A' | 'B' | 'C' = aDeMostrador ? 'A' : letraCliente
   const faltaCuitParaFacturaA =
     letraAEmitir === 'A' && (docReceptor.tipo !== 'CUIT' || docReceptor.nro.trim() === '')
+  // Igual que en Ventas: a un consumidor final sin identificar no se le pide el
+  // documento; el enlace lo muestra si hace falta.
+  const [identificarCliente, setIdentificarCliente] = useState(false)
+  const mostrarDocumento = letraAEmitir === 'A' || docReceptor.tipo !== 'CF' || identificarCliente
 
   const issueMutation = useMutation({
     mutationFn: () =>
@@ -425,6 +429,17 @@ export function SaleDetailDialog({
                     {/* Documento del receptor, como en Ventas: el de la ficha o
                         el tipeado acá. */}
                     <div className="flex items-end gap-2">
+                      {!mostrarDocumento && (
+                        <button
+                          type="button"
+                          className="mr-auto text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                          onClick={() => setIdentificarCliente(true)}
+                        >
+                          Identificar al cliente (DNI / CUIT)
+                        </button>
+                      )}
+                      {mostrarDocumento && (
+                      <>
                       <div className="flex flex-col gap-1">
                         <Label className="text-xs">Documento del cliente</Label>
                         <Select
@@ -451,6 +466,8 @@ export function SaleDetailDialog({
                           setDocManual({ tipo: docReceptor.tipo, nro: e.target.value.replace(/\D/g, '') })
                         }
                       />
+                      </>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"

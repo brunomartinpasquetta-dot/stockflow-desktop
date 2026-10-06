@@ -5,6 +5,7 @@
 import type {
   FacturasEmitidasPaginaDTO,
   FacturasEmitidasTotalesDTO,
+  ItemParaDevolucionDTO,
   FiltroFacturasEmitidasDTO,
   AssistantAskResultDTO,
   AssistantMessageDTO,
@@ -342,6 +343,12 @@ export const api = {
     ): Promise<FacturasEmitidasPaginaDTO> => unwrap(sf().sales.facturasEmitidasPagina(f)),
     facturasEmitidasTotales: (f: FiltroFacturasEmitidasDTO): Promise<FacturasEmitidasTotalesDTO> =>
       unwrap(sf().sales.facturasEmitidasTotales(f)),
+    itemsParaDevolucion: (f: {
+      desde: number
+      hasta: number
+      texto?: string
+      limite?: number
+    }): Promise<ItemParaDevolucionDTO[]> => unwrap(sf().sales.itemsParaDevolucion(f)),
   },
   fiscal: {
     getConfig: (): Promise<FiscalConfigDTO | null> => unwrap(sf().fiscal.getConfig()),

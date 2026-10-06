@@ -11,6 +11,7 @@ import {
   useCurrentCash,
   useCustomerBalances,
   useCustomers,
+  useDebouncedValue,
   useFamilies,
   usePaymentMethods,
   usePromotions,
@@ -23,6 +24,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
+import { enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma } from '@/lib/enterConfirma'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
@@ -42,7 +44,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { ArticleDTO, CompanyDTO, CreateSaleResultDTO, CustomerDTO, DocType, PriceMode, PrinterConfigDTO, VoucherType } from '@/types/api'
 
 interface CartLine {
@@ -384,83 +386,106 @@ function ArticlePicker({
  * agrega su artículo espejo al carrito (misma ruta que cualquier artículo).
  * No muestra costos ni márgenes (lo ve el vendedor).
  */
-/** Selector de venta reciente para lanzar una devolución desde el PDV. */
+/**
+ * Selector de DEVOLUCIÓN por ARTÍCULO (pedido de Bruno, 6-oct-2026: "debe
+ * mostrar por ítems, no por ventas"). Lo que el cliente trae de vuelta es un
+ * artículo: se busca por nombre, código, cliente o N° de comprobante y al elegir
+ * el renglón se abre la devolución de esa venta con ese artículo ya marcado.
+ */
 function DevolucionPicker({
   open,
-  customers,
   onClose,
   onPick,
 }: {
   open: boolean
-  customers: CustomerDTO[]
   onClose: () => void
-  onPick: (saleId: string) => void
+  onPick: (saleId: string, lineId: string) => void
 }) {
   const [busca, setBusca] = useState('')
-  const salesQuery = useQuery({
-    queryKey: ['ventasDevolucionRecientes'],
-    queryFn: () => api.sales.listByDateRange(Date.now() - 30 * 86_400_000, Date.now() + 3_600_000),
+  const texto = useDebouncedValue(busca.trim(), 200)
+  const itemsQuery = useQuery({
+    queryKey: ['devolucionItems', texto],
+    queryFn: () =>
+      api.sales.itemsParaDevolucion({
+        desde: Date.now() - 30 * 86_400_000,
+        hasta: Date.now() + 3_600_000,
+        texto,
+        limite: 60,
+      }),
     enabled: open,
+    placeholderData: keepPreviousData,
   })
-  const customerName = useMemo(() => {
-    const m = new Map(customers.map((c) => [c.id, `${c.lastName}${c.firstName ? ', ' + c.firstName : ''}`]))
-    return (id: string) => m.get(id) ?? '—'
-  }, [customers])
-  const rows = useMemo(() => {
-    const completadas = (salesQuery.data ?? []).filter((v) => v.status === 'completed')
-    completadas.sort((a, b) => b.date - a.date)
-    const q = busca.trim().toLowerCase()
-    if (!q) return completadas.slice(0, 30)
-    return completadas
-      .filter((v) => String(v.number).includes(q) || customerName(v.customerId).toLowerCase().includes(q))
-      .slice(0, 30)
-  }, [salesQuery.data, busca, customerName])
+  const items = itemsQuery.data ?? []
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Devolución — seleccione la venta</DialogTitle>
+          <DialogTitle>Devolución — seleccione el artículo</DialogTitle>
         </DialogHeader>
         <Input
           autoFocus
-          placeholder="Buscar por N° de comprobante o cliente…"
+          placeholder="Buscar por artículo, código, cliente o N° de comprobante…"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter elige el primero de la lista, como al cargar un artículo.
+            const primero = items[0]
+            if (e.key === 'Enter' && primero) onPick(primero.saleId, primero.lineId)
+          }}
         />
-        <div className="max-h-80 overflow-auto rounded-md border">
+        <div className="max-h-[50vh] overflow-auto rounded-md border">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-muted">
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-2 py-1.5">Fecha</th>
-                <th className="px-2 py-1.5 text-right">N°</th>
+                <th className="px-2 py-1.5">Artículo</th>
+                <th className="px-2 py-1.5 text-right">Cant.</th>
+                <th className="px-2 py-1.5 text-right">Importe</th>
                 <th className="px-2 py-1.5">Cliente</th>
-                <th className="px-2 py-1.5 text-right">Total</th>
+                <th className="px-2 py-1.5 text-right">Venta</th>
               </tr>
             </thead>
             <tbody>
-              {salesQuery.isLoading ? (
-                <tr><td colSpan={4} className="px-2 py-6 text-center text-muted-foreground">Cargando…</td></tr>
-              ) : rows.length === 0 ? (
-                <tr><td colSpan={4} className="px-2 py-6 text-center text-muted-foreground">Sin ventas completadas en los últimos 30 días.</td></tr>
+              {itemsQuery.isLoading ? (
+                <tr><td colSpan={6} className="px-2 py-6 text-center text-muted-foreground">Cargando…</td></tr>
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-2 py-6 text-center text-muted-foreground">
+                    {texto ? 'Ningún artículo vendido en los últimos 30 días coincide con la búsqueda.' : 'Sin ventas en los últimos 30 días.'}
+                  </td>
+                </tr>
               ) : (
-                rows.map((v) => (
-                  <tr
-                    key={v.id}
-                    className="cursor-pointer border-t hover:bg-accent"
-                    onClick={() => onPick(v.id)}
-                  >
-                    <td className="px-2 py-1.5 text-xs text-muted-foreground">{formatDateTime(v.date)}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{v.number}</td>
-                    <td className="px-2 py-1.5">{customerName(v.customerId)}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{formatCurrency(v.total)}</td>
-                  </tr>
-                ))
+                items.map((it) => {
+                  const devuelto = Number(it.devuelto)
+                  return (
+                    <tr
+                      key={it.lineId}
+                      className="cursor-pointer border-t hover:bg-accent"
+                      onClick={() => onPick(it.saleId, it.lineId)}
+                    >
+                      <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">{formatDateTime(it.saleDate)}</td>
+                      <td className="px-2 py-1.5">
+                        <div className="font-medium">{it.description}</div>
+                        {it.code && <div className="text-[11px] text-muted-foreground">{it.code}</div>}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {Number(it.quantity)}
+                        {devuelto > 0 && <div className="text-[11px] text-muted-foreground">ya devuelto {devuelto}</div>}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{formatCurrency(it.lineTotal)}</td>
+                      <td className="px-2 py-1.5">{it.customerName}</td>
+                      <td className="px-2 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
+                        {it.saleType} {it.saleNumber}
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted-foreground">Ventas más viejas: buscalas desde el Historial de Ventas (botón Devolución en el detalle).</p>
+        <p className="text-xs text-muted-foreground">Ventas de más de 30 días: búsquelas en el Historial de Ventas (botón Devolución en el detalle).</p>
       </DialogContent>
     </Dialog>
   )
@@ -679,6 +704,12 @@ function PDV() {
     tipo: (selectedCustomer?.docType ?? 'CF') as DocType,
     nro: selectedCustomer?.docNumber ?? '',
   }
+  // El documento sólo se pregunta cuando hace falta: Factura A (pide CUIT) o un
+  // documento ya cargado. A un consumidor final sin identificar no se le pide
+  // nada (Bruno, 6-oct-2026: "es muy molesto"); si el cliente quiere sus datos
+  // en la factura, el enlace de abajo lo muestra.
+  const [identificarCliente, setIdentificarCliente] = useState(false)
+  const mostrarDocumento = voucherType === 'A' || docReceptor.tipo !== 'CF' || identificarCliente
 
   /**
    * Una Factura A exige el CUIT del receptor: sin él ARCA la rechaza. Se avisa
@@ -720,6 +751,8 @@ function PDV() {
   const canDevolver = usePermission('void_sale') && canWrite
   const [devolucionPickerOpen, setDevolucionPickerOpen] = useState(false)
   const [returningSaleId, setReturningSaleId] = useState<string | null>(null)
+  // Renglón elegido en el selector de Devolución: llega ya marcado en el diálogo.
+  const [returningLineId, setReturningLineId] = useState<string | null>(null)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
   /**
@@ -742,6 +775,11 @@ function PDV() {
   // los pagos registrados siguen sumando exacto el total.
   const [calcularVueltoOn, setCalcularVueltoOn] = useState<boolean>(() => leerPreferenciaVuelto())
   const [pagaCon, setPagaCon] = useState('')
+  // "Enter confirma la venta": con el buscador vacío, Enter hace lo que F2. Se
+  // recuerda en cada PC y viene apagada (ver lib/enterConfirma).
+  const [enterConfirmaOn, setEnterConfirmaOn] = useState<boolean>(() => leerEnterConfirma())
+  // Cuándo se cargó el último artículo: un Enter pegado al del lector no confirma.
+  const ultimoArticuloRef = useRef(0)
   // Pantalla de cobro con vuelto (se abre al confirmar, como en StockFácil).
   const [cobroVueltoOpen, setCobroVueltoOpen] = useState(false)
   // Modo mixto explícito (toggle "Pago Mixto"): expone el split N-filas.
@@ -882,6 +920,7 @@ function PDV() {
     addArticleWithQty(article, '1')
   }
   function addArticleWithQty(article: ArticleDTO, qty: string): void {
+    ultimoArticuloRef.current = Date.now()
     // Lista 2/3 pedida pero vacía en la ficha: se cobra Lista 1 y se avisa.
     const listaCaida = priceListFallback(article, selectedPriceList)
     if (listaCaida) {
@@ -987,6 +1026,7 @@ function PDV() {
     // El documento vuelve a seguir al cliente nuevo: lo tipeado para el
     // anterior no puede quedar pegado.
     setDocManual(null)
+    setIdentificarCliente(false)
   }
 
   function clearSale(): void {
@@ -1199,6 +1239,11 @@ function PDV() {
     guardarPreferenciaVuelto(activo)
     if (!activo) setPagaCon('')
   }
+  function toggleEnterConfirma(activo: boolean): void {
+    setEnterConfirmaOn(activo)
+    guardarEnterConfirma(activo)
+    barcodeRef.current?.focus()
+  }
 
   // ── Comisión del medio de pago (FEATURE #1, sólo informativo para el vendedor) ──
   // El comercio ABSORBE la comisión; el cliente paga el total normal. Acá se
@@ -1376,7 +1421,7 @@ function PDV() {
       toast.error(
         `La venta quedó registrada pero ARCA no la autorizó: ${
           err instanceof Error ? err.message : 'error desconocido'
-        }. Podés reintentar desde el Historial de Ventas.`,
+        }. Puede reintentar desde el Historial de Ventas.`,
         { duration: 15_000 },
       )
       return null
@@ -1717,9 +1762,20 @@ function PDV() {
               La facturación electrónica no está activa: se registrará sin CAE.
             </span>
           )}
-          {/* Documento del receptor: aparece al elegir una factura, que es
-              cuando ARCA lo pide. En Remito X no tiene sentido y sería ruido. */}
-          {fiscalEnabled && voucherType !== 'X' && (
+          {/* Documento del receptor: sólo cuando hace falta (Factura A, o un
+              documento ya cargado). Un consumidor final sin identificar no lo
+              ve; el enlace lo muestra si el cliente quiere sus datos. En Remito
+              X no tiene sentido. */}
+          {fiscalEnabled && voucherType !== 'X' && !mostrarDocumento && (
+            <button
+              type="button"
+              className="mt-0.5 w-fit text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={() => setIdentificarCliente(true)}
+            >
+              Identificar al cliente (DNI / CUIT)
+            </button>
+          )}
+          {fiscalEnabled && voucherType !== 'X' && mostrarDocumento && (
             <div className="mt-1 flex items-end gap-2">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs">Documento del cliente</Label>
@@ -1806,7 +1862,24 @@ function PDV() {
                   setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1))
                   return
                 }
-                if (e.key === 'Enter') commitBarcode()
+                if (e.key === 'Enter') {
+                  // Buscador vacío + "Enter confirma la venta": es como F2.
+                  if (
+                    enterDebeConfirmar({
+                      activo: enterConfirmaOn,
+                      busqueda: barcode,
+                      hayArticulos: cart.length > 0,
+                      puedeConfirmar: canConfirm,
+                      repetida: e.repeat,
+                      msDesdeElUltimoArticulo: Date.now() - ultimoArticuloRef.current,
+                    })
+                  ) {
+                    e.preventDefault()
+                    void confirmar()
+                    return
+                  }
+                  commitBarcode()
+                }
                 if (e.key === 'Escape' && barcode.trim() !== '') {
                   setBarcode('')
                   setHighlight(-1)
@@ -2183,6 +2256,15 @@ function PDV() {
                 />
                 <span>Calcular vuelto</span>
               </label>
+              <label className="flex items-center gap-2 text-sm" title="Con el buscador vacío, Enter confirma la venta (igual que F2). Se recuerda en cada PC.">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-input"
+                  checked={enterConfirmaOn}
+                  onChange={(e) => toggleEnterConfirma(e.target.checked)}
+                />
+                <span>Enter confirma la venta</span>
+              </label>
               {/* Tildada, dice qué va a pasar (al tildarla sola no se ve ningún cambio). */}
               {calcularVueltoOn && (
                 <span className="text-[11px] leading-tight text-muted-foreground">
@@ -2198,7 +2280,7 @@ function PDV() {
             onClick={() => void confirmar()}
           >
             {createSale.isPending || procesando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
-            Confirmar venta (F2) — {formatCurrency(totals.total)}
+            Confirmar venta ({enterConfirmaOn ? 'F2 o Enter' : 'F2'}) — {formatCurrency(totals.total)}
           </Button>
           <div className="flex gap-1.5">
             <Button
@@ -2283,18 +2365,22 @@ function PDV() {
       </Dialog>
       <DevolucionPicker
         open={devolucionPickerOpen}
-        customers={customersQuery.data ?? []}
         onClose={() => setDevolucionPickerOpen(false)}
-        onPick={(saleId) => {
+        onPick={(saleId, lineId) => {
           setDevolucionPickerOpen(false)
+          setReturningLineId(lineId)
           setReturningSaleId(saleId)
         }}
       />
       {returningSaleId && (
         <ReturnSaleDialog
           saleId={returningSaleId}
+          lineaInicial={returningLineId ?? undefined}
           open
-          onClose={() => setReturningSaleId(null)}
+          onClose={() => {
+            setReturningSaleId(null)
+            setReturningLineId(null)
+          }}
           onDone={() => {
             void articlesQuery.refetch()
           }}

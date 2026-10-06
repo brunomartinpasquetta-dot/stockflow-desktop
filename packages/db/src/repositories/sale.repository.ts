@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, like, lt, lte, max, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, like, lt, lte, max, ne, or, sql, type SQL } from 'drizzle-orm';
 import {
   CreateSaleWithLinesSchema,
   type CreateSaleWithLinesInput,
@@ -21,6 +21,7 @@ import {
   cashMovements,
   cashRegisters,
   companies,
+  customers,
   paymentMethods,
   payments,
   promotionItems,
@@ -64,6 +65,29 @@ function condicionesFacturasEmitidas(f: FiltroFacturasEmitidas): SQL[] {
   if (f.type) conds.push(eq(sales.type, f.type));
   if (!f.incluirAnuladas) conds.push(ne(sales.status, 'voided'));
   return conds;
+}
+
+/** Un renglón vendido que todavía se puede devolver (selector de Devolución). */
+export interface ItemParaDevolucion {
+  lineId: string;
+  saleId: string;
+  saleNumber: number;
+  saleType: string;
+  saleDate: number;
+  customerId: string;
+  customerName: string;
+  articleId: string | null;
+  /** Nombre del artículo; en un artículo rápido, lo escrito a mano. */
+  description: string;
+  code: string | null;
+  quantity: string;
+  /** Lo que ya se devolvió de este renglón. */
+  devuelto: string;
+  lineTotal: string;
+}
+
+function sinAcentos(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
 export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInsert> {
@@ -868,6 +892,81 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
   async findBySeller(sellerId: string): Promise<Sale[]> {
     try {
       return this.db.select().from(sales).where(eq(sales.sellerId, sellerId)).all();
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * Renglones vendidos (de ventas completadas) que todavía admiten devolución,
+   * del más nuevo al más viejo, para elegir QUÉ se devuelve en vez de buscar la
+   * venta. `texto` filtra por palabras sobre artículo, código, cliente y N° de
+   * comprobante, sin distinguir mayúsculas ni acentos. El filtro es en memoria
+   * porque SQLite no ignora acentos; la ventana de fechas lo mantiene chico.
+   */
+  async itemsParaDevolucion(f: {
+    desde: number;
+    hasta: number;
+    texto?: string;
+    limite?: number;
+  }): Promise<ItemParaDevolucion[]> {
+    try {
+      const filas = this.db
+        .select({
+          lineId: saleLines.id,
+          saleId: sales.id,
+          saleNumber: sales.number,
+          saleType: sales.type,
+          saleDate: sales.date,
+          customerId: sales.customerId,
+          lastName: customers.lastName,
+          firstName: customers.firstName,
+          articleId: saleLines.articleId,
+          lineDescription: saleLines.description,
+          articleDescription: articles.description,
+          code: articles.barcode,
+          quantity: saleLines.quantity,
+          lineTotal: saleLines.lineTotal,
+          devuelto: sql<number>`COALESCE((SELECT SUM(CAST(rl.quantity AS REAL)) FROM return_lines rl WHERE rl.sale_line_id = ${saleLines.id}), 0)`,
+        })
+        .from(saleLines)
+        .innerJoin(sales, eq(saleLines.saleId, sales.id))
+        .leftJoin(articles, eq(saleLines.articleId, articles.id))
+        .leftJoin(customers, eq(sales.customerId, customers.id))
+        .where(and(eq(sales.status, 'completed'), gte(sales.date, f.desde), lte(sales.date, f.hasta)))
+        .orderBy(desc(sales.date), desc(sales.id), asc(saleLines.lineNumber))
+        .limit(30_000)
+        .all();
+
+      const palabras = sinAcentos(f.texto ?? '').split(/\s+/).filter(Boolean);
+      const limite = Math.min(Math.max(f.limite ?? 60, 1), 200);
+      const out: ItemParaDevolucion[] = [];
+      for (const r of filas) {
+        if (Number(r.quantity) - Number(r.devuelto) <= 1e-9) continue;
+        const nombre = r.articleDescription ?? r.lineDescription ?? 'Artículo';
+        const cliente = r.lastName ? `${r.lastName}${r.firstName ? ', ' + r.firstName : ''}` : '—';
+        if (palabras.length > 0) {
+          const texto = sinAcentos([nombre, r.code ?? '', r.lineDescription ?? '', String(r.saleNumber), cliente].join(' '));
+          if (!palabras.every((w) => texto.includes(w))) continue;
+        }
+        out.push({
+          lineId: r.lineId,
+          saleId: r.saleId,
+          saleNumber: r.saleNumber,
+          saleType: r.saleType,
+          saleDate: r.saleDate,
+          customerId: r.customerId,
+          customerName: cliente,
+          articleId: r.articleId,
+          description: nombre,
+          code: r.code ?? null,
+          quantity: r.quantity,
+          devuelto: String(r.devuelto),
+          lineTotal: r.lineTotal,
+        });
+        if (out.length >= limite) break;
+      }
+      return out;
     } catch (err) {
       return rethrowDbError(err);
     }

@@ -2088,6 +2088,23 @@ export interface FacturasEmitidasPaginaDTO {
 }
 
 /** Totales de todo lo filtrado (no sólo lo cargado) + las notas de crédito/débito. */
+/** Renglón vendido que todavía admite devolución (selector de Devolución, por artículo). */
+export interface ItemParaDevolucionDTO {
+  lineId: string;
+  saleId: string;
+  saleNumber: number;
+  saleType: string;
+  saleDate: number;
+  customerId: string;
+  customerName: string;
+  articleId: string | null;
+  description: string;
+  code: string | null;
+  quantity: string;
+  devuelto: string;
+  lineTotal: string;
+}
+
 export interface FacturasEmitidasTotalesDTO {
   cantidad: number;
   anuladas: number;
@@ -2355,6 +2372,7 @@ export interface ApiSurface {
       payload: FiltroFacturasEmitidasDTO & { antesDe?: { date: number; id: string } | null; limite?: number },
     ): Res<FacturasEmitidasPaginaDTO>;
     facturasEmitidasTotales(payload: FiltroFacturasEmitidasDTO): Res<FacturasEmitidasTotalesDTO>;
+    itemsParaDevolucion(payload: { desde: number; hasta: number; texto?: string; limite?: number }): Res<ItemParaDevolucionDTO[]>;
     getNextNumber(payload: { type: VoucherType }): Res<{ number: number }>;
   };
   returns: {

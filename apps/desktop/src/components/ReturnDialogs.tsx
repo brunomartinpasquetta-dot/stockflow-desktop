@@ -25,6 +25,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 
+/**
+ * ¿"Imprimir ticket" (Ventas / Configuración) está activado? Sin dato legible
+ * se toma como activado, igual que en Ventas.
+ */
+async function impresionAutomaticaActivada(): Promise<boolean> {
+  try {
+    const cfg = await api.hardware.printer.getConfig()
+    return cfg?.autoPrintOnSale !== false
+  } catch {
+    return true
+  }
+}
+
 interface LineState {
   lineId: string
   /** null = artículo rápido: se devuelve sólo la plata, no vuelve stock. */
@@ -41,6 +54,8 @@ function buildLineStates(
     id: string
     articleId: string | null
     description?: string | null
+    /** Nombre del artículo resuelto por el servidor (ventas). */
+    articleDescription?: string | null
     quantity: string
     lineTotal: string
     vatRate?: string
@@ -68,9 +83,11 @@ function buildLineStates(
       lineId: l.id,
       articleId: l.articleId,
       // Artículo rápido: la descripción la trae la línea, no hay ficha.
-      description: l.articleId
-        ? (descByArticle.get(l.articleId) ?? l.articleId)
-        : (l.description ?? 'Artículo rápido'),
+      // El nombre que resolvió el servidor manda: la lista de artículos activos
+      // no tiene los dados de baja y mostraba el identificador interno.
+      description:
+        l.articleDescription ??
+        (l.articleId ? (descByArticle.get(l.articleId) ?? 'Artículo dado de baja') : (l.description ?? 'Artículo rápido')),
       sold,
       returned,
       unitEff: sold > 0 ? linePaid / sold : 0,
@@ -129,11 +146,14 @@ function ReturnTable({ lines, setLines }: { lines: LineState[]; setLines: (fn: (
 
 export function ReturnSaleDialog({
   saleId,
+  lineaInicial,
   open,
   onClose,
   onDone,
 }: {
   saleId: string
+  /** Renglón elegido en el selector por artículo: llega marcado para devolver. */
+  lineaInicial?: string
   open: boolean
   onClose: () => void
   onDone?: () => void
@@ -163,19 +183,26 @@ export function ReturnSaleDialog({
   )
 
   // sembrar líneas cuando llegan venta + devoluciones previas + empresa (modo de precios)
-  if (open && !seeded && saleQ.data && returnsQ.data && articlesQ.data && companyQ.data) {
+  if (open && !seeded && saleQ.data && returnsQ.data && companyQ.data) {
     const returnedByLine = new Map<string, number>()
     for (const r of returnsQ.data) {
       for (const rl of r.lines) {
         returnedByLine.set(rl.saleLineId, (returnedByLine.get(rl.saleLineId) ?? 0) + Number(rl.quantity))
       }
     }
+    const armadas = buildLineStates(saleQ.data.lines, returnedByLine, descByArticle, {
+      subtotal: saleQ.data.sale.subtotal,
+      discount: saleQ.data.sale.discount,
+      priceMode: companyQ.data.priceMode,
+    })
+    // El renglón elegido en el selector llega con una unidad marcada (o lo que
+    // quede, si es menos): se ajusta la cantidad y listo.
     setLines(
-      buildLineStates(saleQ.data.lines, returnedByLine, descByArticle, {
-        subtotal: saleQ.data.sale.subtotal,
-        discount: saleQ.data.sale.discount,
-        priceMode: companyQ.data.priceMode,
-      }),
+      lineaInicial
+        ? armadas.map((l) =>
+            l.lineId === lineaInicial ? { ...l, toReturn: String(Math.min(1, Math.max(0, l.sold - l.returned))) } : l,
+          )
+        : armadas,
     )
     setMethod(saleQ.data.sale.isAccountSale ? 'account' : 'cash')
     setSeeded(true)
@@ -208,14 +235,13 @@ export function ReturnSaleDialog({
         notes: notes.trim() || null,
         lines: chosen.map((l) => ({ saleLineId: l.lineId, quantity: Number(l.toReturn).toFixed(3) })),
       })
-      toast.success(
-        `Devolución DEV #${result.ret.number} registrada — ${method === 'cash' ? `reintegro en efectivo por ${formatCurrency(result.ret.total)}` : `crédito en cuenta por ${formatCurrency(result.ret.total)}`}`,
-      )
+      const aviso = `Devolución DEV #${result.ret.number} registrada — ${method === 'cash' ? `reintegro en efectivo por ${formatCurrency(result.ret.total)}` : `crédito en cuenta por ${formatCurrency(result.ret.total)}`}`
       void qc.invalidateQueries({ queryKey: ['articles'] })
       void qc.invalidateQueries({ queryKey: ['cash'] })
       void qc.invalidateQueries({ queryKey: ['customerBalances'] })
       void qc.invalidateQueries({ queryKey: ['returns', saleId] })
       // Comprobante A4 (o Guardar como PDF desde el diálogo).
+      let imprimirComprobante: (() => void) | null = null
       if (companyQ.data && sale) {
         const doc: FormalDocData = {
           company: companyQ.data,
@@ -237,8 +263,19 @@ export function ReturnSaleDialog({
           notes: notes.trim() || null,
           footerNote: 'Documento no fiscal — comprobante de devolución',
         }
-        void printNode(createElement(FormalDocA4, { data: doc }), 'a4')
+        imprimirComprobante = () => void printNode(createElement(FormalDocA4, { data: doc }), 'a4')
       }
+      // La ventana de impresión sólo se abre sola si "Imprimir ticket" está
+      // activado (la misma casilla de Ventas). Apagada, la devolución se
+      // registra sin abrir nada y el comprobante queda a un clic, en el aviso.
+      const imprimirSolo = imprimirComprobante != null && (await impresionAutomaticaActivada())
+      if (imprimirComprobante && imprimirSolo) imprimirComprobante()
+      toast.success(
+        aviso,
+        imprimirComprobante && !imprimirSolo
+          ? { duration: 12_000, action: { label: 'Imprimir comprobante', onClick: imprimirComprobante } }
+          : undefined,
+      )
       onDone?.()
       onClose()
     } catch (e) {

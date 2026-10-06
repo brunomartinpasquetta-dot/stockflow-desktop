@@ -9,6 +9,7 @@ import type {
   FacturasEmitidasTotalesDTO,
   FiltroFacturasEmitidasDTO,
   FiscalVoucherDTO,
+  ItemParaDevolucionDTO,
   SaleDTO,
   SaleLineDTO,
   SalePaymentDTO,
@@ -67,6 +68,24 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
         const { ventas, hayMas } = await ctx.repos.sales.paginaFacturasEmitidas(payload ?? {});
         const vouchers = ctx.repos.fiscal.facturasDeVentas(ventas.map((v) => v.id));
         return { ventas: ventas as unknown as SaleDTO[], vouchers: vouchers as unknown as FiscalVoucherDTO[], hayMas };
+      },
+    ),
+    /**
+     * Selector de Devolución POR ARTÍCULO (pedido de Bruno, 6-oct-2026): lo que
+     * se devuelve es un artículo, no una venta. Mismo permiso que el Historial
+     * de Ventas: alcanza con poder vender, anular o ver reportes. No lleva costos.
+     */
+    'sales:itemsParaDevolucion': withSession(
+      deps,
+      async (
+        payload: { desde: number; hasta: number; texto?: string; limite?: number },
+        ctx,
+      ): Promise<ItemParaDevolucionDTO[]> => {
+        const rol = ctx.currentUser.role;
+        const puede =
+          hasPermission(rol, 'create_sale') || hasPermission(rol, 'void_sale') || hasPermission(rol, 'view_reports');
+        if (!puede) requirePermission(ctx.currentUser, 'view_reports');
+        return (await ctx.repos.sales.itemsParaDevolucion(payload)) as ItemParaDevolucionDTO[];
       },
     ),
     'sales:facturasEmitidasTotales': withSession(
