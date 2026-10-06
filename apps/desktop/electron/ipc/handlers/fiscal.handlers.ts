@@ -18,6 +18,8 @@ import {
 } from '@stockflow/shared';
 
 import { ArcaGatewayImpl } from '../../fiscal/ArcaGatewayImpl';
+import { codigoDePuntoDeVenta, explicarPuntoDeVenta, type PuntoHabilitado } from '../../fiscal/explicar-pv';
+import { WsfeApiError } from '../../fiscal/WsfeClient';
 import {
   archivarFacturaPdf,
   carpetaFacturas,
@@ -112,6 +114,31 @@ function buildGateway(deps: HandlerDeps): ArcaGateway & ArcaGatewayImpl {
     keyPath,
     cacheDir: ArcaGatewayImpl.defaultCacheDir(deps.userDataDir),
   });
+}
+
+/**
+ * Si ARCA rechaza el PUNTO DE VENTA (11002 / 10005), la respuesta no dice cuál
+ * recibió ni cuáles tiene habilitados. Se le pregunta (con el ticket que ya
+ * está en cache: no pide uno nuevo) y el aviso sale con el número que mandó
+ * StockFlow y los que sirven. Cualquier otro error pasa tal cual.
+ */
+async function explicandoPuntoDeVenta(
+  deps: HandlerDeps,
+  err: unknown,
+  puntoVenta: number,
+): Promise<unknown> {
+  if (!(err instanceof Error) || err.name !== 'WsfeApiError') return err;
+  const codigo = codigoDePuntoDeVenta(err.message);
+  if (!codigo) return err;
+  let habilitados: PuntoHabilitado[] | null = null;
+  try {
+    habilitados = await buildGateway(deps).listSalePoints();
+  } catch {
+    /* sin consulta: el aviso sale sin la lista */
+  }
+  return new WsfeApiError(explicarPuntoDeVenta(puntoVenta, habilitados, codigo), 'ARCA_PUNTO_DE_VENTA', [
+    err.message,
+  ]);
 }
 
 function requireAdmin(role: string | undefined): void {
@@ -504,7 +531,12 @@ export function buildFiscalHandlers(deps: HandlerDeps): HandlerMap {
         ctx,
       ): Promise<IssuedVoucherDTO> => {
         const svc = new FiscalService(ctx, buildGateway(deps));
-        const v = (await svc.issueInvoiceForSale(payload)) as IssuedVoucherDTO;
+        let v: IssuedVoucherDTO;
+        try {
+          v = (await svc.issueInvoiceForSale(payload)) as IssuedVoucherDTO;
+        } catch (err) {
+          throw await explicandoPuntoDeVenta(deps, err, payload.salePoint);
+        }
         // El PDF se archiva ACÁ, donde llega el CAE: así queda guardado aunque
         // la factura la haya emitido una terminal por navegador y aunque el
         // cajero cierre la ventana enseguida. Nunca frena la respuesta.
