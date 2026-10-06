@@ -99,13 +99,48 @@ const PIN_VALIDO = /^\d{6}$/;
  * por defecto y el aviso de "Permitir acceso" a veces no aparece (o se rechaza
  * sin querer). Es la causa número uno de que una instalación en red no ande.
  */
+/** PowerShell con el comando en base64 (UTF-16LE): sin líos de comillas. */
+function powershell(comando: string, timeout = 20_000): Promise<{ stdout: string }> {
+  const encoded = Buffer.from(comando, 'utf16le').toString('base64');
+  return execFileP('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+    timeout,
+    windowsHide: true,
+  });
+}
+
+/**
+ * ¿El puerto está abierto en el firewall de Windows?
+ *
+ * Antes se buscaba la palabra "LocalPort" en la salida de netsh, que VIENE
+ * TRADUCIDA: en un Windows en castellano dice "PuertoLocal", así que el chequeo
+ * decía "FALTA" aunque la regla existiera (Nemesis, 6-oct-2026: la terminal
+ * conectaba y el aviso seguía). Ahora:
+ *  1. PowerShell (objetos, no texto traducido): cualquier regla de entrada
+ *     habilitada que permita ese puerto TCP, o el programa StockFlow, con
+ *     cualquier nombre (la que crea Windows con "Permitir acceso" cuenta).
+ *  2. Si PowerShell no está o falla: netsh por el nombre de nuestra regla,
+ *     usando el código de salida (0 = encontró la regla), no el texto.
+ */
 async function firewallRuleState(port: number): Promise<'present' | 'absent' | 'unsupported'> {
   if (process.platform !== 'win32') return 'unsupported';
   try {
-    const { stdout } = await execFileP('netsh', [
-      'advfirewall', 'firewall', 'show', 'rule', `name=StockFlow ${port}`,
-    ]);
-    return /LocalPort/i.test(stdout) ? 'present' : 'absent';
+    const { stdout } = await powershell(
+      `$p = @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue | ` +
+        `Get-NetFirewallPortFilter -ErrorAction SilentlyContinue | ` +
+        `Where-Object { ($_.Protocol -eq 'TCP' -or $_.Protocol -eq 'Any') -and ($_.LocalPort -contains '${port}' -or $_.LocalPort -contains 'Any') }).Count; ` +
+        `$a = @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue | ` +
+        `Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue | ` +
+        `Where-Object { $_.Program -like '*StockFlow*' }).Count; ` +
+        `Write-Output ($p + $a)`,
+    );
+    const n = Number.parseInt(stdout.trim().split(/\s+/).pop() ?? '', 10);
+    if (Number.isFinite(n)) return n > 0 ? 'present' : 'absent';
+  } catch {
+    /* sin PowerShell o sin el módulo de firewall: se prueba con netsh */
+  }
+  try {
+    await execFileP('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=StockFlow ${port}`], { windowsHide: true });
+    return 'present'; // netsh sale con 0 sólo si encontró la regla
   } catch {
     return 'absent';
   }
@@ -113,17 +148,30 @@ async function firewallRuleState(port: number): Promise<'present' | 'absent' | '
 
 async function addFirewallRule(port: number): Promise<{ ok: boolean; needsAdmin?: boolean; error?: string }> {
   if (process.platform !== 'win32') return { ok: true };
+  const args = ['advfirewall', 'firewall', 'add', 'rule', `name=StockFlow ${port}`, 'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`, 'profile=any'];
   try {
-    await execFileP('netsh', [
-      'advfirewall', 'firewall', 'add', 'rule',
-      `name=StockFlow ${port}`, 'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`,
-    ]);
+    await execFileP('netsh', args, { windowsHide: true });
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // netsh devuelve "Acceso denegado" / "requires elevation" sin permisos.
-    const needsAdmin = /denegado|denied|elevat|administrador|administrator/i.test(msg);
-    return { ok: false, needsAdmin, error: msg };
+    // Antes el botón terminaba acá y "no hacía nada" (StockFlow no corre como
+    // administrador). Ahora pide el permiso de Windows (la ventana de Control de
+    // cuentas de usuario) y crea la regla con eso.
+    if (!/denegado|denied|elevat|administrador|administrator/i.test(msg)) return { ok: false, error: msg };
+    try {
+      await powershell(
+        `Start-Process -FilePath 'netsh.exe' -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList ` +
+          `'advfirewall firewall add rule name="StockFlow ${port}" dir=in action=allow protocol=TCP localport=${port} profile=any'`,
+        120_000,
+      );
+    } catch (e2) {
+      const m2 = e2 instanceof Error ? e2.message : String(e2);
+      return { ok: false, needsAdmin: true, error: /cancel/i.test(m2) ? 'Se canceló el permiso de administrador.' : m2 };
+    }
+    return (await firewallRuleState(port)) === 'present'
+      ? { ok: true }
+      : { ok: false, needsAdmin: true, error: 'No se pudo crear la regla. Pruebe de nuevo y acepte el permiso de administrador.' };
   }
 }
 
