@@ -2,6 +2,7 @@
  * Servicio de caja: apertura/cierre, movimientos manuales y reportes de arqueo.
  */
 import type { CashMovement, CashRegister, PaymentMethod, PaymentMethodType } from '@stockflow/shared';
+import { CashRegisterRepository } from '@stockflow/db';
 import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { hasPermission, requirePermission } from '../auth/permissions';
@@ -62,6 +63,13 @@ export interface HistoricalCashRegisterSummary {
   depositedElectronicAmount: string;
   /** Cuánto podía ingresarse en total (efectivo contado + neto electrónico). */
   depositableAmount: string;
+  /**
+   * Caja importada del sistema anterior (migración desde StockFácil). No se
+   * ingresa a Caja General: la Caja General arranca en cero el día de la
+   * migración (decisión de Bruno, 4-oct-2026) y ofrecer "Ingresar" en 3.000
+   * cajas viejas confundía y dejaba meter plata que ya no existe.
+   */
+  importada: boolean;
   /**
    * Ingresos de esa caja separados por forma de pago. Va en el LISTADO —y no
    * sólo en el detalle— porque la pregunta del comercio es "cuánto vendí por
@@ -234,6 +242,8 @@ export class CashService {
 
     // Qué cierres ya fueron ingresados a Caja General (para marcar huérfanos).
     const depositedIds = await repos.cashGeneral.closeDepositRefIds(registers.map((r) => r.id));
+    // Cajas importadas del sistema anterior (base migrada): no se ingresan.
+    const fechaMigracion = await repos.cashRegisters.fechaDeMigracion();
 
     const summaries: HistoricalCashRegisterSummary[] = [];
     for (const r of registers) {
@@ -287,6 +297,7 @@ export class CashService {
           : '0';
       const deposito = depositedIds.get(r.id);
       const yaDepositado = deposito?.total ?? '0';
+      const importada = CashRegisterRepository.esImportada(r, fechaMigracion);
       summaries.push({
         id: r.id,
         number: r.number,
@@ -302,12 +313,14 @@ export class CashService {
         difference,
         status: r.status,
         movementCount: movements.length,
-        depositedToGeneral: Number(yaDepositado) >= Number(depositable) - 0.005,
+        // Importada: nada para ingresar (ni el botón, ni "Sin ingresar").
+        depositedToGeneral: importada || Number(yaDepositado) >= Number(depositable) - 0.005,
         depositedAmount: yaDepositado,
         depositedCashAmount: deposito?.cash ?? '0',
         depositedElectronicAmount: deposito?.electronic ?? '0',
         incomeByPaymentMethod: [...porMedio.values()],
-        depositableAmount: depositable,
+        depositableAmount: importada ? '0' : depositable,
+        importada,
       });
     }
     return summaries;

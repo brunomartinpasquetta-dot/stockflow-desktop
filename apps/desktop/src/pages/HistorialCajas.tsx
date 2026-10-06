@@ -729,6 +729,13 @@ export function HistorialCajas() {
                       <TableCell>
                         {r.status !== 'closed' ? (
                           <span className="text-xs text-muted-foreground">—</span>
+                        ) : r.importada ? (
+                          // Caja del sistema anterior (migración): la Caja General
+                          // arranca en cero el día de la migración y estas cajas no
+                          // se ingresan. Un estado, una palabra; el porqué, al pasar el mouse.
+                          <Badge variant="outline" className="text-muted-foreground" title="Importada del sistema anterior: no se ingresa a Caja General">
+                            Importada
+                          </Badge>
                         ) : r.depositedToGeneral ? (
                           <Badge variant="success">Ingresado</Badge>
                         ) : (

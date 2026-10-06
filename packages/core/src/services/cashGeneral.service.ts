@@ -8,6 +8,7 @@
  */
 import { addDecimal, subDecimal } from '@stockflow/shared';
 import type { CashGeneralCategory, CashGeneralMovementType } from '@stockflow/db';
+import { CashRegisterRepository } from '@stockflow/db';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -161,6 +162,14 @@ export class CashGeneralService {
     if (!reg) throw new NotFoundError('Caja', input.cashRegisterId);
     if (reg.userId !== currentUser?.id) {
       requirePermission(currentUser, 'close_cash');
+    }
+    // Caja importada del sistema anterior: la Caja General arranca en cero el
+    // día de la migración; su plata ya no está (ver cash.service, `importada`).
+    if (CashRegisterRepository.esImportada(reg, await repos.cashRegisters.fechaDeMigracion())) {
+      throw new ValidationError(
+        'cashRegisterId',
+        'Es una caja importada del sistema anterior: no se ingresa a Caja General.',
+      );
     }
     // Tope de lo que ese cierre puede aportar: efectivo contado + neto de los
     // medios no físicos. Permite completar un depósito parcial (típico: se

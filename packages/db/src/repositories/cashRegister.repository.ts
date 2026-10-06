@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, max, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, like, lte, max, or } from 'drizzle-orm';
 import {
   CloseCashRegisterSchema,
   OpenCashRegisterSchema,
@@ -183,6 +183,36 @@ export class CashRegisterRepository extends BaseRepository<
     } catch (err) {
       return rethrowDbError(err);
     }
+  }
+
+  /**
+   * Momento de la migración desde el sistema anterior, o `null` si la base no
+   * vino de una migración. Toda base migrada con `tools/migracion/migrar.py`
+   * tiene la caja sintética "Caja histórica (migración desde StockFácil)",
+   * abierta en el momento de migrar (verificado en las bases de Leo, Denver y
+   * Nemesis). Las cajas importadas son las anteriores a ese momento.
+   */
+  async fechaDeMigracion(): Promise<number | null> {
+    try {
+      const row = this.db
+        .select({ openDate: cashRegisters.openDate })
+        .from(cashRegisters)
+        .where(like(cashRegisters.notes, 'Caja histórica (migración desde%'))
+        .orderBy(desc(cashRegisters.openDate))
+        .limit(1)
+        .get();
+      return row?.openDate ?? null;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * ¿Caja importada del sistema anterior? Anterior a la migración y sin
+   * terminal (las del sistema viejo no tienen; las de StockFlow sí desde 2026).
+   */
+  static esImportada(r: { openDate: number; terminalId?: string | null }, fechaMigracion: number | null): boolean {
+    return fechaMigracion != null && r.terminalId == null && r.openDate <= fechaMigracion;
   }
 
   async findByDateRange(opts: {
