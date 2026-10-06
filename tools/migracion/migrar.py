@@ -1198,14 +1198,23 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
         rep.aviso(f"{len(lista)} {letra_sf} NO migradas (no son ventas; cargar a mano si hace falta): "
                   + "; ".join(lista[:4]) + (" …" if len(lista) > 4 else ""))
     # El punto de venta y el último número que usó StockFácil, sacados de los
-    # comprobantes (MIEMPRESA.PUNTO puede estar viejo: Denver decía 3 y
-    # facturaba por el 4). Es el PV a configurar en StockFlow.
+    # comprobantes. NINGUNA de las dos fuentes es definitiva: MIEMPRESA.PUNTO
+    # puede estar viejo (Denver decía 3 y facturaba por el 4) y los códigos de
+    # barras pueden traer otro número que el habilitado en ARCA (Nemesis: los
+    # comprobantes decían 4 y el punto habilitado era el 7, el de MIEMPRESA).
+    # El valor definitivo sale de «Consultar en ARCA» en StockFlow.
     nombres_cbte = {1: "Factura A", 6: "Factura B", 11: "Factura C",
                     2: "Nota de débito A", 7: "Nota de débito B", 12: "Nota de débito C"}
     for (pv_, cod_), (nro_, fecha_) in sorted(ultimo_cbte.items()):
         rep.aviso(f"último comprobante con CAE: {nombres_cbte.get(cod_, f'código {cod_}')} "
                   f"PV {pv_} N° {nro_} ({datetime.fromtimestamp(fecha_ / 1000):%d/%m/%Y}). "
-                  "Configurar ese punto de venta en StockFlow.")
+                  "Confirmar el punto de venta con «Consultar en ARCA» antes de configurarlo en StockFlow.")
+    pv_comprobantes = sorted({pv_ for (pv_, _cod) in ultimo_cbte})
+    if punto_venta_viejo is not None and pv_comprobantes and punto_venta_viejo not in pv_comprobantes:
+        rep.aviso(f"OJO: MIEMPRESA.PUNTO dice {punto_venta_viejo} pero los comprobantes dicen "
+                  f"{', '.join(str(x) for x in pv_comprobantes)}. Uno de los dos NO es el punto habilitado en "
+                  "ARCA para web services: en StockFlow, Facturación Electrónica → «Consultar en ARCA» "
+                  "muestra los que sirven. No facturar hasta confirmarlo.")
 
     art_borrado: str | None = None
     lineas_migradas: set[int] = set()
