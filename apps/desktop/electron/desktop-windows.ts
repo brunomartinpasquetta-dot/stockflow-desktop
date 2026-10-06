@@ -12,6 +12,9 @@
  * - Las child windows cargan la app en modo "embedded": `#/embedded/<pageKey>`.
  */
 import { BrowserWindow, screen } from 'electron';
+import { medidasDeVentana } from './medidas-ventana';
+
+export { medidasDeVentana } from './medidas-ventana';
 
 export interface DesktopWindowOpenInput {
   /** pageKey del registry (también es la windowKey). */
@@ -145,18 +148,22 @@ export class DesktopWindowsManager {
       this.windows.delete(windowKey);
     }
 
-    // Tamaño por defecto: ~92% del área útil de la pantalla (tope 1500x900).
-    // Con 1100x720 fijos, pantallas grandes abrían ventanas chicas y los
-    // layouts anchos (la fila del resumen de Estadísticas) quebraban en dos.
-    const area = screen.getPrimaryDisplay().workAreaSize;
-    const defW = Math.min(1500, Math.round(area.width * 0.92));
-    const defH = Math.min(900, Math.round(area.height * 0.92));
+    // Siempre dentro de la pantalla donde está la ventana principal (con dos
+    // monitores, la del monitor en uso), ver `medidasDeVentana`.
+    const principal = this.config.getMainWindow();
+    const pantalla =
+      principal && !principal.isDestroyed()
+        ? screen.getDisplayMatching(principal.getBounds())
+        : screen.getPrimaryDisplay();
+    const m = medidasDeVentana(pantalla.workArea, input);
     const win = new BrowserWindow({
       ...barraDeTitulo(),
-      width: input.width ?? defW,
-      height: input.height ?? defH,
-      minWidth: input.minWidth ?? 480,
-      minHeight: input.minHeight ?? 360,
+      width: m.width,
+      height: m.height,
+      minWidth: m.minWidth,
+      minHeight: m.minHeight,
+      x: m.x,
+      y: m.y,
       title: input.title ?? 'StockFlow',
       show: false,
       autoHideMenuBar: true,
@@ -176,6 +183,13 @@ export class DesktopWindowsManager {
     win.once('ready-to-show', () => {
       if (!win.isDestroyed()) win.show();
     });
+    // Pantalla más chica que lo que necesita la página: se achica el contenido
+    // para que entre entero (se reaplica en cada carga: el zoom es por página).
+    if (m.zoom < 1) {
+      win.webContents.on('did-finish-load', () => {
+        if (!win.isDestroyed()) win.webContents.setZoomFactor(m.zoom);
+      });
+    }
     win.on('closed', () => {
       this.windows.delete(windowKey);
     });
