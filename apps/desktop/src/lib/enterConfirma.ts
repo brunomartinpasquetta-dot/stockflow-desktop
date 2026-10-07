@@ -1,19 +1,20 @@
 /**
- * "Enter confirma la venta" (casilla en Opciones de venta).
+ * "Enter confirma la venta".
  *
- * Con la casilla tildada, un Enter con el buscador VACÍO y artículos cargados
- * confirma la venta, igual que F2: se carga el artículo, Enter, y listo. Viene
- * apagada: un doble Enter sin querer cerraría una venta a medio armar, y no
- * todos los comercios trabajan así. Se recuerda en cada PC.
+ * Un Enter con el buscador VACÍO y artículos cargados confirma la venta, igual
+ * que F2: se carga el artículo, Enter, y listo. VIENE ACTIVADO (Bruno, 6-oct-2026:
+ * lo pidió como comportamiento, no como una casilla para tildar); la casilla de
+ * Opciones de venta sólo sirve para apagarlo en una PC donde moleste. Se recuerda
+ * en cada PC.
  */
 
 const CLAVE = 'stockflow:ventas:enterConfirma'
 
 export function leerEnterConfirma(): boolean {
   try {
-    return localStorage.getItem(CLAVE) === '1'
+    return localStorage.getItem(CLAVE) !== '0'
   } catch {
-    return false
+    return true
   }
 }
 

@@ -18,6 +18,7 @@ import { useArticles, useCompany, useCurrentCash } from '@/lib/hooks'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { type PriceMode, vatBreakdown } from '@/lib/pricing'
 import { printNode } from '@/lib/printService'
+import { imprimirTicketActivado } from '@/lib/imprimirTicket'
 import { FormalDocA4, type FormalDocData } from '@/print/FormalDocA4'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,15 +27,15 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 
 /**
- * ¿"Imprimir ticket" (Ventas / Configuración) está activado? Sin dato legible
- * se toma como activado, igual que en Ventas.
+ * ¿"Imprimir ticket" (Ventas / Configuración) está activado? Manda la
+ * configuración de la impresora; sin ella, lo elegido en esta PC (ver
+ * lib/imprimirTicket); sin nada, activado, igual que en Ventas.
  */
 async function impresionAutomaticaActivada(): Promise<boolean> {
   try {
-    const cfg = await api.hardware.printer.getConfig()
-    return cfg?.autoPrintOnSale !== false
+    return imprimirTicketActivado(await api.hardware.printer.getConfig())
   } catch {
-    return true
+    return imprimirTicketActivado(null)
   }
 }
 

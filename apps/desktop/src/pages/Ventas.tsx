@@ -25,6 +25,7 @@ import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
 import { enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma } from '@/lib/enterConfirma'
+import { guardarImprimirTicketLocal, imprimirTicketActivado, leerImprimirTicketLocal } from '@/lib/imprimirTicket'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
@@ -775,8 +776,8 @@ function PDV() {
   // los pagos registrados siguen sumando exacto el total.
   const [calcularVueltoOn, setCalcularVueltoOn] = useState<boolean>(() => leerPreferenciaVuelto())
   const [pagaCon, setPagaCon] = useState('')
-  // "Enter confirma la venta": con el buscador vacío, Enter hace lo que F2. Se
-  // recuerda en cada PC y viene apagada (ver lib/enterConfirma).
+  // "Enter confirma la venta": con el buscador vacío, Enter hace lo que F2. Viene
+  // activado; se recuerda en cada PC y la casilla lo apaga (ver lib/enterConfirma).
   const [enterConfirmaOn, setEnterConfirmaOn] = useState<boolean>(() => leerEnterConfirma())
   // Cuándo se cargó el último artículo: un Enter pegado al del lector no confirma.
   const ultimoArticuloRef = useRef(0)
@@ -794,15 +795,20 @@ function PDV() {
   } | null>(null)
   // Toggle "Imprimir ticket automáticamente". Valor inicial = config; al
   // cambiarlo se persiste en la config (se recuerda entre sesiones).
-  const [autoPrintOnSale, setAutoPrintOnSale] = useState(true)
+  // Arranca con lo que se eligió en esta PC (la config de la impresora puede no
+  // existir todavía y entonces no hay dónde leerlo).
+  const [autoPrintOnSale, setAutoPrintOnSale] = useState(() => leerImprimirTicketLocal() ?? true)
   const [autoPrintSeeded, setAutoPrintSeeded] = useState(false)
   // Sembrar el toggle desde la config persistida una sola vez (undefined→true).
   if (!autoPrintSeeded && printerConfigQuery.data !== undefined) {
     setAutoPrintSeeded(true)
-    setAutoPrintOnSale(printerConfigQuery.data?.autoPrintOnSale !== false)
+    setAutoPrintOnSale(imprimirTicketActivado(printerConfigQuery.data))
   }
   function toggleAutoPrint(next: boolean): void {
     setAutoPrintOnSale(next)
+    // Siempre se recuerda en esta PC: sin configuración de impresora guardada,
+    // lo de abajo no persiste nada y la casilla volvía a tildarse sola.
+    guardarImprimirTicketLocal(next)
     const cfg = printerConfigQuery.data
     if (cfg) {
       // Persistir el cambio en la config (mismo flag que Configuración).
@@ -2256,7 +2262,7 @@ function PDV() {
                 />
                 <span>Calcular vuelto</span>
               </label>
-              <label className="flex items-center gap-2 text-sm" title="Con el buscador vacío, Enter confirma la venta (igual que F2). Se recuerda en cada PC.">
+              <label className="flex items-center gap-2 text-sm" title="Con el buscador vacío, Enter confirma la venta (igual que F2). Destíldela para apagarlo en esta PC.">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-input"
