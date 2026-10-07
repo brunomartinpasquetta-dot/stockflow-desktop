@@ -2,6 +2,8 @@
  * Cliente IPC tipado: envuelve `window.stockflow.*`, desempaqueta la respuesta
  * uniforme `{ ok, data } | { ok:false, code, ... }` y, en error, lanza `ApiError`.
  */
+import { urlDePing } from '@/lib/direccionServidor'
+
 import type {
   FacturasEmitidasPaginaDTO,
   FacturasEmitidasTotalesDTO,
@@ -679,13 +681,24 @@ export const api = {
     /**
      * Ping directo desde el renderer (HTTP GET /lan/ping al server LAN).
      * No usa IPC: el renderer puede hacer fetch sin CORS issues (server permite *).
+     *
+     * La dirección NO se arma a mano cuando la terminal entró por el navegador:
+     * se usa la misma por la que se sirvió la página. Por el ACCESO REMOTO se
+     * entra con `https://…` y sin puerto, y `http://<host>:7777` lo bloqueaba
+     * el navegador por contenido mixto: el ping fallaba siempre, la terminal
+     * quedaba "sin conexión con el servidor" y, como la licencia la informa el
+     * servidor en ese mismo ping, TODO quedaba en sólo lectura — el cajero
+     * cargaba la compra y el botón «Pagar» nunca se habilitaba (Nemesis,
+     * 7-oct-2026). Las llamadas normales ya usaban esta dirección
+     * (`serverBaseUrl` en preload-bridge); faltaba acá.
      */
     pingServer: async (ip: string, port: number, timeoutMs = 3000): Promise<{ ok: boolean; latencyMs?: number; license?: string }> => {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), timeoutMs)
       const start = Date.now()
       try {
-        const res = await fetch(`http://${ip}:${port}/lan/ping`, { signal: controller.signal })
+        const servida = (window as unknown as { __stockflowServidor?: string }).__stockflowServidor
+        const res = await fetch(urlDePing(ip, port, servida), { signal: controller.signal })
         if (!res.ok) return { ok: false }
         // El servidor informa su licencia: el puesto no tiene una propia y
         // trabaja amparado por ella (una licencia por comercio).

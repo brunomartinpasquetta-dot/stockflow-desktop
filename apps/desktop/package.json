@@ -60,7 +60,8 @@
     "test:fiscal-pv": "tsx electron/__tests__/fiscal-pv.smoke.ts",
     "test:ventas-enter": "tsx electron/__tests__/ventas-enter.smoke.ts",
     "test:devolucion-items": "tsx electron/__tests__/devolucion-items.smoke.ts",
-    "test:imprimir-ticket": "tsx electron/__tests__/imprimir-ticket.smoke.ts"
+    "test:imprimir-ticket": "tsx electron/__tests__/imprimir-ticket.smoke.ts",
+    "test:direccion-servidor": "tsx electron/__tests__/direccion-servidor.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

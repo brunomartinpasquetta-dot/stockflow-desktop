@@ -253,6 +253,11 @@ function crearListeners(): BridgeIO['listeners'] {
 export function instalarPuenteWeb(): void {
   const lanCfg = configDesdeUrl();
 
+  // Dirección por la que SE LLEGA al servidor, tal cual entró la terminal. El
+  // resto del programa no puede armarla como `http://<ip>:<puerto>`: por el
+  // acceso remoto se entra con `https://…` y sin puerto. Ver `pingServer`.
+  (window as unknown as { __stockflowServidor?: string }).__stockflowServidor = lanCfg.serverBaseUrl;
+
   // ¿Es una corrida NUEVA del navegador (se abrió el acceso) o una recarga?
   // sessionStorage muere al cerrar la ventana y sobrevive a las recargas, así
   // que su ausencia significa "recién abierto" → se cierra la sesión anterior
