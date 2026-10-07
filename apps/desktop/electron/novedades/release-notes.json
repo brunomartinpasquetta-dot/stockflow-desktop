@@ -2,9 +2,14 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
+      "version": "1.14.1",
+      "novedades": [],
+      "internas": true
+    },
+    {
       "version": "1.14.0",
       "novedades": [
-        "Ventas: nueva casilla «Enter confirma la venta» en las Opciones de venta. Tildada, con el buscador vacío y artículos cargados, la tecla Enter confirma la venta igual que F2. Viene apagada y se recuerda en cada PC.",
+        "Ventas: con el buscador vacío y artículos cargados, la tecla Enter confirma la venta, igual que F2. Viene activado; la casilla «Enter confirma la venta», en las Opciones de venta, permite apagarlo en una PC.",
         "Devolución: la lista para elegir qué devolver muestra los artículos vendidos en los últimos 30 días, no las ventas. Se busca por artículo, código, cliente o número de comprobante; al elegir uno se abre la devolución de esa venta con el artículo ya marcado.",
         "Devolución: si «Imprimir ticket» está desactivado, ya no se abre la ventana de impresión al registrar una devolución. El comprobante se imprime desde un botón en el aviso, cuando se necesite.",
         "Ventas: en una factura B o C a consumidor final ya no se pide el documento del cliente. Si el cliente quiere sus datos en la factura, el enlace «Identificar al cliente» los habilita. En la factura A, o cuando el cliente ya tiene un documento cargado, todo sigue igual."
