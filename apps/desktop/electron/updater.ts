@@ -71,6 +71,40 @@ const GITHUB_LATEST_URL =
 const GITHUB_RELEASES_URL =
   'https://api.github.com/repos/brunomartinpasquetta-dot/stockflow-desktop/releases?per_page=10';
 
+/**
+ * SEGUNDA VÍA: el propio servidor de BPSG. GitHub puede estar caído, bloqueado
+ * por el antivirus o el proxy del comercio, o simplemente lento: cuando pasa,
+ * el comercio no se entera NUNCA de que hay versión nueva (7-oct-2026, un
+ * cliente esperando horas un aviso que no llegaba). La página de descargas
+ * publica la última versión en un archivo de texto de 8 bytes y el instalador
+ * con un nombre fijo, así que alcanza con preguntarle a ella.
+ */
+const BPSG_DESCARGAS = 'https://bpsgsistemas.com/dl';
+const BPSG_VERSION_URL = `${BPSG_DESCARGAS}/.version`;
+
+/** Instalador de la página de BPSG según el sistema. */
+export function instaladorDeBpsg(plataforma: NodeJS.Platform = process.platform): string {
+  if (plataforma === 'darwin') return `${BPSG_DESCARGAS}/StockFlow.dmg`;
+  return `${BPSG_DESCARGAS}/StockFlow-Setup.exe`;
+}
+
+/** Última versión publicada según la página de BPSG (`v1.14.3` → `1.14.3`). */
+export async function versionDesdeBpsg(
+  leer: (url: string) => Promise<string | null> = async (url) => {
+    const res = await fetch(url, { headers: { 'cache-control': 'no-cache' } });
+    return res.ok ? await res.text() : null;
+  },
+): Promise<RemoteRelease | null> {
+  try {
+    const texto = (await leer(BPSG_VERSION_URL))?.trim() ?? '';
+    const version = texto.replace(/^v/i, '');
+    if (!/^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$/.test(version)) return null;
+    return { latestVersion: version, downloadUrl: instaladorDeBpsg() };
+  } catch {
+    return null;
+  }
+}
+
 interface GithubAsset {
   name: string;
   browser_download_url: string;
@@ -170,6 +204,20 @@ export async function checkRemoteVersion(
   }
 }
 
+/**
+ * Última versión publicada, por la vía que conteste primero: GitHub y, si no
+ * contesta, la página de descargas de BPSG. El canal 'beta' sólo existe en
+ * GitHub (la página publica siempre la versión final).
+ */
+export async function ultimaVersionPublicada(
+  channel: 'stable' | 'beta' = 'stable',
+): Promise<RemoteRelease | null> {
+  const porGithub = await checkRemoteVersion(channel);
+  if (porGithub) return porGithub;
+  if (channel === 'beta') return null;
+  return versionDesdeBpsg();
+}
+
 export interface OutdatedInfo {
   currentVersion: string;
   latestVersion: string;
@@ -188,7 +236,7 @@ export async function checkForOutdatedVersion(opts: {
   channel?: 'stable' | 'beta';
 }): Promise<{ outdated: boolean; latestVersion: string | null }> {
   if (!opts.isPackaged) return { outdated: false, latestVersion: null };
-  const remote = await checkRemoteVersion(opts.channel ?? 'stable');
+  const remote = await ultimaVersionPublicada(opts.channel ?? 'stable');
   if (!remote) return { outdated: false, latestVersion: null };
   if (compareVersions(remote.latestVersion, opts.appVersion) > 0) {
     opts.onOutdated({
