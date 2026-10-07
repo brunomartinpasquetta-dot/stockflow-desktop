@@ -33,6 +33,41 @@ export function guardarEnterConfirma(activo: boolean): void {
  */
 export const MS_ENTRE_AGREGAR_Y_CONFIRMAR = 250
 
+/** Lo mínimo que hace falta saber del elemento que tiene el foco. */
+export interface ElementoDelEnter {
+  tagName?: string
+  type?: string
+  role?: string | null
+  isContentEditable?: boolean
+}
+
+/**
+ * Qué hacer con un Enter según dónde esté el foco. El Enter confirma desde
+ * CUALQUIER lugar de la pantalla —después de destildar una casilla, de cambiar
+ * una lista, de hacer clic en blanco— y no sólo con el cursor en el buscador:
+ *  - buscador: tiene su propio Enter (carga el artículo; vacío, confirma).
+ *  - boton: Enter ya lo activa; no se le suma otra acción.
+ *  - campo: se está escribiendo (cantidad, precio, documento…): Enter acepta el
+ *    campo y vuelve al buscador, así el siguiente Enter ya confirma.
+ *  - libre: casilla, lista desplegable o fondo; ahí Enter no hace nada propio.
+ */
+export type DestinoDelEnter = 'buscador' | 'boton' | 'campo' | 'libre'
+
+export function destinoDelEnter(el: ElementoDelEnter | null, esBuscador: boolean): DestinoDelEnter {
+  if (esBuscador) return 'buscador'
+  if (!el) return 'libre'
+  const tag = (el.tagName ?? '').toUpperCase()
+  if (tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY' || el.role === 'button') return 'boton'
+  if (tag === 'TEXTAREA' || el.isContentEditable) return 'campo'
+  if (tag === 'INPUT') {
+    const tipo = (el.type ?? 'text').toLowerCase()
+    if (tipo === 'checkbox' || tipo === 'radio') return 'libre'
+    if (tipo === 'button' || tipo === 'submit' || tipo === 'reset') return 'boton'
+    return 'campo'
+  }
+  return 'libre'
+}
+
 export interface EstadoDelEnter {
   /** La casilla "Enter confirma la venta". */
   activo: boolean

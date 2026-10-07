@@ -3,7 +3,7 @@
  * hace lo que F2. Viene activado; la casilla lo apaga y se recuerda en cada PC.
  *   pnpm --filter @stockflow/desktop test:ventas-enter
  */
-import { enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma, MS_ENTRE_AGREGAR_Y_CONFIRMAR } from '../../src/lib/enterConfirma';
+import { destinoDelEnter, enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma, MS_ENTRE_AGREGAR_Y_CONFIRMAR } from '../../src/lib/enterConfirma';
 
 let fallas = 0;
 function check(ok: boolean, que: string): void {
@@ -21,6 +21,24 @@ check(!enterDebeConfirmar({ ...base, puedeConfirmar: false }), 'si no se puede c
 check(!enterDebeConfirmar({ ...base, repetida: true }), 'Enter mantenido apretado no confirma');
 check(!enterDebeConfirmar({ ...base, msDesdeElUltimoArticulo: MS_ENTRE_AGREGAR_Y_CONFIRMAR - 1 }), 'el segundo Enter del lector (CR+LF) pegado al primero no confirma');
 check(enterDebeConfirmar({ ...base, msDesdeElUltimoArticulo: MS_ENTRE_AGREGAR_Y_CONFIRMAR }), 'una persona que aprieta Enter de nuevo sí confirma');
+
+
+// ── Dónde está el foco (Enter desde cualquier lugar de la pantalla) ──
+check(destinoDelEnter({ tagName: 'INPUT', type: 'text' }, true) === 'buscador', 'en el buscador: lo maneja el buscador');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'checkbox' }, false) === 'libre', 'después de tocar una casilla (foco en la casilla): confirma');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'radio' }, false) === 'libre', 'opción de radio: confirma');
+check(destinoDelEnter({ tagName: 'SELECT' }, false) === 'libre', 'después de cambiar una lista (forma de pago, lista de precios): confirma');
+check(destinoDelEnter({ tagName: 'BODY' }, false) === 'libre', 'foco en el fondo: confirma');
+check(destinoDelEnter(null, false) === 'libre', 'sin elemento enfocado: confirma');
+check(destinoDelEnter({ tagName: 'BUTTON' }, false) === 'boton', 'en un botón: Enter lo activa, no se suma otra acción');
+check(destinoDelEnter({ tagName: 'A' }, false) === 'boton', 'en un enlace: no confirma');
+check(destinoDelEnter({ tagName: 'DIV', role: 'button' }, false) === 'boton', 'en un elemento con rol de botón: no confirma');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'submit' }, false) === 'boton', 'input de tipo botón: no confirma');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'text' }, false) === 'campo', 'escribiendo en un campo (cantidad, documento…): acepta el campo y vuelve al buscador');
+check(destinoDelEnter({ tagName: 'INPUT' }, false) === 'campo', 'input sin tipo explícito es de texto');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'number' }, false) === 'campo', 'campo numérico');
+check(destinoDelEnter({ tagName: 'TEXTAREA' }, false) === 'campo', 'área de texto');
+check(destinoDelEnter({ tagName: 'DIV', isContentEditable: true }, false) === 'campo', 'texto editable');
 
 // Sin almacenamiento (Node): activado y sin romper.
 check(leerEnterConfirma() === true, 'por defecto viene ACTIVADO (sin almacenamiento)');

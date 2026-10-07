@@ -24,7 +24,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
-import { enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma } from '@/lib/enterConfirma'
+import { destinoDelEnter, enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma } from '@/lib/enterConfirma'
 import { guardarImprimirTicketLocal, imprimirTicketActivado, leerImprimirTicketLocal } from '@/lib/imprimirTicket'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
@@ -756,6 +756,9 @@ function PDV() {
   const [returningLineId, setReturningLineId] = useState<string | null>(null)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
+  // Raíz de la pantalla: el Enter global sólo vale para lo que pasa ACÁ (no para
+  // la búsqueda global ni el chat de Flowy, que viven en la misma ventana).
+  const raizRef = useRef<HTMLDivElement>(null)
   /**
    * Renglón marcado del desplegable, para moverse con las flechas.
    * -1 = ninguno: Enter usa el criterio de siempre (código exacto, o el primer
@@ -809,6 +812,7 @@ function PDV() {
     // Siempre se recuerda en esta PC: sin configuración de impresora guardada,
     // lo de abajo no persiste nada y la casilla volvía a tildarse sola.
     guardarImprimirTicketLocal(next)
+    barcodeRef.current?.focus()
     const cfg = printerConfigQuery.data
     if (cfg) {
       // Persistir el cambio en la config (mismo flag que Configuración).
@@ -1244,6 +1248,7 @@ function PDV() {
     setCalcularVueltoOn(activo)
     guardarPreferenciaVuelto(activo)
     if (!activo) setPagaCon('')
+    barcodeRef.current?.focus()
   }
   function toggleEnterConfirma(activo: boolean): void {
     setEnterConfirmaOn(activo)
@@ -1641,6 +1646,41 @@ function PDV() {
       if (dialogoAbierto || procesando) return
       // Diálogos con estado propio (p. ej. dentro de un componente hijo).
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
+      // Enter desde cualquier lugar de la pantalla (no sólo con el cursor en el
+      // buscador): después de destildar una opción, cambiar una lista o hacer
+      // clic en blanco el foco ya no está ahí y Enter dejaba de confirmar.
+      if (e.key === 'Enter' && enterConfirmaOn) {
+        const el = e.target instanceof HTMLElement ? e.target : null
+        const dentro = el == null || el === document.body || el === document.documentElement || raizRef.current?.contains(el) === true
+        if (!dentro) return
+        const destino = destinoDelEnter(
+          el
+            ? { tagName: el.tagName, type: (el as HTMLInputElement).type, role: el.getAttribute('role'), isContentEditable: el.isContentEditable }
+            : null,
+          el === barcodeRef.current,
+        )
+        if (destino === 'buscador' || destino === 'boton') return
+        if (destino === 'campo') {
+          e.preventDefault()
+          barcodeRef.current?.focus()
+          return
+        }
+        if (
+          enterDebeConfirmar({
+            activo: true,
+            busqueda: barcode,
+            hayArticulos: cart.length > 0,
+            puedeConfirmar: canConfirm,
+            repetida: e.repeat,
+            msDesdeElUltimoArticulo: Date.now() - ultimoArticuloRef.current,
+          })
+        ) {
+          e.preventDefault()
+          e.stopPropagation()
+          void confirmar()
+        }
+        return
+      }
       if (e.key === 'F2') {
         e.preventDefault()
         e.stopPropagation()
@@ -1676,7 +1716,7 @@ function PDV() {
   })
 
   return (
-    <div className="flex h-full flex-col gap-2">
+    <div ref={raizRef} className="flex h-full flex-col gap-2">
       {/* ── Zona superior: encabezado de la venta ── */}
       <div className="grid grid-cols-5 gap-3 rounded-lg border bg-card p-2">
         <div className="col-span-2 flex flex-col gap-1">
@@ -1743,6 +1783,7 @@ function PDV() {
                   return
                 }
                 cambiarFacturar(e.target.checked)
+                barcodeRef.current?.focus()
               }}
             />
             <span className={facturar ? 'font-semibold text-primary' : 'text-muted-foreground'}>
