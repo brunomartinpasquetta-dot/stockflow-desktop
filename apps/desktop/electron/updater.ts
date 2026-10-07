@@ -344,8 +344,14 @@ export function setupAutoUpdater(ctx: UpdaterContext): UpdaterController {
   // arrancar (main.ts) y con el botón "Verificar": si la descarga automática
   // fallaba, el usuario no se enteraba NUNCA de que había versión nueva, que es
   // exactamente lo que pasó con la descarga diferencial rota.
+  // CORRE TAMBIÉN EN WINDOWS (7-oct-2026). Antes era sólo de mac, con la idea
+  // de que en Windows la descarga automática se encarga. Pero si esa descarga
+  // falla —internet lento, antivirus, GitHub caído, el .exe sin firma— el
+  // comercio NO ve ningún aviso y se queda meses en una versión vieja sin
+  // enterarse (pasó varias veces; la última, Nemesis sin recibir la 1.14.2).
+  // Este chequeo le pregunta a GitHub qué versión hay y muestra el aviso
+  // "nueva versión disponible" aunque la descarga automática no haya podido.
   const periodicManual = setInterval(() => {
-    if (!isMac) return;          // en Windows manda el auto-update, no el aviso manual
     if (!prefs.autoCheck) return;
     void manualCheck();
   }, MEDIA_HORA_MS);
