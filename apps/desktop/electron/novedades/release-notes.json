@@ -3,7 +3,9 @@
   "versiones": [
     {
       "version": "1.14.1",
-      "novedades": [],
+      "novedades": [
+        "Ventas: la casilla «Imprimir ticket» queda como se la deje en cada PC, aunque se cierre la pantalla o se reinicie el sistema."
+      ],
       "internas": true
     },
     {
