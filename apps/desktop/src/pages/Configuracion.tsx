@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { printNode, widthFromPaperFormat } from '@/lib/printService'
+import { guardarImprimirTicketLocal, imprimirTicketActivado, leerImprimirTicketLocal } from '@/lib/imprimirTicket'
 import type {
   BackupConfigDTO,
   BackupEntryDTO,
@@ -104,8 +105,10 @@ function PrinterSection() {
   const [systemName, setSystemName] = useState<string>('')
   const [paperFormat, setPaperFormat] = useState<PaperFormatDTO>('58mm')
   const [autoOpen, setAutoOpen] = useState(true)
-  // Imprimir el ticket automáticamente al confirmar venta. Default true.
-  const [autoPrintOnSale, setAutoPrintOnSale] = useState(true)
+  // Imprimir el ticket automáticamente al confirmar venta. Default true; sin
+  // configuración guardada arranca con lo que se eligió en Ventas en esta PC
+  // (si no, guardar la configuración lo volvía a tildar).
+  const [autoPrintOnSale, setAutoPrintOnSale] = useState(() => leerImprimirTicketLocal() ?? true)
   // Override: mostrar el diálogo del SO en lugar de imprimir directo. Por
   // defecto OFF → con impresora térmica configurada se imprime directo.
   const [showDialog, setShowDialog] = useState(false)
@@ -121,8 +124,8 @@ function PrinterSection() {
     setSeeded(cfgQuery.data)
     if (cfgQuery.data) {
       setAutoOpen(cfgQuery.data.autoOpenDrawer)
-      // autoPrintOnSale: undefined (config vieja) → default true.
-      setAutoPrintOnSale(cfgQuery.data.autoPrintOnSale !== false)
+      // autoPrintOnSale: undefined (config vieja) → lo elegido en esta PC, o true.
+      setAutoPrintOnSale(imprimirTicketActivado(cfgQuery.data))
       // silentPrint === false fuerza el diálogo; cualquier otro valor → directo.
       setShowDialog(cfgQuery.data.silentPrint === false)
       const fmt: PaperFormatDTO =
@@ -224,6 +227,7 @@ function PrinterSection() {
       return
     }
     const width: 58 | 80 = paperFormat === '80mm' ? 80 : 58
+    guardarImprimirTicketLocal(autoPrintOnSale)
     saveMut.mutate({
       kind: 'system',
       interface: systemName.trim(),
@@ -357,9 +361,9 @@ function PrinterSection() {
           <span className="flex flex-col">
             <span>Imprimir ticket automáticamente al confirmar venta</span>
             <span className="text-xs text-muted-foreground">
-              Si lo desactivás, la venta no imprime al confirmar. Podés imprimir manualmente con
-              "Imprimir último ticket" desde la pantalla de Ventas. También se puede activar/desactivar
-              desde ahí.
+              Si lo desactiva, la venta no imprime al confirmar. Puede imprimir manualmente con
+              "Imprimir último ticket" desde la pantalla de Ventas. También se puede activar o
+              desactivar desde ahí.
             </span>
           </span>
         </label>
