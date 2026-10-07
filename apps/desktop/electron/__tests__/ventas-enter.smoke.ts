@@ -25,20 +25,22 @@ check(enterDebeConfirmar({ ...base, msDesdeElUltimoArticulo: MS_ENTRE_AGREGAR_Y_
 
 // ── Dónde está el foco (Enter desde cualquier lugar de la pantalla) ──
 check(destinoDelEnter({ tagName: 'INPUT', type: 'text' }, true) === 'buscador', 'en el buscador: lo maneja el buscador');
-check(destinoDelEnter({ tagName: 'INPUT', type: 'checkbox' }, false) === 'libre', 'después de tocar una casilla (foco en la casilla): confirma');
-check(destinoDelEnter({ tagName: 'INPUT', type: 'radio' }, false) === 'libre', 'opción de radio: confirma');
-check(destinoDelEnter({ tagName: 'SELECT' }, false) === 'libre', 'después de cambiar una lista (forma de pago, lista de precios): confirma');
-check(destinoDelEnter({ tagName: 'BODY' }, false) === 'libre', 'foco en el fondo: confirma');
-check(destinoDelEnter(null, false) === 'libre', 'sin elemento enfocado: confirma');
-check(destinoDelEnter({ tagName: 'BUTTON' }, false) === 'boton', 'en un botón: Enter lo activa, no se suma otra acción');
-check(destinoDelEnter({ tagName: 'A' }, false) === 'boton', 'en un enlace: no confirma');
-check(destinoDelEnter({ tagName: 'DIV', role: 'button' }, false) === 'boton', 'en un elemento con rol de botón: no confirma');
-check(destinoDelEnter({ tagName: 'INPUT', type: 'submit' }, false) === 'boton', 'input de tipo botón: no confirma');
-check(destinoDelEnter({ tagName: 'INPUT', type: 'text' }, false) === 'campo', 'escribiendo en un campo (cantidad, documento…): acepta el campo y vuelve al buscador');
-check(destinoDelEnter({ tagName: 'INPUT' }, false) === 'campo', 'input sin tipo explícito es de texto');
-check(destinoDelEnter({ tagName: 'INPUT', type: 'number' }, false) === 'campo', 'campo numérico');
-check(destinoDelEnter({ tagName: 'TEXTAREA' }, false) === 'campo', 'área de texto');
-check(destinoDelEnter({ tagName: 'DIV', isContentEditable: true }, false) === 'campo', 'texto editable');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'checkbox' }, false) === 'confirmar', 'después de tocar una casilla: confirma');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'radio' }, false) === 'confirmar', 'opción de radio: confirma');
+check(destinoDelEnter({ tagName: 'SELECT' }, false) === 'confirmar', 'después de cambiar una lista (forma de pago, lista de precios): confirma');
+check(destinoDelEnter({ tagName: 'BODY' }, false) === 'confirmar', 'foco en el fondo: confirma');
+check(destinoDelEnter(null, false) === 'confirmar', 'sin elemento enfocado: confirma');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'text' }, false) === 'confirmar', 'con el cursor en un campo (cantidad, documento…): confirma');
+check(destinoDelEnter({ tagName: 'INPUT' }, false) === 'confirmar', 'input sin tipo explícito: confirma');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'number' }, false) === 'confirmar', 'campo numérico: confirma');
+check(destinoDelEnter({ tagName: 'BUTTON', focusVisible: false }, false) === 'confirmar', 'botón que quedó enfocado por un clic del mouse: confirma (no lo vuelve a activar)');
+check(destinoDelEnter({ tagName: 'DIV', role: 'button', focusVisible: false }, false) === 'confirmar', 'elemento con rol de botón enfocado por mouse: confirma');
+check(destinoDelEnter({ tagName: 'INPUT', type: 'submit', focusVisible: false }, false) === 'confirmar', 'input de tipo botón enfocado por mouse: confirma');
+check(destinoDelEnter({ tagName: 'BUTTON', focusVisible: true }, false) === 'propio', 'botón al que se llegó con Tab: Enter lo activa (accesibilidad)');
+check(destinoDelEnter({ tagName: 'A', focusVisible: true }, false) === 'propio', 'enlace al que se llegó con Tab: Enter lo sigue');
+check(destinoDelEnter({ tagName: 'BUTTON' }, false) === 'confirmar', 'si no se sabe cómo llegó el foco, se trata como mouse');
+check(destinoDelEnter({ tagName: 'TEXTAREA' }, false) === 'propio', 'área de texto: Enter es salto de línea');
+check(destinoDelEnter({ tagName: 'DIV', isContentEditable: true }, false) === 'propio', 'texto editable: Enter es suyo');
 
 // Sin almacenamiento (Node): activado y sin romper.
 check(leerEnterConfirma() === true, 'por defecto viene ACTIVADO (sin almacenamiento)');

@@ -24,7 +24,7 @@ import { useCanWrite } from '@/contexts/LicenseContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
-import { destinoDelEnter, enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma } from '@/lib/enterConfirma'
+import { destinoDelEnter, enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma, vigilarOrigenDelFoco } from '@/lib/enterConfirma'
 import { guardarImprimirTicketLocal, imprimirTicketActivado, leerImprimirTicketLocal } from '@/lib/imprimirTicket'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
@@ -759,6 +759,13 @@ function PDV() {
   // Raíz de la pantalla: el Enter global sólo vale para lo que pasa ACÁ (no para
   // la búsqueda global ni el chat de Flowy, que viven en la misma ventana).
   const raizRef = useRef<HTMLDivElement>(null)
+  // Cómo llegó el foco (Tab o clic): decide si Enter activa un botón o confirma.
+  const origenFocoRef = useRef<ReturnType<typeof vigilarOrigenDelFoco> | null>(null)
+  useEffect(() => {
+    const v = vigilarOrigenDelFoco()
+    origenFocoRef.current = v
+    return () => v.detener()
+  }, [])
   /**
    * Renglón marcado del desplegable, para moverse con las flechas.
    * -1 = ninguno: Enter usa el criterio de siempre (código exacto, o el primer
@@ -1653,18 +1660,20 @@ function PDV() {
         const el = e.target instanceof HTMLElement ? e.target : null
         const dentro = el == null || el === document.body || el === document.documentElement || raizRef.current?.contains(el) === true
         if (!dentro) return
+        const focusVisible = origenFocoRef.current?.focoPorTeclado(el) ?? false
         const destino = destinoDelEnter(
           el
-            ? { tagName: el.tagName, type: (el as HTMLInputElement).type, role: el.getAttribute('role'), isContentEditable: el.isContentEditable }
+            ? {
+                tagName: el.tagName,
+                type: (el as HTMLInputElement).type,
+                role: el.getAttribute('role'),
+                isContentEditable: el.isContentEditable,
+                focusVisible,
+              }
             : null,
           el === barcodeRef.current,
         )
-        if (destino === 'buscador' || destino === 'boton') return
-        if (destino === 'campo') {
-          e.preventDefault()
-          barcodeRef.current?.focus()
-          return
-        }
+        if (destino !== 'confirmar') return
         if (
           enterDebeConfirmar({
             activo: true,

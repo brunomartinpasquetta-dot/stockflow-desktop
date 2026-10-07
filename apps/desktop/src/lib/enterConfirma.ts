@@ -39,33 +39,78 @@ export interface ElementoDelEnter {
   type?: string
   role?: string | null
   isContentEditable?: boolean
+  /** El foco llegó con el TECLADO (Tab) y no con un clic del mouse (:focus-visible). */
+  focusVisible?: boolean
 }
 
 /**
  * Qué hacer con un Enter según dónde esté el foco. El Enter confirma desde
  * CUALQUIER lugar de la pantalla —después de destildar una casilla, de cambiar
- * una lista, de hacer clic en blanco— y no sólo con el cursor en el buscador:
+ * una lista, de editar una cantidad, de apretar un botón con el mouse— y no sólo
+ * con el cursor en el buscador (Bruno, 6-oct-2026: "si toco cualquier otra cosa,
+ * cuando presiono Enter no ejecuta la venta"):
  *  - buscador: tiene su propio Enter (carga el artículo; vacío, confirma).
- *  - boton: Enter ya lo activa; no se le suma otra acción.
- *  - campo: se está escribiendo (cantidad, precio, documento…): Enter acepta el
- *    campo y vuelve al buscador, así el siguiente Enter ya confirma.
- *  - libre: casilla, lista desplegable o fondo; ahí Enter no hace nada propio.
+ *  - propio: el elemento resuelve el Enter por sí mismo —un botón o enlace al que
+ *    se llegó con Tab (ver `vigilarOrigenDelFoco`), un área de texto— y no se lo pisa.
+ *  - confirmar: todo lo demás (casillas, listas, campos de texto, el fondo, y un
+ *    botón que sólo quedó enfocado por un clic del mouse).
  */
-export type DestinoDelEnter = 'buscador' | 'boton' | 'campo' | 'libre'
+export type DestinoDelEnter = 'buscador' | 'propio' | 'confirmar'
 
 export function destinoDelEnter(el: ElementoDelEnter | null, esBuscador: boolean): DestinoDelEnter {
   if (esBuscador) return 'buscador'
-  if (!el) return 'libre'
+  if (!el) return 'confirmar'
   const tag = (el.tagName ?? '').toUpperCase()
-  if (tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY' || el.role === 'button') return 'boton'
-  if (tag === 'TEXTAREA' || el.isContentEditable) return 'campo'
-  if (tag === 'INPUT') {
-    const tipo = (el.type ?? 'text').toLowerCase()
-    if (tipo === 'checkbox' || tipo === 'radio') return 'libre'
-    if (tipo === 'button' || tipo === 'submit' || tipo === 'reset') return 'boton'
-    return 'campo'
+  const tipo = (el.type ?? '').toLowerCase()
+  const esBoton =
+    tag === 'BUTTON' ||
+    tag === 'A' ||
+    tag === 'SUMMARY' ||
+    el.role === 'button' ||
+    (tag === 'INPUT' && (tipo === 'button' || tipo === 'submit' || tipo === 'reset'))
+  if (esBoton) return el.focusVisible ? 'propio' : 'confirmar'
+  if (tag === 'TEXTAREA' || el.isContentEditable) return 'propio'
+  return 'confirmar'
+}
+
+/**
+ * ¿El foco actual llegó con el teclado (Tab) o con un clic del mouse?
+ *
+ * No se puede preguntar `:focus-visible` en el momento del Enter: el propio
+ * Enter cuenta como "uso de teclado" y el navegador marca como enfocado-con-
+ * teclado a un botón que se apretó con el mouse (probado en la ventana real:
+ * Enter dejaba de confirmar después de tocar «Imprimir último ticket»). Se
+ * anota, en el momento de enfocar, qué pasó último: un Tab o un clic.
+ */
+export function vigilarOrigenDelFoco(doc: Document = document): {
+  focoPorTeclado: (el: Element | null) => boolean
+  detener: () => void
+} {
+  let ultimoClic = 0
+  let ultimoTab = 0
+  let elemento: Element | null = null
+  let porTeclado = false
+  const alClic = (): void => {
+    ultimoClic = performance.now()
   }
-  return 'libre'
+  const alTeclado = (e: KeyboardEvent): void => {
+    if (e.key === 'Tab') ultimoTab = performance.now()
+  }
+  const alEnfocar = (e: FocusEvent): void => {
+    elemento = e.target instanceof Element ? e.target : null
+    porTeclado = ultimoTab > ultimoClic
+  }
+  doc.addEventListener('mousedown', alClic, true)
+  doc.addEventListener('keydown', alTeclado, true)
+  doc.addEventListener('focusin', alEnfocar, true)
+  return {
+    focoPorTeclado: (el) => el != null && el === elemento && porTeclado,
+    detener: () => {
+      doc.removeEventListener('mousedown', alClic, true)
+      doc.removeEventListener('keydown', alTeclado, true)
+      doc.removeEventListener('focusin', alEnfocar, true)
+    },
+  }
 }
 
 export interface EstadoDelEnter {
