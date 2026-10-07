@@ -269,6 +269,7 @@ function bootstrap(): { lanArgs: string[] } {
     machineId,
     apiUrl: process.env.CLOUD_API_URL ?? CLOUD_API_URL_DEFAULT,
     publicKeyPem: process.env.CLOUD_JWT_PUBLIC_KEY ?? CLOUD_PUBLIC_KEY_PEM,
+    appVersion: app.getVersion(),
   });
   hardwareManager = new HardwareManager({ userDataDir });
   backupService = new BackupService({

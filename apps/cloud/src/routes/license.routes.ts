@@ -104,12 +104,14 @@ export async function licenseRoutes(app: FastifyInstance): Promise<void> {
     async (req: FastifyRequest, reply: FastifyReply) => {
       const user = req.user;
       try {
+        const cuerpo = (req.body ?? {}) as { version?: unknown };
         const result = await licenseService.heartbeat(
           app.cloudDb,
           user.sub,
           user.exp * 1000,
           (p) => app.jwt.sign(p),
           user.kind,
+          typeof cuerpo.version === 'string' ? cuerpo.version : null,
         );
         return reply.send(
           result.suspended ? { jwt: result.jwt, suspended: true } : { jwt: result.jwt },

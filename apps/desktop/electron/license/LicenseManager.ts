@@ -26,6 +26,12 @@ interface LicenseManagerOptions {
   machineId: string;
   apiUrl: string;
   publicKeyPem: string;
+  /**
+   * Versión que corre este comercio. Viaja en el heartbeat para saber quién
+   * quedó atrás con una versión vieja: hasta ahora no había forma de saberlo y
+   * había que preguntarle a cada cliente.
+   */
+  appVersion?: string;
 }
 
 interface ActivateResponse {
@@ -77,6 +83,7 @@ export class LicenseManager {
   private readonly machineId: string;
   private readonly apiUrl: string;
   private readonly publicKeyPem: string;
+  private readonly appVersion: string | null;
 
   /** Estado en runtime impuesto por el heartbeat (revocada / suspendida). */
   private runtimeStatus: LicenseStatus | null = null;
@@ -90,6 +97,7 @@ export class LicenseManager {
     this.machineId = opts.machineId;
     this.apiUrl = opts.apiUrl.replace(/\/+$/, '');
     this.publicKeyPem = opts.publicKeyPem ?? '';
+    this.appVersion = opts.appVersion ?? null;
   }
 
   /* ------------------------------------------------------------------ */
@@ -599,7 +607,8 @@ export class LicenseManager {
       try {
         res = await fetch(`${this.apiUrl}/api/licenses/heartbeat`, {
           method: 'POST',
-          headers: { authorization: `Bearer ${jwt}` },
+          headers: { authorization: `Bearer ${jwt}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ version: this.appVersion ?? null }),
         });
       } catch {
         // Offline: no cambiamos el estado (el JWT offline sigue siendo válido).

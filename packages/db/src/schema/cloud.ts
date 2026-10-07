@@ -71,6 +71,14 @@ export const licenses = pgTable(
     machineId: varchar('machine_id', { length: 128 }),
     activatedAt: timestamp('activated_at'),
     lastHeartbeat: timestamp('last_heartbeat'),
+    /**
+     * Versión de StockFlow que corre ese comercio, informada en el heartbeat.
+     * Hasta ahora no había forma de saber quién se había quedado atrás: si la
+     * actualización automática fallaba en una PC, el comercio seguía con una
+     * versión vieja y nadie se enteraba hasta que llamaba por un problema ya
+     * resuelto (7-oct-2026).
+     */
+    appVersion: varchar('app_version', { length: 24 }),
     status: varchar('status', { length: 16 }).notNull().default('pending'),
     /** 'paid' = licencia normal; 'trial' = prueba gratis autoservicio (30 días). */
     kind: varchar('kind', { length: 8 }).notNull().default('paid'),

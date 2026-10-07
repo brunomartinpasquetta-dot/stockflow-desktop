@@ -220,8 +220,18 @@ export class LicenseService {
      *  en sólo-lectura hasta ~6 días después de cobrar (el JWT trial recién
      *  renovado no vencía y el heartbeat contestaba jwt:null). */
     jwtKind?: 'trial',
+    /** Versión que informa el comercio (para saber quién quedó atrás). */
+    appVersion?: string | null,
   ): Promise<{ jwt: string | null; suspended?: boolean }> {
-    await db.update(licenses).set({ lastHeartbeat: new Date() }).where(eq(licenses.id, licenseId));
+    // La versión se guarda sólo si vino y tiene pinta de versión: el campo lo
+    // llena el cliente y no se confía en él a ciegas.
+    const limpia = typeof appVersion === 'string' && /^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$/.test(appVersion)
+      ? appVersion.slice(0, 24)
+      : null;
+    await db
+      .update(licenses)
+      .set(limpia ? { lastHeartbeat: new Date(), appVersion: limpia } : { lastHeartbeat: new Date() })
+      .where(eq(licenses.id, licenseId));
 
     const [license] = await db.select().from(licenses).where(eq(licenses.id, licenseId)).limit(1);
     if (!license || license.status !== 'active') {
