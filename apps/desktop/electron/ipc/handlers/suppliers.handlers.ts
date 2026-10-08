@@ -6,9 +6,17 @@ import type { SupplierDTO } from '../types';
 
 export function buildSuppliersHandlers(deps: HandlerDeps): HandlerMap {
   return {
+    /**
+     * Por defecto SIN los dados de baja: si siguieran apareciendo para elegir
+     * en Compras, darlos de baja no serviría de nada. Con `incluirBaja` se ven
+     * todos, para poder reactivarlos.
+     */
     'suppliers:list': withSession(
       deps,
-      (_payload, ctx): Promise<SupplierDTO[]> => ctx.repos.suppliers.findAll(),
+      async (payload: { incluirBaja?: boolean } | undefined, ctx): Promise<SupplierDTO[]> => {
+        const todos = await ctx.repos.suppliers.findAll();
+        return payload?.incluirBaja ? todos : todos.filter((p) => p.active !== false);
+      },
     ),
     'suppliers:get': withSession(
       deps,
@@ -28,10 +36,10 @@ export function buildSuppliersHandlers(deps: HandlerDeps): HandlerMap {
     ),
     'suppliers:delete': withSession(
       deps,
-      async (payload: { id: string }, ctx): Promise<{ deleted: true }> => {
+      async (payload: { id: string }, ctx): Promise<{ deleted: boolean; dadoDeBaja: boolean }> => {
         requirePermission(ctx.currentUser, 'manage_suppliers');
-        await ctx.repos.suppliers.delete(payload.id);
-        return { deleted: true };
+        const r = await ctx.repos.suppliers.borrarODarDeBaja(payload.id);
+        return { deleted: r === 'borrado', dadoDeBaja: r === 'dado_de_baja' };
       },
     ),
   };

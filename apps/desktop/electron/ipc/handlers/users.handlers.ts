@@ -45,10 +45,10 @@ export function buildUsersHandlers(deps: HandlerDeps): HandlerMap {
     ),
     'users:delete': withSession(
       deps,
-      async (payload: { id: string }, ctx): Promise<{ deleted: true }> => {
+      async (payload: { id: string }, ctx): Promise<{ deleted: boolean; dadoDeBaja: boolean }> => {
         requirePermission(ctx.currentUser, 'manage_users');
-        await ctx.repos.users.delete(payload.id);
-        return { deleted: true };
+        const r = await ctx.repos.users.borrarODarDeBaja(payload.id);
+        return { deleted: r === 'borrado', dadoDeBaja: r === 'dado_de_baja' };
       },
     ),
   };

@@ -818,16 +818,30 @@ async function main(): Promise<void> {
   // ----------------------------------------------------- cash general
   console.log('\n[cash general]');
   {
-    const balance0 = await admin.cashGeneral.getBalance();
-    check('cashGeneral.getBalance inicial = 0', Number(balance0) === 0, `balance=${balance0}`);
+    /**
+     * Se mide POR DIFERENCIA, no en absoluto: desde el rediseño del cierre
+     * (8-oct-2026) cerrar una caja ya ingresa su recaudación a Caja General,
+     * así que al llegar acá el saldo arrastra los cierres de las secciones
+     * anteriores de esta misma prueba.
+     */
+    const balance0 = Number(await admin.cashGeneral.getBalance());
+    const movs0 = (await admin.cashGeneral.listMovements({})).length;
     const income = await admin.cashGeneral.addIncome({ amount: '100', description: 'Aporte de socio' });
-    check('cashGeneral.addIncome 100 → balanceAfter 100', Number(income.balanceAfter) === 100, `balance=${income.balanceAfter}`);
+    check(
+      'cashGeneral.addIncome 100 sube el saldo en 100',
+      Number(income.balanceAfter) === balance0 + 100,
+      `balance=${income.balanceAfter} (antes ${balance0})`,
+    );
     const expense = await admin.cashGeneral.addExpense({ amount: '30', description: 'Pago servicios', category: 'service' });
-    check('cashGeneral.addExpense 30 → balanceAfter 70', Number(expense.balanceAfter) === 70, `balance=${expense.balanceAfter}`);
+    check(
+      'cashGeneral.addExpense 30 baja el saldo en 30',
+      Number(expense.balanceAfter) === balance0 + 70,
+      `balance=${expense.balanceAfter}`,
+    );
     const balanceN = await admin.cashGeneral.getBalance();
-    check('cashGeneral.getBalance final = 70', Number(balanceN) === 70, `balance=${balanceN}`);
+    check('cashGeneral.getBalance refleja los dos movimientos', Number(balanceN) === balance0 + 70, `balance=${balanceN}`);
     const movs = await admin.cashGeneral.listMovements({});
-    check('cashGeneral.listMovements devuelve 2 movimientos', movs.length === 2, `len=${movs.length}`);
+    check('cashGeneral.listMovements suma 2 movimientos', movs.length === movs0 + 2, `len=${movs.length} (antes ${movs0})`);
   }
 
   // ------------------------------- pagos a proveedor desde Caja General
@@ -848,11 +862,20 @@ async function main(): Promise<void> {
       `moves=${provMoves.map((m) => `${m.paymentMethodId}:${m.amount}`).join(',')}`,
     );
 
-    // Fondos: CG queda 500 efectivo + 500 electrónico (desde el 70 heredado).
-    await admin.cashGeneral.addIncome({ amount: '430', description: 'Fondos para pagos (efectivo)' });
+    /**
+     * Se parte de lo que haya (los cierres de esta prueba ya ingresaron su
+     * recaudación) y se fondea para tener 500 efectivo y 500 electrónico
+     * EXTRA; los asserts de abajo miran la diferencia.
+     */
+    const bPrev = await admin.cashGeneral.getBalanceBreakdown();
+    await admin.cashGeneral.addIncome({ amount: '500', description: 'Fondos para pagos (efectivo)' });
     await admin.cashGeneral.addIncome({ amount: '500', description: 'Fondos para pagos (banco)', isCash: false });
     const b0 = await admin.cashGeneral.getBalanceBreakdown();
-    check('breakdown inicial: 1000 = 500 efectivo + 500 electrónico', Number(b0.total) === 1000 && Number(b0.cash) === 500 && Number(b0.electronic) === 500, `total=${b0.total} cash=${b0.cash} elec=${b0.electronic}`);
+    check(
+      'breakdown: el fondeo sumó 500 efectivo + 500 electrónico',
+      Number(b0.cash) === Number(bPrev.cash) + 500 && Number(b0.electronic) === Number(bPrev.electronic) + 500,
+      `cash=${b0.cash} (antes ${bPrev.cash}) elec=${b0.electronic} (antes ${bPrev.electronic})`,
+    );
 
     // payInvoice desde CAJA GENERAL, mixto: 150 efectivo + 50 transferencia.
     const movesBefore = (await repos.cashMovements.findByRegister(reg2.id)).length;
@@ -868,9 +891,9 @@ async function main(): Promise<void> {
     check('payInvoice desde Caja General → balance 200 (400−200), sigue partial', pagoCG.account.balance === '200.0000' && pagoCG.account.status === 'partial', `balance=${pagoCG.account.balance}`);
     const b1 = await admin.cashGeneral.getBalanceBreakdown();
     check(
-      'Caja General tras el pago: total 800, efectivo 350 (−150), electrónico 450 (−50)',
-      Number(b1.total) === 800 && Number(b1.cash) === 350 && Number(b1.electronic) === 450,
-      `total=${b1.total} cash=${b1.cash} elec=${b1.electronic}`,
+      'Caja General tras el pago: −150 efectivo y −50 electrónico',
+      Number(b1.cash) === Number(b0.cash) - 150 && Number(b1.electronic) === Number(b0.electronic) - 50,
+      `cash=${b1.cash} (antes ${b0.cash}) elec=${b1.electronic} (antes ${b0.electronic})`,
     );
     check('el pago desde Caja General NO toca la caja diaria', (await repos.cashMovements.findByRegister(reg2.id)).length === movesBefore);
     const cgMovs = await admin.cashGeneral.listMovements({});
@@ -888,7 +911,11 @@ async function main(): Promise<void> {
     });
     check('payToSupplier desde Caja General → aplica 100 FIFO', fifoCG.totalApplied === '100.0000' && fifoCG.accounts.some((a) => a.balance === '100.0000'));
     const b2 = await admin.cashGeneral.getBalanceBreakdown();
-    check('breakdown tras FIFO: total 700, efectivo 250', Number(b2.total) === 700 && Number(b2.cash) === 250, `total=${b2.total} cash=${b2.cash}`);
+    check(
+      'breakdown tras FIFO: bajó 100 de efectivo',
+      Number(b2.cash) === Number(b1.cash) - 100 && Number(b2.electronic) === Number(b1.electronic),
+      `cash=${b2.cash} (antes ${b1.cash})`,
+    );
 
     // Sin saldo suficiente en Caja General → se rechaza ANTES de tocar nada.
     const compraGrande = await admin.purchases.createPurchase({
@@ -908,7 +935,7 @@ async function main(): Promise<void> {
       (e) => e instanceof BusinessRuleError && /Caja General/.test((e as Error).message),
     );
     const b3 = await admin.cashGeneral.getBalanceBreakdown();
-    check('el rechazo no movió Caja General', Number(b3.total) === 700, `total=${b3.total}`);
+    check('el rechazo no movió Caja General', Number(b3.total) === Number(b2.total), `total=${b3.total} (antes ${b2.total})`);
 
     // Anular una compra contado pagada desde Caja General DEVUELVE la plata
     // (antes el reverso solo existía para caja diaria y el saldo quedaba
@@ -925,10 +952,18 @@ async function main(): Promise<void> {
       lines: [{ articleId: art.id, quantity: '1.000', costPrice: '200.0000', vatRate: '0.00' }],
     });
     const bAntesVoid = await admin.cashGeneral.getBalanceBreakdown();
-    check('compra contado desde CG bajó 200 (150 efectivo + 50 electrónico)', Number(bAntesVoid.total) === 500 && Number(bAntesVoid.cash) === 100 && Number(bAntesVoid.electronic) === 400, `total=${bAntesVoid.total} cash=${bAntesVoid.cash} elec=${bAntesVoid.electronic}`);
+    check(
+      'compra contado desde CG bajó 200 (150 efectivo + 50 electrónico)',
+      Number(bAntesVoid.cash) === Number(b3.cash) - 150 && Number(bAntesVoid.electronic) === Number(b3.electronic) - 50,
+      `cash=${bAntesVoid.cash} (antes ${b3.cash}) elec=${bAntesVoid.electronic} (antes ${b3.electronic})`,
+    );
     await admin.purchases.voidPurchase(compraCG.purchase.id);
     const bTrasVoid = await admin.cashGeneral.getBalanceBreakdown();
-    check('voidPurchase devuelve el dinero a Caja General con el desglose original', Number(bTrasVoid.total) === 700 && Number(bTrasVoid.cash) === 250 && Number(bTrasVoid.electronic) === 450, `total=${bTrasVoid.total} cash=${bTrasVoid.cash} elec=${bTrasVoid.electronic}`);
+    check(
+      'voidPurchase devuelve el dinero a Caja General con el desglose original',
+      Number(bTrasVoid.cash) === Number(b3.cash) && Number(bTrasVoid.electronic) === Number(b3.electronic),
+      `cash=${bTrasVoid.cash} (esperado ${b3.cash}) elec=${bTrasVoid.electronic} (esperado ${b3.electronic})`,
+    );
   }
 
   // ----------------------------------------------------- analytics

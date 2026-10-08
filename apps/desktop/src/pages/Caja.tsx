@@ -10,6 +10,7 @@ import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { usePrintCashClose } from '@/lib/usePrint'
 import { formatCurrency, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { cambioSuperaLoContado, netoElectronico, totalParaCajaGeneral } from '@/lib/caja'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,10 +21,9 @@ import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { CashReportDTO, CashMovementDTO } from '@/types/api'
+import type { CashMovementDTO } from '@/types/api'
 
 /** Datos del cierre recién confirmado, para proponer el depósito a Caja General. */
-type DepositInfo = { registerId: string; report: CashReportDTO; counted: string }
 
 function movementKind(m: CashMovementDTO): string {
   if (m.relatedSaleId) return m.type === 'income' ? 'Venta' : 'Anulación'
@@ -58,6 +58,22 @@ function CajaCerrada() {
   const { open } = useCashMutations()
   const canWrite = useCanWrite()
   const [amount, setAmount] = useState('0')
+  /**
+   * El cambio que dejó el cierre anterior se propone como apertura: es
+   * exactamente la plata que quedó en el cajón, y evita que el cajero la tenga
+   * que adivinar o contar de nuevo.
+   */
+  const sugerencia = useQuery({
+    queryKey: ['cash', 'sugerenciaApertura'],
+    queryFn: () => api.cash.sugerenciaDeApertura(),
+    staleTime: 60_000,
+  })
+  const cambioSugerido = sugerencia.data?.cambio ?? null
+  const [tomoSugerencia, setTomoSugerencia] = useState(false)
+  if (cambioSugerido != null && !tomoSugerencia) {
+    setTomoSugerencia(true)
+    setAmount(cambioSugerido)
+  }
   // Deep-link `?action=open`: marca el input para auto-foco (ya está autoFocus).
   // Solo limpia el param.
   const [searchParamsClosed, setSearchParamsClosed] = useSearchParams()
@@ -91,6 +107,13 @@ function CajaCerrada() {
           <p className="text-sm text-muted-foreground">
             Para registrar ventas hay que abrir la caja. Ingrese el monto inicial en efectivo del cajón.
           </p>
+          {cambioSugerido != null && (
+            <p className="rounded-md bg-muted px-3 py-2 text-sm">
+              El cierre anterior dejó{' '}
+              <span className="font-semibold tabular-nums">{formatCurrency(cambioSugerido)}</span> de
+              cambio en el cajón. Si es lo que hay, deje el monto como está.
+            </p>
+          )}
           <div className="flex flex-col gap-1">
             <Label htmlFor="apertura">Monto inicial</Label>
             <CurrencyInput
@@ -120,7 +143,7 @@ function CajaCerrada() {
 }
 
 // ── Estado B: caja abierta ────────────────────────────────────────────────
-function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCloseComplete: (info: DepositInfo, proposed: string) => void }) {
+function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCloseComplete: () => void }) {
   const report = useCashReport(registerId)
   const { close, addMovement } = useCashMutations()
   const canWrite = useCanWrite()
@@ -165,6 +188,17 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
   const [closeOpen, setCloseOpen] = useState(false)
   const [closeAmount, setCloseAmount] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
+  /**
+   * CIERRE EN DOS PASOS (pedido de Bruno, 8-oct-2026):
+   *  1. cuánto cambio queda en el cajón para la próxima apertura;
+   *  2. cuánto efectivo hay contado, con los otros medios a la vista.
+   * Al confirmar el paso 2 la caja se cierra Y la recaudación entra sola a
+   * Caja General. Antes eran dos trámites y el segundo se podía cerrar sin
+   * querer, dejando la plata del día sin ingresar; y el cambio se sacaba con
+   * un egreso manual, que descuadraba el arqueo.
+   */
+  const [closePaso, setClosePaso] = useState<1 | 2>(1)
+  const [closeChange, setCloseChange] = useState('')
 
   // Deep-link `?action=close`: abrir el dialog de cierre al cargar.
   const [searchParamsOpen, setSearchParamsOpen] = useSearchParams()
@@ -246,10 +280,12 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
   async function confirmarCierre(): Promise<void> {
     const amt = parseCurrencyInput(closeAmount)
     try {
+      const cambio = parseCurrencyInput(closeChange || '0')
       const result = await close.mutateAsync({
         registerId,
         closingAmount: amt,
         notes: closeNotes.trim() || undefined,
+        changeLeft: cambio,
       })
       setCloseOpen(false)
       const diff = result.report.difference ?? '0'
@@ -284,16 +320,29 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
       )
       setCloseAmount('')
       setCloseNotes('')
+      setCloseChange('')
+      setClosePaso(1)
 
-      // Paso 2 del cierre: proponer el depósito a Caja General con el TOTAL del
-      // día (efectivo contado + neto de los demás medios: transferencias, tarjetas).
-      const nonCashNet = result.report.byPaymentMethod
-        .filter((b) => !b.isPhysicalCash)
-        .reduce((acc, b) => acc + Number(b.net ?? 0), 0)
-      const proposed = (Number(amt) + Math.max(0, nonCashNet)).toFixed(2)
-      // El dialog vive en el padre <Caja/>: al cerrarse la caja este componente
-      // se desmonta (la query pasa a null) y un estado local no sobreviviría.
-      onCloseComplete({ registerId, report: result.report, counted: amt }, proposed)
+      // El ingreso a Caja General ya lo hizo el servidor dentro del cierre: se
+      // avisa el resultado, no se pide otra confirmación.
+      if (result.deposito) {
+        toast.success(
+          `Ingresó a Caja General ${formatCurrency(result.deposito.total)} (efectivo ${formatCurrency(result.deposito.efectivo)} + electrónico ${formatCurrency(result.deposito.electronico)}).`,
+          { duration: 10_000 },
+        )
+      } else if (result.motivoSinDeposito) {
+        toast.warning(
+          `La caja quedó cerrada, pero no entró a Caja General: ${result.motivoSinDeposito} Puede ingresarla desde el Historial de cajas.`,
+          { duration: 20_000 },
+        )
+      }
+      if (Number(cambio) > 0) {
+        toast.info(
+          `Quedan ${formatCurrency(cambio)} de cambio en el cajón. La próxima apertura los va a proponer.`,
+          { duration: 10_000 },
+        )
+      }
+      onCloseComplete()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo cerrar la caja')
     }
@@ -301,6 +350,16 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
 
   const closeDiff = closeAmount ? (Number(parseCurrencyInput(closeAmount)) - Number(expected)).toFixed(4) : null
   const breakdown = r?.byPaymentMethod ?? []
+  /**
+   * Lo cobrado por medios que NO son efectivo físico. Misma fórmula que usa el
+   * servidor (`netoElectronico` en shared): calcularlo distinto en cada lado
+   * era lo que impedía completar el cierre.
+   */
+  const electronicoDelCierre = netoElectronico(breakdown)
+  const contado = parseCurrencyInput(closeAmount || '0')
+  const cambio = parseCurrencyInput(closeChange || '0')
+  const cambioSupera = cambioSuperaLoContado(contado, cambio)
+  const aCajaGeneral = totalParaCajaGeneral(contado, cambio, electronicoDelCierre).total
   // Comisión total descontada de los medios de pago (FEATURE #1). Si el backend
   // todavía no envía el campo, se infiere sumando las comisiones por medio.
   const commissionTotal =
@@ -326,9 +385,14 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      {/* Nombres (pedido de Bruno, 7-oct-2026): «Ingresos totales» en vez de
+          «Ingresos del día (todos los medios)», y la plata que NO es efectivo
+          a la vista, con UN nombre estándar en toda la app: «Electrónico». Sin
+          ese número, al cerrar parecía que había que tipearlo. */}
+      <div className="grid grid-cols-4 gap-3">
         <SummaryCard label="Efectivo esperado en el cajón" value={formatCurrency(expected)} accent="main" />
-        <SummaryCard label="Ingresos del día (todos los medios)" value={formatCurrency(r?.incomeTotal ?? '0')} accent="income" />
+        <SummaryCard label="Ingresos totales" value={formatCurrency(r?.incomeTotal ?? '0')} accent="income" />
+        <SummaryCard label="Cobrado electrónico" value={formatCurrency(electronicoDelCierre)} accent="income" />
         <SummaryCard label="Egresos del día" value={formatCurrency(r?.expenseTotal ?? '0')} accent="expense" />
       </div>
 
@@ -541,61 +605,135 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: cerrar caja */}
-      <Dialog open={closeOpen} onOpenChange={(o) => { if (!o) setCloseOpen(false) }}>
+      {/* Dialog: cerrar caja — DOS PASOS (ver `closePaso`). */}
+      <Dialog
+        open={closeOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setCloseOpen(false)
+            setClosePaso(1)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cerrar caja</DialogTitle>
+            <DialogTitle>
+              {closePaso === 1 ? 'Cerrar caja — cambio para mañana' : 'Cerrar caja — efectivo contado'}
+            </DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <div className="rounded-md bg-muted px-3 py-2 text-sm">
-              Efectivo esperado en el cajón: <span className="font-semibold tabular-nums">{formatCurrency(expected)}</span>
-            </div>
-            {breakdown.length > 0 && (
-              <div className="rounded-md border px-3 py-2 text-xs">
-                <div className="mb-1 font-medium text-muted-foreground">Recaudación por medio (informativo)</div>
-                {breakdown.map((b) => (
-                  <div key={b.paymentMethodId ?? '__none__'} className="flex justify-between">
-                    <span>{b.name}</span>
-                    <span className="tabular-nums">{formatCurrency(b.net)}</span>
-                  </div>
-                ))}
+
+          {closePaso === 1 ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted-foreground">
+                ¿Cuánto cambio deja en el cajón para la próxima apertura? Se descuenta solo de lo que
+                pasa a Caja General: no hace falta registrar ningún egreso a mano.
+              </p>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="close-change">Cambio que queda en el cajón</Label>
+                <CurrencyInput id="close-change" autoFocus value={closeChange} onChange={setCloseChange} />
+                <span className="text-xs text-muted-foreground">
+                  Si no deja nada, escriba 0.
+                </span>
               </div>
-            )}
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="close-amount">Efectivo real contado</Label>
-              <CurrencyInput
-                id="close-amount"
-                autoFocus
-                value={closeAmount}
-                onChange={setCloseAmount}
-              />
-              <span className="text-xs text-muted-foreground">Sólo se compara contra el efectivo; los demás medios se concilian aparte.</span>
             </div>
-            {closeDiff != null && Number(closeDiff) !== 0 && (
-              <Badge variant={Number(closeDiff) < 0 ? 'destructive' : 'warning'}>
-                {Number(closeDiff) < 0 ? 'Faltante' : 'Sobrante'} de {formatCurrency(Math.abs(Number(closeDiff)))}
-              </Badge>
-            )}
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="close-notes">Observaciones (opcional)</Label>
-              <textarea
-                id="close-notes"
-                rows={2}
-                value={closeNotes}
-                onChange={(e) => setCloseNotes(e.target.value)}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="rounded-md bg-muted px-3 py-2 text-sm">
+                Efectivo esperado en el cajón:{' '}
+                <span className="font-semibold tabular-nums">{formatCurrency(expected)}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="close-amount">Efectivo real contado</Label>
+                <CurrencyInput id="close-amount" autoFocus value={closeAmount} onChange={setCloseAmount} />
+              </div>
+              {closeDiff != null && Number(closeDiff) !== 0 && (
+                <Badge variant={Number(closeDiff) < 0 ? 'destructive' : 'warning'}>
+                  {Number(closeDiff) < 0 ? 'Faltante' : 'Sobrante'} de{' '}
+                  {formatCurrency(Math.abs(Number(closeDiff)))}
+                </Badge>
+              )}
+
+              {/* Los otros medios, a la vista: esta plata ya está en la cuenta
+                  del comercio y entra completa. No se tipea nada. */}
+              <div className="rounded-md border px-3 py-2 text-xs">
+                <div className="mb-1 flex justify-between font-medium">
+                  <span>Cobrado por medios electrónicos</span>
+                  <span className="tabular-nums">{formatCurrency(electronicoDelCierre)}</span>
+                </div>
+                {breakdown
+                  .filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0)
+                  .map((b) => (
+                    <div key={b.paymentMethodId ?? b.name} className="flex justify-between text-muted-foreground">
+                      <span>{b.name}</span>
+                      <span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
+                    </div>
+                  ))}
+              </div>
+
+              <div className="flex flex-col gap-0.5 rounded-md bg-primary/10 px-3 py-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Efectivo contado</span>
+                  <span className="tabular-nums">{formatCurrency(parseCurrencyInput(closeAmount || '0'))}</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Menos el cambio que queda</span>
+                  <span className="tabular-nums">
+                    −{formatCurrency(parseCurrencyInput(closeChange || '0'))}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Más lo electrónico</span>
+                  <span className="tabular-nums">{formatCurrency(electronicoDelCierre)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between border-t pt-1">
+                  <span className="text-sm font-medium">Ingresa a Caja General</span>
+                  <b className="text-lg tabular-nums">{formatCurrency(aCajaGeneral)}</b>
+                </div>
+              </div>
+              {cambioSupera && (
+                <Badge variant="destructive">
+                  El cambio que deja es mayor que el efectivo contado.
+                </Badge>
+              )}
+
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="close-notes">Observaciones (opcional)</Label>
+                <textarea
+                  id="close-notes"
+                  rows={2}
+                  value={closeNotes}
+                  onChange={(e) => setCloseNotes(e.target.value)}
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
             </div>
-          </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseOpen(false)} disabled={close.isPending}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={() => void confirmarCierre()} disabled={close.isPending || !closeAmount || !canWrite}>
-              {close.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Confirmar cierre
-            </Button>
+            {closePaso === 1 ? (
+              <>
+                <Button variant="outline" onClick={() => setCloseOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => setClosePaso(2)} disabled={closeChange === '' || !canWrite}>
+                  Continuar
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setClosePaso(1)} disabled={close.isPending}>
+                  Volver
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => void confirmarCierre()}
+                  disabled={close.isPending || !closeAmount || cambioSupera || !canWrite}
+                >
+                  {close.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Cerrar e ingresar a Caja General
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -605,53 +743,6 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
 
 export function Caja() {
   const current = useCurrentCash()
-  const canWrite = useCanWrite()
-
-  // PASO 2 del cierre — el dialog vive acá porque CajaAbierta se desmonta
-  // apenas la caja queda cerrada (la query pasa a null).
-  const [depositInfo, setDepositInfo] = useState<DepositInfo | null>(null)
-  const [depositCash, setDepositCash] = useState('0')
-  // Neto de los medios no físicos del cierre: entra siempre completo.
-  const depositElectronico = useMemo(() => {
-    if (!depositInfo) return '0'
-    return depositInfo.report.byPaymentMethod
-      .filter((b) => !b.isPhysicalCash)
-      .reduce((acc, b) => acc + Math.max(0, Number(b.net ?? 0)), 0)
-      .toFixed(2)
-  }, [depositInfo])
-
-  async function confirmarDeposito(): Promise<void> {
-    if (!depositInfo) return
-    // Ya no hay que prorratear nada: el electrónico entra completo y el
-    // efectivo es lo que el usuario decidió llevar a la caja fuerte.
-    const cashAmount = parseCurrencyInput(depositCash)
-    const electronicAmount = depositElectronico
-    const amt = (Number(cashAmount) + Number(electronicAmount)).toFixed(2)
-    if (Number(cashAmount) < 0) {
-      toast.error('El efectivo no puede ser negativo')
-      return
-    }
-    if (Number(cashAmount) > Number(depositInfo.counted) + 0.005) {
-      toast.error(`No se puede ingresar más efectivo del contado (${formatCurrency(depositInfo.counted)})`)
-      return
-    }
-    if (Number(amt) <= 0) {
-      toast.error('El monto debe ser mayor a cero')
-      return
-    }
-    try {
-      await api.cashGeneral.transferFromClosed({
-        cashRegisterId: depositInfo.registerId,
-        amount: amt,
-        cashAmount,
-        electronicAmount,
-      })
-      toast.success(`Ingresado ${formatCurrency(amt)} a Caja General (efectivo ${formatCurrency(cashAmount)} · electrónico ${formatCurrency(electronicAmount)})`)
-      setDepositInfo(null)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo ingresar a Caja General')
-    }
-  }
 
   if (current.isLoading) {
     return (
@@ -663,78 +754,11 @@ export function Caja() {
   return (
     <>
       {current.data ? (
-        <CajaAbierta
-          registerId={current.data.id}
-          onCloseComplete={(info) => {
-            setDepositCash(info.counted)
-            setDepositInfo(info)
-          }}
-        />
+        <CajaAbierta registerId={current.data.id} onCloseComplete={() => current.refetch()} />
       ) : (
         <CajaCerrada />
       )}
 
-      {/* PASO 2 del cierre — ingreso a Caja General.
-          El importe electrónico NO es editable a propósito: esa plata ya está
-          en la cuenta del comercio, no puede "quedarse en el cajón". Lo único
-          ajustable es el efectivo (por si deja cambio para el día siguiente).
-          Antes había un solo campo con la suma de ambos, y al cerrar se
-          escribía el efectivo contado —el número que uno tiene delante— y la
-          parte electrónica quedaba afuera sin que nadie lo notara. */}
-      <Dialog open={depositInfo !== null} onOpenChange={(o) => { if (!o) setDepositInfo(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Ingresar a Caja General</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-              La caja quedó cerrada. Esto es lo que recaudó el día y pasa a Caja General.
-            </p>
-            {depositInfo && (
-              <>
-                <div className="flex flex-col gap-1 rounded-md border bg-muted/40 px-3 py-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">Cobrado con tarjeta y transferencia</span>
-                    <b className="tabular-nums">{formatCurrency(depositElectronico)}</b>
-                  </div>
-                  {depositInfo.report.byPaymentMethod
-                    .filter((b) => !b.isPhysicalCash && Number(b.net ?? 0) !== 0)
-                    .map((b) => (
-                      <div key={b.name} className="flex justify-between text-xs text-muted-foreground">
-                        <span>{b.name}</span><span className="tabular-nums">{formatCurrency(b.net ?? '0')}</span>
-                      </div>
-                    ))}
-                  <span className="mt-0.5 text-[11px] text-muted-foreground">
-                    Ya está en la cuenta: entra completo, no se puede modificar.
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="deposit-cash">Efectivo que llevás a la caja fuerte</Label>
-                  <CurrencyInput id="deposit-cash" value={depositCash} onChange={setDepositCash} />
-                  <span className="text-xs text-muted-foreground">
-                    Efectivo contado en el cajón: {formatCurrency(depositInfo.counted)}.
-                    {Number(parseCurrencyInput(depositCash)) < Number(depositInfo.counted) - 0.005 && (
-                      <> Quedan <b>{formatCurrency((Number(depositInfo.counted) - Number(parseCurrencyInput(depositCash))).toFixed(2))}</b> como cambio para mañana.</>
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-md bg-primary/10 px-3 py-2">
-                  <span className="text-sm font-medium">Total que ingresa</span>
-                  <b className="text-lg tabular-nums">
-                    {formatCurrency((Number(parseCurrencyInput(depositCash)) + Number(depositElectronico)).toFixed(2))}
-                  </b>
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDepositInfo(null)}>No ingresar</Button>
-            <Button onClick={() => void confirmarDeposito()} disabled={!canWrite}>Confirmar ingreso</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

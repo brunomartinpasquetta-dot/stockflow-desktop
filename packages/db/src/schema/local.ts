@@ -150,6 +150,12 @@ export const suppliers = sqliteTable('suppliers', {
   ingBrutos: text('ing_brutos'),
   phone: text('phone'),
   mobile: text('mobile'),
+  /**
+   * Dado de baja (migración 0041): el proveedor con compras cargadas no se
+   * borra, se desactiva. Deja de aparecer para elegir y el historial sigue
+   * mostrando de quién se compró.
+   */
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
   createdAt: createdAtCol(),
   updatedAt: updatedAtCol(),
 });
@@ -318,6 +324,16 @@ export const cashRegisters = sqliteTable(
     terminalName: text('terminal_name'),
     /** Observaciones del cierre (ej. diferencia de arqueo). */
     notes: text('notes'),
+    /**
+     * Cambio que quedó en el cajón para la próxima apertura (migración 0040).
+     * Antes el comercio lo sacaba con un egreso manual, que descuadraba el
+     * arqueo y hacía depositar de menos. Ahora el cierre lo pregunta, lo
+     * descuenta de lo que va a Caja General y lo propone como apertura
+     * siguiente.
+     */
+    changeLeft: text('change_left'),
+    /** Quién CERRÓ la caja: con turnos no es el mismo que la abrió. */
+    closedByUserId: text('closed_by_user_id'),
     createdAt: createdAtCol(),
   },
   (t) => ({

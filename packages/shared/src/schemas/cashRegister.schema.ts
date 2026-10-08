@@ -32,6 +32,14 @@ export const CloseCashRegisterSchema = z.object({
   closingAmount: signedMoneySchema,
   /** Observaciones del cierre (se anteponen a la línea de arqueo automática). */
   notes: z.string().max(500).nullish(),
+  /**
+   * Cambio que queda en el cajón para la próxima apertura. No puede ser
+   * negativo ni mayor que lo contado: dejar más de lo que hay en el cajón no
+   * existe, y si se aceptara el depósito a Caja General saldría negativo.
+   */
+  changeLeft: moneySchema.nullish(),
+  /** Quién cerró la caja (con turnos no es el mismo que la abrió). */
+  closedByUserId: z.string().nullish(),
 });
 
 export type CashRegisterOutput = z.infer<typeof CashRegisterSchema>;

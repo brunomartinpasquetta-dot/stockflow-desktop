@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { useSupplierMutations, useSuppliers } from '@/lib/hooks'
 import { validateCUIT } from '@/lib/cuit'
+import { Button } from '@/components/ui/button'
 import { EntityTable, type Column } from '@/components/EntityTable'
 import { EntityFormDialog, type FieldConfig } from '@/components/EntityFormDialog'
 import { useCanWrite } from '@/contexts/LicenseContext'
@@ -24,7 +25,9 @@ const supplierSchema = z.object({
 
 export function Proveedores() {
   const canWrite = useCanWrite()
-  const suppliers = useSuppliers()
+  /** Los dados de baja se esconden salvo que se los pida: ver el borrado. */
+  const [incluirBaja, setIncluirBaja] = useState(false)
+  const suppliers = useSuppliers(incluirBaja)
   const m = useSupplierMutations()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<SupplierDTO | null>(null)
@@ -51,6 +54,12 @@ export function Proveedores() {
     { key: 'cuit', header: 'CUIT', render: (r) => r.cuit ?? '—' },
     { key: 'city', header: 'Ciudad', render: (r) => r.city ?? '—' },
     { key: 'phone', header: 'Teléfono', render: (r) => r.phone ?? r.mobile ?? '—' },
+    // Un estado, una palabra (regla de etiquetas de la app).
+    {
+      key: 'active',
+      header: 'Estado',
+      render: (r) => (r.active === false ? 'Dado de baja' : 'Activo'),
+    },
   ]
 
   const fields: FieldConfig[] = [
@@ -95,7 +104,18 @@ export function Proveedores() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-lg font-semibold">Proveedores</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Proveedores</h1>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-input"
+            checked={incluirBaja}
+            onChange={(e) => setIncluirBaja(e.target.checked)}
+          />
+          Incluir dados de baja
+        </label>
+      </div>
       <EntityTable
         readOnly={!canWrite}
         columns={columns}
@@ -103,7 +123,25 @@ export function Proveedores() {
         isLoading={suppliers.isLoading}
         searchFields={['code', 'name', 'cuit', 'city']}
         searchPlaceholder="Buscar por código, razón social o CUIT…"
-        extraActions={(r) => <WhatsAppButton phone={r.mobile ?? r.phone} />}
+        extraActions={(r) => (
+          <>
+            {r.active === false && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!canWrite}
+                onClick={() => {
+                  void m.update
+                    .mutateAsync({ id: r.id, data: { active: true } })
+                    .then(() => toast.success('Proveedor reactivado'))
+                }}
+              >
+                Reactivar
+              </Button>
+            )}
+            <WhatsAppButton phone={r.mobile ?? r.phone} />
+          </>
+        )}
         newLabel="Nuevo proveedor"
         emptyMessage="No hay proveedores cargados"
         onNew={() => {
@@ -115,7 +153,18 @@ export function Proveedores() {
           setFormOpen(true)
         }}
         onDelete={async (r) => {
-          await m.remove.mutateAsync(r.id)
+          // Un proveedor con compras cargadas no se borra: se da de baja, y el
+          // historial sigue mostrando de quién se compró.
+          const res = await m.remove.mutateAsync(r.id)
+          if (res.dadoDeBaja) {
+            toast.success(
+              'El proveedor tiene movimientos registrados: no se borró, quedó dado de baja. Ya no aparece para elegir en Compras. ' +
+                "Para verlo o reactivarlo, tilde 'Incluir dados de baja'.",
+              { duration: 10_000 },
+            )
+          } else {
+            toast.success('Proveedor borrado')
+          }
         }}
         deleteTitle={(r) => r.name}
       />

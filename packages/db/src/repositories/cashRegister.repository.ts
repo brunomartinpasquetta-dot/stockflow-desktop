@@ -64,6 +64,29 @@ export class CashRegisterRepository extends BaseRepository<
     }
   }
 
+  /**
+   * Cambio que dejó el último cierre de esta terminal, para proponerlo como
+   * apertura del turno siguiente (migración 0040). Devuelve null si el último
+   * cierre es anterior a la función y no tiene el dato.
+   */
+  async cambioDelUltimoCierre(terminalId?: string | null): Promise<string | null> {
+    try {
+      const cerradas = this.db
+        .select()
+        .from(cashRegisters)
+        .where(eq(cashRegisters.status, 'closed'))
+        .all();
+      const propias = terminalId ? cerradas.filter((r) => r.terminalId === terminalId) : cerradas;
+      // Si esta terminal nunca cerró una, vale la última de la instalación
+      // (una sola PC, o cajas heredadas sin terminal).
+      const candidatas = propias.length > 0 ? propias : cerradas;
+      const ultima = candidatas.sort((a, b) => (b.closeDate ?? 0) - (a.closeDate ?? 0))[0];
+      return ultima?.changeLeft ?? null;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   /** Abre una caja nueva. Falla si ya hay una abierta. */
   async openRegister(rawData: unknown): Promise<CashRegister> {
     try {
@@ -166,6 +189,18 @@ export class CashRegisterRepository extends BaseRepository<
         const userNotes = data.notes?.trim();
         const notes = userNotes ? `${userNotes}\n${arqueo}` : arqueo;
 
+        /**
+         * El cambio no puede superar lo contado: si lo hiciera, el depósito a
+         * Caja General saldría negativo y la caja del día siguiente abriría
+         * con plata que no existe.
+         */
+        if (data.changeLeft != null && Number(data.changeLeft) > Number(data.closingAmount) + 0.005) {
+          throw new ConstraintError(
+            'CHANGE_OVER_COUNTED',
+            'El cambio que deja no puede ser mayor que el efectivo contado.',
+          );
+        }
+
         const updated = tx
           .update(cashRegisters)
           .set({
@@ -173,6 +208,8 @@ export class CashRegisterRepository extends BaseRepository<
             closeDate: Date.now(),
             closingAmount: data.closingAmount,
             notes,
+            changeLeft: data.changeLeft ?? null,
+            closedByUserId: data.closedByUserId ?? null,
           })
           .where(eq(cashRegisters.id, id))
           .returning()

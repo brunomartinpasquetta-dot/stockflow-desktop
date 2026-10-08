@@ -168,6 +168,8 @@ export interface SupplierDTO {
   ingBrutos: string | null;
   phone: string | null;
   mobile: string | null;
+  /** Dado de baja: no aparece para elegir, pero el historial lo sigue mostrando. */
+  active: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -224,7 +226,32 @@ export interface CashRegisterDTO {
   status: CashStatus;
   userId: string;
   notes: string | null;
+  /** Cambio que quedó en el cajón para la próxima apertura (migración 0040). */
+  changeLeft: string | null;
+  /** Quién cerró la caja: con turnos no es el mismo que la abrió. */
+  closedByUserId: string | null;
   createdAt: number;
+}
+
+/**
+ * Resultado del cierre. Incluye lo que entró a Caja General, porque ahora
+ * entra SOLO al cerrar: ya no hay un segundo diálogo que se pueda cerrar sin
+ * querer y dejar la recaudación colgada.
+ */
+/**
+ * Resultado de borrar una ficha que puede tener historial: si lo tenía, no se
+ * borra — se da de baja y el historial queda intacto.
+ */
+export interface BajaODeleteDTO {
+  deleted: boolean;
+  dadoDeBaja: boolean;
+}
+
+export interface CloseCashResultDTO {
+  register: CashRegisterDTO;
+  report: CashReportDTO;
+  deposito: { efectivo: string; electronico: string; total: string } | null;
+  motivoSinDeposito: string | null;
 }
 
 export interface CashMovementDTO {
@@ -2334,11 +2361,12 @@ export interface ApiSurface {
     findByDocNumber(payload: { docNumber: string }): Res<CustomerDTO | null>;
   };
   suppliers: {
-    list(): Res<SupplierDTO[]>;
+    list(payload?: { incluirBaja?: boolean }): Res<SupplierDTO[]>;
     get(payload: IdPayload): Res<SupplierDTO | null>;
     create(payload: EntityPayload): Res<SupplierDTO>;
     update(payload: UpdatePayload): Res<SupplierDTO>;
-    delete(payload: IdPayload): Res<{ deleted: true }>;
+    /** Borra, o da de baja si el proveedor ya tiene movimientos. */
+    delete(payload: IdPayload): Res<BajaODeleteDTO>;
   };
   families: {
     list(): Res<FamilyDTO[]>;
@@ -2359,7 +2387,8 @@ export interface ApiSurface {
     get(payload: IdPayload): Res<UserDTO | null>;
     create(payload: EntityPayload): Res<UserDTO>;
     update(payload: UpdatePayload): Res<UserDTO>;
-    delete(payload: IdPayload): Res<{ deleted: true }>;
+    /** Borra, o da de baja si el usuario ya tiene movimientos. */
+    delete(payload: IdPayload): Res<BajaODeleteDTO>;
   };
   roles: {
     getConfig(): Res<RolesConfigDTO>;
@@ -2425,10 +2454,13 @@ export interface ApiSurface {
   };
   cash: {
     open(payload: { openingAmount: string }): Res<CashRegisterDTO>;
-    close(payload: { registerId: string; closingAmount: string; notes?: string | null }): Res<{
-      register: CashRegisterDTO;
-      report: CashReportDTO;
-    }>;
+    close(payload: {
+      registerId: string;
+      closingAmount: string;
+      notes?: string | null;
+      changeLeft?: string | null;
+    }): Res<CloseCashResultDTO>;
+    sugerenciaDeApertura(): Res<{ cambio: string | null }>;
     getCurrent(): Res<CashRegisterDTO | null>;
     getReport(payload: { registerId: string }): Res<CashReportDTO>;
     addMovement(payload: AddMovementInputDTO): Res<CashMovementDTO>;

@@ -293,11 +293,13 @@ export const api = {
     findByDocNumber: (docNumber: string): Promise<CustomerDTO | null> => unwrap(sf().customers.findByDocNumber({ docNumber })),
   },
   suppliers: {
-    list: (): Promise<SupplierDTO[]> => unwrap(sf().suppliers.list()),
+    list: (incluirBaja = false): Promise<SupplierDTO[]> =>
+      unwrap(sf().suppliers.list({ incluirBaja })),
     get: (id: string): Promise<SupplierDTO | null> => unwrap(sf().suppliers.get({ id })),
     create: (data: EntityPayload): Promise<SupplierDTO> => unwrap(sf().suppliers.create(data)),
     update: (id: string, data: EntityPayload): Promise<SupplierDTO> => unwrap(sf().suppliers.update({ id, data })),
-    delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().suppliers.delete({ id })),
+    delete: (id: string): Promise<import('@/types/api').BajaODeleteDTO> =>
+      unwrap(sf().suppliers.delete({ id })),
   },
   families: {
     list: (): Promise<FamilyDTO[]> => unwrap(sf().families.list()),
@@ -318,7 +320,8 @@ export const api = {
     get: (id: string): Promise<UserDTO | null> => unwrap(sf().users.get({ id })),
     create: (data: EntityPayload): Promise<UserDTO> => unwrap(sf().users.create(data)),
     update: (id: string, data: EntityPayload): Promise<UserDTO> => unwrap(sf().users.update({ id, data })),
-    delete: (id: string): Promise<{ deleted: true }> => unwrap(sf().users.delete({ id })),
+    delete: (id: string): Promise<import('@/types/api').BajaODeleteDTO> =>
+      unwrap(sf().users.delete({ id })),
   },
   roles: {
     getConfig: (): Promise<RolesConfigDTO> => unwrap(sf().roles.getConfig()),
@@ -454,8 +457,22 @@ export const api = {
   },
   cash: {
     open: (openingAmount: string): Promise<CashRegisterDTO> => unwrap(sf().cash.open({ openingAmount })),
-    close: (registerId: string, closingAmount: string, notes?: string): Promise<{ register: CashRegisterDTO; report: CashReportDTO }> =>
-      unwrap(sf().cash.close({ registerId, closingAmount, notes: notes ?? null })),
+    close: (
+      registerId: string,
+      closingAmount: string,
+      notes?: string,
+      changeLeft?: string | null,
+    ): Promise<import('@/types/api').CloseCashResultDTO> =>
+      unwrap(
+        sf().cash.close({
+          registerId,
+          closingAmount,
+          notes: notes ?? null,
+          changeLeft: changeLeft ?? null,
+        }),
+      ),
+    sugerenciaDeApertura: (): Promise<{ cambio: string | null }> =>
+      unwrap(sf().cash.sugerenciaDeApertura()),
     getCurrent: (): Promise<CashRegisterDTO | null> => unwrap(sf().cash.getCurrent()),
     getReport: (registerId: string): Promise<CashReportDTO> => unwrap(sf().cash.getReport({ registerId })),
     addMovement: (

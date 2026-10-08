@@ -7,7 +7,7 @@ import {
   type UpdateUserInput,
 } from '@stockflow/shared';
 
-import { NotFoundError, ValidationError, rethrowDbError } from '../errors';
+import { ConstraintError, NotFoundError, ValidationError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import { users, type NewUser, type User } from '../schema/local';
 import { BaseRepository } from './base.repository';
@@ -100,6 +100,30 @@ export class UserRepository extends BaseRepository<User, NewUser> {
       return rethrowDbError(err);
     }
     return super.delete(id);
+  }
+
+  /**
+   * Borra el usuario, o lo DA DE BAJA si ya tiene movimientos.
+   *
+   * La ficha del usuario está referenciada desde más de diez tablas (ventas,
+   * cajas, compras, auditoría…). Borrar a un empleado que vendió rompía el
+   * borrado con «FOREIGN KEY constraint failed» y, peor, borrarlo de verdad
+   * dejaría el historial sin saber quién vendió o quién cerró la caja — que es
+   * justo para lo que sirve (pedido de Bruno, 8-oct-2026). Dado de baja no
+   * puede entrar al sistema y el historial queda intacto.
+   */
+  async borrarODarDeBaja(id: string): Promise<'borrado' | 'dado_de_baja'> {
+    await this.assertNotLastActiveAdmin(id);
+    try {
+      await this.delete(id);
+      return 'borrado';
+    } catch (err) {
+      if (err instanceof ConstraintError && err.constraint.includes('FOREIGNKEY')) {
+        await this.update(id, { active: false });
+        return 'dado_de_baja';
+      }
+      throw err;
+    }
   }
 
   async findByUsername(username: string): Promise<User | null> {

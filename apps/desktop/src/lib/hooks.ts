@@ -92,10 +92,10 @@ export function useCustomerMutations() {
 }
 
 // --- Proveedores ---
-export function useSuppliers() {
+export function useSuppliers(incluirBaja = false) {
   return useQuery<SupplierDTO[]>({
-    queryKey: ['suppliers'],
-    queryFn: api.suppliers.list,
+    queryKey: ['suppliers', { incluirBaja }],
+    queryFn: () => api.suppliers.list(incluirBaja),
     staleTime: CATALOGO_STALE_MS,
   })
 }
@@ -192,9 +192,23 @@ export function useCashMutations() {
       onSuccess: invalidateCash,
     }),
     close: useMutation({
-      mutationFn: ({ registerId, closingAmount, notes }: { registerId: string; closingAmount: string; notes?: string }) =>
-        api.cash.close(registerId, closingAmount, notes),
-      onSuccess: invalidateCash,
+      mutationFn: ({
+        registerId,
+        closingAmount,
+        notes,
+        changeLeft,
+      }: {
+        registerId: string
+        closingAmount: string
+        notes?: string
+        /** Cambio que queda en el cajón para la próxima apertura. */
+        changeLeft?: string | null
+      }) => api.cash.close(registerId, closingAmount, notes, changeLeft),
+      onSuccess: () => {
+        invalidateCash()
+        // El cierre ahora ingresa solo a Caja General: su saldo cambió.
+        void qc.invalidateQueries({ queryKey: ['cashGeneral'] })
+      },
     }),
     addMovement: useMutation({
       mutationFn: ({

@@ -597,7 +597,7 @@ export function Compras() {
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <div className="grid shrink-0 grid-cols-4 gap-3 rounded-lg border bg-card p-3">
+      <div className="grid shrink-0 grid-cols-4 gap-2 rounded-lg border bg-card p-2">
         <div className="col-span-2 flex flex-col gap-1">
           <Label>Proveedor</Label>
           <Button variant="outline" className="justify-between" onClick={() => setSupplierPickerOpen(true)}>
@@ -775,14 +775,19 @@ export function Compras() {
               ) : (
                 cart.map((l, i) => (
                   <tr key={l.article.id} className="border-t">
-                    <td className="px-2 py-1">
-                      <div className="font-medium">{l.article.description}</div>
-                      <div className="font-mono text-xs text-muted-foreground">
-                        {l.article.barcode}
+                    {/* Descripción y código en UNA línea: con dos renglones por
+                        ítem entraban dos productos en pantalla y una factura de
+                        compra real trae veinte o cuarenta (Bruno, 8-oct-2026). */}
+                    <td className="px-2 py-0.5">
+                      <div className="flex min-w-0 items-baseline gap-2">
+                        <span className="truncate font-medium">{l.article.description}</span>
+                        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                          {l.article.barcode}
+                        </span>
                         {l.sugerido && (
                           <Badge
                             variant="warning"
-                            className="ml-1.5 font-sans"
+                            className="shrink-0 font-sans"
                             title="El sistema eligió este artículo por parecido con la descripción de la factura: contrólelo."
                           >
                             Sugerido
@@ -790,16 +795,16 @@ export function Compras() {
                         )}
                       </div>
                     </td>
-                    <td className="px-2 py-1 text-sm text-muted-foreground">{l.article.brand ?? ''}</td>
-                    <td className="px-2 py-1">
-                      <Input className="h-8 text-right tabular-nums" inputMode="decimal" value={l.quantity}
+                    <td className="px-2 py-0.5 text-sm text-muted-foreground">{l.article.brand ?? ''}</td>
+                    <td className="px-2 py-0.5">
+                      <Input className="h-7 text-right tabular-nums" inputMode="decimal" value={l.quantity}
                         onChange={(e) => setLine(i, 'quantity', e.target.value)} onBlur={() => setLine(i, 'quantity', parseCurrencyInput(l.quantity))} />
                     </td>
-                    <td className="px-2 py-1">
-                      <CurrencyInput className="h-8 text-right tabular-nums" value={l.costPrice}
+                    <td className="px-2 py-0.5">
+                      <CurrencyInput className="h-7 text-right tabular-nums" value={l.costPrice}
                         onChange={(v) => setLine(i, 'costPrice', v)} />
                     </td>
-                    <td className="px-2 py-1">
+                    <td className="px-2 py-0.5">
                       <Select className="h-8" value={l.vatRate} onChange={(e) => setLine(i, 'vatRate', e.target.value)}>
                         {VAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </Select>
@@ -810,7 +815,7 @@ export function Compras() {
                       const vigente = l.article[`listPrice${n}` as 'listPrice1']
                       const cambia = l[campo].trim() !== '' && Number(parseCurrencyInput(l[campo])) !== Number(vigente)
                       return (
-                        <td key={n} className="px-2 py-1">
+                        <td key={n} className="px-2 py-0.5">
                           {/* Editable SIEMPRE, en los dos modos: si el redondeo
                               automático no le sirve al comercio, lo pisa acá.
                               Vacío = esa lista no se toca. */}
@@ -832,7 +837,7 @@ export function Compras() {
                         </td>
                       )
                     })}
-                    <td className="px-2 py-1 text-right tabular-nums font-medium">
+                    <td className="px-2 py-0.5 text-right tabular-nums font-medium">
                       {formatCurrency(lineTotal({ quantity: l.quantity, unitPrice: l.costPrice }))}
                       {priceMode === 'net' && (
                         <div className="text-[10px] font-normal text-muted-foreground">
@@ -840,7 +845,7 @@ export function Compras() {
                         </div>
                       )}
                     </td>
-                    <td className="px-2 py-1">
+                    <td className="px-2 py-0.5">
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeLine(i)} title="Quitar producto de la compra">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -886,7 +891,8 @@ export function Compras() {
         </div>
       </div>
 
-      <div className="grid shrink-0 grid-cols-3 gap-3 rounded-lg border bg-card p-3">
+      {/* Pie compacto: antes se comía el alto y la grilla quedaba sin lugar. */}
+      <div className="grid shrink-0 grid-cols-3 gap-2 rounded-lg border bg-card p-2">
         <div className="flex flex-col gap-1 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">{priceMode === 'gross' ? 'Subtotal (con IVA)' : 'Subtotal neto'}</span>
@@ -903,7 +909,7 @@ export function Compras() {
           </div>
           <div className="mt-1 flex items-baseline justify-between border-t pt-1">
             <span className="font-semibold">TOTAL</span>
-            <span className="text-2xl font-bold tabular-nums">{formatCurrency(totals.total)}</span>
+            <span className="text-xl font-bold tabular-nums">{formatCurrency(totals.total)}</span>
           </div>
         </div>
 

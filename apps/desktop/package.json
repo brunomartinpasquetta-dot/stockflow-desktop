@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "1.14.15",
+  "version": "1.15.0",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -65,7 +65,8 @@
     "test:aviso-actualizacion": "tsx electron/__tests__/aviso-actualizacion.smoke.ts",
     "test:etiqueta-medio-pago": "tsx electron/__tests__/etiqueta-medio-pago.smoke.ts",
     "test:cantidad-sospechosa": "tsx electron/__tests__/cantidad-sospechosa.smoke.ts",
-    "test:direccion-de-red": "tsx electron/__tests__/direccion-de-red.smoke.ts"
+    "test:direccion-de-red": "tsx electron/__tests__/direccion-de-red.smoke.ts",
+    "test:caja-cierre": "tsx electron/__tests__/caja-cierre.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -3,10 +3,18 @@
  */
 import type { CashMovement, CashRegister, PaymentMethod, PaymentMethodType } from '@stockflow/shared';
 import { CashRegisterRepository } from '@stockflow/db';
-import { addDecimal, cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
+import {
+  addDecimal,
+  cmpDecimal,
+  netoElectronico,
+  subDecimal,
+  sumDecimals,
+  totalParaCajaGeneral,
+} from '@stockflow/shared';
 
 import { hasPermission, requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
+import { CashGeneralService } from './cashGeneral.service';
 import { BusinessRuleError, NotFoundError, PermissionDeniedError } from '../errors';
 
 export interface AddMovementInput {
@@ -157,6 +165,11 @@ export async function assertPhysicalCashAvailable(
 export class CashService {
   constructor(private readonly ctx: ServiceContext) {}
 
+  /** Caja General, para el ingreso automático al cerrar. */
+  private cashGeneral(): CashGeneralService {
+    return new CashGeneralService(this.ctx);
+  }
+
   /**
    * Abre una caja a nombre del usuario actual.
    *
@@ -164,6 +177,17 @@ export class CashService {
    * instalación en red abre y arquea la suya. Sin terminal (una sola PC) se
    * mantiene la regla de una caja a la vez.
    */
+  /**
+   * Cuánto proponer como apertura: el cambio que dejó el último cierre. Es
+   * una lectura mínima y NO pide `view_reports` a propósito: el cajero que
+   * abre el turno muchas veces no tiene permiso de reportes, y sin esto
+   * tendría que adivinar el número (riesgo detectado en el análisis del
+   * 7-oct-2026).
+   */
+  async sugerenciaDeApertura(terminalId?: string | null): Promise<string | null> {
+    return this.ctx.repos.cashRegisters.cambioDelUltimoCierre(terminalId ?? null);
+  }
+
   async openCashRegister(
     openingAmount: string,
     terminal?: { id: string; name?: string | null } | null,
@@ -182,11 +206,33 @@ export class CashService {
    * Cierra una caja. Puede hacerlo el dueño de la caja o un usuario con permiso
    * `close_cash` (admin/manager). Devuelve la caja cerrada + el reporte de arqueo.
    */
+  /**
+   * Cierra la caja en UNA sola operación (rediseño pedido por Bruno,
+   * 8-oct-2026).
+   *
+   * Antes el cierre eran dos trámites separados: cerrar, y después aceptar o
+   * no un diálogo de «Ingresar a Caja General». Si ese segundo paso se
+   * cerraba, la recaudación del día se quedaba colgada sin que nadie lo
+   * notara. Y el cambio para el día siguiente se sacaba con un EGRESO MANUAL,
+   * que descuadraba el arqueo.
+   *
+   * Ahora: se cuenta el efectivo, se dice cuánto cambio queda, y lo que
+   * recaudó el día —el efectivo menos ese cambio, más lo cobrado por medios
+   * electrónicos— entra solo a Caja General. El cambio queda registrado y es
+   * la apertura sugerida del turno siguiente.
+   */
   async closeCashRegister(
     registerId: string,
     closingAmount: string,
     notes?: string,
-  ): Promise<{ register: CashRegister; report: CashReport }> {
+    changeLeft?: string | null,
+  ): Promise<{
+    register: CashRegister;
+    report: CashReport;
+    /** Lo que entró a Caja General, o null si no entró nada (y por qué). */
+    deposito: { efectivo: string; electronico: string; total: string } | null;
+    motivoSinDeposito: string | null;
+  }> {
     const { repos, currentUser } = this.ctx;
     const register = await repos.cashRegisters.findById(registerId);
     if (!register) throw new NotFoundError('Caja', registerId);
@@ -197,9 +243,40 @@ export class CashService {
       throw new BusinessRuleError('cash_already_closed', `La caja ${registerId} ya está cerrada`);
     }
 
-    const closed = await repos.cashRegisters.closeRegister(registerId, { closingAmount, notes });
+    const closed = await repos.cashRegisters.closeRegister(registerId, {
+      closingAmount,
+      notes,
+      changeLeft: changeLeft ?? null,
+      closedByUserId: currentUser.id,
+    });
     const report = await this.buildReport(closed);
-    return { register: closed, report };
+
+    /**
+     * El depósito se intenta SIEMPRE y su fallo NO voltea el cierre: la caja
+     * ya quedó cerrada y arqueada. Si no se pudo, se dice por qué y queda el
+     * botón de ingresar desde el Historial de cajas.
+     */
+    let deposito: { efectivo: string; electronico: string; total: string } | null = null;
+    let motivoSinDeposito: string | null = null;
+    const electronico = netoElectronico(report.byPaymentMethod);
+    const { efectivo, total } = totalParaCajaGeneral(closingAmount, changeLeft ?? '0', electronico);
+    if (Number(total) <= 0) {
+      motivoSinDeposito = 'No quedó nada para ingresar a Caja General.';
+    } else {
+      try {
+        await this.cashGeneral().transferFromClosed({
+          cashRegisterId: registerId,
+          amount: total,
+          cashAmount: efectivo,
+          electronicAmount: electronico,
+        });
+        deposito = { efectivo, electronico, total };
+      } catch (err) {
+        motivoSinDeposito = err instanceof Error ? err.message : 'No se pudo ingresar a Caja General.';
+      }
+    }
+
+    return { register: closed, report, deposito, motivoSinDeposito };
   }
 
   /** Reporte de arqueo de una caja (abierta o cerrada). Lectura: no requiere permiso. */
@@ -291,9 +368,19 @@ export class CashService {
         subDecimal(cashIncome, cashExpense, 2),
         2,
       );
+      /**
+       * Lo que ESA caja puede aportar a Caja General. El cambio que quedó en
+       * el cajón no cuenta: es la apertura del turno siguiente (migración
+       * 0040). Sin descontarlo, el Historial mostraba «Sin ingresar» para
+       * siempre una caja que ya había ingresado todo lo que correspondía.
+       */
+      const efectivoDepositable = subDecimal(r.closingAmount ?? '0', r.changeLeft ?? '0', 4);
       const depositable =
         r.status === 'closed'
-          ? sumDecimals([r.closingAmount ?? '0', Number(netoElectronico) > 0 ? netoElectronico : '0'])
+          ? sumDecimals([
+              Number(efectivoDepositable) > 0 ? efectivoDepositable : '0',
+              Number(netoElectronico) > 0 ? netoElectronico : '0',
+            ])
           : '0';
       const deposito = depositedIds.get(r.id);
       const yaDepositado = deposito?.total ?? '0';

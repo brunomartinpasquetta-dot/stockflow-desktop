@@ -188,7 +188,15 @@ export class CashGeneralService {
     }
     assertPositive(input.amount);
     const maxElectronic = Number(noFisico) > 0 ? noFisico : '0';
-    const maxCash = reg.closingAmount ?? '0';
+    /**
+     * El cambio que quedó en el cajón NO es depositable: es la apertura del
+     * turno siguiente. Si se pudiera ingresar, la caja de mañana abriría con
+     * plata que ya se llevó a la caja fuerte y la Caja General quedaría
+     * inflada (migración 0040).
+     */
+    const contado = reg.closingAmount ?? '0';
+    const sinCambio = subDecimal(contado, reg.changeLeft ?? '0', 2);
+    const maxCash = Number(sinCambio) > 0 ? sinCambio : '0';
     const maxDepositable = addDecimal(maxCash, maxElectronic, 2);
     const m = await repos.cashGeneral.transferFromClosed({
       cashRegisterId: input.cashRegisterId,

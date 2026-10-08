@@ -1,7 +1,7 @@
 import { eq, like, or, sql } from 'drizzle-orm';
 import { CreateSupplierSchema, UpdateSupplierSchema } from '@stockflow/shared';
 
-import { rethrowDbError } from '../errors';
+import { ConstraintError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import { suppliers, type NewSupplier, type Supplier } from '../schema/local';
 import { BaseRepository } from './base.repository';
@@ -12,6 +12,30 @@ export class SupplierRepository extends BaseRepository<Supplier, NewSupplier> {
 
   constructor(db: LocalDatabase) {
     super(db, suppliers, 'Proveedor');
+  }
+
+  /**
+   * Borra el proveedor, o lo DA DE BAJA si ya tiene movimientos (compras,
+   * facturas, artículos con su código). Mismo criterio que los artículos:
+   * borrarlo rompería el historial, que es justo lo que sirve para saber a
+   * quién se le compró (pedido de Bruno, 8-oct-2026).
+   */
+  async borrarODarDeBaja(id: string): Promise<'borrado' | 'dado_de_baja'> {
+    try {
+      await this.delete(id);
+      return 'borrado';
+    } catch (err) {
+      if (err instanceof ConstraintError && err.constraint.includes('FOREIGNKEY')) {
+        await this.update(id, { active: false });
+        return 'dado_de_baja';
+      }
+      throw err;
+    }
+  }
+
+  /** Reactiva un proveedor dado de baja. */
+  async reactivar(id: string): Promise<Supplier> {
+    return this.update(id, { active: true });
   }
 
   async findByCode(code: string): Promise<Supplier | null> {

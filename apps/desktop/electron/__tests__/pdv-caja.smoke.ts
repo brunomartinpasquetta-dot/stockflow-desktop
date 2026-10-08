@@ -158,31 +158,33 @@ const main = async () => {
   console.log('\n[5] Depósito parcial de un cierre con desglose real');
   // reg3: apertura 0, +1000 efectivo (cobranza), +1500 transferencia.
   await svc.cash.addMovement({ type: 'income', description: 'Venta transf', amount: '1500.0000', paymentMethodId: PM_TRANSF, cashRegisterId: reg3.id });
-  await svc.cash.closeCashRegister(reg3.id, '1000.0000');
-  const res3 = await resumenDe(reg3.id);
-  check('depositable = 1000 efectivo + 1500 electrónico neto', Number(res3.depositableAmount) === 2500, res3.depositableAmount);
-  // Primero SÓLO la parte electrónica (el caso que antes se calculaba mal).
-  await svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '1500.00', cashAmount: '0.00', electronicAmount: '1500.00' });
+  // El cierre YA ingresa a Caja General (rediseño 8-oct-2026): se cierra
+  // dejando 300 de cambio en el cajón para la próxima apertura.
+  const cierre3 = await svc.cash.closeCashRegister(reg3.id, '1000.0000', undefined, '300.00');
+  check('el cierre ingresa solo a Caja General', cierre3.deposito != null, cierre3.motivoSinDeposito ?? '');
+  check('entra el efectivo MENOS el cambio (1000 − 300 = 700)',
+    cierre3.deposito?.efectivo === '700.00', cierre3.deposito?.efectivo ?? '—');
+  check('y todo lo electrónico (1500)', cierre3.deposito?.electronico === '1500.00', cierre3.deposito?.electronico ?? '—');
+  check('total ingresado 2200', cierre3.deposito?.total === '2200.00', cierre3.deposito?.total ?? '—');
   const res3b = await resumenDe(reg3.id);
-  check('ya ingresado: 1500 en total', Number(res3b.depositedAmount) === 1500, res3b.depositedAmount);
-  check('desglose: 0 efectivo / 1500 electrónico',
-    Number(res3b.depositedCashAmount) === 0 && Number(res3b.depositedElectronicAmount) === 1500,
+  check('el resumen lo muestra ingresado completo', res3b.depositedToGeneral === true);
+  check('desglose guardado: 700 efectivo / 1500 electrónico',
+    Number(res3b.depositedCashAmount) === 700 && Number(res3b.depositedElectronicAmount) === 1500,
     `${res3b.depositedCashAmount} / ${res3b.depositedElectronicAmount}`);
-  check('todavía no figura como ingresado completo', res3b.depositedToGeneral === false);
-  // Completar con el efectivo.
-  await svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '1000.00', cashAmount: '1000.00', electronicAmount: '0.00' });
-  const res3c = await resumenDe(reg3.id);
-  check('completo: 1000 efectivo / 1500 electrónico',
-    Number(res3c.depositedCashAmount) === 1000 && Number(res3c.depositedElectronicAmount) === 1500 && res3c.depositedToGeneral,
-    `${res3c.depositedCashAmount} / ${res3c.depositedElectronicAmount}`);
-  const errDeMas = await falla(() =>
-    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '1.00', cashAmount: '1.00', electronicAmount: '0.00' }),
+  // El cambio que quedó en el cajón NO se puede ingresar después: es la
+  // apertura de mañana. Si se pudiera, la Caja General quedaría inflada.
+  const errCambio = await falla(() =>
+    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg3.id, amount: '300.00', cashAmount: '300.00', electronicAmount: '0.00' }),
   );
-  check('no se puede ingresar más de lo que recaudó', errDeMas != null, errDeMas ?? 'dejó');
+  check('el cambio que queda en el cajón no se puede ingresar aparte', errCambio != null, errCambio ?? 'dejó');
+  // El saldo de Caja General ARRASTRA los cierres anteriores de la prueba: se
+  // mira lo que aportó ESTE cierre, no el total.
   const saldo = await svc.cashGeneral.getBalanceBreakdown();
-  check('Caja General: efectivo 1000 / electrónico 1500',
-    Number(saldo.cash) === 1000 && Number(saldo.electronic) === 1500,
-    `${saldo.cash} / ${saldo.electronic}`);
+  check('Caja General sumó el electrónico de este cierre (1500)',
+    Number(saldo.electronic) === 1500, `${saldo.cash} / ${saldo.electronic}`);
+  // El cambio queda registrado y se propone como apertura del turno siguiente.
+  check('la apertura sugerida es el cambio que se dejó (300)',
+    (await svc.cash.sugerenciaDeApertura()) === '300.00', String(await svc.cash.sugerenciaDeApertura()));
 
   /* ------------------------------------------------------------------ */
   console.log('\n[6] Tanda 7: IVA de compras con descuento, transferencias validadas');
@@ -215,23 +217,19 @@ const main = async () => {
   const okTransf = await falla(() => svc.cashGeneral.transferFromDaily({ cashRegisterId: reg4.id, amount: '1000.00' }));
   check('una transferencia dentro del disponible entra', okTransf == null, okTransf ?? '');
 
-  await svc.cash.closeCashRegister(reg4.id, '2200.0000');
-  const errDesglose = await falla(() =>
-    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2200.00', cashAmount: '2000.00', electronicAmount: '100.00' }),
+  // Dejar MÁS cambio del que hay contado se rechaza: la caja de mañana
+  // abriría con plata que no existe.
+  const errCambioDeMas = await falla(() =>
+    svc.cash.closeCashRegister(reg4.id, '2200.0000', undefined, '3000.00'),
   );
-  check('un desglose que no suma el total se rechaza', errDesglose != null && /desglose/i.test(errDesglose), errDesglose ?? 'dejó');
-  const errMasEfectivo = await falla(() =>
-    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2500.00', cashAmount: '2500.00', electronicAmount: '0.00' }),
-  );
-  check('ingresar más efectivo del contado se rechaza', errMasEfectivo != null, errMasEfectivo ?? 'dejó');
-  const errElecInventado = await falla(() =>
-    svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2300.00', cashAmount: '2200.00', electronicAmount: '100.00' }),
-  );
-  check('ingresar electrónico que el cierre no tuvo se rechaza', errElecInventado != null, errElecInventado ?? 'dejó');
-  const okCierre = await falla(() =>
+  check('dejar más cambio del efectivo contado se rechaza', errCambioDeMas != null, errCambioDeMas ?? 'dejó');
+  const cierre4 = await svc.cash.closeCashRegister(reg4.id, '2200.0000');
+  check('sin cambio, entra todo el efectivo contado', cierre4.deposito?.efectivo === '2200.00', cierre4.deposito?.efectivo ?? '—');
+  // Y no se puede ingresar dos veces lo mismo.
+  const errDosVeces = await falla(() =>
     svc.cashGeneral.transferFromClosed({ cashRegisterId: reg4.id, amount: '2200.00', cashAmount: '2200.00', electronicAmount: '0.00' }),
   );
-  check('el depósito correcto del cierre entra', okCierre == null, okCierre ?? '');
+  check('no se puede volver a ingresar un cierre ya ingresado', errDosVeces != null, errDosVeces ?? 'dejó');
 
   /* ------------------------------------------------------------------ */
   console.log('\n[7] Venta con débito, devuelta en efectivo y anulada: no se reintegra dos veces');
@@ -261,9 +259,9 @@ const main = async () => {
     payments: [{ paymentMethodId: PM_TRANSF, amount: '1000.0000' }],
     lines: [{ articleId: art.id, quantity: '1.000' }],
   });
-  await svc.cash.closeCashRegister(reg6.id, '0.0000');
-  // Se ingresa el cierre completo (electrónico 1000) a Caja General.
-  await svc.cashGeneral.transferFromClosed({ cashRegisterId: reg6.id, amount: '1000.00', cashAmount: '0.00', electronicAmount: '1000.00' });
+  // El cierre ingresa solo el electrónico (1000) a Caja General.
+  const cierre6 = await svc.cash.closeCashRegister(reg6.id, '0.0000');
+  check('un día sin efectivo igual ingresa lo electrónico', cierre6.deposito?.electronico === '1000.00', cierre6.deposito?.electronico ?? '—');
   const cgAntes = await svc.cashGeneral.getBalanceBreakdown();
   const reg7 = await svc.cash.openCashRegister('0.0000');
   await svc.sales.voidSale(vt6.sale.id, 'prueba reverso electrónico');
@@ -286,7 +284,11 @@ const main = async () => {
   const cg2 = await svc.cashGeneral.getBalanceBreakdown();
   await svc.sales.voidSale(vt7.sale.id);
   const cg3 = await svc.cashGeneral.getBalanceBreakdown();
-  check('cierre NO ingresado: el reverso no toca Caja General', cg2.electronic === cg3.electronic, `${cg2.electronic} / ${cg3.electronic}`);
+  // Desde el rediseño del cierre (8-oct-2026) el cierre SIEMPRE ingresa, así
+  // que anular esa venta tiene que sacar la plata de Caja General: si no, el
+  // comercio tendría en la caja fuerte una venta que ya no existe.
+  check('anular una venta de un cierre ya ingresado saca la plata de Caja General',
+    Number(cg2.electronic) - Number(cg3.electronic) === 500, `${cg2.electronic} / ${cg3.electronic}`);
   const res7 = await resumenDe(reg7.id);
   check('…y ese cierre queda sin nada electrónico por ingresar', Number(res7.depositableAmount) === 0, res7.depositableAmount);
 

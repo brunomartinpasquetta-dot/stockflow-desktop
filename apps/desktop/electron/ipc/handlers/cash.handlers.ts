@@ -6,6 +6,7 @@ import type {
   CashMovementDTO,
   CashRegisterDTO,
   CashReportDTO,
+  CloseCashResultDTO,
   HistoricalCashRegisterDTO,
   HistoricalCashReportDTO,
 } from '../types';
@@ -31,13 +32,20 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
     'cash:close': withSession(
       deps,
       async (
-        payload: { registerId: string; closingAmount: string; notes?: string | null },
+        payload: {
+          registerId: string;
+          closingAmount: string;
+          notes?: string | null;
+          /** Cambio que queda en el cajón para la próxima apertura. */
+          changeLeft?: string | null;
+        },
         ctx,
-      ): Promise<{ register: CashRegisterDTO; report: CashReportDTO }> => {
+      ): Promise<CloseCashResultDTO> => {
         const result = await new CashService(ctx).closeCashRegister(
           payload.registerId,
           payload.closingAmount,
           payload.notes ?? undefined,
+          payload.changeLeft ?? null,
         );
         if (deps.sessionStore.getCurrentCashRegister()?.id === payload.registerId) {
           deps.sessionStore.setCurrentCashRegister(null);
@@ -57,6 +65,12 @@ export function buildCashHandlers(deps: HandlerDeps): HandlerMap {
         }
         return result;
       },
+    ),
+    'cash:sugerenciaDeApertura': withSession(
+      deps,
+      async (_payload, ctx): Promise<{ cambio: string | null }> => ({
+        cambio: await new CashService(ctx).sugerenciaDeApertura(deps.machineId),
+      }),
     ),
     'cash:getCurrent': withSession(deps, async (_payload, ctx): Promise<CashRegisterDTO | null> => {
       // La caja de ESTA terminal (o la compartida heredada, si no hay por puesto).

@@ -133,7 +133,21 @@ function UsuariosTab() {
 
   async function handleDelete(u: UserDTO): Promise<void> {
     if (isLastAdmin(u)) throw new Error('No se puede borrar al único administrador del sistema')
-    await m.remove.mutateAsync(u.id)
+    /**
+     * El empleado que ya vendió NO se borra: se da de baja. Borrarlo dejaría
+     * el historial sin saber quién vendió o quién cerró la caja, que es
+     * justamente para lo que sirve (pedido de Bruno, 8-oct-2026).
+     */
+    const res = await m.remove.mutateAsync(u.id)
+    if (res.dadoDeBaja) {
+      toast.success(
+        'El usuario tiene movimientos registrados: no se borró, quedó dado de baja. Ya no puede entrar al sistema, ' +
+          'y el historial sigue mostrando sus ventas y cierres de caja. Para reactivarlo, edítelo y tilde «Activo».',
+        { duration: 12_000 },
+      )
+    } else {
+      toast.success('Usuario borrado')
+    }
   }
 
   return (

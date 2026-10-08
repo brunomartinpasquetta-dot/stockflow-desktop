@@ -461,7 +461,7 @@ export function createApiBridge(
       findByDocNumber: (p) => c<never>('customers:findByDocNumber', p),
     },
     suppliers: {
-      list: () => c<never>('suppliers:list'),
+      list: (p) => c<never>('suppliers:list', p),
       get: (p) => c<never>('suppliers:get', p),
       create: (p) => c<never>('suppliers:create', p),
       update: (p) => c<never>('suppliers:update', p),
@@ -574,6 +574,7 @@ export function createApiBridge(
     cash: {
       open: (p) => c<never>('cash:open', p),
       close: (p) => c<never>('cash:close', p),
+      sugerenciaDeApertura: () => c<never>('cash:sugerenciaDeApertura'),
       getCurrent: () => c<never>('cash:getCurrent'),
       getReport: (p) => c<never>('cash:getReport', p),
       addMovement: (p) => c<never>('cash:addMovement', p),

@@ -196,8 +196,14 @@ async function main(): Promise<void> {
   // ----------------------------------------------------- asserts finales
   console.log('\n[asserts finales del escenario]');
 
+  /**
+   * $500 de la transferencia manual + $1000 que ingresó SOLO el cierre.
+   * Desde el rediseño del 8-oct-2026 cerrar la caja lleva la recaudación a
+   * Caja General sin un segundo trámite (antes quedaba colgada si el usuario
+   * cerraba el diálogo). Acá no se dejó cambio, así que entra todo.
+   */
   const cgBalance = await admin.cashGeneral.getBalance();
-  check('cash_general.balance === 500.00', cgBalance === '500.00', `balance=${cgBalance}`);
+  check('cash_general.balance === 1500.00 (500 transferidos + 1000 del cierre)', cgBalance === '1500.00', `balance=${cgBalance}`);
 
   const arBalance = await repos.accountsReceivable.getTotalBalance(cliente.id);
   check('accounts_receivable[cliente] === 400.0000', arBalance === '400.0000', `balance=${arBalance}`);
@@ -209,15 +215,15 @@ async function main(): Promise<void> {
   // La caja diaria ya está cerrada → cashRegistersValue = 0; cashValue = 0 + 500.
   const summary = await admin.accounting.getFinancialSummary({ from: 0, to: Date.now() + 86_400_000 });
   check(
-    'getFinancialSummary: cashGeneralValue = 500',
-    summary.assets.cashGeneralValue === '500.0000',
+    'getFinancialSummary: cashGeneralValue = 1500',
+    summary.assets.cashGeneralValue === '1500.0000',
     `cashGeneralValue=${summary.assets.cashGeneralValue}`,
   );
   check(
-    'getFinancialSummary: cashValue incluye los $500 de Caja General',
+    'getFinancialSummary: cashValue incluye los $1500 de Caja General',
     summary.assets.cashValue === summary.assets.cashRegistersValue
       ? false
-      : Number(summary.assets.cashValue) === Number(summary.assets.cashRegistersValue) + 500,
+      : Number(summary.assets.cashValue) === Number(summary.assets.cashRegistersValue) + 1500,
     `cashValue=${summary.assets.cashValue} registros=${summary.assets.cashRegistersValue}`,
   );
 
