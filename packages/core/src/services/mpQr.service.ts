@@ -111,13 +111,37 @@ export class MpQrService {
       throw new BusinessRuleError('mp_invalid_token', `Access token inválido: ${msg}`);
     }
 
+    /**
+     * SE USA LA SUCURSAL QUE EL COMERCIO YA TIENE.
+     *
+     * Antes se creaba una sucursal «StockFlow» sin mirar. Dos problemas: al
+     * comercio le aparecía una sucursal de más en su Mercado Pago, y muchas
+     * cuentas no están autorizadas a crearlas por API — Mercado Pago contesta
+     * "at least one policy returned unauthorized" y la configuración no pasaba
+     * de ahí (Denver, 8-oct-2026: ya tenía su sucursal y su QR armados desde la
+     * app). Sólo se crea una cuando la cuenta no tiene ninguna.
+     */
     let storeId: string;
+    let existentes: Awaited<ReturnType<typeof client.searchStores>> = [];
     try {
-      const store = await client.createStore(input.mpUserId, { name: 'StockFlow' });
-      storeId = String(store.id);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new BusinessRuleError('mp_store_create_failed', `No se pudo crear la sucursal en MercadoPago: ${msg}`);
+      existentes = await client.searchStores(input.mpUserId);
+    } catch {
+      /* si no se pueden listar, se intenta crear como antes */
+    }
+    if (existentes.length > 0) {
+      storeId = String(existentes[0]!.id);
+    } else {
+      try {
+        const store = await client.createStore(input.mpUserId, { name: 'StockFlow' });
+        storeId = String(store.id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new BusinessRuleError(
+          'mp_store_create_failed',
+          `No se pudo crear la sucursal en MercadoPago: ${msg}. ` +
+            'Cree la sucursal desde la app de Mercado Pago y vuelva a intentar.',
+        );
+      }
     }
 
     const webhookSecret = randomBytes(32).toString('hex');
@@ -224,25 +248,70 @@ export class MpQrService {
       .toUpperCase()}`;
 
     const client = await this.client();
-    let pos;
+
+    /**
+     * SE ADOPTA EL QR QUE EL COMERCIO YA TIENE PEGADO EN EL MOSTRADOR.
+     *
+     * Antes se creaba siempre un punto de cobro nuevo, lo que obligaba al
+     * comercio a imprimir otro cartel y, en cuentas que no están autorizadas a
+     * crearlos por API, directamente fallaba. Si en la sucursal ya hay uno
+     * libre —no usado por otra caja de StockFlow— se usa ese. Los QR hechos
+     * desde la app de Mercado Pago vienen sin «identificación externa», que es
+     * a donde se manda el importe de cada venta: se la completamos.
+     */
+    const yaUsados = new Set(
+      this.ctx.db.select().from(mpPosDevices).all().map((d) => String(d.mpPosId)),
+    );
+    let pos: Awaited<ReturnType<typeof client.createPos>> | undefined;
+    let externalUsado = externalPosId;
     try {
-      pos = await client.createPos({
-        name: `StockFlow ${externalPosId}`,
-        external_id: externalPosId,
-        store_id: cfg.storeId,
-        category: 5411,
-      });
+      const libres = (await client.searchPos(cfg.storeId)).filter((p) => !yaUsados.has(String(p.id)));
+      const candidato = libres[0];
+      if (candidato) {
+        externalUsado = String(candidato.external_id ?? '') || externalPosId;
+        if (!candidato.external_id) {
+          const actualizado = await client.updatePos(candidato.id, { external_id: externalPosId });
+          pos = { ...candidato, ...actualizado, external_id: externalPosId };
+          externalUsado = externalPosId;
+        } else {
+          pos = candidato;
+        }
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new BusinessRuleError('mp_pos_create_failed', `No se pudo crear el POS en MercadoPago: ${msg}`);
+      console.warn('[mpQr] no se pudo adoptar un punto de cobro existente:', err);
+    }
+
+    if (!pos) {
+      try {
+        pos = await client.createPos({
+          name: `StockFlow ${externalPosId}`,
+          external_id: externalPosId,
+          store_id: cfg.storeId,
+          category: 5411,
+        });
+        externalUsado = externalPosId;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new BusinessRuleError(
+          'mp_pos_create_failed',
+          `No se pudo crear el punto de cobro en MercadoPago: ${msg}. ` +
+            'Cree el QR desde la app de Mercado Pago y vuelva a intentar: el sistema usa el que ya exista.',
+        );
+      }
     }
 
     let qrUrl = '';
-    try {
-      const qr = await client.getQr(cfg.mpUserId, externalPosId);
-      qrUrl = String(qr.qr_template_url ?? qr.qr_template_image ?? '');
-    } catch (err) {
-      console.warn('[mpQr] getQr falló:', err);
+    // Un punto de cobro que ya existía suele traer su propio QR: se usa ese, que
+    // es el cartel que el comercio ya tiene pegado en el mostrador.
+    const qrDelPos = (pos as { qr?: { template_image?: string; image?: string } }).qr;
+    if (qrDelPos) qrUrl = String(qrDelPos.template_image ?? qrDelPos.image ?? '');
+    if (!qrUrl) {
+      try {
+        const qr = await client.getQr(cfg.mpUserId, externalUsado);
+        qrUrl = String(qr.qr_template_url ?? qr.qr_template_image ?? '');
+      } catch (err) {
+        console.warn('[mpQr] getQr falló:', err);
+      }
     }
 
     let qrImageBase64: string | null = null;
@@ -265,7 +334,9 @@ export class MpQrService {
       .values({
         id,
         cashRegisterId: input.cashRegisterId,
-        externalPosId,
+        // La identificación REALMENTE usada: si se adoptó un punto de cobro que
+        // ya tenía la suya, es esa; guardar otra dejaría los cobros sin destino.
+        externalPosId: externalUsado,
         mpPosId: String(pos.id),
         qrUrl,
         qrImageBase64,

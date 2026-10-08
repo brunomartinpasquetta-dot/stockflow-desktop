@@ -152,6 +152,30 @@ export class MpApiClient {
     return this.request<MpUserMe>({ method: 'GET', path: '/users/me' });
   }
 
+  /**
+   * Sucursales que el comercio YA tiene en su cuenta. La mayoría de los
+   * comercios arman su QR desde la app de Mercado Pago antes de tener
+   * StockFlow, y muchas cuentas no están autorizadas a crear sucursales por
+   * API ("at least one policy returned unauthorized"): hay que usar la que ya
+   * está en vez de intentar crear otra.
+   */
+  async searchStores(userId: string): Promise<MpStore[]> {
+    const r = await this.request<{ results?: MpStore[] }>({
+      method: 'GET',
+      path: `/users/${userId}/stores/search`,
+    });
+    return r.results ?? [];
+  }
+
+  /** Puntos de cobro ya existentes (opcionalmente los de una sucursal). */
+  async searchPos(storeId?: string): Promise<MpPos[]> {
+    const r = await this.request<{ results?: MpPos[] }>({
+      method: 'GET',
+      path: `/pos?limit=100${storeId ? `&store_id=${encodeURIComponent(storeId)}` : ''}`,
+    });
+    return r.results ?? [];
+  }
+
   createStore(userId: string, store: { name: string; business_hours?: unknown; location?: unknown }): Promise<MpStore> {
     return this.request<MpStore>({
       method: 'POST',
@@ -166,6 +190,16 @@ export class MpApiClient {
       path: `/pos`,
       body: { category: 5411, ...pos },
     });
+  }
+
+  /**
+   * Completa la «identificación externa» de un punto de cobro que el comercio
+   * ya tenía. Hace falta porque el cobro con importe se manda a esa
+   * identificación, y los QR creados desde la app de Mercado Pago vienen sin
+   * ella.
+   */
+  updatePos(posId: string | number, cambios: { external_id?: string; name?: string }): Promise<MpPos> {
+    return this.request<MpPos>({ method: 'PUT', path: `/pos/${posId}`, body: cambios });
   }
 
   getQr(userId: string, externalPosId: string): Promise<MpQrInfo> {
