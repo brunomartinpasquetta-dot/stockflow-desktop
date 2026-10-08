@@ -177,39 +177,28 @@ export const LAN_SERVER_DENIED_CHANNELS = new Set([
 export const LAN_SERVER_DENIED_GROUPS = new Set(['maintenance']);
 
 /**
- * Lo que NO se hace desde INTERNET, aunque sí se pueda desde la red local.
+ * ACCESO REMOTO: hace lo MISMO que una terminal del local.
  *
- * Criterio: desde afuera el dueño mira, vende y cobra; lo que toca la
- * configuración del comercio, su facturación ante ARCA o sus datos en bloque
- * se hace sentado en el local. Es lo que limita el daño si alguien consigue
- * una contraseña: no puede emitir facturas a nombre del comercio, cambiar la
- * ficha fiscal, exportar el padrón de clientes ni reiniciar la operativa.
+ * Antes había una lista extra de cosas prohibidas desde internet (borrar
+ * artículos o clientes, emitir facturas, cambiar la ficha del comercio,
+ * actualizar precios en bloque…). La idea era limitar el daño si alguien
+ * conseguía una contraseña, pero en la práctica el dueño entra desde afuera
+ * justamente para trabajar: se encontraba con botones muertos y sin
+ * explicación, y tenía que ir hasta el local para una tarea de dos minutos
+ * (pedido de Bruno, 7-oct-2026: "que la conexión remota permita hacer todo lo
+ * que hacés desde la PC del negocio").
+ *
+ * Qué protege ahora, que es lo mismo que protege al local:
+ *  - El usuario y su contraseña, y lo que su ROL le permite: un vendedor sigue
+ *    sin poder borrar un artículo, entre desde donde entre.
+ *  - Antes de publicar el acceso, el sistema exige que no haya contraseñas
+ *    fáciles (`lan:remotoClavesDebiles`).
+ *  - Lo que necesita estar sentado en la PC del servidor —instalar el lector de
+ *    facturas o la IA, restaurar un respaldo, manejar usuarios— sigue sin
+ *    hacerse desde afuera, igual que desde una terminal (`LAN_SERVER_DENIED_*`).
  */
-export const REMOTO_DENIED_GROUPS = new Set(['fiscal', 'import', 'maintenance', 'demo', 'mpQr']);
-export const REMOTO_DENIED_CHANNELS = new Set([
-  'company:upsert',
-  'priceUpdate:apply',
-  'priceUpdate:rollback',
-  'sales:voidRange',
-  'catalogo:syncConfigurar',
-  'catalogo:vincularLote',
-  // Crea y vincula en bloque TODO el padrón en el catálogo: se hace en el local.
-  'catalogo:aplicarCargaTotal',
-  'paymentMethods:delete',
-  'customers:delete',
-  'suppliers:delete',
-  'articles:delete',
-  // Toca la utilidad de TODO el padrón de una vez: se hace sentado en el local.
-  'articles:recalcularMargenes',
-  // IA de Flowy: instalar/descargar/configurar se hace en el local.
-  'assistant:iaConfigurar',
-  'assistant:iaDescargar',
-  'assistant:iaInstalarOllama',
-  'assistant:iaProbar',
-  // Facturas por teléfono: activar y descargar el lector se hace en el local.
-  'facturas:configurar',
-  'facturas:descargarLector',
-]);
+export const REMOTO_DENIED_GROUPS = new Set<string>([]);
+export const REMOTO_DENIED_CHANNELS = new Set<string>([]);
 
 /** ¿El servidor atiende este canal cuando la visita entra por el acceso remoto? */
 export function remotoAccepts(channel: string): boolean {

@@ -400,27 +400,42 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   /* ------------------------------------------------------------------ */
-  console.log('\n[ACCESO REMOTO] la puerta del túnel tiene menos permisos que la red local');
+  console.log('\n[ACCESO REMOTO] desde afuera se hace lo mismo que desde una terminal del local');
   {
-    const { remotoAccepts } = await import('../preload-bridge');
-    check('desde afuera NO se emite factura', remotoAccepts('fiscal:issueInvoice') === false);
-    check(
-      'desde afuera NO se importa ni se reinicia la operativa',
-      remotoAccepts('import:execute') === false && remotoAccepts('maintenance:resetOperationalData') === false,
-    );
-    check('desde afuera NO se cambia la ficha del comercio', remotoAccepts('company:upsert') === false);
-    check(
-      'desde afuera NO se borran clientes ni artículos',
-      remotoAccepts('customers:delete') === false && remotoAccepts('articles:delete') === false,
-    );
+    const { remotoAccepts, lanServerAccepts } = await import('../preload-bridge');
+    // Pedido de Bruno (7-oct-2026): entrar desde afuera y encontrarse botones
+    // muertos obligaba a ir hasta el local por una tarea de dos minutos. Lo que
+    // protege es el usuario, su contraseña y su ROL — igual que en el mostrador.
     check(
       'desde afuera SÍ se vende y se cobra',
       remotoAccepts('sales:create') && remotoAccepts('cash:addMovement') && remotoAccepts('accounts:receivePayment'),
     );
     check('desde afuera SÍ se consulta', remotoAccepts('articles:list') && remotoAccepts('sales:get'));
     check(
-      'lo prohibido por red sigue prohibido por el túnel',
-      remotoAccepts('backup:restore') === false && remotoAccepts('users:create') === false,
+      'desde afuera SÍ se compra y se paga al proveedor',
+      remotoAccepts('purchases:create') && remotoAccepts('supplierAccounts:registerPayment'),
+    );
+    check(
+      'desde afuera SÍ se borra un artículo o un cliente (lo decide el rol, no la puerta)',
+      remotoAccepts('articles:delete') && remotoAccepts('customers:delete'),
+    );
+    check('desde afuera SÍ se emite factura', remotoAccepts('fiscal:issueInvoice'));
+    check('desde afuera SÍ se cambia la ficha del comercio', remotoAccepts('company:upsert'));
+    check('desde afuera SÍ se actualizan precios', remotoAccepts('priceUpdate:apply'));
+    // Lo que necesita estar sentado en la PC del servidor sigue afuera, igual
+    // que para una terminal: no es una restricción del túnel.
+    check(
+      'lo que se hace sentado en el servidor sigue sin hacerse desde afuera',
+      remotoAccepts('backup:restore') === false &&
+        remotoAccepts('users:create') === false &&
+        remotoAccepts('maintenance:resetOperationalData') === false &&
+        remotoAccepts('assistant:iaInstalarOllama') === false,
+    );
+    check(
+      'el túnel ya no recorta nada por su cuenta: lo que pasa por la red local pasa por el túnel',
+      ['sales:create', 'articles:delete', 'fiscal:issueInvoice', 'company:upsert', 'purchases:create',
+       'backup:restore', 'users:create', 'maintenance:resetOperationalData']
+        .every((c) => remotoAccepts(c) === lanServerAccepts(c)),
     );
   }
 
