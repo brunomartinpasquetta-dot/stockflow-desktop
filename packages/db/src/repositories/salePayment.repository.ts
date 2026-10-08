@@ -1,9 +1,10 @@
 import { and, eq, gte, lte } from 'drizzle-orm';
-import { sumDecimals } from '@stockflow/shared';
+import { cmpDecimal, subDecimal, sumDecimals } from '@stockflow/shared';
 
 import { ConstraintError, rethrowDbError } from '../errors';
 import type { LocalDatabase } from '../local/client';
 import {
+  paymentMethods,
   sales,
   salePayments,
   type NewSalePayment,
@@ -117,6 +118,47 @@ export class SalePaymentRepository extends BaseRepository<
       }
       const total = sumDecimals(rows.map((r) => r.commissionAmount));
       return { total, byMethod };
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * VENTAS de una caja repartidas por cómo se cobraron (pedido de Bruno,
+   * 7-oct-2026: la caja diaria tiene que mostrar las ventas en efectivo, las
+   * cobradas con un medio electrónico y las que quedaron en cuenta corriente).
+   *
+   * No es lo mismo que los INGRESOS de la caja: acá entran sólo las ventas
+   * completadas de este turno —ni cobranzas de fiado, ni ingresos a mano, ni
+   * ventas anuladas—, y la venta fiada SÍ cuenta aunque no mueva plata.
+   */
+  async getSalesSplitByRegister(
+    cashRegisterId: string,
+  ): Promise<{ efectivo: string; electronico: string; cuentaCorriente: string }> {
+    try {
+      const rows = this.db
+        .select({
+          amount: salePayments.amount,
+          isPhysicalCash: paymentMethods.isPhysicalCash,
+        })
+        .from(salePayments)
+        .innerJoin(sales, eq(salePayments.saleId, sales.id))
+        .leftJoin(paymentMethods, eq(salePayments.paymentMethodId, paymentMethods.id))
+        .where(and(eq(sales.cashRegisterId, cashRegisterId), eq(sales.status, 'completed')))
+        .all();
+      // Un medio borrado deja de tener ficha: se cuenta como electrónico para no
+      // inflar el efectivo, que es lo que se arquea contra el cajón.
+      const efectivo = sumDecimals(rows.filter((r) => r.isPhysicalCash === true).map((r) => r.amount));
+      const electronico = sumDecimals(rows.filter((r) => r.isPhysicalCash !== true).map((r) => r.amount));
+      // Lo fiado es el resto de la venta: lo que no se cobró con ningún medio.
+      const vendido = this.db
+        .select({ total: sales.total })
+        .from(sales)
+        .where(and(eq(sales.cashRegisterId, cashRegisterId), eq(sales.status, 'completed')))
+        .all();
+      const cobrado = sumDecimals([efectivo, electronico]);
+      const fiado = subDecimal(sumDecimals(vendido.map((v) => v.total)), cobrado, 4);
+      return { efectivo, electronico, cuentaCorriente: cmpDecimal(fiado, '0') > 0 ? fiado : '0.0000' };
     } catch (err) {
       return rethrowDbError(err);
     }

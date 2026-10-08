@@ -551,6 +551,7 @@ export function createApiBridge(
       facturasEmitidasPagina: (p) => c<never>('sales:facturasEmitidasPagina', p),
       facturasEmitidasTotales: (p) => c<never>('sales:facturasEmitidasTotales', p),
       itemsParaDevolucion: (p) => c<never>('sales:itemsParaDevolucion', p),
+      articulosVendidosPorCaja: (p) => c<never>('sales:articulosVendidosPorCaja', p),
       getNextNumber: (p) => c<never>('sales:getNextNumber', p),
     },
     purchases: {

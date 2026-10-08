@@ -242,9 +242,16 @@ export class MpQrService {
     const existing = await this.getPosDeviceByCashRegister(input.cashRegisterId);
     if (existing) return existing;
 
-    const externalPosId = `CAJA-${input.cashRegisterId.slice(0, 8)}-${Math.random()
+    /**
+     * SÓLO LETRAS Y NÚMEROS: Mercado Pago rechaza la identificación con
+     * guiones («external_id must be alphanumeric»). Se armaba como
+     * `CAJA-xxxxxxxx-XXXX`, así que la creación del punto de cobro FALLABA
+     * SIEMPRE y el comercio se quedaba sin QR (Denver, 8-oct-2026).
+     */
+    const externalPosId = `CAJA${input.cashRegisterId.replace(/[^A-Za-z0-9]/g, '').slice(0, 8)}${Math.random()
       .toString(36)
-      .slice(2, 6)
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 4)
       .toUpperCase()}`;
 
     const client = await this.client();
@@ -265,17 +272,18 @@ export class MpQrService {
     let pos: Awaited<ReturnType<typeof client.createPos>> | undefined;
     let externalUsado = externalPosId;
     try {
-      const libres = (await client.searchPos(cfg.storeId)).filter((p) => !yaUsados.has(String(p.id)));
+      // Sólo sirve un punto de cobro que YA tenga identificación externa: es a
+      // donde se manda el importe de cada venta. Los QR hechos desde la app de
+      // Mercado Pago no la tienen y no se les puede poner (Denver, 8-oct-2026);
+      // para esos se crea uno propio en la misma sucursal, y el comercio usa el
+      // cartel nuevo.
+      const libres = (await client.searchPos(cfg.storeId)).filter(
+        (p) => !yaUsados.has(String(p.id)) && String(p.external_id ?? '').trim() !== '',
+      );
       const candidato = libres[0];
       if (candidato) {
-        externalUsado = String(candidato.external_id ?? '') || externalPosId;
-        if (!candidato.external_id) {
-          const actualizado = await client.updatePos(candidato.id, { external_id: externalPosId });
-          pos = { ...candidato, ...actualizado, external_id: externalPosId };
-          externalUsado = externalPosId;
-        } else {
-          pos = candidato;
-        }
+        pos = candidato;
+        externalUsado = String(candidato.external_id);
       }
     } catch (err) {
       console.warn('[mpQr] no se pudo adoptar un punto de cobro existente:', err);
@@ -283,11 +291,13 @@ export class MpQrService {
 
     if (!pos) {
       try {
+        // SIN rubro: con `category: 5411` algunas cuentas contestan
+        // «pos_unknown_mcc» y no dejan crear el punto de cobro. Mercado Pago
+        // toma el del comercio cuando no se manda.
         pos = await client.createPos({
           name: `StockFlow ${externalPosId}`,
           external_id: externalPosId,
           store_id: cfg.storeId,
-          category: 5411,
         });
         externalUsado = externalPosId;
       } catch (err) {

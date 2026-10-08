@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useWindowNav } from '@/lib/useWindowNav'
 import { toast } from 'sonner'
 import { Loader2, Printer, History } from 'lucide-react'
@@ -12,9 +13,10 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { api } from '@/lib/api'
+import type { ArticuloVendidoEnCajaDTO } from '@/types/api'
 import { usePrintHistoricalCashReport, usePrintCashClose } from '@/lib/usePrint'
 import { etiquetaMedioPago } from '@/lib/etiquetaMedioPago'
-import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, formatQty, parseCurrencyInput } from '@/lib/format'
 import { dayEnd, dayStart, isoDaysAgo, todayIso } from '@/lib/periodPresets'
 import { cn } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/currency-input'
@@ -582,6 +584,8 @@ export function HistorialCajas() {
   const [turnoFiltro, setTurnoFiltro] = useState<Turno | ''>('')
   const [detailId, setDetailId] = useState<string | null>(null)
   const [depositRegId, setDepositRegId] = useState<string | null>(null)
+  /** Caja cuya mercadería vendida se está mirando (pedido de Bruno, 8-oct-2026). */
+  const [mercaderiaReg, setMercaderiaReg] = useState<{ id: string; numero: number; fecha: number } | null>(null)
   const canWrite = useCanWrite()
   const [appliedRange, setAppliedRange] = useState({
     from: dayStart(isoDaysAgo(30)),
@@ -702,13 +706,14 @@ export function HistorialCajas() {
                   <TableHead className="text-right">Diferencia</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Caja General</TableHead>
+                  <TableHead>Mercadería</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {listQuery.isLoading ? (
-                  <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Cargando…</TableCell></TableRow>
                 ) : list.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} className="py-10 text-center text-muted-foreground">No hay cajas en el rango seleccionado.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={12} className="py-10 text-center text-muted-foreground">No hay cajas en el rango seleccionado.</TableCell></TableRow>
                 ) : (
                   list.map((r) => (
                     <TableRow
@@ -727,6 +732,17 @@ export function HistorialCajas() {
                       <TableCell className="text-right tabular-nums">{r.closingAmount ? formatCurrency(r.closingAmount) : '—'}</TableCell>
                       <TableCell className="text-right tabular-nums">{r.difference ? formatCurrency(r.difference) : '—'}</TableCell>
                       <TableCell><StatusBadge r={r} /></TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 whitespace-nowrap text-xs"
+                          title="Ver qué artículos se vendieron en esta caja"
+                          onClick={() => setMercaderiaReg({ id: r.id, numero: r.number, fecha: r.openDate })}
+                        >
+                          Ver mercadería vendida
+                        </Button>
+                      </TableCell>
                       <TableCell>
                         {r.status !== 'closed' ? (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -798,6 +814,12 @@ export function HistorialCajas() {
         ) : null
       })()}
 
+      {mercaderiaReg && (
+        <MercaderiaVendidaDialog
+          caja={mercaderiaReg}
+          onClose={() => setMercaderiaReg(null)}
+        />
+      )}
       {detailId && (
         <HistoricalCashReportDialog
           cashRegisterId={detailId}
@@ -806,5 +828,97 @@ export function HistorialCajas() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * QUÉ MERCADERÍA SE VENDIÓ EN UNA CAJA.
+ *
+ * Pedido de Bruno (8-oct-2026): "los clientes quieren saber la mercadería que
+ * se vende en una caja" — cuántas gaseosas, cuántos cigarrillos, cuántas
+ * cervezas salieron en ese turno. Lo que más salió va primero, que es como lo
+ * mira el comercio. Las devoluciones ya están descontadas.
+ */
+function MercaderiaVendidaDialog({
+  caja,
+  onClose,
+}: {
+  caja: { id: string; numero: number; fecha: number }
+  onClose: () => void
+}) {
+  const q = useQuery({
+    queryKey: ['cash', 'mercaderia', caja.id],
+    queryFn: () => api.sales.articulosVendidosPorCaja(caja.id),
+  })
+  const [busca, setBusca] = useState('')
+  const filas = useMemo<ArticuloVendidoEnCajaDTO[]>(() => {
+    const t = busca.trim().toLowerCase()
+    const todas: ArticuloVendidoEnCajaDTO[] = q.data ?? []
+    if (!t) return todas
+    return todas.filter(
+      (a) => a.description.toLowerCase().includes(t) || (a.code ?? '').toLowerCase().includes(t),
+    )
+  }, [q.data, busca])
+  const unidades = filas.reduce((acc, a) => acc + Number(a.cantidad), 0)
+  const importe = filas.reduce((acc, a) => acc + Number(a.total), 0)
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>
+            Mercadería vendida — Caja #{caja.numero} · {formatDateTime(caja.fecha)}
+          </DialogTitle>
+        </DialogHeader>
+        {q.isLoading ? (
+          <div className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : (q.data ?? []).length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            En esta caja no se vendió ningún artículo.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Input
+              autoFocus
+              placeholder="Buscar un artículo…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+            <div className="max-h-[55vh] overflow-auto rounded-md border">
+              <Table>
+                <TableHeader className="sticky top-0 bg-muted">
+                  <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead className="text-right">Cantidad</TableHead>
+                    <TableHead className="text-right">Importe</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filas.map((a) => (
+                    <TableRow key={(a.articleId ?? '') + a.description}>
+                      <TableCell>
+                        <div>{a.description}</div>
+                        {a.code && <div className="text-[11px] text-muted-foreground">{a.code}</div>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">{formatQty(a.cantidad)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(a.total)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-between px-1 text-sm">
+              <span className="text-muted-foreground">
+                {filas.length} artículo(s) · {formatQty(String(unidades))} unidades
+              </span>
+              <span className="font-semibold tabular-nums">{formatCurrency(importe.toFixed(2))}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Las devoluciones ya están descontadas. No se cuentan las ventas anuladas.
+            </p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

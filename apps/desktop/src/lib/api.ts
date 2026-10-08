@@ -8,6 +8,7 @@ import type {
   FacturasEmitidasPaginaDTO,
   FacturasEmitidasTotalesDTO,
   ItemParaDevolucionDTO,
+  ArticuloVendidoEnCajaDTO,
   FiltroFacturasEmitidasDTO,
   AssistantAskResultDTO,
   AssistantMessageDTO,
@@ -351,6 +352,8 @@ export const api = {
       texto?: string
       limite?: number
     }): Promise<ItemParaDevolucionDTO[]> => unwrap(sf().sales.itemsParaDevolucion(f)),
+    articulosVendidosPorCaja: (cashRegisterId: string): Promise<ArticuloVendidoEnCajaDTO[]> =>
+      unwrap(sf().sales.articulosVendidosPorCaja({ cashRegisterId })),
   },
   fiscal: {
     getConfig: (): Promise<FiscalConfigDTO | null> => unwrap(sf().fiscal.getConfig()),

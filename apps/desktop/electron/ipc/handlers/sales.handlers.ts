@@ -8,6 +8,7 @@ import type {
   FacturasEmitidasPaginaDTO,
   FacturasEmitidasTotalesDTO,
   FiltroFacturasEmitidasDTO,
+  ArticuloVendidoEnCajaDTO,
   FiscalVoucherDTO,
   ItemParaDevolucionDTO,
   SaleDTO,
@@ -86,6 +87,21 @@ export function buildSalesHandlers(deps: HandlerDeps): HandlerMap {
           hasPermission(rol, 'create_sale') || hasPermission(rol, 'void_sale') || hasPermission(rol, 'view_reports');
         if (!puede) requirePermission(ctx.currentUser, 'view_reports');
         return (await ctx.repos.sales.itemsParaDevolucion(payload)) as ItemParaDevolucionDTO[];
+      },
+    ),
+    /**
+     * QUÉ MERCADERÍA SE VENDIÓ EN UNA CAJA (pedido de Bruno, 8-oct-2026: el
+     * comercio quiere saber cuántas gaseosas, cuántos cigarrillos y cuántas
+     * cervezas salieron en ese turno). Mismo permiso que el Historial de cajas.
+     */
+    'sales:articulosVendidosPorCaja': withSession(
+      deps,
+      async (payload: { cashRegisterId: string }, ctx): Promise<ArticuloVendidoEnCajaDTO[]> => {
+        const rol = ctx.currentUser.role;
+        const puede =
+          hasPermission(rol, 'create_sale') || hasPermission(rol, 'void_sale') || hasPermission(rol, 'view_reports');
+        if (!puede) requirePermission(ctx.currentUser, 'view_reports');
+        return (await ctx.repos.sales.articulosVendidosPorCaja(payload.cashRegisterId)) as ArticuloVendidoEnCajaDTO[];
       },
     ),
     'sales:facturasEmitidasTotales': withSession(

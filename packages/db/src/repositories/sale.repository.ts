@@ -67,6 +67,15 @@ function condicionesFacturasEmitidas(f: FiltroFacturasEmitidas): SQL[] {
   return conds;
 }
 
+/** Un artículo vendido en una caja, con lo que salió y lo que entró por él. */
+export interface ArticuloVendidoEnCaja {
+  articleId: string | null;
+  description: string;
+  code: string | null;
+  cantidad: string;
+  total: string;
+}
+
 /** Un renglón vendido que todavía se puede devolver (selector de Devolución). */
 export interface ItemParaDevolucion {
   lineId: string;
@@ -967,6 +976,64 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
         if (out.length >= limite) break;
       }
       return out;
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * QUÉ MERCADERÍA SE VENDIÓ EN UNA CAJA (pedido de Bruno, 8-oct-2026: "los
+   * clientes quieren saber la mercadería que se vende en una caja" — tantas
+   * gaseosas, tantos cigarrillos, tantas cervezas).
+   *
+   * Cuenta sólo las ventas COMPLETADAS de ese turno y descuenta lo que se
+   * devolvió, así el número es el que de verdad salió del depósito. Los
+   * artículos rápidos (fuera del padrón) se agrupan por lo que se escribió.
+   */
+  async articulosVendidosPorCaja(cashRegisterId: string): Promise<ArticuloVendidoEnCaja[]> {
+    try {
+      const filas = this.db
+        .select({
+          articleId: saleLines.articleId,
+          lineDescription: saleLines.description,
+          articleDescription: articles.description,
+          code: articles.barcode,
+          quantity: saleLines.quantity,
+          lineTotal: saleLines.lineTotal,
+          devuelto: sql<number>`COALESCE((SELECT SUM(CAST(rl.quantity AS REAL)) FROM return_lines rl WHERE rl.sale_line_id = ${saleLines.id}), 0)`,
+          devueltoImporte: sql<number>`COALESCE((SELECT SUM(CAST(rl.line_total AS REAL)) FROM return_lines rl WHERE rl.sale_line_id = ${saleLines.id}), 0)`,
+        })
+        .from(saleLines)
+        .innerJoin(sales, eq(saleLines.saleId, sales.id))
+        .leftJoin(articles, eq(saleLines.articleId, articles.id))
+        .where(and(eq(sales.cashRegisterId, cashRegisterId), eq(sales.status, 'completed')))
+        .all();
+
+      const porArticulo = new Map<string, ArticuloVendidoEnCaja>();
+      for (const f of filas) {
+        const nombre = f.articleDescription ?? f.lineDescription ?? 'Artículo';
+        const clave = f.articleId ?? `rapido:${nombre}`;
+        const cantidad = Number(f.quantity) - Number(f.devuelto);
+        const importe = Number(f.lineTotal) - Number(f.devueltoImporte);
+        if (cantidad <= 1e-9 && importe <= 1e-9) continue;
+        const previo = porArticulo.get(clave);
+        if (previo) {
+          previo.cantidad = String(Number(previo.cantidad) + cantidad);
+          previo.total = String(Number(previo.total) + importe);
+        } else {
+          porArticulo.set(clave, {
+            articleId: f.articleId,
+            description: nombre,
+            code: f.code ?? null,
+            cantidad: String(cantidad),
+            total: String(importe),
+          });
+        }
+      }
+      // Lo que más salió, primero: es como lo mira el comercio.
+      return [...porArticulo.values()]
+        .map((a) => ({ ...a, cantidad: String(Math.round(Number(a.cantidad) * 1000) / 1000), total: Number(a.total).toFixed(4) }))
+        .sort((a, b) => Number(b.cantidad) - Number(a.cantidad) || Number(b.total) - Number(a.total));
     } catch (err) {
       return rethrowDbError(err);
     }
