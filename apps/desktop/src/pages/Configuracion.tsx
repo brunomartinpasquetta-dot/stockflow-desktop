@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { printNode, widthFromPaperFormat } from '@/lib/printService'
+import { motivoDireccionInservible } from '@/lib/direccionDeRed'
 import { guardarImprimirTicketLocal, imprimirTicketActivado, leerImprimirTicketLocal } from '@/lib/imprimirTicket'
 import type {
   BackupConfigDTO,
@@ -1228,15 +1229,21 @@ function LanSection() {
                 </div>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              IP local: <span className="font-mono">{ipQuery.data?.ip ?? '—'}</span>
-              {ipQuery.data?.ip && (
-                <>
-                  {' '}
-                  · URL para clientes: <span className="font-mono">http://{ipQuery.data.ip}:{serverPort}</span>
-                </>
+            {/* Decía «IP local · URL para clientes» y se confundía con la IP de
+                las terminales de la lista de abajo: un comercio escribió esa
+                otra y nunca conectó (8-oct-2026). Ahora dice QUÉ hay que hacer
+                con la dirección, y avisa cuando no sirve. */}
+            <div className="flex flex-col gap-1 text-xs">
+              <p className="text-muted-foreground">
+                Dirección de ESTA PC, la que hay que escribir en las otras:{' '}
+                <span className="select-all font-mono text-foreground">
+                  http://{ipQuery.data?.ip ?? '—'}:{serverPort}
+                </span>
+              </p>
+              {motivoDireccionInservible(ipQuery.data?.ip) && (
+                <p className="text-destructive">{motivoDireccionInservible(ipQuery.data?.ip)}</p>
               )}
-            </p>
+            </div>
           </div>
         )}
 
@@ -1247,7 +1254,9 @@ function LanSection() {
           <div className="flex flex-col gap-2 rounded-md border p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium">Terminales conectadas</span>
-              <span className="text-xs text-muted-foreground">se actualiza solo</span>
+              <span className="text-xs text-muted-foreground">
+                son las OTRAS PC · se actualiza solo
+              </span>
             </div>
             {(terminales.data ?? []).length === 0 ? (
               <p className="text-xs text-muted-foreground">
