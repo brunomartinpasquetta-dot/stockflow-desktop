@@ -5,10 +5,20 @@ import { Loader2, QrCode, CheckCircle2, AlertCircle } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
 import { useLicense } from '@/contexts/LicenseContext'
+import { usePrintQrCartel } from '@/lib/usePrint'
+import type { MpPosDeviceDTO } from '@/types/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 /**
  * Pantalla de configuración de MercadoPago QR Atendido.
@@ -22,6 +32,8 @@ export function ConfiguracionMercadoPago() {
 
   const [mpUserId, setMpUserId] = useState('')
   const [accessToken, setAccessToken] = useState('')
+  /** Caja cuyo QR se está mirando, para verlo grande e imprimirlo. */
+  const [verQr, setVerQr] = useState<{ pos: MpPosDeviceDTO; numero: number } | null>(null)
 
   const setupMutation = useMutation({
     mutationFn: () => api.mpQr.setupCompany({ mpUserId, accessToken }),
@@ -46,9 +58,11 @@ export function ConfiguracionMercadoPago() {
 
   const createPosMutation = useMutation({
     mutationFn: (cashRegisterId: string) => api.mpQr.createPosDevice(cashRegisterId),
-    onSuccess: () => {
+    onSuccess: (pos) => {
       toast.success('QR generado para la caja.')
       void qc.invalidateQueries({ queryKey: ['mpQr', 'pos'] })
+      // Se abre solo: recién generado, lo que hace falta es imprimirlo.
+      if (currentCashQuery.data) setVerQr({ pos, numero: currentCashQuery.data.number })
     },
     onError: (err) => {
       const msg = err instanceof ApiError ? err.message : 'Error'
@@ -188,7 +202,22 @@ export function ConfiguracionMercadoPago() {
                         )}
                       </td>
                       <td>
-                        {!posQuery.data?.find((p) => p.cashRegisterId === currentCashQuery.data?.id) && (
+                        {posQuery.data?.find((p) => p.cashRegisterId === currentCashQuery.data?.id) ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setVerQr({
+                                pos: posQuery.data.find(
+                                  (p) => p.cashRegisterId === currentCashQuery.data?.id,
+                                )!,
+                                numero: currentCashQuery.data!.number,
+                              })
+                            }
+                          >
+                            Ver e imprimir QR
+                          </Button>
+                        ) : (
                           <Button
                             size="sm"
                             onClick={() => createPosMutation.mutate(currentCashQuery.data!.id)}
@@ -212,6 +241,80 @@ export function ConfiguracionMercadoPago() {
           )}
         </CardContent>
       </Card>
+
+      <QrDialog datos={verQr} onClose={() => setVerQr(null)} />
     </div>
+  )
+}
+
+/**
+ * Muestra el QR de la caja en grande y lo imprime en A4 para pegarlo en el
+ * mostrador. El QR es siempre el mismo: se imprime una vez y queda.
+ */
+function QrDialog({
+  datos,
+  onClose,
+}: {
+  datos: { pos: MpPosDeviceDTO; numero: number } | null
+  onClose: () => void
+}) {
+  const imprimir = usePrintQrCartel()
+  const companyQuery = useQuery({
+    queryKey: ['company'],
+    queryFn: () => api.company.get(),
+    enabled: !!datos,
+  })
+
+  const pos = datos?.pos
+  const src = pos ? (pos.qrImageBase64 ? `data:image/png;base64,${pos.qrImageBase64}` : pos.qrUrl) : ''
+
+  return (
+    <Dialog open={!!datos} onOpenChange={(abierto) => !abierto && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>QR de cobro — Caja {datos?.numero}</DialogTitle>
+          <DialogDescription>
+            Este QR es siempre el mismo: imprímalo una vez y déjelo en el mostrador. El importe de
+            cada venta se envía desde el sistema.
+          </DialogDescription>
+        </DialogHeader>
+
+        {src ? (
+          <div className="flex flex-col items-center gap-2">
+            <img
+              src={src}
+              alt="Código QR de Mercado Pago"
+              className="h-64 w-64 rounded border bg-white p-2"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si no se ve el código, revise la conexión a internet.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Mercado Pago no devolvió la imagen del QR. Vuelva a generarlo.
+          </p>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cerrar
+          </Button>
+          <Button
+            disabled={!pos}
+            onClick={() =>
+              void imprimir({
+                company: companyQuery.data ?? null,
+                numeroDeCaja: datos?.numero,
+                qrImageBase64: pos?.qrImageBase64 ?? null,
+                qrUrl: pos?.qrUrl ?? '',
+              })
+            }
+          >
+            Imprimir cartel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -15,6 +15,7 @@ import { FormalDocA4, type FormalDocData } from '@/print/FormalDocA4'
 import { HistoricalCashReport, type HistoricalCashReportData } from '@/print/HistoricalCashReport'
 import { AccountingSummaryReport, type AccountingSummaryReportData } from '@/print/AccountingSummaryReport'
 import { VatBookReport, type VatBookReportData } from '@/print/VatBookReport'
+import { QrCartel, type QrCartelData } from '@/print/QrCartel'
 
 /**
  * Devuelve la config de impresora (ancho lógico + opciones de impresión
@@ -84,4 +85,9 @@ export function usePrintQuote() {
     (data: FormalDocData) => printNode(createElement(FormalDocA4, { data }), 'a4'),
     [],
   )
+}
+
+export function usePrintQrCartel() {
+  // Cartel del QR de Mercado Pago — siempre A4, va pegado en el mostrador.
+  return useCallback((data: QrCartelData) => printNode(createElement(QrCartel, { data }), 'a4'), [])
 }
