@@ -18,6 +18,8 @@ interface LanContextValue {
   online: boolean
   /** Estado de la licencia del SERVIDOR (sólo en modo cliente). */
   serverLicense?: string | null
+  /** true = se está entrando por el ACCESO REMOTO, no desde el local. */
+  esRemoto?: boolean
   lastPingAt: number | null
   lastError: string | null
 }
@@ -39,6 +41,7 @@ export function LanProvider({ children }: { children: ReactNode }) {
 
   const [online, setOnline] = useState<boolean>(true)
   const [serverLicense, setServerLicense] = useState<string | null>(null)
+  const [esRemoto, setEsRemoto] = useState(false)
   const [lastPingAt, setLastPingAt] = useState<number | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
 
@@ -52,6 +55,7 @@ export function LanProvider({ children }: { children: ReactNode }) {
       if (cancelled) return
       setOnline(r.ok)
       setServerLicense(r.ok ? (r.license ?? 'active') : null)
+      if (r.ok) setEsRemoto(r.remoto === true)
       setLastPingAt(Date.now())
       setLastError(r.ok ? null : 'Sin conexión con el servidor')
     }
@@ -69,10 +73,11 @@ export function LanProvider({ children }: { children: ReactNode }) {
       mode: cfg?.mode,
       online: isClient ? online : true,
       serverLicense,
+      esRemoto,
       lastPingAt,
       lastError,
     }),
-    [cfg, isClient, online, serverLicense, lastPingAt, lastError],
+    [cfg, isClient, online, serverLicense, esRemoto, lastPingAt, lastError],
   )
 
   return <LanContext.Provider value={value}>{children}</LanContext.Provider>

@@ -692,7 +692,11 @@ export const api = {
      * 7-oct-2026). Las llamadas normales ya usaban esta dirección
      * (`serverBaseUrl` en preload-bridge); faltaba acá.
      */
-    pingServer: async (ip: string, port: number, timeoutMs = 3000): Promise<{ ok: boolean; latencyMs?: number; license?: string }> => {
+    pingServer: async (
+      ip: string,
+      port: number,
+      timeoutMs = 3000,
+    ): Promise<{ ok: boolean; latencyMs?: number; license?: string; remoto?: boolean }> => {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), timeoutMs)
       const start = Date.now()
@@ -702,8 +706,8 @@ export const api = {
         if (!res.ok) return { ok: false }
         // El servidor informa su licencia: el puesto no tiene una propia y
         // trabaja amparado por ella (una licencia por comercio).
-        const body = (await res.json().catch(() => ({}))) as { license?: string }
-        return { ok: true, latencyMs: Date.now() - start, license: body.license }
+        const body = (await res.json().catch(() => ({}))) as { license?: string; remoto?: boolean }
+        return { ok: true, latencyMs: Date.now() - start, license: body.license, remoto: body.remoto === true }
       } catch {
         return { ok: false }
       } finally {

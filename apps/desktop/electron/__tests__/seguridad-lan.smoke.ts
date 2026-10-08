@@ -400,15 +400,23 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   /* ------------------------------------------------------------------ */
-  console.log('\n[ACCESO REMOTO] desde afuera se hace lo mismo que desde una terminal del local');
+  console.log('\n[ACCESO REMOTO] desde afuera se hace todo MENOS vender');
   {
     const { remotoAccepts, lanServerAccepts } = await import('../preload-bridge');
     // Pedido de Bruno (7-oct-2026): entrar desde afuera y encontrarse botones
     // muertos obligaba a ir hasta el local por una tarea de dos minutos. Lo que
     // protege es el usuario, su contraseña y su ROL — igual que en el mostrador.
+    // Lo ÚNICO que no se hace desde afuera: vender. No es seguridad, es
+    // licencias: si se pudiera cobrar desde una tablet, esa tablet sería una
+    // caja más sin terminal paga (Bruno, 7-oct-2026).
+    check('desde afuera NO se registra una venta', remotoAccepts('sales:create') === false);
     check(
-      'desde afuera SÍ se vende y se cobra',
-      remotoAccepts('sales:create') && remotoAccepts('cash:addMovement') && remotoAccepts('accounts:receivePayment'),
+      'desde afuera SÍ se mueve la caja y se cobra una cuenta corriente',
+      remotoAccepts('cash:addMovement') && remotoAccepts('accounts:receivePayment'),
+    );
+    check(
+      'desde afuera SÍ se devuelve y se anula (no es vender, y hace falta cuando el dueño no está)',
+      remotoAccepts('returns:createForSale') && remotoAccepts('sales:void'),
     );
     check('desde afuera SÍ se consulta', remotoAccepts('articles:list') && remotoAccepts('sales:get'));
     check(
@@ -432,10 +440,14 @@ async function main(): Promise<void> {
         remotoAccepts('assistant:iaInstalarOllama') === false,
     );
     check(
-      'el túnel ya no recorta nada por su cuenta: lo que pasa por la red local pasa por el túnel',
-      ['sales:create', 'articles:delete', 'fiscal:issueInvoice', 'company:upsert', 'purchases:create',
+      'salvo vender, el túnel no recorta nada: lo que pasa por la red local pasa por el túnel',
+      ['articles:delete', 'fiscal:issueInvoice', 'company:upsert', 'purchases:create', 'priceUpdate:apply',
        'backup:restore', 'users:create', 'maintenance:resetOperationalData']
         .every((c) => remotoAccepts(c) === lanServerAccepts(c)),
+    );
+    check(
+      'vender SÍ se puede desde una terminal del local',
+      lanServerAccepts('sales:create') === true,
     );
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X, Zap } from 'lucide-react'
+import { AlertTriangle, BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X, Zap } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -21,6 +21,7 @@ import { useAuth, usePermission } from '@/contexts/AuthContext'
 import { EXTRAS_PARAM, useWindowSelf } from '@/contexts/WindowManagerContext'
 import { useWindowNav } from '@/lib/useWindowNav'
 import { useCanWrite } from '@/contexts/LicenseContext'
+import { useLanContext } from '@/contexts/LanContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
@@ -1284,7 +1285,15 @@ function PDV() {
   }, [accountSale, mixedMode, split.payments, selectedMethod, commissionByPct, totalNum])
   const netToCash = totalNum - commissionTotal
 
+  // DESDE EL ACCESO REMOTO NO SE VENDE: el mostrador es el mostrador, y si se
+  // pudiera cobrar desde afuera una tablet pasaría a ser una caja más sin
+  // terminal paga. Todo lo demás (compras, cobranzas, precios, caja, consultas)
+  // sí se hace desde afuera. Se avisa con un cartel ARRIBA, no sólo apagando el
+  // botón: un botón muerto sin explicación es lo que más hace renegar.
+  const { esRemoto } = useLanContext()
+
   const canConfirm =
+    !esRemoto &&
     canWrite &&
     cart.length > 0 &&
     totalNum > 0 &&
@@ -1726,6 +1735,16 @@ function PDV() {
 
   return (
     <div ref={raizRef} className="flex h-full flex-col gap-2">
+      {esRemoto && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <span>
+            <b>Desde el acceso remoto no se registran ventas.</b> Las ventas se cobran en una terminal del
+            local. Desde acá sí puede consultar, cargar compras, cobrar cuentas corrientes, cambiar precios y
+            ver la caja.
+          </span>
+        </div>
+      )}
       {/* ── Zona superior: encabezado de la venta ── */}
       <div className="grid grid-cols-5 gap-3 rounded-lg border bg-card p-2">
         <div className="col-span-2 flex flex-col gap-1">

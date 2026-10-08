@@ -198,7 +198,19 @@ export const LAN_SERVER_DENIED_GROUPS = new Set(['maintenance']);
  *    hacerse desde afuera, igual que desde una terminal (`LAN_SERVER_DENIED_*`).
  */
 export const REMOTO_DENIED_GROUPS = new Set<string>([]);
-export const REMOTO_DENIED_CHANNELS = new Set<string>([]);
+/**
+ * LO ÚNICO QUE NO SE HACE DESDE AFUERA: VENDER (Bruno, 7-oct-2026).
+ *
+ * No es por seguridad sino por licencias: si desde el acceso remoto se pudiera
+ * cobrar, un comercio usaría una tablet o una PC de su casa como una caja más y
+ * no pagaría la terminal. Mostrador es mostrador. Todo lo DEMÁS —compras,
+ * cobranzas, cuentas corrientes, artículos, precios, caja, facturación,
+ * consultas— sí se hace desde afuera.
+ *
+ * Devoluciones, anulaciones y cobranzas de cuenta corriente NO son vender y
+ * quedan habilitadas: hacen falta justamente cuando el dueño no está.
+ */
+export const REMOTO_DENIED_CHANNELS = new Set<string>(['sales:create']);
 
 /** ¿El servidor atiende este canal cuando la visita entra por el acceso remoto? */
 export function remotoAccepts(channel: string): boolean {

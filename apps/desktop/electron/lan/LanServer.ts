@@ -578,6 +578,10 @@ export class LanServer {
         // preguntarle, y el comercio necesita saber con qué versión trabaja
         // para reportar un problema.
         version: this.opts.appVersion ?? null,
+        // Si la visita entró por el acceso remoto, la pantalla lo necesita
+        // saber para explicar por qué no se puede vender desde ahí (en vez de
+        // dejar el botón muerto sin motivo, que es lo que más confunde).
+        remoto: esTunel,
       });
       return;
     }
