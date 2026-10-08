@@ -14,6 +14,7 @@ export const SupplierSchema = z.object({
   ingBrutos: z.string().nullable(),
   phone: z.string().nullable(),
   mobile: z.string().nullable(),
+  active: z.boolean(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -32,6 +33,13 @@ const supplierBase = z.object({
   ingBrutos: z.string().nullish(),
   phone: z.string().nullish(),
   mobile: z.string().nullish(),
+  /**
+   * Dado de baja (migración 0041). TIENE que estar acá: zod descarta los
+   * campos que el esquema no declara, así que sin esto el «dar de baja» se
+   * quedaba sin campos que actualizar y el comercio veía «error interno»
+   * (Bruno, 8-oct-2026, queriendo borrar un proveedor con compras).
+   */
+  active: z.boolean().optional(),
 });
 
 export const CreateSupplierSchema = supplierBase;

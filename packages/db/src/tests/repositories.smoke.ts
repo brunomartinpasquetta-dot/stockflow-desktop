@@ -352,6 +352,16 @@ async function main(): Promise<void> {
     check('suppliers.findByCuit desconocido → null', (await repos.suppliers.findByCuit('30999999999')) === null);
     check('suppliers.findByCuit vacío → null (no trae proveedores sin CUIT)', (await repos.suppliers.findByCuit('')) === null && (await repos.suppliers.findByCuit('--')) === null);
 
+    /**
+     * Dar de baja en vez de borrar (8-oct-2026). El primer intento salió con
+     * «error interno»: el esquema de zod no declaraba `active`, así que lo
+     * descartaba y la actualización quedaba sin campos. Esta prueba mira el
+     * RESULTADO (quedó inactivo), que es lo que faltaba.
+     */
+    const provLibre = await repos.suppliers.create({ code: 'PF03', name: 'Proveedor sin compras' } as never);
+    check('un proveedor SIN movimientos se borra de verdad',
+      (await repos.suppliers.borrarODarDeBaja(provLibre.id)) === 'borrado' &&
+        (await repos.suppliers.findById(provLibre.id)) === null);
     // article_supplier_codes
     const codigos = repos.articleSupplierCodes;
     check('codigos.buscar sin vínculo → null', codigos.buscar(prov.id, '123456') === null);
@@ -360,6 +370,33 @@ async function main(): Promise<void> {
     check('codigos.buscar encuentra el vínculo', codigos.buscar(prov.id, '123456')?.articleId === artA.id);
     const v2 = codigos.guardar(prov.id, '123456', artB.id);
     check('codigos.guardar es upsert: mismo id, artículo nuevo', v2.id === v1.id && v2.articleId === artB.id && v2.createdAt === v1.createdAt);
+
+    // Una COMPRA es lo que de verdad ata al proveedor (el código de artículo
+    // se borra en cascada). Se inserta directo para no depender del servicio.
+    await repos.suppliers.create({ code: 'PF04', name: 'Cervecería de prueba' } as never);
+    const provConCompras = (await repos.suppliers.findByCode('PF04'))!;
+    db.$client
+      .prepare(
+        `INSERT INTO purchases (id, number, type, date, supplier_id, payment_type, subtotal,
+           discount, vat_amount, total, status, updated_prices_on_save, created_at, updated_at)
+         VALUES ('pur-baja-1', 9001, 'X', ?, ?, 'cash', '0.0000', '0.0000', '0.0000', '0.0000',
+                 'completed', 0, ?, ?)`,
+      )
+      .run(Date.now(), provConCompras.id, Date.now(), Date.now());
+    check('un proveedor CON compras queda dado de baja, no borrado',
+      (await repos.suppliers.borrarODarDeBaja(provConCompras.id)) === 'dado_de_baja');
+    const provBaja2 = await repos.suppliers.findById(provConCompras.id);
+    check('y realmente quedó inactivo (el bug: decía dado de baja y seguía activo)',
+      provBaja2 != null && provBaja2.active === false, `active=${String(provBaja2?.active)}`);
+    check('se puede reactivar', (await repos.suppliers.reactivar(provConCompras.id)).active === true);
+
+    // El vínculo por código de artículo NO alcanza para retenerlo (se borra en
+    // cascada). Se usa un proveedor aparte para no romper lo que sigue.
+    await repos.suppliers.create({ code: 'PF05', name: 'Sólo con código' } as never);
+    const provSoloCodigo = (await repos.suppliers.findByCode('PF05'))!;
+    codigos.guardar(provSoloCodigo.id, '999999', artA.id);
+    check('un proveedor sólo con código de artículo se borra',
+      (await repos.suppliers.borrarODarDeBaja(provSoloCodigo.id)) === 'borrado');
     codigos.guardar(prov2.id, '123456', artA.id);
     check('el mismo código en otro proveedor es otro vínculo', codigos.buscar(prov2.id, '123456')?.articleId === artA.id && codigos.buscar(prov.id, '123456')?.articleId === artB.id);
     codigos.guardar(prov.id, '000777', artA.id);
