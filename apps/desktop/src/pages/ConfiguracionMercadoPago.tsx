@@ -6,6 +6,7 @@ import { Loader2, QrCode, CheckCircle2, AlertCircle } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import { useLicense } from '@/contexts/LicenseContext'
 import { usePrintQrCartel } from '@/lib/usePrint'
+import { descargarImagen, nombreDeArchivo } from '@/lib/descargarArchivo'
 import type { MpPosDeviceDTO } from '@/types/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -259,6 +260,7 @@ function QrDialog({
   onClose: () => void
 }) {
   const imprimir = usePrintQrCartel()
+  const [descargando, setDescargando] = useState(false)
   const companyQuery = useQuery({
     queryKey: ['company'],
     queryFn: () => api.company.get(),
@@ -296,9 +298,33 @@ function QrDialog({
           </p>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="sm:justify-between">
           <Button variant="outline" onClick={onClose}>
             Cerrar
+          </Button>
+          <div className="flex gap-2">
+          <Button
+            variant="outline"
+            disabled={!pos || descargando}
+            onClick={() => {
+              if (!pos) return
+              setDescargando(true)
+              const comercio = nombreDeArchivo(companyQuery.data?.name ?? 'StockFlow')
+              void descargarImagen(`QR-${comercio}-caja-${datos?.numero ?? 0}.png`, {
+                base64: pos.qrImageBase64,
+                url: pos.qrUrl,
+              })
+                .then(() => toast.success('QR descargado.'))
+                .catch((err: unknown) =>
+                  toast.error(
+                    `No se pudo descargar: ${err instanceof Error ? err.message : 'error desconocido'}`,
+                  ),
+                )
+                .finally(() => setDescargando(false))
+            }}
+          >
+            {descargando && <Loader2 className="mr-2 animate-spin" size={14} />}
+            Descargar QR
           </Button>
           <Button
             disabled={!pos}
@@ -313,6 +339,7 @@ function QrDialog({
           >
             Imprimir cartel
           </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

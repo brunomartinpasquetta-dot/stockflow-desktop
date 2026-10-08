@@ -2,9 +2,10 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
-      "version": "1.14.10",
+      "version": "1.14.11",
       "novedades": [
-        "Mercado Pago: el QR de la caja ahora se puede ver y imprimir. En Configuración → Mercado Pago, al lado de la caja, el botón «Ver e imprimir QR» lo muestra en pantalla y «Imprimir cartel» saca una hoja A4 con el nombre del comercio y el código grande, para dejarlo en el mostrador. Recién generado el QR, la ventana se abre sola."
+        "Mercado Pago: el QR de la caja ahora se puede ver y imprimir. En Configuración → Mercado Pago, al lado de la caja, el botón «Ver e imprimir QR» lo muestra en pantalla y «Imprimir cartel» saca una hoja A4 con el nombre del comercio y el código grande, para dejarlo en el mostrador. Recién generado el QR, la ventana se abre sola.",
+        "Mercado Pago: el botón «Descargar QR» guarda la imagen del código en un archivo, para imprimirla desde otra computadora o mandarla a una imprenta."
       ],
       "internas": true
     },
