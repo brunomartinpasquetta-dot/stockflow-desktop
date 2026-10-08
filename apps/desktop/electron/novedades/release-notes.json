@@ -2,6 +2,15 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
+      "version": "1.14.14",
+      "novedades": [
+        "Ventas: cobrar con QR es un solo botón. Mientras el QR esté disponible, «MercadoPago QR» ya no aparece en la lista de formas de pago: se cobra apretando el botón celeste y nada más.",
+        "Mercado Pago: el sistema ya no usa un QR que esté en el modo en que el cliente escribe cuánto paga, porque con ese modo el cobro no funciona. Si la caja quedó enganchada a uno así, en Configuración → Mercado Pago está «Rehacer el QR de la caja», que crea uno que sí acepta el importe (atención: el código cambia y hay que imprimir el cartel de nuevo).",
+        "Mercado Pago: cuando un cobro falla, el aviso dice en una línea qué pasó y qué hacer, en vez del mensaje técnico de Mercado Pago."
+      ],
+      "internas": true
+    },
+    {
       "version": "1.14.13",
       "novedades": [
         "Mercado Pago: ya se cobra con QR. La caja se crea en modo atendido, que es el que permite que el importe lo mande el sistema; antes quedaba en el modo sin integrar, donde el cliente tiene que escribir cuánto paga, así que el QR se abría vacío y el cobro fallaba. Las cajas ya vinculadas se corrigen solas la primera vez que se cobra, sin volver a generar el QR ni cambiar el cartel impreso.",

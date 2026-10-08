@@ -80,6 +80,12 @@ export function buildMpQrHandlers(deps: HandlerDeps): HandlerMap {
         return toDevice(d);
       },
     ),
+    'mpQr:recrearPosDevice': withSession(
+      deps,
+      async (payload: { cashRegisterId: string }, ctx): Promise<MpPosDeviceDTO> => {
+        return svc(deps, ctx).recrearPosDevice(payload);
+      },
+    ),
     'mpQr:getQrForCashRegister': withSession(
       deps,
       async (payload: { cashRegisterId: string }, ctx): Promise<{ qrUrl: string; qrImageBase64: string | null } | null> => {

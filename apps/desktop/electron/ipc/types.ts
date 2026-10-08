@@ -2632,6 +2632,7 @@ export interface ApiSurface {
     testConnection(): Res<MpTestConnectionDTO>;
     listPosDevices(): Res<MpPosDeviceDTO[]>;
     createPosDevice(payload: { cashRegisterId: string }): Res<MpPosDeviceDTO>;
+    recrearPosDevice(payload: { cashRegisterId: string }): Res<MpPosDeviceDTO>;
     getQrForCashRegister(payload: { cashRegisterId: string }): Res<{ qrUrl: string; qrImageBase64: string | null } | null>;
     createOrder(payload: MpCreateOrderInputDTO): Res<MpOrderDTO>;
     cancelOrder(payload: { orderId: string }): Res<MpOrderDTO>;

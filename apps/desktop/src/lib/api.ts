@@ -724,6 +724,7 @@ export const api = {
     testConnection: () => unwrap(sf().mpQr.testConnection()),
     listPosDevices: () => unwrap(sf().mpQr.listPosDevices()),
     createPosDevice: (cashRegisterId: string) => unwrap(sf().mpQr.createPosDevice({ cashRegisterId })),
+    recrearPosDevice: (cashRegisterId: string) => unwrap(sf().mpQr.recrearPosDevice({ cashRegisterId })),
     getQrForCashRegister: (cashRegisterId: string) => unwrap(sf().mpQr.getQrForCashRegister({ cashRegisterId })),
     createOrder: (payload: import('@/types/api').MpCreateOrderInputDTO) => unwrap(sf().mpQr.createOrder(payload)),
     cancelOrder: (orderId: string) => unwrap(sf().mpQr.cancelOrder({ orderId })),

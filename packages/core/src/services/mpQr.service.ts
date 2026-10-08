@@ -60,6 +60,23 @@ export interface MpWebhookContext {
 
 const ORDER_TTL_MS = 5 * 60_000;
 
+/**
+ * ¿El punto de cobro acepta el importe que manda la caja?
+ *
+ * Mercado Pago llama «pdv» al modo atendido (la caja manda el importe y el
+ * cliente sólo confirma) y «standalone» al QR sin integrar, donde el cliente
+ * escribe cuánto paga. En ese segundo modo el QR se abre vacío y el pedido con
+ * importe no existe para el punto, así que el comercio no puede cobrar
+ * (Denver, 8-oct-2026). La API vieja llamaba a lo mismo `fixed_amount`.
+ */
+export function enModoAtendido(pos: unknown): boolean {
+  const p = pos as { config?: { qr?: { operating_mode?: string } }; fixed_amount?: boolean };
+  const modo = p?.config?.qr?.operating_mode;
+  if (modo) return modo === 'pdv';
+  // Cuentas viejas que no informan el modo: vale lo que diga `fixed_amount`.
+  return p?.fixed_amount !== false;
+}
+
 export class MpQrService {
   constructor(
     private readonly ctx: ServiceContext,
@@ -290,13 +307,18 @@ export class MpQrService {
     let pos: Awaited<ReturnType<typeof client.createPos>> | undefined;
     let externalUsado = externalPosId;
     try {
-      // Sólo sirve un punto de cobro que YA tenga identificación externa: es a
-      // donde se manda el importe de cada venta. Los QR hechos desde la app de
-      // Mercado Pago no la tienen y no se les puede poner (Denver, 8-oct-2026);
-      // para esos se crea uno propio en la misma sucursal, y el comercio usa el
-      // cartel nuevo.
+      // Sólo sirve un punto de cobro que (a) tenga identificación externa, que
+      // es a donde se manda el importe de cada venta, y (b) esté en MODO
+      // ATENDIDO. Adoptar uno en modo «el cliente escribe el importe» deja la
+      // caja sin poder cobrar: el QR se abre vacío y el pedido con importe no
+      // existe para ese punto (Denver, 8-oct-2026). Para los que no sirven se
+      // crea uno propio en la misma sucursal y el comercio usa el cartel
+      // nuevo.
       const libres = (await client.searchPos(cfg.storeId)).filter(
-        (p) => !yaUsados.has(String(p.id)) && String(p.external_id ?? '').trim() !== '',
+        (p) =>
+          !yaUsados.has(String(p.id)) &&
+          String(p.external_id ?? '').trim() !== '' &&
+          enModoAtendido(p),
       );
       const candidato = libres[0];
       if (candidato) {
@@ -378,6 +400,31 @@ export class MpQrService {
   }
 
   /**
+   * Rehace el QR de la caja creando un punto de cobro NUEVO en modo atendido.
+   *
+   * Para cuando la caja quedó enganchada a un punto que no acepta el importe
+   * del sistema —por ejemplo uno hecho desde la app de Mercado Pago, o uno
+   * adoptado antes de que el sistema mirara el modo (Denver, 8-oct-2026)—. El
+   * cambio de modo sobre el punto viejo no siempre lo deja hacer Mercado Pago,
+   * así que se hace uno nuevo. **El QR cambia: hay que imprimir el cartel otra
+   * vez**, por eso no pasa solo y hay un botón.
+   */
+  async recrearPosDevice(input: { cashRegisterId: string }): Promise<MpPosDevice> {
+    requirePermission(this.ctx.currentUser, 'manage_mp_qr');
+    const existing = await this.getPosDeviceByCashRegister(input.cashRegisterId);
+    if (existing) {
+      this.ctx.db.delete(mpPosDevices).where(eq(mpPosDevices.id, existing.id)).run();
+    }
+    try {
+      return await this.createPosDevice(input);
+    } catch (err) {
+      // Si no se pudo crear el nuevo, se deja la caja como estaba.
+      if (existing) this.ctx.db.insert(mpPosDevices).values(existing).run();
+      throw err;
+    }
+  }
+
+  /**
    * Convierte el fallo al crear el cobro en algo que se pueda accionar.
    *
    * Mercado Pago contesta siempre lo mismo —«si quieres conocer los recursos
@@ -388,42 +435,38 @@ export class MpQrService {
    * puntos de cobro tiene la cuenta de verdad.
    */
   private async explicarFalloDeOrden(msg: string, device: MpPosDevice): Promise<string> {
-    const cfg = await this.getConfigRow();
-    const partes = [`No se pudo crear el cobro en Mercado Pago: ${msg}`];
-    partes.push(
-      `Se pidió para la cuenta ${cfg?.mpUserId ?? '—'} y el punto de cobro «${device.externalPosId}».`,
-    );
+    /**
+     * UNA SOLA CONCLUSIÓN Y UN SOLO PASO A SEGUIR.
+     *
+     * La primera versión de este aviso listaba todo lo que había averiguado y
+     * terminaba con dos frases que se contradecían. Bruno, 8-oct-2026: «es
+     * medio confuso». En pantalla va qué hacer; el detalle técnico queda en el
+     * registro.
+     */
     try {
       const client = await this.client();
       const puntos = await client.searchPos();
-      if (puntos.length === 0) {
-        partes.push('La cuenta no tiene ningún punto de cobro: vuelva a generar el QR de la caja.');
-      } else {
-        const nombres = puntos
-          .map((p) => (p.external_id ? String(p.external_id) : `(sin identificación, id ${p.id})`))
-          .join(', ');
-        const elNuestro = puntos.find((p) => String(p.external_id ?? '') === device.externalPosId);
-        const existe = !!elNuestro;
-        partes.push(`Puntos de cobro de la cuenta: ${nombres}.`);
-        const modo = (elNuestro as { config?: { qr?: { operating_mode?: string } } } | undefined)
-          ?.config?.qr?.operating_mode;
-        if (elNuestro && (modo === 'standalone' || (elNuestro as { fixed_amount?: boolean }).fixed_amount === false)) {
-          partes.push(
-            'El punto de cobro está en modo «el cliente escribe el importe», por eso no acepta el monto del sistema.',
-          );
-        }
-        partes.push(
-          existe
-            ? 'El punto de cobro existe, así que el problema no es la caja: la cuenta no tiene habilitado el cobro con QR desde un sistema («QR Atendido»). Hay que pedirlo en Mercado Pago.'
-            : 'El punto de cobro guardado no está en la cuenta: vuelva a generar el QR de la caja.',
-        );
+      const elNuestro = puntos.find((p) => String(p.external_id ?? '') === device.externalPosId);
+      console.warn('[mpQr] falló el cobro:', {
+        error: msg,
+        punto: device.externalPosId,
+        puntosDeLaCuenta: puntos.map((p) => ({
+          id: p.id,
+          external_id: p.external_id,
+          modo: (p as { config?: { qr?: { operating_mode?: string } } }).config?.qr?.operating_mode,
+        })),
+      });
+      if (!elNuestro) {
+        return 'La caja apunta a un QR que ya no está en la cuenta de Mercado Pago. Genere el QR de la caja otra vez en Configuración → Mercado Pago.';
       }
+      if (!enModoAtendido(elNuestro)) {
+        return 'El QR de esta caja está en el modo en que el cliente escribe cuánto paga, y por eso no acepta el importe del sistema. En Configuración → Mercado Pago use «Rehacer el QR de la caja»: se crea uno que sí acepta el importe. Atención: el código cambia, hay que imprimir el cartel de nuevo.';
+      }
+      return 'Mercado Pago rechazó el cobro aunque el QR de la caja está bien configurado. Suele ser que la cuenta todavía no tiene habilitado el cobro con QR desde un sistema: hay que pedirlo a Mercado Pago.';
     } catch (e) {
-      partes.push(
-        `No se pudieron consultar los puntos de cobro de la cuenta (${e instanceof Error ? e.message : 'error'}).`,
-      );
+      console.warn('[mpQr] no se pudieron consultar los puntos de cobro:', e);
+      return `No se pudo crear el cobro en Mercado Pago (${msg}). Revise la conexión a internet y la configuración de Mercado Pago.`;
     }
-    return partes.join(' ');
   }
 
   async createOrder(input: MpCreateOrderInput): Promise<MpOrder> {

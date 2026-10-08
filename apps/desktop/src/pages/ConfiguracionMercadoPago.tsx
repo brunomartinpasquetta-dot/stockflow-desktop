@@ -34,6 +34,8 @@ export function ConfiguracionMercadoPago() {
   const [accessToken, setAccessToken] = useState('')
   /** Caja cuyo QR se está mirando, para verlo grande e imprimirlo. */
   const [verQr, setVerQr] = useState<{ pos: MpPosDeviceDTO; numero: number } | null>(null)
+  /** Caja cuyo QR se va a rehacer, esperando la confirmación. */
+  const [confirmarRehacer, setConfirmarRehacer] = useState<string | null>(null)
 
   const setupMutation = useMutation({
     mutationFn: () => api.mpQr.setupCompany({ accessToken }),
@@ -67,6 +69,19 @@ export function ConfiguracionMercadoPago() {
     onError: (err) => {
       const msg = err instanceof ApiError ? err.message : 'Error'
       toast.error(`No se pudo generar QR: ${msg}`)
+    },
+  })
+
+  const recrearMutation = useMutation({
+    mutationFn: (cashRegisterId: string) => api.mpQr.recrearPosDevice(cashRegisterId),
+    onSuccess: (pos) => {
+      toast.success('QR rehecho. Imprima el cartel nuevo: el código cambió.')
+      void qc.invalidateQueries({ queryKey: ['mpQr', 'pos'] })
+      if (currentCashQuery.data) setVerQr({ pos, numero: currentCashQuery.data.number })
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : 'Error'
+      toast.error(`No se pudo rehacer el QR: ${msg}`)
     },
   })
 
@@ -217,6 +232,23 @@ export function ConfiguracionMercadoPago() {
                           >
                             Ver e imprimir QR
                           </Button>
+                        ) : null}
+                        {posQuery.data?.find((p) => p.cashRegisterId === currentCashQuery.data?.id) ? (
+                          /* Para la caja que quedó enganchada a un QR que no
+                             acepta el importe del sistema. Pide confirmación
+                             porque el código cambia y hay que reimprimirlo. */
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-2"
+                            disabled={recrearMutation.isPending}
+                            onClick={() => setConfirmarRehacer(currentCashQuery.data!.id)}
+                          >
+                            {recrearMutation.isPending && (
+                              <Loader2 className="mr-2 animate-spin" size={14} />
+                            )}
+                            Rehacer el QR de la caja
+                          </Button>
                         ) : (
                           <Button
                             size="sm"
@@ -243,6 +275,36 @@ export function ConfiguracionMercadoPago() {
       </Card>
 
       <QrDialog datos={verQr} onClose={() => setVerQr(null)} />
+
+      <Dialog open={!!confirmarRehacer} onOpenChange={(a) => !a && setConfirmarRehacer(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rehacer el QR de la caja</DialogTitle>
+            <DialogDescription>
+              Se crea un QR nuevo que acepta el importe enviado desde el sistema. Úselo cuando al
+              cobrar aparezca que el QR está en el modo en que el cliente escribe cuánto paga.
+              <strong className="mt-2 block text-foreground">
+                El código cambia: hay que imprimir el cartel de nuevo y reemplazar el que está en el
+                mostrador.
+              </strong>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmarRehacer(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const id = confirmarRehacer
+                setConfirmarRehacer(null)
+                if (id) recrearMutation.mutate(id)
+              }}
+            >
+              Rehacer el QR
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

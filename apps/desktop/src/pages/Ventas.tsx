@@ -1238,6 +1238,36 @@ function PDV() {
     [activeMethods, selectedMethodId],
   )
 
+  /**
+   * UNA SOLA FORMA DE COBRAR CON QR: el botón celeste.
+   *
+   * Cuando el QR está operativo, elegir «MercadoPago QR» en la lista de formas
+   * de pago no agregaba nada —terminaba abriendo el mismo cobro— y dejaba dos
+   * botones haciendo lo mismo, con el verde también habilitado. Bruno,
+   * 8-oct-2026: «es medio confuso… debe ser simple, que de última sea sólo
+   * presionando el botón celeste». Así que mientras el botón celeste esté, el
+   * QR no aparece en la lista: se cobra con el botón y listo. Si el QR no está
+   * configurado, el medio sigue disponible para registrar a mano un pago por
+   * un QR fijo.
+   */
+  const metodosParaElegir = useMemo(
+    () => (canCobrarQr ? activeMethods.filter((m) => m.id !== mpMethod?.id) : activeMethods),
+    [activeMethods, canCobrarQr, mpMethod],
+  )
+
+  // Si el QR era el medio elegido y ahora se cobra con el botón celeste, el
+  // selector quedaría apuntando a un medio que ya no está en la lista: se
+  // vuelve al primero disponible.
+  if (
+    metodosParaElegir.length > 0 &&
+    selectedMethodId &&
+    !metodosParaElegir.some((m) => m.id === selectedMethodId)
+  ) {
+    setSelectedMethodId(
+      (metodosParaElegir.find((m) => m.type === 'cash') ?? metodosParaElegir[0])?.id ?? null,
+    )
+  }
+
   // Vuelto: se calcula sobre lo que se cobra en EFECTIVO. Pago único con un
   // medio de efectivo físico → el total; pago mixto → la parte en efectivo.
   const metodoEfectivo = useMemo(() => activeMethods.find((m) => m.isPhysicalCash) ?? null, [activeMethods])
@@ -2256,7 +2286,7 @@ function PDV() {
                 <Label htmlFor="pdv-method">Forma de pago</Label>
                 <PaymentMethodSelect
                   id="pdv-method"
-                  methods={activeMethods}
+                  methods={metodosParaElegir}
                   value={selectedMethodId}
                   onChange={setSelectedMethodId}
                 />

@@ -717,6 +717,7 @@ export function createApiBridge(
       testConnection: () => c<never>('mpQr:testConnection'),
       listPosDevices: () => c<never>('mpQr:listPosDevices'),
       createPosDevice: (p) => c<never>('mpQr:createPosDevice', p),
+      recrearPosDevice: (p) => c<never>('mpQr:recrearPosDevice', p),
       getQrForCashRegister: (p) => c<never>('mpQr:getQrForCashRegister', p),
       createOrder: (p) => c<never>('mpQr:createOrder', p),
       cancelOrder: (p) => c<never>('mpQr:cancelOrder', p),
