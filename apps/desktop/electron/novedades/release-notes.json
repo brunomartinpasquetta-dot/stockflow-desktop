@@ -2,6 +2,14 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
+      "version": "1.14.9",
+      "novedades": [
+        "Historial de cajas: cada caja tiene ahora el botón «Ver mercadería vendida», que abre la lista de artículos vendidos en ese turno con la cantidad y el importe, el más vendido primero, con buscador y totales. Las devoluciones ya están descontadas y las ventas anuladas no se cuentan.",
+        "Mercado Pago: ya se puede vincular la caja y obtener el QR en cuentas en las que antes no se podía crear el punto de cobro. Si el comercio ya tiene un QR hecho desde la aplicación de Mercado Pago, el sistema crea el suyo dentro de la misma sucursal."
+      ],
+      "internas": true
+    },
+    {
       "version": "1.14.8",
       "novedades": [],
       "internas": true
