@@ -405,9 +405,11 @@ export class MpQrService {
         const elNuestro = puntos.find((p) => String(p.external_id ?? '') === device.externalPosId);
         const existe = !!elNuestro;
         partes.push(`Puntos de cobro de la cuenta: ${nombres}.`);
-        if (elNuestro && (elNuestro as { fixed_amount?: boolean }).fixed_amount === false) {
+        const modo = (elNuestro as { config?: { qr?: { operating_mode?: string } } } | undefined)
+          ?.config?.qr?.operating_mode;
+        if (elNuestro && (modo === 'standalone' || (elNuestro as { fixed_amount?: boolean }).fixed_amount === false)) {
           partes.push(
-            'El punto de cobro está configurado para que el cliente escriba el importe, por eso no acepta el monto del sistema.',
+            'El punto de cobro está en modo «el cliente escribe el importe», por eso no acepta el monto del sistema.',
           );
         }
         partes.push(
@@ -490,17 +492,20 @@ export class MpQrService {
         /* el reintento no salió: se prueba lo de abajo */
       }
       /**
-       * EL PUNTO DE COBRO TIENE QUE ACEPTAR IMPORTE DEL SISTEMA.
+       * EL PUNTO DE COBRO TIENE QUE ESTAR EN MODO ATENDIDO.
        *
-       * Si fue creado sin `fixed_amount`, Mercado Pago lo deja en modo «el
-       * cliente escribe cuánto paga»: el QR se abre vacío y los pedidos con
-       * importe no existen para ese punto. Se le prende la opción y se
-       * reintenta UNA vez, así la caja ya vinculada se arregla sola y el
-       * cartel impreso sigue sirviendo (Denver, 8-oct-2026).
+       * Si quedó en `standalone` —el QR sin integrar, donde el cliente
+       * escribe cuánto paga— el QR se abre vacío y los pedidos con importe no
+       * existen para ese punto. Se lo pasa a `pdv` y se reintenta UNA vez,
+       * así la caja ya vinculada se arregla sola y el cartel impreso sigue
+       * sirviendo (Denver, 8-oct-2026).
        */
       if (!corregido) {
         try {
-          await client.updatePos(device.mpPosId, { fixed_amount: true });
+          await client.updatePos(device.mpPosId, {
+            fixed_amount: true,
+            config: { qr: { operating_mode: 'pdv' } },
+          });
           await client.putOrder(usuario, device.externalPosId, pedido);
           corregido = true;
         } catch {

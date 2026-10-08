@@ -2,9 +2,9 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
-      "version": "1.14.12",
+      "version": "1.14.13",
       "novedades": [
-        "Mercado Pago: ya se cobra con QR. El punto de cobro se crea aceptando el importe que manda el sistema; antes quedaba en modo «el cliente escribe cuánto paga», así que el QR se abría vacío y el cobro fallaba. Las cajas ya vinculadas se corrigen solas la primera vez que se cobra, sin volver a generar el QR ni cambiar el cartel impreso.",
+        "Mercado Pago: ya se cobra con QR. La caja se crea en modo atendido, que es el que permite que el importe lo mande el sistema; antes quedaba en el modo sin integrar, donde el cliente tiene que escribir cuánto paga, así que el QR se abría vacío y el cobro fallaba. Las cajas ya vinculadas se corrigen solas la primera vez que se cobra, sin volver a generar el QR ni cambiar el cartel impreso.",
         "Mercado Pago: la configuración ya no pide el número de usuario, se toma del propio Access Token.",
         "Mercado Pago: si aun así el cobro falla, el aviso dice qué cuenta y qué punto de cobro se usaron y cuáles tiene la cuenta, en vez del mensaje genérico de Mercado Pago."
       ],

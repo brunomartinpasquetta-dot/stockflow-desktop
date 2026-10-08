@@ -187,11 +187,15 @@ export class MpApiClient {
   /**
    * Crea un punto de cobro para QR integrado.
    *
-   * `fixed_amount: true` es OBLIGATORIO: es lo que hace que el importe lo
-   * ponga el sistema. Sin eso Mercado Pago deja el QR en modo «el cliente
-   * escribe cuánto paga» —se abre vacío— y los pedidos con importe no existen
-   * para ese punto, así que el cobro falla con el mensaje genérico de recurso
-   * inexistente (Denver, 8-oct-2026).
+   * `config.qr.operating_mode: 'pdv'` es el modo ATENDIDO: la caja manda el
+   * importe y el cliente sólo confirma. El otro modo, `standalone`, es el QR
+   * sin integrar, donde el cliente escribe cuánto paga. Si no se manda, el
+   * punto queda en ese modo: el QR se abre VACÍO y los pedidos con importe no
+   * existen para ese punto, así que el cobro falla con el «no encontrado»
+   * genérico de Mercado Pago, que no dice qué falta (Denver, 8-oct-2026).
+   *
+   * Se manda además `fixed_amount: true`, que es como se llamaba lo mismo en
+   * la API vieja y que algunas cuentas siguen mirando.
    *
    * El rubro ya no se manda fijo: algunas cuentas lo rechazan
    * («pos_unknown_mcc») y Mercado Pago toma el del comercio.
@@ -205,7 +209,7 @@ export class MpApiClient {
     return this.request<MpPos>({
       method: 'POST',
       path: `/pos`,
-      body: { fixed_amount: true, ...pos },
+      body: { fixed_amount: true, config: { qr: { operating_mode: 'pdv' } }, ...pos },
     });
   }
 
@@ -217,7 +221,12 @@ export class MpApiClient {
    */
   updatePos(
     posId: string | number,
-    cambios: { external_id?: string; name?: string; fixed_amount?: boolean },
+    cambios: {
+      external_id?: string;
+      name?: string;
+      fixed_amount?: boolean;
+      config?: { qr?: { operating_mode?: 'pdv' | 'standalone' } };
+    },
   ): Promise<MpPos> {
     return this.request<MpPos>({ method: 'PUT', path: `/pos/${posId}`, body: cambios });
   }
