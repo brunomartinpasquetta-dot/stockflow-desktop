@@ -752,11 +752,20 @@ async function main(): Promise<void> {
   }
 
   try {
-    // Setup
-    const setupRes = await admin.mpQr.setupCompany({ mpUserId: '12345', accessToken: 'TEST-TOKEN' });
+    // Setup. Se manda A PROPÓSITO un usuario equivocado (es lo que pasaba en
+    // la realidad: el comercio tipeaba el número de la aplicación en vez del
+    // de su cuenta y después no podía cobrar, Denver 8-oct-2026). Tiene que
+    // quedar guardado el que dice el token, no el que se tipeó.
+    const setupRes = await admin.mpQr.setupCompany({
+      mpUserId: '7535649106517061',
+      accessToken: 'TEST-TOKEN',
+    });
     check('mpQr.setupCompany devuelve storeId', setupRes.configured && setupRes.storeId === 'STORE-X');
     const cfg = await admin.mpQr.getConfig();
-    check('mpQr.getConfig configurado', cfg.configured === true && cfg.mpUserId === '12345');
+    check(
+      'mpQr: el usuario sale del token, no de lo que se tipeó',
+      cfg.configured === true && cfg.mpUserId === '12345',
+    );
 
     // Crear POS device para reg2 (caja abierta)
     const dev = await admin.mpQr.createPosDevice({ cashRegisterId: reg2.id });

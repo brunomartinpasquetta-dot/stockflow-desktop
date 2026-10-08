@@ -42,7 +42,8 @@ export interface MpConfigStatus {
 }
 
 export interface MpSetupInput {
-  mpUserId: string;
+  /** Ya no se pide: se saca del propio token. Se acepta por compatibilidad. */
+  mpUserId?: string;
   accessToken: string;
 }
 
@@ -99,17 +100,34 @@ export class MpQrService {
     if (this.ctx.currentUser.role !== 'admin') {
       throw new BusinessRuleError('mp_setup_admin_only', 'Sólo un administrador puede configurar MercadoPago.');
     }
-    if (!input.mpUserId || !input.accessToken) {
-      throw new BusinessRuleError('mp_invalid_input', 'mpUserId y accessToken son obligatorios.');
+    // El usuario ya no se pide: se saca del token (ver abajo).
+    if (!input.accessToken) {
+      throw new BusinessRuleError('mp_invalid_input', 'Falta el access token de Mercado Pago.');
     }
 
     const client = new MpApiClient(input.accessToken, this.mpBaseUrl);
+    /**
+     * EL USUARIO SALE DEL TOKEN, NO DE LO QUE SE TIPEA.
+     *
+     * La pantalla pedía el «User ID» a mano y nadie lo verificaba. Lo que el
+     * comercio tiene a mano es el Client ID de la aplicación —el mismo número
+     * que arranca el access token—, y ese NO es el número de su cuenta de
+     * cobro. Con el número equivocado la configuración pasa igual (crear la
+     * sucursal y el punto de cobro usan sólo el token), pero al cobrar la
+     * dirección del pedido lleva el usuario adentro y Mercado Pago contesta
+     * que el recurso no existe: «No se pudo crear la orden» y el comercio no
+     * puede cobrar (Denver, 8-oct-2026). El token sabe de quién es: se
+     * pregunta y listo.
+     */
+    let usuarioReal: string;
     try {
-      await client.validateToken();
+      const me = await client.validateToken();
+      usuarioReal = String(me.id);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new BusinessRuleError('mp_invalid_token', `Access token inválido: ${msg}`);
     }
+    input = { ...input, mpUserId: usuarioReal };
 
     /**
      * SE USA LA SUCURSAL QUE EL COMERCIO YA TIENE.
@@ -359,6 +377,53 @@ export class MpQrService {
     return this.ctx.db.select().from(mpPosDevices).where(eq(mpPosDevices.id, id)).get()!;
   }
 
+  /**
+   * Convierte el fallo al crear el cobro en algo que se pueda accionar.
+   *
+   * Mercado Pago contesta siempre lo mismo —«si quieres conocer los recursos
+   * de la API visita el sitio de desarrolladores»— tanto si no existe el punto
+   * de cobro como si la cuenta no tiene habilitado el QR dinámico. Con ese
+   * texto nadie puede hacer nada (Denver, 8-oct-2026: el comercio quedó sin
+   * poder cobrar y hubo que adivinar). Se le agrega qué se intentó y qué
+   * puntos de cobro tiene la cuenta de verdad.
+   */
+  private async explicarFalloDeOrden(msg: string, device: MpPosDevice): Promise<string> {
+    const cfg = await this.getConfigRow();
+    const partes = [`No se pudo crear el cobro en Mercado Pago: ${msg}`];
+    partes.push(
+      `Se pidió para la cuenta ${cfg?.mpUserId ?? '—'} y el punto de cobro «${device.externalPosId}».`,
+    );
+    try {
+      const client = await this.client();
+      const puntos = await client.searchPos();
+      if (puntos.length === 0) {
+        partes.push('La cuenta no tiene ningún punto de cobro: vuelva a generar el QR de la caja.');
+      } else {
+        const nombres = puntos
+          .map((p) => (p.external_id ? String(p.external_id) : `(sin identificación, id ${p.id})`))
+          .join(', ');
+        const elNuestro = puntos.find((p) => String(p.external_id ?? '') === device.externalPosId);
+        const existe = !!elNuestro;
+        partes.push(`Puntos de cobro de la cuenta: ${nombres}.`);
+        if (elNuestro && (elNuestro as { fixed_amount?: boolean }).fixed_amount === false) {
+          partes.push(
+            'El punto de cobro está configurado para que el cliente escriba el importe, por eso no acepta el monto del sistema.',
+          );
+        }
+        partes.push(
+          existe
+            ? 'El punto de cobro existe, así que el problema no es la caja: la cuenta no tiene habilitado el cobro con QR desde un sistema («QR Atendido»). Hay que pedirlo en Mercado Pago.'
+            : 'El punto de cobro guardado no está en la cuenta: vuelva a generar el QR de la caja.',
+        );
+      }
+    } catch (e) {
+      partes.push(
+        `No se pudieron consultar los puntos de cobro de la cuenta (${e instanceof Error ? e.message : 'error'}).`,
+      );
+    }
+    return partes.join(' ');
+  }
+
   async createOrder(input: MpCreateOrderInput): Promise<MpOrder> {
     requirePermission(this.ctx.currentUser, 'manage_mp_qr');
     const cfg = await this.getConfigRow();
@@ -376,26 +441,76 @@ export class MpQrService {
     const externalReference = input.externalReference ?? `ORD-${randomUUID()}`;
 
     const client = await this.client();
+    const pedido = {
+      external_reference: externalReference,
+      title: 'Venta StockFlow',
+      description: input.description,
+      total_amount: Number(amountNum.toFixed(2)),
+      items: [
+        {
+          title: input.description,
+          unit_price: Number(amountNum.toFixed(2)),
+          quantity: 1,
+          unit_measure: 'unit',
+          total_amount: Number(amountNum.toFixed(2)),
+        },
+      ],
+      cash_out: { amount: 0 },
+    };
     try {
-      await client.putOrder(cfg.mpUserId, device.externalPosId, {
-        external_reference: externalReference,
-        title: 'Venta StockFlow',
-        description: input.description,
-        total_amount: Number(amountNum.toFixed(2)),
-        items: [
-          {
-            title: input.description,
-            unit_price: Number(amountNum.toFixed(2)),
-            quantity: 1,
-            unit_measure: 'unit',
-            total_amount: Number(amountNum.toFixed(2)),
-          },
-        ],
-        cash_out: { amount: 0 },
-      });
+      await client.putOrder(cfg.mpUserId, device.externalPosId, pedido);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new BusinessRuleError('mp_order_failed', `No se pudo crear la orden en MercadoPago: ${msg}`);
+      /**
+       * SEGUNDO INTENTO CON EL USUARIO QUE DICE EL TOKEN.
+       *
+       * Las instalaciones configuradas antes guardaron el número que el
+       * comercio tipeó a mano, que suele ser el de la aplicación y no el de la
+       * cuenta de cobro. Con ese número la dirección del pedido no existe y
+       * Mercado Pago contesta su mensaje genérico de recurso inexistente, así
+       * que el comercio no puede cobrar y no tiene forma de adivinar el número
+       * correcto. Se pregunta al token de quién es, se corrige la
+       * configuración y se reintenta UNA vez: el comercio no se entera.
+       */
+      let corregido = false;
+      let usuario = cfg.mpUserId;
+      try {
+        const me = await client.validateToken();
+        const real = String(me.id);
+        if (real && real !== usuario) {
+          this.ctx.db
+            .update(mpConfig)
+            .set({ mpUserId: real, updatedAt: Date.now() })
+            .where(eq(mpConfig.id, cfg.id))
+            .run();
+          usuario = real;
+          await client.putOrder(usuario, device.externalPosId, pedido);
+          corregido = true;
+        }
+      } catch {
+        /* el reintento no salió: se prueba lo de abajo */
+      }
+      /**
+       * EL PUNTO DE COBRO TIENE QUE ACEPTAR IMPORTE DEL SISTEMA.
+       *
+       * Si fue creado sin `fixed_amount`, Mercado Pago lo deja en modo «el
+       * cliente escribe cuánto paga»: el QR se abre vacío y los pedidos con
+       * importe no existen para ese punto. Se le prende la opción y se
+       * reintenta UNA vez, así la caja ya vinculada se arregla sola y el
+       * cartel impreso sigue sirviendo (Denver, 8-oct-2026).
+       */
+      if (!corregido) {
+        try {
+          await client.updatePos(device.mpPosId, { fixed_amount: true });
+          await client.putOrder(usuario, device.externalPosId, pedido);
+          corregido = true;
+        } catch {
+          /* tampoco: vale el error original, explicado abajo */
+        }
+      }
+      if (!corregido) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new BusinessRuleError('mp_order_failed', await this.explicarFalloDeOrden(msg, device));
+      }
     }
 
     const now = Date.now();

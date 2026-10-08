@@ -184,11 +184,28 @@ export class MpApiClient {
     });
   }
 
-  createPos(pos: { name: string; external_id: string; store_id: string; category?: number }): Promise<MpPos> {
+  /**
+   * Crea un punto de cobro para QR integrado.
+   *
+   * `fixed_amount: true` es OBLIGATORIO: es lo que hace que el importe lo
+   * ponga el sistema. Sin eso Mercado Pago deja el QR en modo «el cliente
+   * escribe cuánto paga» —se abre vacío— y los pedidos con importe no existen
+   * para ese punto, así que el cobro falla con el mensaje genérico de recurso
+   * inexistente (Denver, 8-oct-2026).
+   *
+   * El rubro ya no se manda fijo: algunas cuentas lo rechazan
+   * («pos_unknown_mcc») y Mercado Pago toma el del comercio.
+   */
+  createPos(pos: {
+    name: string;
+    external_id: string;
+    store_id: string;
+    category?: number;
+  }): Promise<MpPos> {
     return this.request<MpPos>({
       method: 'POST',
       path: `/pos`,
-      body: { category: 5411, ...pos },
+      body: { fixed_amount: true, ...pos },
     });
   }
 
@@ -198,7 +215,10 @@ export class MpApiClient {
    * identificación, y los QR creados desde la app de Mercado Pago vienen sin
    * ella.
    */
-  updatePos(posId: string | number, cambios: { external_id?: string; name?: string }): Promise<MpPos> {
+  updatePos(
+    posId: string | number,
+    cambios: { external_id?: string; name?: string; fixed_amount?: boolean },
+  ): Promise<MpPos> {
     return this.request<MpPos>({ method: 'PUT', path: `/pos/${posId}`, body: cambios });
   }
 

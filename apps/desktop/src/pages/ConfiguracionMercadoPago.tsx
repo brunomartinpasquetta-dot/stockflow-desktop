@@ -31,13 +31,12 @@ export function ConfiguracionMercadoPago() {
   const posQuery = useQuery({ queryKey: ['mpQr', 'pos'], queryFn: () => api.mpQr.listPosDevices() })
   const currentCashQuery = useQuery({ queryKey: ['cash', 'current'], queryFn: () => api.cash.getCurrent() })
 
-  const [mpUserId, setMpUserId] = useState('')
   const [accessToken, setAccessToken] = useState('')
   /** Caja cuyo QR se está mirando, para verlo grande e imprimirlo. */
   const [verQr, setVerQr] = useState<{ pos: MpPosDeviceDTO; numero: number } | null>(null)
 
   const setupMutation = useMutation({
-    mutationFn: () => api.mpQr.setupCompany({ mpUserId, accessToken }),
+    mutationFn: () => api.mpQr.setupCompany({ accessToken }),
     onSuccess: () => {
       toast.success('MercadoPago configurado correctamente.')
       setAccessToken('')
@@ -95,7 +94,7 @@ export function ConfiguracionMercadoPago() {
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle2 size={18} /> Configurado
               </div>
-              <div>User ID MercadoPago: <code className="bg-muted px-1 rounded">{config.mpUserId}</code></div>
+              <div>Cuenta de Mercado Pago: <code className="bg-muted px-1 rounded">{config.mpUserId}</code></div>
               <div>Store ID: <code className="bg-muted px-1 rounded">{config.storeId}</code></div>
               <div className="break-all">
                 Webhook secret:{' '}
@@ -144,10 +143,10 @@ export function ConfiguracionMercadoPago() {
                 <AlertCircle size={18} /> No configurado
               </div>
               <div className="grid gap-2 max-w-md">
-                <div>
-                  <Label htmlFor="mp-user-id">User ID MercadoPago</Label>
-                  <Input id="mp-user-id" value={mpUserId} onChange={(e) => setMpUserId(e.target.value)} placeholder="123456789" />
-                </div>
+                {/* El usuario ya no se pide: se saca del propio token. Pedirlo
+                    a mano hacía que el comercio pusiera el número de la
+                    aplicación en vez del de su cuenta y después no podía
+                    cobrar (Denver, 8-oct-2026). */}
                 <div>
                   <Label htmlFor="mp-token">Access Token</Label>
                   <Input
@@ -160,7 +159,7 @@ export function ConfiguracionMercadoPago() {
                 </div>
                 <Button
                   onClick={() => setupMutation.mutate()}
-                  disabled={setupMutation.isPending || !mpUserId || !accessToken}
+                  disabled={setupMutation.isPending || !accessToken}
                 >
                   {setupMutation.isPending && <Loader2 className="mr-2 animate-spin" size={14} />}
                   Conectar

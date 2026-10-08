@@ -1452,7 +1452,8 @@ export interface MpConfigStatusDTO {
 }
 
 export interface MpSetupInputDTO {
-  mpUserId: string;
+  /** Ya no se pide: se saca del propio token. Se acepta por compatibilidad. */
+  mpUserId?: string;
   accessToken: string;
 }
 
