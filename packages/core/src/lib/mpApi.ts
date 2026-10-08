@@ -200,17 +200,34 @@ export class MpApiClient {
    * El rubro ya no se manda fijo: algunas cuentas lo rechazan
    * («pos_unknown_mcc») y Mercado Pago toma el del comercio.
    */
-  createPos(pos: {
+  async createPos(pos: {
     name: string;
     external_id: string;
     store_id: string;
     category?: number;
   }): Promise<MpPos> {
-    return this.request<MpPos>({
-      method: 'POST',
-      path: `/pos`,
-      body: { fixed_amount: true, config: { qr: { operating_mode: 'pdv' } }, ...pos },
-    });
+    // El modo atendido se configura con `config.qr.operating_mode`, y ese
+    // campo SÓLO existe en /v2/pos: en /pos la cuenta contesta «config is
+    // unknown» (Denver, 8-oct-2026).
+    try {
+      return await this.request<MpPos>({
+        method: 'POST',
+        path: `/v2/pos`,
+        body: { ...pos, config: { qr: { operating_mode: 'pdv' } } },
+      });
+    } catch (err) {
+      // Cuentas que todavía están en la versión vieja: ahí lo mismo se pide
+      // con `fixed_amount`.
+      try {
+        return await this.request<MpPos>({
+          method: 'POST',
+          path: `/pos`,
+          body: { ...pos, fixed_amount: true },
+        });
+      } catch {
+        throw err;
+      }
+    }
   }
 
   /**
@@ -219,7 +236,7 @@ export class MpApiClient {
    * identificación, y los QR creados desde la app de Mercado Pago vienen sin
    * ella.
    */
-  updatePos(
+  async updatePos(
     posId: string | number,
     cambios: {
       external_id?: string;
@@ -228,6 +245,16 @@ export class MpApiClient {
       config?: { qr?: { operating_mode?: 'pdv' | 'standalone' } };
     },
   ): Promise<MpPos> {
+    // `config` sólo lo entiende /v2/pos; en la versión vieja hay que mandar
+    // `fixed_amount`. Se prueba la nueva y se cae a la vieja.
+    if (cambios.config) {
+      try {
+        return await this.request<MpPos>({ method: 'PUT', path: `/v2/pos/${posId}`, body: cambios });
+      } catch {
+        const { config: _config, ...sinConfig } = cambios;
+        return this.request<MpPos>({ method: 'PUT', path: `/pos/${posId}`, body: sinConfig });
+      }
+    }
     return this.request<MpPos>({ method: 'PUT', path: `/pos/${posId}`, body: cambios });
   }
 
@@ -238,19 +265,43 @@ export class MpApiClient {
     });
   }
 
-  putOrder(userId: string, externalPosId: string, order: Record<string, unknown>): Promise<unknown> {
-    return this.request({
-      method: 'PUT',
-      path: `/instore/orders/qr/seller/collectors/${userId}/pos/${externalPosId}/orders`,
-      body: order,
-    });
+  /**
+   * Crea la orden de cobro con importe sobre el punto de cobro.
+   *
+   * La dirección termina en `/qrs`, NO en `/orders`: con `/orders` Mercado
+   * Pago contesta su «no encontrado» genérico y el comercio no puede cobrar
+   * (Denver, 8-oct-2026; referencia «Crear orden — QR Modelo Dinámico»). Se
+   * deja el camino viejo como respaldo por si alguna cuenta todavía responde
+   * ahí.
+   */
+  async putOrder(
+    userId: string,
+    externalPosId: string,
+    order: Record<string, unknown>,
+  ): Promise<unknown> {
+    const base = `/instore/orders/qr/seller/collectors/${userId}/pos/${externalPosId}`;
+    try {
+      return await this.request({ method: 'PUT', path: `${base}/qrs`, body: order });
+    } catch (err) {
+      try {
+        return await this.request({ method: 'PUT', path: `${base}/orders`, body: order });
+      } catch {
+        throw err;
+      }
+    }
   }
 
-  deleteOrder(userId: string, externalPosId: string): Promise<unknown> {
-    return this.request({
-      method: 'DELETE',
-      path: `/instore/orders/qr/seller/collectors/${userId}/pos/${externalPosId}/orders`,
-    });
+  async deleteOrder(userId: string, externalPosId: string): Promise<unknown> {
+    const base = `/instore/orders/qr/seller/collectors/${userId}/pos/${externalPosId}`;
+    try {
+      return await this.request({ method: 'DELETE', path: `${base}/qrs` });
+    } catch (err) {
+      try {
+        return await this.request({ method: 'DELETE', path: `${base}/orders` });
+      } catch {
+        throw err;
+      }
+    }
   }
 
   getPayment(paymentId: string | number): Promise<{ id: number | string; status: string; external_reference?: string; [k: string]: unknown }> {
