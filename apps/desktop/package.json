@@ -62,7 +62,8 @@
     "test:devolucion-items": "tsx electron/__tests__/devolucion-items.smoke.ts",
     "test:imprimir-ticket": "tsx electron/__tests__/imprimir-ticket.smoke.ts",
     "test:direccion-servidor": "tsx electron/__tests__/direccion-servidor.smoke.ts",
-    "test:aviso-actualizacion": "tsx electron/__tests__/aviso-actualizacion.smoke.ts"
+    "test:aviso-actualizacion": "tsx electron/__tests__/aviso-actualizacion.smoke.ts",
+    "test:etiqueta-medio-pago": "tsx electron/__tests__/etiqueta-medio-pago.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

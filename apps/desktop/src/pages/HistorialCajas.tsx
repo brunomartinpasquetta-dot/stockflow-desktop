@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCanWrite } from '@/contexts/LicenseContext'
 import { api } from '@/lib/api'
 import { usePrintHistoricalCashReport, usePrintCashClose } from '@/lib/usePrint'
+import { etiquetaMedioPago } from '@/lib/etiquetaMedioPago'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput } from '@/lib/format'
 import { dayEnd, dayStart, isoDaysAgo, todayIso } from '@/lib/periodPresets'
 import { cn } from '@/lib/utils'
@@ -345,7 +346,7 @@ function HistoricalCashReportDialog({
                       <TableRow><TableCell colSpan={4} className="py-3 text-center text-muted-foreground">Sin movimientos</TableCell></TableRow>
                     ) : r.byPaymentMethod.map((b) => (
                       <TableRow key={b.paymentMethodId ?? '__none__'}>
-                        <TableCell>{b.name}{b.isPhysicalCash ? ' (efectivo)' : ''}</TableCell>
+                        <TableCell>{etiquetaMedioPago(b)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(b.incomeTotal)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(b.expenseTotal)}</TableCell>
                         <TableCell className="text-right tabular-nums font-medium">{formatCurrency(b.net)}</TableCell>

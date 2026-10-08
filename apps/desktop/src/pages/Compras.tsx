@@ -543,6 +543,30 @@ export function Compras() {
         ? split.isComplete && activeMethods.length > 0
         : selectedMethod != null)
 
+  /**
+   * POR QUÉ no se puede confirmar. Un botón apagado sin motivo es lo que más
+   * hace renegar: el comercio ve la compra completa, el botón gris, y no tiene
+   * forma de saber qué falta (nos costó una tarde entera con un cliente,
+   * 7-oct-2026). Se devuelve lo PRIMERO que falta, en el orden en que se carga
+   * una compra.
+   */
+  const motivoNoConfirma = ((): string | null => {
+    if (canConfirm) return null
+    if (!canWrite) return 'El sistema está en sólo lectura: revise la licencia o la conexión con el servidor.'
+    if (supplierId == null) return 'Falta elegir el proveedor.'
+    if (cart.length === 0) return 'Todavía no cargó ningún artículo.'
+    if (totalNum <= 0) return 'El total de la compra es cero.'
+    if (createMutation.isPending) return 'Se está registrando la compra…'
+    if (noCash) return 'No hay caja diaria abierta: ábrala, pague desde Caja General o registre la compra a cuenta del proveedor.'
+    if (isAccountPurchase) return null
+    if (mixedMode) {
+      if (activeMethods.length === 0) return 'No hay medios de pago configurados.'
+      return 'El pago mixto no cubre el total: reparta todo el importe entre los medios, o salga del pago mixto con F12.'
+    }
+    if (selectedMethod == null) return 'Falta elegir la forma de pago.'
+    return 'Falta completar algún dato de la compra.'
+  })()
+
   // F2 = confirmar; F4 cicla medio; F12 toggle mixto.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -964,6 +988,9 @@ export function Compras() {
               ? `Confirmar compra a cuenta (F2) — ${formatCurrency(totals.total)}`
               : `Pagar (F2) — ${formatCurrency(totals.total)}`}
           </Button>
+          {motivoNoConfirma && (
+            <p className="text-xs text-destructive">{motivoNoConfirma}</p>
+          )}
           {cart.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearCompra} disabled={createMutation.isPending}>
               <X className="h-4 w-4" />

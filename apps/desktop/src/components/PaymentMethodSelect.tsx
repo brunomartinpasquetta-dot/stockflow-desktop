@@ -6,6 +6,7 @@
  * existe en la lista cae al medio de efectivo físico (o al primero activo).
  */
 import { Select } from '@/components/ui/select'
+import { etiquetaMedioPago } from '@/lib/etiquetaMedioPago'
 import type { PaymentMethodDTO } from '@/types/api'
 
 interface PaymentMethodSelectProps {
@@ -43,8 +44,7 @@ export function PaymentMethodSelect({
     >
       {methods.map((m) => (
         <option key={m.id} value={m.id}>
-          {m.name}
-          {m.isPhysicalCash ? ' (efectivo)' : ''}
+          {etiquetaMedioPago(m)}
         </option>
       ))}
     </Select>
