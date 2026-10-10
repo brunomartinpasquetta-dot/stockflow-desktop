@@ -707,11 +707,20 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
         # sólo ceros siguen afuera. Si no hay ninguno se genera un EAN-13
         # interno válido, para que igual pueda imprimir etiquetas y usar el lector.
         cand = ""
-        for campo, solo_numeros in (("CODIGO2", False), ("CODIGO", True)):
+        for campo in ("CODIGO2", "CODIGO"):
             v = txt(r[campo])
             if not v or set(v) <= {"0"} or v in barcodes_usados:
                 continue
-            if solo_numeros and not v.isdigit():
+            # Lo ÚNICO que se descarta es lo que rompió Excel ('7.62221E+12'):
+            # ahí el código real se perdió y un EAN interno es mejor que un
+            # número falso. Todo lo demás entra TAL CUAL, letras incluidas.
+            #
+            # Antes de CODIGO sólo se aceptaba lo numérico, y en un comercio
+            # con códigos como 'TECH358' o 'SURI166' —El Paranacito, 3.674 de
+            # 3.677 artículos— TODOS quedaban con un código inventado: el
+            # cajero no podía encontrar un solo artículo por el código que usa
+            # todos los días (Bruno, 10-oct-2026). La migración es un espejo.
+            if re.match(r"^[0-9.]+E\+?[0-9]+$", v, re.IGNORECASE):
                 continue
             cand = v
             break
