@@ -134,6 +134,48 @@ async function main(): Promise<void> {
     'y la caja diaria volvió a pagar',
   );
 
+  // ── UN PAGO VIEJO: el que se hizo ANTES de esta versión, sin el enlace ni el
+  // origen guardado. Es el caso real del cliente, y es el que tiene que andar.
+  const compra2 = await compras.createPurchase({
+    type: 'X',
+    supplierId: prov.id,
+    isAccountPurchase: true,
+    updatePrices: false,
+    discount: '0.0000',
+    payments: [],
+    lines: [{ articleId: art.id, quantity: '1.000', costPrice: '5000.0000' }],
+  } as never);
+  const pagoViejo = await cuentas.payInvoice({
+    accountId: compra2.accountPayable!.id,
+    payments: [{ paymentMethodId: efectivo.id, amount: '5000.0000' }],
+    expectedAmount: '5000.0000',
+    fundingSource: 'daily',
+  });
+  // Se simula un pago de la versión anterior: sin origen guardado y sin enlace.
+  db.$client.prepare('UPDATE supplier_payments SET funding_source = NULL WHERE id = ?').run(
+    pagoViejo.payments[0]!.id,
+  );
+  db.$client.prepare('UPDATE cash_movements SET supplier_payment_id = NULL WHERE supplier_payment_id = ?').run(
+    pagoViejo.payments[0]!.id,
+  );
+
+  const cajaAntesViejo = Number((await cash.getCashReport(reg.id)).expectedCash);
+  const cgAntesViejo = Number(await cashGeneral.getBalance());
+  await cuentas.corregirOrigenDePago({
+    supplierPaymentId: pagoViejo.payments[0]!.id,
+    nuevoOrigen: 'general',
+  });
+  check(
+    Number((await cash.getCashReport(reg.id)).expectedCash) === cajaAntesViejo + 5000,
+    'UN PAGO VIEJO (sin el dato guardado) también se corrige: la caja diaria recupera su plata',
+    `${cajaAntesViejo} → ${(await cash.getCashReport(reg.id)).expectedCash}`,
+  );
+  check(
+    Number(await cashGeneral.getBalance()) === cgAntesViejo - 5000,
+    'y Caja General se hace cargo del pago viejo',
+    String(await cashGeneral.getBalance()),
+  );
+
   closeLocalDb(db);
 }
 

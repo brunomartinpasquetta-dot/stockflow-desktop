@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import {
   CreateSupplierAccountPaymentSchema,
@@ -507,12 +507,12 @@ export class SupplierPaymentRepository extends BaseRepository<
           .all();
         const pmMap = new Map(pmRows.map((r) => [r.id, r]));
 
-        const enDiaria = tx
+        const enDiaria: (typeof cashMovements.$inferSelect)[] = tx
           .select()
           .from(cashMovements)
           .where(inArray(cashMovements.supplierPaymentId, ids))
           .all();
-        const enGeneral = tx
+        const enGeneral: (typeof cashGeneralMovements.$inferSelect)[] = tx
           .select()
           .from(cashGeneralMovements)
           .where(inArray(cashGeneralMovements.supplierPaymentId, ids))
@@ -525,6 +525,64 @@ export class SupplierPaymentRepository extends BaseRepository<
          * anteriores a la migración 0042, que no lo tienen guardado, se
          * deduce de dónde está el egreso.
          */
+        /**
+         * PAGOS VIEJOS (anteriores a la migración 0042): no tienen el enlace.
+         * Se los reconoce por lo que sí es inequívoco —mismo instante, mismo
+         * importe, mismo medio— y se los adopta. Sin esto la corrección no
+         * servía para el único caso que la originó, que es justamente un pago
+         * ya hecho (Bruno, 10-oct-2026).
+         */
+        if (enDiaria.length === 0 && enGeneral.length === 0) {
+          for (const h of hermanos) {
+            const candidatos = tx
+              .select()
+              .from(cashMovements)
+              .where(
+                and(
+                  eq(cashMovements.type, 'expense'),
+                  eq(cashMovements.date, h.date),
+                  eq(cashMovements.amount, h.amount),
+                  eq(cashMovements.paymentMethodId, h.paymentMethodId),
+                  isNull(cashMovements.supplierPaymentId),
+                ),
+              )
+              .all()
+              .filter((m) => m.description.startsWith('Pago a proveedor'));
+            // Si hay más de uno idéntico no se adivina: se deja que el aviso
+            // lo diga, antes que mover la plata equivocada.
+            if (candidatos.length === 1) {
+              const m = candidatos[0]!;
+              tx.update(cashMovements)
+                .set({ supplierPaymentId: h.id })
+                .where(eq(cashMovements.id, m.id))
+                .run();
+              enDiaria.push({ ...m, supplierPaymentId: h.id });
+            }
+          }
+          if (enDiaria.length === 0) {
+            const cgCands = tx
+              .select()
+              .from(cashGeneralMovements)
+              .where(
+                and(
+                  eq(cashGeneralMovements.type, 'expense'),
+                  eq(cashGeneralMovements.amount, total),
+                  eq(cashGeneralMovements.referenceId, pago.accountId),
+                  isNull(cashGeneralMovements.supplierPaymentId),
+                ),
+              )
+              .all();
+            if (cgCands.length === 1) {
+              const m = cgCands[0]!;
+              tx.update(cashGeneralMovements)
+                .set({ supplierPaymentId: pago.id })
+                .where(eq(cashGeneralMovements.id, m.id))
+                .run();
+              enGeneral.push({ ...m, supplierPaymentId: pago.id });
+            }
+          }
+        }
+
         const origenActual: 'daily' | 'general' =
           pago.fundingSource === 'general' || pago.fundingSource === 'daily'
             ? pago.fundingSource
