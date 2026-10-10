@@ -152,11 +152,6 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
   const companyQuery = useQuery({ queryKey: ['company'], queryFn: api.company.get })
   const paymentMethodsQuery = usePaymentMethods()
   const printCashClose = usePrintCashClose()
-  const printerConfigQuery = useQuery({
-    queryKey: ['hardwarePrinterConfig'],
-    queryFn: () => api.hardware.printer.getConfig(),
-    staleTime: 30_000,
-  })
 
   const activeMethods = useMemo(() => (paymentMethodsQuery.data ?? []).filter((m) => m.active), [paymentMethodsQuery.data])
   const methodNameById = useMemo(
@@ -298,25 +293,19 @@ function CajaAbierta({ registerId, onCloseComplete }: { registerId: string; onCl
         closedBy: currentUser?.fullName ?? '—',
       }
 
-      // Impresión vía window.print() + driver del SO (patrón canónico).
-      // Si hay impresora configurada, imprimimos automáticamente; si no, el
-      // toast ofrece el botón "Imprimir reporte" como fallback.
-      const printerCfg = printerConfigQuery.data ?? null
-      let printed = false
-      if (printerCfg) {
-        try {
-          await printCashClose(reportData)
-          printed = true
-        } catch {
-          toast.warning('No se pudo imprimir el reporte — use "Imprimir reporte" para reintentar')
-        }
-      }
-
+      /**
+       * EL CIERRE NO IMPRIME NADA SOLO (Bruno, 10-oct-2026, definitivo: «cuando
+       * se hace una devolución y cuando se cierra caja no se imprime nada»).
+       *
+       * Antes, con una impresora configurada, mandaba el reporte de cierre a
+       * imprimir sin preguntar. En la PC de El Paranacito, con una impresora
+       * mal instalada, eso CERRABA el programa entero al cerrar la caja. Y
+       * aunque anduviera, nadie lo había pedido: el reporte queda a un clic
+       * en el aviso y en el Historial de cajas.
+       */
       toast.success(
         `Caja cerrada — esperado ${formatCurrency(result.report.expectedCash)}, contado ${formatCurrency(amt)}, diferencia ${formatCurrency(diff)}`,
-        printed
-          ? undefined
-          : { action: { label: 'Imprimir reporte', onClick: () => void printCashClose(reportData) } },
+        { duration: 12_000, action: { label: 'Imprimir reporte', onClick: () => void printCashClose(reportData) } },
       )
       setCloseAmount('')
       setCloseNotes('')

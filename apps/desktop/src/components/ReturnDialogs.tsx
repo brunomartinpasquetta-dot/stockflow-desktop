@@ -18,26 +18,12 @@ import { useArticles, useCompany, useCurrentCash } from '@/lib/hooks'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { type PriceMode, vatBreakdown } from '@/lib/pricing'
 import { printNode } from '@/lib/printService'
-import { imprimirTicketActivado } from '@/lib/imprimirTicket'
 import { FormalDocA4, type FormalDocData } from '@/print/FormalDocA4'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-
-/**
- * ¿"Imprimir ticket" (Ventas / Configuración) está activado? Manda la
- * configuración de la impresora; sin ella, lo elegido en esta PC (ver
- * lib/imprimirTicket); sin nada, activado, igual que en Ventas.
- */
-async function impresionAutomaticaActivada(): Promise<boolean> {
-  try {
-    return imprimirTicketActivado(await api.hardware.printer.getConfig())
-  } catch {
-    return imprimirTicketActivado(null)
-  }
-}
 
 interface LineState {
   lineId: string
@@ -269,11 +255,11 @@ export function ReturnSaleDialog({
       // La ventana de impresión sólo se abre sola si "Imprimir ticket" está
       // activado (la misma casilla de Ventas). Apagada, la devolución se
       // registra sin abrir nada y el comprobante queda a un clic, en el aviso.
-      const imprimirSolo = imprimirComprobante != null && (await impresionAutomaticaActivada())
-      if (imprimirComprobante && imprimirSolo) imprimirComprobante()
+      // LA DEVOLUCIÓN NO IMPRIME NADA SOLA (Bruno, 10-oct-2026, definitivo).
+      // Si hace falta el comprobante, queda a un clic en el aviso.
       toast.success(
         aviso,
-        imprimirComprobante && !imprimirSolo
+        imprimirComprobante
           ? { duration: 12_000, action: { label: 'Imprimir comprobante', onClick: imprimirComprobante } }
           : undefined,
       )
