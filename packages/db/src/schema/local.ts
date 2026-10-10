@@ -368,6 +368,12 @@ export const cashMovements = sqliteTable(
     ),
     /** Medio de pago del movimiento (nullable: movimientos antiguos no lo tienen). */
     paymentMethodId: text('payment_method_id').references(() => paymentMethods.id),
+    /**
+     * Pago a proveedor que originó este egreso (migración 0042). Sin este
+     * enlace no se podía saber qué movimiento correspondía a qué pago, y por
+     * eso un pago cargado con el origen equivocado no tenía arreglo.
+     */
+    supplierPaymentId: text('supplier_payment_id'),
     createdAt: createdAtCol(),
   },
   (t) => ({
@@ -915,6 +921,12 @@ export const supplierPayments = sqliteTable(
     reference: text('reference'),
     /** Nota del pago (espejo de payments.notes de clientes; migración 0023). */
     notes: text('notes'),
+    /**
+     * De dónde salió la plata: 'daily' (caja diaria) o 'general' (Caja
+     * General). Migración 0042. Null en los pagos anteriores, que por eso no
+     * se pueden corregir solos.
+     */
+    fundingSource: text('funding_source'),
     createdAt: createdAtCol(),
   },
   (t) => ({
@@ -1577,6 +1589,8 @@ export const cashGeneralMovements = sqliteTable(
     cashAmount: text('cash_amount'),
     /** Parte del importe que fue electrónica (null en filas anteriores a 0032). */
     electronicAmount: text('electronic_amount'),
+    /** Pago a proveedor que originó este movimiento (migración 0042). */
+    supplierPaymentId: text('supplier_payment_id'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => ({

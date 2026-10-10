@@ -450,6 +450,11 @@ export const api = {
   supplierAccounts: {
     listBalances: (): Promise<SupplierBalanceDTO[]> => unwrap(sf().supplierAccounts.listBalances()),
     payInvoice: (input: PaySupplierInvoiceInputDTO): Promise<PaySupplierInvoiceResultDTO> => unwrap(sf().supplierAccounts.payInvoice(input)),
+    corregirOrigenDePago: (
+      supplierPaymentId: string,
+      nuevoOrigen: 'daily' | 'general',
+    ): Promise<{ movidos: number; destino: 'daily' | 'general'; cajaUsada: string | null }> =>
+      unwrap(sf().supplierAccounts.corregirOrigenDePago({ supplierPaymentId, nuevoOrigen })),
     payToSupplier: (input: PayToSupplierInputDTO): Promise<PayToSupplierResultDTO> => unwrap(sf().supplierAccounts.payToSupplier(input)),
     getStatement: (supplierId: string): Promise<SupplierStatementDTO> => unwrap(sf().supplierAccounts.getStatement({ supplierId })),
     listOpenBySupplier: (supplierId: string): Promise<SupplierAccountPayableDTO[]> => unwrap(sf().supplierAccounts.listOpenBySupplier({ supplierId })),

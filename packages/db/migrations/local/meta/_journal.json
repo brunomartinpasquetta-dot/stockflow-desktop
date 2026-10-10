@@ -288,6 +288,13 @@
       "when": 1786725684791,
       "tag": "0041_proveedores_dados_de_baja",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1786725685791,
+      "tag": "0042_origen_del_pago",
+      "breakpoints": true
     }
   ]
 }

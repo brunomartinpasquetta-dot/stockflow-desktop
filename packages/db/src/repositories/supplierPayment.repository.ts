@@ -17,6 +17,7 @@ import {
   cashGeneral,
   cashGeneralMovements,
   cashMovements,
+  cashRegisters,
   paymentMethods,
   suppliers,
   supplierAccountsPayable,
@@ -50,6 +51,8 @@ function cashGeneralExpenseInTx(
     referenceId: string;
     userId: string;
     now: number;
+    /** Pago que originó el egreso: permite corregir después su origen. */
+    supplierPaymentId?: string | null;
   },
 ): void {
   const cgCur = tx.select().from(cashGeneral).where(eq(cashGeneral.id, 'singleton')).get();
@@ -83,6 +86,7 @@ function cashGeneralExpenseInTx(
       category: 'supplier_payment',
       createdBy: opts.userId,
       referenceId: opts.referenceId,
+      supplierPaymentId: opts.supplierPaymentId ?? null,
       balanceAfter,
       isCash: Number(cashPart) >= Number(elecPart),
       balanceAfterCash,
@@ -206,6 +210,7 @@ export class SupplierPaymentRepository extends BaseRepository<
               date: now,
               reference: p.reference ?? null,
               notes: data.notes ?? null,
+              fundingSource: data.fundingSource,
             })
             .returning()
             .all()[0];
@@ -225,6 +230,10 @@ export class SupplierPaymentRepository extends BaseRepository<
               date: now,
               userId: data.userId,
               paymentMethodId: pm.id,
+              // Enlace al pago (migración 0042): sin esto no se sabe qué
+              // movimiento corresponde a qué pago y el origen no se puede
+              // corregir.
+              supplierPaymentId: row.id,
             })
             .run();
         }
@@ -243,6 +252,7 @@ export class SupplierPaymentRepository extends BaseRepository<
             referenceId: data.accountId,
             userId: data.userId,
             now,
+            supplierPaymentId: inserted[0]?.id ?? null,
           });
         }
 
@@ -373,6 +383,7 @@ export class SupplierPaymentRepository extends BaseRepository<
                 date: now,
                 reference: m.reference,
                 notes: data.notes ?? null,
+                fundingSource: data.fundingSource,
               })
               .returning()
               .all()[0];
@@ -395,6 +406,7 @@ export class SupplierPaymentRepository extends BaseRepository<
                   date: now,
                   userId: data.userId,
                   paymentMethodId: pm.id,
+                  supplierPaymentId: row.id,
                 })
                 .run();
             }
@@ -430,10 +442,237 @@ export class SupplierPaymentRepository extends BaseRepository<
             referenceId: data.supplierId,
             userId: data.userId,
             now,
+            // Un pago FIFO se reparte entre varias facturas: se enlaza el
+            // primero, que alcanza para encontrar el grupo por fecha.
+            supplierPaymentId: inserted[0]?.id ?? null,
           });
         }
 
         return { payments: inserted, accounts: updatedAccounts, totalApplied: total };
+      });
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
+  /**
+   * CORREGIR DE DÓNDE SALIÓ LA PLATA de un pago a proveedor.
+   *
+   * El caso real (cliente, 8-oct-2026): pagaron una factura eligiendo «caja
+   * diaria» cuando el dinero salió de Caja General. La deuda estaba bien —la
+   * factura está pagada— pero el egreso quedó en la caja equivocada, y no
+   * había forma de arreglarlo salvo movimientos a mano.
+   *
+   * Esto NO anula el pago ni toca el saldo del proveedor: sólo mueve el
+   * egreso de una caja a la otra.
+   *
+   * Reglas (las mismas que ya usa la anulación de ventas):
+   *  - La devolución del efectivo a una caja diaria CERRADA no puede entrar
+   *    ahí (su arqueo ya está hecho y dejaría de cuadrar): va a la caja
+   *    abierta de hoy. Lo electrónico sí vuelve a la caja original, porque no
+   *    toca el arqueo del efectivo.
+   *  - Pasar el egreso A Caja General exige que tenga saldo.
+   */
+  async corregirOrigen(data: {
+    supplierPaymentId: string;
+    nuevoOrigen: 'daily' | 'general';
+    /** Caja diaria destino cuando el nuevo origen es la caja diaria. */
+    cashRegisterId?: string | null;
+    userId: string;
+  }): Promise<{ movidos: number; destino: 'daily' | 'general'; cajaUsada: string | null }> {
+    try {
+      return this.db.transaction((tx) => {
+        const pago = tx
+          .select()
+          .from(supplierPayments)
+          .where(eq(supplierPayments.id, data.supplierPaymentId))
+          .get();
+        if (!pago) throw new NotFoundError('Pago a proveedor', data.supplierPaymentId);
+
+        // Todos los pagos registrados en el MISMO acto (misma cuenta, mismo
+        // instante): un pago mixto son varias filas y se corrigen juntas.
+        const hermanos = tx
+          .select()
+          .from(supplierPayments)
+          .where(and(eq(supplierPayments.accountId, pago.accountId), eq(supplierPayments.date, pago.date)))
+          .all();
+        const ids = hermanos.map((h) => h.id);
+        const total = sumDecimals(hermanos.map((h) => h.amount));
+        const now = Date.now();
+
+        const pmRows = tx
+          .select()
+          .from(paymentMethods)
+          .where(inArray(paymentMethods.id, [...new Set(hermanos.map((h) => h.paymentMethodId))]))
+          .all();
+        const pmMap = new Map(pmRows.map((r) => [r.id, r]));
+
+        const enDiaria = tx
+          .select()
+          .from(cashMovements)
+          .where(inArray(cashMovements.supplierPaymentId, ids))
+          .all();
+        const enGeneral = tx
+          .select()
+          .from(cashGeneralMovements)
+          .where(inArray(cashGeneralMovements.supplierPaymentId, ids))
+          .all();
+
+        /**
+         * El origen lo dice el PAGO, no los movimientos: después de una
+         * corrección quedan movimientos en las dos cajas (el egreso y su
+         * devolución) y mirarlos daba siempre el origen viejo. Para los pagos
+         * anteriores a la migración 0042, que no lo tienen guardado, se
+         * deduce de dónde está el egreso.
+         */
+        const origenActual: 'daily' | 'general' =
+          pago.fundingSource === 'general' || pago.fundingSource === 'daily'
+            ? pago.fundingSource
+            : enDiaria.length > 0
+              ? 'daily'
+              : 'general';
+        if (enDiaria.length === 0 && enGeneral.length === 0) {
+          throw new ConstraintError(
+            'PAYMENT_WITHOUT_MOVEMENT',
+            'Este pago es anterior a la versión que guarda de dónde salió el dinero, así que no se puede corregir solo. Hay que ajustarlo a mano.',
+          );
+        }
+        if (origenActual === data.nuevoOrigen) {
+          throw new ConstraintError(
+            'SAME_FUNDING_SOURCE',
+            data.nuevoOrigen === 'daily'
+              ? 'El pago ya figura como salido de la caja diaria.'
+              : 'El pago ya figura como salido de Caja General.',
+          );
+        }
+
+        if (data.nuevoOrigen === 'general') {
+          // Devolver a la caja diaria lo que no salió de ahí…
+          const aDevolver = enDiaria.filter((m) => m.type === 'expense');
+          for (const mv of aDevolver) {
+            const pm = mv.paymentMethodId ? pmMap.get(mv.paymentMethodId) : undefined;
+            const esEfectivo = pm == null || pm.isPhysicalCash === true;
+            let destinoCaja = mv.cashRegisterId;
+            if (esEfectivo) {
+              const reg = tx
+                .select({ status: cashRegisters.status })
+                .from(cashRegisters)
+                .where(eq(cashRegisters.id, mv.cashRegisterId))
+                .get();
+              if (reg?.status !== 'open') {
+                const abierta = tx
+                  .select({ id: cashRegisters.id })
+                  .from(cashRegisters)
+                  .where(eq(cashRegisters.status, 'open'))
+                  .limit(1)
+                  .get();
+                if (!abierta) {
+                  throw new ConstraintError(
+                    'NO_OPEN_REGISTER',
+                    'La caja de ese pago está cerrada y no hay ninguna abierta: abra la caja para devolverle el efectivo.',
+                  );
+                }
+                destinoCaja = abierta.id;
+              }
+            }
+            tx.insert(cashMovements)
+              .values({
+                cashRegisterId: destinoCaja,
+                type: 'income',
+                description: `Corrección: el pago a proveedor salió de Caja General`,
+                amount: mv.amount,
+                date: now,
+                userId: data.userId,
+                paymentMethodId: mv.paymentMethodId,
+                supplierPaymentId: mv.supplierPaymentId,
+              })
+              .run();
+          }
+          // …y descontarlo de Caja General, que es de donde salió de verdad.
+          cashGeneralExpenseInTx(tx, {
+            total,
+            parts: hermanos.map((h) => ({ paymentMethodId: h.paymentMethodId, amount: h.amount })),
+            pmMap,
+            description: 'Pago a proveedor (corrección de origen)',
+            referenceId: pago.accountId,
+            userId: data.userId,
+            now,
+            supplierPaymentId: pago.id,
+          });
+          tx.update(supplierPayments).set({ fundingSource: 'general' }).where(inArray(supplierPayments.id, ids)).run();
+          return { movidos: aDevolver.length, destino: 'general' as const, cajaUsada: null };
+        }
+
+        // general → daily: se devuelve a Caja General y sale de la caja diaria.
+        const caja =
+          data.cashRegisterId ??
+          tx.select({ id: cashRegisters.id }).from(cashRegisters).where(eq(cashRegisters.status, 'open')).limit(1).get()
+            ?.id;
+        if (!caja) {
+          throw new ConstraintError(
+            'NO_OPEN_REGISTER',
+            'No hay una caja diaria abierta para registrar el egreso.',
+          );
+        }
+        exigirCajaAbiertaEnTx(tx, caja, 'la corrección del pago');
+        const cgCur = tx.select().from(cashGeneral).where(eq(cashGeneral.id, 'singleton')).get();
+        let cashPart = '0';
+        let elecPart = '0';
+        for (const h of hermanos) {
+          const pm = pmMap.get(h.paymentMethodId);
+          if (pm?.isPhysicalCash === false) elecPart = addDecimal(elecPart, h.amount, 2);
+          else cashPart = addDecimal(cashPart, h.amount, 2);
+        }
+        const balanceAfter = addDecimal(cgCur?.currentBalance ?? '0', total, 2);
+        const balanceAfterCash = addDecimal(cgCur?.cashBalance ?? '0', cashPart, 2);
+        const balanceAfterElec = addDecimal(cgCur?.electronicBalance ?? '0', elecPart, 2);
+        tx.insert(cashGeneralMovements)
+          .values({
+            id: uuidv7(),
+            type: 'income',
+            amount: total,
+            description: 'Corrección: el pago a proveedor salió de la caja diaria',
+            category: 'other',
+            createdBy: data.userId,
+            referenceId: pago.accountId,
+            supplierPaymentId: pago.id,
+            balanceAfter,
+            isCash: Number(cashPart) >= Number(elecPart),
+            balanceAfterCash,
+            balanceAfterElectronic: balanceAfterElec,
+            cashAmount: cashPart,
+            electronicAmount: elecPart,
+            createdAt: now,
+          })
+          .run();
+        if (cgCur) {
+          tx.update(cashGeneral)
+            .set({
+              currentBalance: balanceAfter,
+              cashBalance: balanceAfterCash,
+              electronicBalance: balanceAfterElec,
+              lastUpdate: now,
+            })
+            .where(eq(cashGeneral.id, 'singleton'))
+            .run();
+        }
+        for (const h of hermanos) {
+          const pm = pmMap.get(h.paymentMethodId);
+          tx.insert(cashMovements)
+            .values({
+              cashRegisterId: caja,
+              type: 'expense',
+              description: pm?.isPhysicalCash === false ? `Pago a proveedor — ${pm.name}` : 'Pago a proveedor',
+              amount: h.amount,
+              date: now,
+              userId: data.userId,
+              paymentMethodId: h.paymentMethodId,
+              supplierPaymentId: h.id,
+            })
+            .run();
+        }
+        tx.update(supplierPayments).set({ fundingSource: 'daily' }).where(inArray(supplierPayments.id, ids)).run();
+        return { movidos: hermanos.length, destino: 'daily' as const, cajaUsada: caja };
       });
     } catch (err) {
       return rethrowDbError(err);

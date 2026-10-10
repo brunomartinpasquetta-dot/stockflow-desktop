@@ -21,6 +21,13 @@ export function buildSupplierAccountsHandlers(deps: HandlerDeps): HandlerMap {
         return new SupplierAccountsService(ctx).listSupplierBalances();
       },
     ),
+    'supplierAccounts:corregirOrigenDePago': withSession(
+      deps,
+      (
+        payload: { supplierPaymentId: string; nuevoOrigen: 'daily' | 'general'; cashRegisterId?: string | null },
+        ctx,
+      ) => new SupplierAccountsService(ctx).corregirOrigenDePago(payload),
+    ),
     'supplierAccounts:payInvoice': withSession(
       deps,
       (payload: PaySupplierInvoiceInputDTO, ctx): Promise<PaySupplierInvoiceResultDTO> =>

@@ -2447,6 +2447,12 @@ export interface ApiSurface {
   supplierAccounts: {
     listBalances(): Res<SupplierBalanceDTO[]>;
     payInvoice(payload: PaySupplierInvoiceInputDTO): Res<PaySupplierInvoiceResultDTO>;
+    /** Mueve el egreso de un pago entre la caja diaria y Caja General. */
+    corregirOrigenDePago(payload: {
+      supplierPaymentId: string;
+      nuevoOrigen: 'daily' | 'general';
+      cashRegisterId?: string | null;
+    }): Res<{ movidos: number; destino: 'daily' | 'general'; cajaUsada: string | null }>;
     payToSupplier(payload: PayToSupplierInputDTO): Res<PayToSupplierResultDTO>;
     getStatement(payload: { supplierId: string; dateRange?: DateRangeDTO }): Res<SupplierStatementDTO>;
     listOpenBySupplier(payload: { supplierId: string }): Res<SupplierAccountPayableDTO[]>;

@@ -284,6 +284,30 @@ export class SupplierAccountsService {
   }
 
   /**
+   * Corrige de dónde salió la plata de un pago: de la caja diaria a Caja
+   * General, o al revés.
+   *
+   * No anula nada: la factura sigue pagada y el saldo del proveedor no se
+   * toca. Lo único que cambia es qué caja puso el dinero. Es el error que
+   * pasa de verdad —elegir mal el origen al pagar— y hasta ahora no tenía
+   * arreglo (cliente, 8-oct-2026).
+   */
+  async corregirOrigenDePago(input: {
+    supplierPaymentId: string;
+    nuevoOrigen: 'daily' | 'general';
+    cashRegisterId?: string | null;
+  }): Promise<{ movidos: number; destino: 'daily' | 'general'; cajaUsada: string | null }> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'manage_supplier_accounts');
+    return repos.supplierPayments.corregirOrigen({
+      supplierPaymentId: input.supplierPaymentId,
+      nuevoOrigen: input.nuevoOrigen,
+      cashRegisterId: input.cashRegisterId ?? null,
+      userId: currentUser.id,
+    });
+  }
+
+  /**
    * Detalle de un comprobante de proveedor: la cuenta, la compra asociada, sus
    * líneas (con descripción/marca del artículo) y los pagos aplicados a ESA
    * cuenta (con el nombre del medio de pago).
