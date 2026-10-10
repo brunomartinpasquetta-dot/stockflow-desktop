@@ -32,6 +32,54 @@
     --radius: 0.4rem;
   }
 
+  /* TEMA OSCURO (pedido de Bruno, 10-oct-2026). Se activa con la clase `dark`
+     en <html> (src/lib/tema.ts), elegida en Configuración → General y
+     recordada por PC; por defecto sigue al dispositivo. El azul StockFlow se
+     mantiene como primario/acento: es la marca, no cambia con el tema. */
+  .dark {
+    color-scheme: dark;
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 44% 10%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 44% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 221 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 68%;
+    --accent: 221 83% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 58% 42%;
+    --success-foreground: 0 0% 100%;
+    --border: 217 28% 22%;
+    --input: 217 28% 26%;
+    --ring: 221 83% 58%;
+    --sidebar: 222 44% 9%;
+    --sidebar-foreground: 210 40% 92%;
+  }
+
+  /* Tintes de estado (avisos ámbar, verdes, celestes…). En claro son fondos
+     casi blancos con texto oscuro; en oscuro quedarían como carteles
+     encandilantes. Se pasan a fondo translúcido del mismo color y texto en el
+     tono claro, sin tocar cada pantalla. Sólo las clases que la app usa. */
+  .dark .bg-amber-50, .dark .bg-amber-100 { background-color: rgb(245 158 11 / 0.16); }
+  .dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: rgb(16 185 129 / 0.16); }
+  .dark .bg-blue-50, .dark .bg-blue-100, .dark .bg-sky-100 { background-color: rgb(56 189 248 / 0.16); }
+  .dark .bg-rose-50 { background-color: rgb(244 63 94 / 0.16); }
+  .dark .bg-indigo-100 { background-color: rgb(129 140 248 / 0.18); }
+  .dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900 { color: rgb(252 211 77); }
+  .dark .text-emerald-700, .dark .text-emerald-800, .dark .text-emerald-900, .dark .text-green-700 { color: rgb(110 231 183); }
+  .dark .text-rose-700, .dark .text-rose-800 { color: rgb(253 164 175); }
+  .dark .text-sky-700, .dark .text-sky-800, .dark .text-blue-700 { color: rgb(125 211 252); }
+  .dark .text-indigo-800 { color: rgb(165 180 252); }
+  .dark .border-amber-200, .dark .border-amber-700 { border-color: rgb(245 158 11 / 0.5); }
+  .dark .border-emerald-700 { border-color: rgb(16 185 129 / 0.5); }
+
   * {
     @apply border-border;
   }
@@ -172,6 +220,10 @@ body.printing #print-area {
     background: transparent !important;
     box-shadow: none !important;
     text-shadow: none !important;
+    /* Con el tema oscuro `--border` es casi negro sobre fondo oscuro, pero en
+       papel sería gris lavado: las líneas de tablas y separadores salen
+       siempre en negro, sea cual sea el tema de la pantalla. */
+    border-color: #000 !important;
   }
   /* Hint al navegador. El tamaño real lo determina el rollo cargado en
      la térmica (driver del SO). El width del #print-area asegura el

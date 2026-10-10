@@ -64,6 +64,21 @@ import {
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#ec4899', '#0ea5e9', '#f97316']
 
+/**
+ * Recharts dibuja ejes, grilla y tooltip con grises fijos pensados para fondo
+ * blanco: con el tema oscuro quedaban negro sobre negro. Todo lo que no es
+ * una serie de datos toma los colores del tema (variables de index.css).
+ */
+const TOOLTIP_ESTILO = {
+  backgroundColor: 'hsl(var(--popover))',
+  color: 'hsl(var(--popover-foreground))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: 6,
+  fontSize: 12,
+} as const
+const EJE = { fill: 'hsl(var(--muted-foreground))', fontSize: 10 } as const
+const LINEA_EJE = { stroke: 'hsl(var(--border))' } as const
+
 /* Rangos en hora local de la máquina (misma zona que usa el resto de la
    pantalla y que 'localtime' en las consultas). */
 function diaRange(offsetDias: number): { from: number; to: number } {
@@ -510,10 +525,10 @@ export function Estadisticas() {
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendContinua}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickFormatter={formatBucket} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={formatEjeMoneda} width={70} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="bucket" tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} tickFormatter={formatBucket} />
+                    <YAxis tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} tickFormatter={formatEjeMoneda} width={70} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={TOOLTIP_ESTILO} />
                     <Line type="monotone" dataKey="total" stroke="#6366f1" name="Total" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -527,10 +542,10 @@ export function Estadisticas() {
               <div className="mx-auto h-36 w-full max-w-md">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(dow.data ?? []).map((d) => ({ ...d, name: DOW_NAMES[d.dayOfWeek] ?? d.dayOfWeek, totalN: Number(d.total) }))}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={formatEjeMoneda} width={70} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} />
+                    <YAxis tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} tickFormatter={formatEjeMoneda} width={70} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={TOOLTIP_ESTILO} />
                     <Bar dataKey="totalN" fill="#10b981" name="Total" maxBarSize={32} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -563,8 +578,8 @@ export function Estadisticas() {
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={TOOLTIP_ESTILO} />
+                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -605,10 +620,10 @@ export function Estadisticas() {
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(topC.data ?? []).map((r) => ({ name: r.fullName, value: Number(r.totalAmount) }))} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={150} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} />
+                    <YAxis dataKey="name" type="category" width={150} tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={TOOLTIP_ESTILO} />
                     <Bar dataKey="value" fill="#6366f1" maxBarSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -643,10 +658,10 @@ export function Estadisticas() {
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={(topS.data ?? []).map((r) => ({ name: r.supplierName, value: Number(r.totalAmount) }))} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={150} />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} />
+                    <YAxis dataKey="name" type="category" width={150} tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={TOOLTIP_ESTILO} />
                     <Bar dataKey="value" fill="#f59e0b" maxBarSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -747,8 +762,8 @@ export function Estadisticas() {
                         <Cell key={r.paymentMethodId} fill={colorMap[r.paymentMethodId]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={TOOLTIP_ESTILO} />
+                    <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -808,11 +823,11 @@ export function Estadisticas() {
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={vfpTiempoPivot}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickFormatter={formatBucket} />
-                    <YAxis />
-                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Legend />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="bucket" tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} tickFormatter={formatBucket} />
+                    <YAxis tick={EJE} axisLine={LINEA_EJE} tickLine={LINEA_EJE} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={TOOLTIP_ESTILO} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
                     {vfpFiltrado.map((r) => (
                       <Bar
                         maxBarSize={26}
@@ -1339,7 +1354,9 @@ function HeatmapHour({ data }: { data: Array<{ hour: number; count: number; tota
           <div
             key={h}
             className="flex h-10 flex-col items-center justify-center rounded-sm text-[10px] font-medium"
-            style={{ backgroundColor: bg, color: intensity > 0.55 ? '#fff' : '#1f2937' }}
+            // Texto oscuro fijo sobre la celda clara se perdía en tema oscuro:
+            // ahora toma el color del tema, y blanco sólo cuando la celda es intensa.
+            style={{ backgroundColor: bg, color: intensity > 0.55 ? '#fff' : 'hsl(var(--foreground))' }}
             title={d ? `${h}h · ${d.count} ventas · ${formatCurrency(d.total)}` : `${h}h · sin ventas`}
           >
             <div>{String(h).padStart(2, '0')}</div>

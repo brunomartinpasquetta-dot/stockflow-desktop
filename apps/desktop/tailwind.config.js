@@ -1,5 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Tema oscuro por CLASE en <html> (no por el sistema operativo): lo elige el
+  // comercio en Configuración y se recuerda por PC. Ver src/lib/tema.ts.
+  darkMode: ['class'],
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {

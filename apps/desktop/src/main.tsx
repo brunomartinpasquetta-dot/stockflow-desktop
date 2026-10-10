@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -9,6 +9,7 @@ import { LanProvider } from '@/contexts/LanContext'
 import { LicenseProvider } from '@/contexts/LicenseContext'
 import { queryClient, subscribeToDataChanges } from '@/lib/queryClient'
 import { router } from '@/router'
+import { estaEnOscuro, iniciarTema } from '@/lib/tema'
 import './index.css'
 
 // En Windows el puntero blanco del SO se pierde sobre el fondo claro. Marcamos
@@ -16,6 +17,21 @@ import './index.css'
 // (en macOS dejamos el cursor nativo).
 if (navigator.userAgent.includes('Windows')) {
   document.documentElement.classList.add('is-windows')
+}
+
+// Tema claro/oscuro: se aplica ANTES de dibujar nada para que no haya un
+// destello blanco, y vale para todas las ventanas (todas arrancan por acá).
+iniciarTema()
+
+/** El Toaster de sonner tiene su propio tema: lo sigue a la pantalla. */
+function ToasterConTema() {
+  const [oscuro, setOscuro] = useState(estaEnOscuro())
+  useEffect(() => {
+    const f = () => setOscuro(estaEnOscuro())
+    window.addEventListener('stockflow:tema', f)
+    return () => window.removeEventListener('stockflow:tema', f)
+  }, [])
+  return <Toaster position="top-right" richColors closeButton theme={oscuro ? 'dark' : 'light'} />
 }
 
 const rootEl = document.getElementById('root')
@@ -37,7 +53,7 @@ createRoot(rootEl).render(
         <LanProvider>
           <LicenseProvider>
             <RouterProvider router={router} />
-            <Toaster position="top-right" richColors closeButton />
+            <ToasterConTema />
           </LicenseProvider>
         </LanProvider>
       </TooltipProvider>

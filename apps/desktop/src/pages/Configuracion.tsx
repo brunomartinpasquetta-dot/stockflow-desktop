@@ -12,6 +12,7 @@ import { FlowyIAConfig } from '@/components/FlowyIAConfig'
 import { FacturasTelefonoConfig } from '@/components/FacturasTelefonoConfig'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ETIQUETAS_TEMA, guardarTema, leerTema, type Tema } from '@/lib/tema'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -1491,12 +1492,40 @@ function GeneralSection() {
     { to: '/usuarios', label: 'Usuarios' },
     { to: '/importar-stock', label: 'Importar stock desde Excel' },
   ]
+  // Tema de ESTA pantalla (se recuerda por PC, no en la base): ver lib/tema.
+  const [tema, setTema] = useState<Tema>(() => leerTema())
+  function elegirTema(t: Tema): void {
+    setTema(t)
+    guardarTema(t)
+  }
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">General</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-1">
+        <fieldset className="mb-2 rounded-md border px-3 pb-2 pt-1">
+          <legend className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Apariencia
+          </legend>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            {(['sistema', 'claro', 'oscuro'] as const).map((t) => (
+              <label key={t} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="tema"
+                  className="h-4 w-4"
+                  checked={tema === t}
+                  onChange={() => elegirTema(t)}
+                />
+                {ETIQUETAS_TEMA[t]}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Vale para esta computadora o dispositivo. Lo que se imprime sale siempre en blanco.
+          </p>
+        </fieldset>
         {links.map((l) => (
           <Link
             key={l.to}

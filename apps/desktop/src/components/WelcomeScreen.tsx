@@ -105,7 +105,7 @@ export function WelcomeScreen() {
       {/* Contenedor que RECORTA (se anima el ancho de éste, no el del webview) */}
       <div className="h-full shrink-0 overflow-hidden" style={{ width: clipWidth, transition: TRANSITION }}>
         {/* Contenido de ancho FIJO: el webview nunca se redimensiona → fluido */}
-        <div className="flex h-full flex-col border-l bg-white" style={{ width: PANEL_WIDTH, borderColor: 'rgb(228 234 243)' }}>
+        <div className="flex h-full flex-col border-l border-border bg-card" style={{ width: PANEL_WIDTH }}>
           <div className="flex items-center justify-between bg-primary px-2 py-1.5 text-primary-foreground">
             <span className="flex items-center gap-1.5 px-1 text-sm font-semibold">
               <WhatsAppGlyph className="h-4 w-4" strokeWidth={2} /> WhatsApp

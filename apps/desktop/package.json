@@ -67,7 +67,8 @@
     "test:cantidad-sospechosa": "tsx electron/__tests__/cantidad-sospechosa.smoke.ts",
     "test:direccion-de-red": "tsx electron/__tests__/direccion-de-red.smoke.ts",
     "test:caja-cierre": "tsx electron/__tests__/caja-cierre.smoke.ts",
-    "test:origen-pago": "tsx electron/__tests__/origen-pago.smoke.ts"
+    "test:origen-pago": "tsx electron/__tests__/origen-pago.smoke.ts",
+    "test:tema": "tsx electron/__tests__/tema.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -183,7 +183,7 @@ export function VincularTelefonoDialog({
                 <img src={qr} alt="Código QR para vincular el teléfono" className="h-72 w-72" />
               ) : (
                 <div className="flex h-72 w-72 items-center justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-neutral-400" />
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               )}
             </div>
