@@ -32,9 +32,9 @@ check(debeIrOscuro('sistema', true) === true, '«Según el dispositivo» con el 
 check(debeIrOscuro('sistema', false) === false, '«Según el dispositivo» con el dispositivo en claro → claro');
 
 // ── Lo guardado en esta PC ─────────────────────────────────────────────────
-check(leerTema() === 'sistema', 'sin nada guardado, sigue al dispositivo (así nadie nota un cambio al actualizar)');
+check(leerTema() === 'claro', 'sin nada guardado, arranca claro (así nadie nota un cambio al actualizar)');
 memoria.set('stockflow:tema', 'cualquier cosa');
-check(leerTema() === 'sistema', 'con basura guardada, vuelve a «según el dispositivo» en vez de romper');
+check(leerTema() === 'claro', 'con basura guardada, vuelve a claro en vez de romper');
 
 guardarTema('oscuro');
 check(memoria.get('stockflow:tema') === 'oscuro', 'guardar «oscuro» lo deja en esta PC');
@@ -43,7 +43,8 @@ guardarTema('claro');
 check(leerTema() === 'claro', 'cambiar a «claro» pisa lo anterior');
 
 // ── Las etiquetas que ve el usuario ───────────────────────────────────────
-check(ETIQUETAS_TEMA.sistema === 'Según el dispositivo', 'la opción por defecto se llama «Según el dispositivo»');
+check(ETIQUETAS_TEMA.claro === 'Claro', 'la opción por defecto se llama «Claro»');
+check(ETIQUETAS_TEMA.sistema === 'Según el dispositivo', 'la de la tablet se llama «Según el dispositivo»');
 check(
   Object.keys(ETIQUETAS_TEMA).length === 3,
   'hay exactamente tres opciones: claro, oscuro y según el dispositivo',

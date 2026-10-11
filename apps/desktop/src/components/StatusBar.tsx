@@ -5,10 +5,11 @@
  */
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { User, Wallet } from 'lucide-react'
+import { Moon, Sun, User, Wallet } from 'lucide-react'
 
 import { BRANDING } from '@/assets/branding'
 import { api } from '@/lib/api'
+import { estaEnOscuro, guardarTema } from '@/lib/tema'
 import { GlobalSearchBar } from '@/components/GlobalSearchBar'
 import { LanStatusIndicator } from '@/components/LanStatusIndicator'
 import { useAuth } from '@/contexts/AuthContext'
@@ -98,6 +99,31 @@ export function StatusBar() {
           <span>{currentUser.fullName}</span>
         </div>
       )}
+      <BotonTema />
     </div>
+  )
+}
+
+/**
+ * Claro / oscuro a mano, al lado del usuario (Bruno, 10-oct-2026). Un clic
+ * alterna; la opción fina («según el dispositivo») sigue en Configuración.
+ */
+function BotonTema() {
+  const [oscuro, setOscuro] = useState(estaEnOscuro())
+  useEffect(() => {
+    const f = () => setOscuro(estaEnOscuro())
+    window.addEventListener('stockflow:tema', f)
+    return () => window.removeEventListener('stockflow:tema', f)
+  }, [])
+  return (
+    <button
+      type="button"
+      onClick={() => guardarTema(oscuro ? 'claro' : 'oscuro')}
+      title={oscuro ? 'Pasar a tema claro' : 'Pasar a tema oscuro'}
+      aria-label={oscuro ? 'Pasar a tema claro' : 'Pasar a tema oscuro'}
+      className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {oscuro ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
   )
 }

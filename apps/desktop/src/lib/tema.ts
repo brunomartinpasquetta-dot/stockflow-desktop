@@ -6,10 +6,10 @@
  * en la que uno trabaja, no del comercio. Una tablet puede ir en oscuro y la
  * PC del mostrador en claro, con los mismos datos.
  *
- * Por defecto SIGUE AL DISPOSITIVO. Bruno vio el acceso remoto en una tablet
- * Samsung en modo oscuro y «se veía espectacular»: así, en las PC de Windows
- * (claras) nadie nota ningún cambio, y en una tablet configurada en oscuro
- * sale oscuro sin tocar nada.
+ * Por defecto CLARO (Bruno, 10-oct-2026: «el tema por defecto igual es el
+ * blanco»): al actualizar nadie nota ningún cambio. El oscuro se elige a mano
+ * —un clic en la barra de estado, al lado del usuario— o, desde Configuración,
+ * «según el dispositivo» para una tablet que ya anda en oscuro.
  *
  * Se aplica poniendo la clase `dark` en <html> (tailwind `darkMode: 'class'`,
  * variables en index.css). Como todas las ventanas de la app comparten el
@@ -28,13 +28,13 @@ export const ETIQUETAS_TEMA: Record<Tema, string> = {
   sistema: 'Según el dispositivo',
 }
 
-/** Lo elegido en esta PC; si nunca se tocó, sigue al dispositivo. */
+/** Lo elegido en esta PC; si nunca se tocó, claro. */
 export function leerTema(): Tema {
   try {
     const v = localStorage.getItem(CLAVE)
-    return (TEMAS as readonly string[]).includes(v ?? '') ? (v as Tema) : 'sistema'
+    return (TEMAS as readonly string[]).includes(v ?? '') ? (v as Tema) : 'claro'
   } catch {
-    return 'sistema'
+    return 'claro'
   }
 }
 

@@ -1494,6 +1494,12 @@ function GeneralSection() {
   ]
   // Tema de ESTA pantalla (se recuerda por PC, no en la base): ver lib/tema.
   const [tema, setTema] = useState<Tema>(() => leerTema())
+  // Si lo cambian desde el botón de la barra (o desde otra ventana), el radio acompaña.
+  useEffect(() => {
+    const f = () => setTema(leerTema())
+    window.addEventListener('stockflow:tema', f)
+    return () => window.removeEventListener('stockflow:tema', f)
+  }, [])
   function elegirTema(t: Tema): void {
     setTema(t)
     guardarTema(t)
@@ -1509,7 +1515,7 @@ function GeneralSection() {
             Apariencia
           </legend>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            {(['sistema', 'claro', 'oscuro'] as const).map((t) => (
+            {(['claro', 'oscuro', 'sistema'] as const).map((t) => (
               <label key={t} className="flex items-center gap-2 text-sm">
                 <input
                   type="radio"
