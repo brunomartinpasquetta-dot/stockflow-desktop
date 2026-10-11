@@ -168,6 +168,9 @@ const GROUPS: MenuGroup[] = [
       { pageKey: 'facturas-emitidas', label: 'Facturas emitidas', icon: Receipt, requires: 'view_accounting' },
       { pageKey: 'compras-por-proveedor', label: 'Facturas de compra', icon: Truck, requires: 'view_accounting' },
       { separator: true, label: '' },
+      // También desde acá (Bruno, 9-oct-2026): es la misma pantalla que en Consultas (F8).
+      { pageKey: 'caja-general', label: 'Caja General', icon: Banknote, requires: 'view_cash_general' },
+      { separator: true, label: '' },
       { pageKey: 'facturacion-electronica', label: 'Facturación Electrónica (ARCA)', icon: ShieldCheck, roles: ['admin'] },
     ],
   },
