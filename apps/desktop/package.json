@@ -69,7 +69,8 @@
     "test:caja-cierre": "tsx electron/__tests__/caja-cierre.smoke.ts",
     "test:origen-pago": "tsx electron/__tests__/origen-pago.smoke.ts",
     "test:tema": "tsx electron/__tests__/tema.smoke.ts",
-    "test:mp-qr-fijo": "tsx electron/__tests__/mp-qr-fijo.smoke.ts"
+    "test:mp-qr-fijo": "tsx electron/__tests__/mp-qr-fijo.smoke.ts",
+    "test:mp-qr-flujo": "tsx electron/__tests__/mp-qr-flujo.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
