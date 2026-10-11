@@ -10,7 +10,7 @@
  * (eso trababa WhatsApp). El webview se crea UNA vez y queda montado para no
  * perder la sesión. SOLO pruebas locales.
  */
-import { BRANDING } from "@/assets/branding"
+import { LogoMarca } from "@/components/LogoMarca"
 import { useEffect, useRef } from 'react'
 import { Minus, RefreshCw, X } from 'lucide-react'
 
@@ -94,11 +94,10 @@ export function WelcomeScreen() {
     <div className="relative flex h-full overflow-hidden bg-gradient-to-br from-background to-muted/30">
       {/* Logo (se comprime cuando el panel abre) */}
       <div className="flex min-w-0 flex-1 items-center justify-center px-8 py-12">
-        <img
-          src={BRANDING.logoStacked}
+        <LogoMarca
+          variante="apilado"
           alt="StockFlow — Sistema de Gestión Comercial"
           className="h-auto w-[260px] select-none"
-          draggable={false}
         />
       </div>
 

@@ -156,12 +156,27 @@ def variante_b(zona: np.ndarray, mascara: np.ndarray) -> np.ndarray:
     return np.clip(C1 * (1 - t) + C2 * t, 0, 255).astype(np.uint8)
 
 
+def variante_c(zona: np.ndarray, mascara: np.ndarray) -> np.ndarray:
+    """«bordes» (la que pidió Bruno: no cambiar el diseño): el dibujo queda tal
+    cual, relieve incluido; sólo la franja antialias del contorno toma el color
+    del píxel opaco más cercano, para que no quede el halo oscuro del recorte."""
+    # Las costuras casi negras del relieve (1–2 px, lum < 70) tampoco son
+    # fuente: se rellenan desde el vecino y en fondo oscuro ya no se leen
+    # como rayas negras. Los filetes claros quedan.
+    lum = zona[..., :3].astype(int).mean(axis=-1)
+    fuente = mascara & (zona[..., 3] >= 200) & (lum >= 70)
+    return propagar(zona[..., :3], fuente, pasos=8)
+
+
+VARIANTES = {'A': variante_a, 'B': variante_b, 'C': variante_c}
+
+
 def repintar(a: np.ndarray, variante: str, modo_caja: str) -> np.ndarray:
     a = a.copy()
     x0, y0, x1, y1 = caja_del_isotipo(a[..., 3], modo_caja)
     zona = a[y0:y1, x0:x1].copy()
     mascara = silueta(zona[..., 3])
-    zona[..., :3] = variante_a(zona, mascara) if variante == 'A' else variante_b(zona, mascara)
+    zona[..., :3] = VARIANTES[variante](zona, mascara)
     zona[..., 3] = alpha_limpio(mascara)
     a[y0:y1, x0:x1] = zona
     return a

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BRANDING } from '@/assets/branding'
+import { LogoMarca } from '@/components/LogoMarca'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -76,11 +76,7 @@ export function AcercaDe() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
-      <img
-        src={BRANDING.logoFull}
-        alt="StockFlow"
-        className="mx-auto mb-4 h-auto w-[280px]"
-      />
+      <LogoMarca variante="completo" className="mx-auto mb-4 h-auto w-[280px]" />
       <h1 className="text-lg font-semibold">Acerca de StockFlow</h1>
       <Card>
         <CardHeader className="pb-2">

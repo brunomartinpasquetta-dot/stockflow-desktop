@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BRANDING } from '@/assets/branding'
+import { LogoMarca } from '@/components/LogoMarca'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -49,11 +49,7 @@ export function Login() {
     <div className="flex h-full items-center justify-center bg-secondary/40 p-4">
       <Card className="w-full max-w-sm">
         <CardContent className="flex flex-col gap-3 pt-6">
-          <img
-            src={BRANDING.logoHorizontal}
-            alt="StockFlow"
-            className="mx-auto mb-6 h-auto w-[320px]"
-          />
+          <LogoMarca variante="horizontal" className="mx-auto mb-6 h-auto w-[320px]" />
           <div className="flex flex-col gap-1">
             <Label htmlFor="login-user">Usuario</Label>
             <Input

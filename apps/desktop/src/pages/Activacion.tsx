@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BRANDING } from '@/assets/branding'
+import { LogoMarca } from '@/components/LogoMarca'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -99,11 +99,7 @@ export function Activacion() {
     <div className="flex h-full items-center justify-center overflow-y-auto bg-secondary/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center gap-2 pt-6 text-center">
-          <img
-            src={BRANDING.logoFull}
-            alt="StockFlow"
-            className="mx-auto h-auto w-[280px]"
-          />
+          <LogoMarca variante="completo" className="mx-auto h-auto w-[280px]" />
           <CardTitle className="text-lg">Empezá a usar StockFlow</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

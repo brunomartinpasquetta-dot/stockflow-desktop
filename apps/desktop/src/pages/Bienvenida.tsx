@@ -3,7 +3,7 @@
  * Pregunta el modo (PC única / Servidor / Cliente). Guarda LAN config y
  * reinicia la app para que tome la configuración.
  */
-import { BRANDING } from "@/assets/branding"
+import { LogoMarca } from "@/components/LogoMarca"
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -103,11 +103,7 @@ export function Bienvenida() {
     <div className="flex min-h-screen items-center justify-center bg-secondary/30 p-6">
       <div className="w-full max-w-2xl">
         <div className="mb-6 flex flex-col items-center gap-2">
-          <img
-            src={BRANDING.logoFull}
-            alt="StockFlow"
-            className="mx-auto mb-4 h-auto w-[280px]"
-          />
+          <LogoMarca variante="completo" className="mx-auto mb-4 h-auto w-[280px]" />
           <h1 className="text-2xl font-semibold">Bienvenido</h1>
           <p className="text-sm text-muted-foreground">Configure cómo se va a usar la aplicación.</p>
         </div>
