@@ -103,11 +103,13 @@ def silueta(alpha: np.ndarray) -> np.ndarray:
 
 
 def alpha_limpio(mascara: np.ndarray) -> np.ndarray:
-    """Borde antialias parejo a partir de la silueta; nada fuera de 2 px."""
+    """Borde antialias parejo a partir de la silueta, NÍTIDO: transición de
+    ~1,5–2 px como el original (con radio 0,7 quedaba en ~4 px y el borde se
+    veía blando a escala Retina — lo midieron los jueces del 10-oct-2026)."""
     m255 = mascara.astype(np.uint8) * 255
-    suave = np.array(img_l(m255).filter(ImageFilter.GaussianBlur(radius=0.7)))
-    lejos = np.array(img_l(m255).filter(ImageFilter.MaxFilter(5))) == 0
-    suave[lejos] = 0
+    suave = np.array(img_l(m255).filter(ImageFilter.GaussianBlur(radius=0.45)))
+    suave[suave < 10] = 0
+    suave[suave > 245] = 255
     return suave
 
 
@@ -168,7 +170,61 @@ def variante_c(zona: np.ndarray, mascara: np.ndarray) -> np.ndarray:
     return propagar(zona[..., :3], fuente, pasos=8)
 
 
-VARIANTES = {'A': variante_a, 'B': variante_b, 'C': variante_c}
+LUZ = np.array([214, 228, 255], dtype=np.float32)   # hacia dónde tira el filete claro del bisel
+SOMBRA = np.array([8, 22, 80], dtype=np.float32)    # hacia dónde tira el lado en sombra
+
+
+def blur_dentro(rgb: np.ndarray, mascara: np.ndarray, radio: float) -> np.ndarray:
+    """Desenfoca el color usando sólo píxeles de adentro (premultiplicado por la máscara)."""
+    m = mascara.astype(np.float32)
+    pm = rgb.astype(np.float32) * m[..., None]
+    b = np.stack([np.array(Image.fromarray(pm[..., i].astype(np.uint8)).filter(ImageFilter.GaussianBlur(radio)), dtype=np.float32) for i in range(3)], axis=-1)
+    bm = np.array(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(radio)), dtype=np.float32) / 255
+    out = b / np.maximum(bm, 1e-3)[..., None]
+    out[~mascara] = rgb[~mascara]
+    return np.clip(out, 0, 255)
+
+
+def base_suave(zona: np.ndarray, mascara: np.ndarray) -> np.ndarray:
+    """Las caras del cubo con su sombreado original, pero sin filetes ni costuras."""
+    lum = zona[..., :3].astype(int).mean(axis=-1)
+    fuente = mascara & (zona[..., 3] >= 200) & (lum >= 70) & (lum <= 150)
+    rgb = propagar(zona[..., :3], fuente, pasos=10)
+    return blur_dentro(rgb, mascara, radio=max(2.0, mascara.shape[1] * 0.008))
+
+
+def bisel(mascara: np.ndarray, sigma: float) -> np.ndarray:
+    """Relieve parejo: >0 donde el borde interior mira a la luz (arriba-izquierda), <0 en sombra."""
+    m = np.array(Image.fromarray(mascara.astype(np.uint8) * 255).filter(ImageFilter.GaussianBlur(sigma)), dtype=np.float32) / 255
+    gy, gx = np.gradient(m)
+    s = (gx + gy) / np.sqrt(2) * sigma * 2.2
+    s[~mascara] = 0
+    return np.clip(s, -1, 1)
+
+
+def variante_d(zona: np.ndarray, mascara: np.ndarray, luz: float, sombra: float, sigma_rel: float) -> np.ndarray:
+    """«relieve rehecho»: mismas caras (base_suave) + bisel continuo en vez de los
+    filetes irregulares del render original. Mismo diseño, bordes parejos."""
+    base = base_suave(zona, mascara)
+    s = bisel(mascara, sigma=max(1.2, mascara.shape[1] * sigma_rel))
+    l = np.clip(s, 0, 1)[..., None] * luz
+    o = np.clip(-s, 0, 1)[..., None] * sombra
+    out = base * (1 - l) + LUZ * l
+    out = out * (1 - o) + SOMBRA * o
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+VARIANTES = {
+    'A': variante_a,
+    'B': variante_b,
+    'C': variante_c,
+    'E': lambda z, m: base_suave(z, m).astype(np.uint8),
+    # D0: volumen redondeado, ancho y tenue — sin ninguna línea clara en el borde.
+    'D0': lambda z, m: variante_d(z, m, luz=0.35, sombra=0.30, sigma_rel=0.012),
+    'D1': lambda z, m: variante_d(z, m, luz=0.55, sombra=0.35, sigma_rel=0.005),
+    'D2': lambda z, m: variante_d(z, m, luz=0.75, sombra=0.45, sigma_rel=0.007),
+    'D3': lambda z, m: variante_d(z, m, luz=0.9, sombra=0.55, sigma_rel=0.010),
+}
 
 
 def repintar(a: np.ndarray, variante: str, modo_caja: str) -> np.ndarray:
@@ -177,6 +233,11 @@ def repintar(a: np.ndarray, variante: str, modo_caja: str) -> np.ndarray:
     zona = a[y0:y1, x0:x1].copy()
     mascara = silueta(zona[..., 3])
     zona[..., :3] = VARIANTES[variante](zona, mascara)
+    # Sangrado del color: los píxeles de la franja antialias (fuera de la
+    # silueta) toman el color del píxel de adentro más cercano. Si no, quedan
+    # con el RGB del recorte original (halo grisáceo) y en oscuro se ve un
+    # ribete pálido alrededor de todo el dibujo.
+    zona[..., :3] = propagar(zona[..., :3], mascara, pasos=4)
     zona[..., 3] = alpha_limpio(mascara)
     a[y0:y1, x0:x1] = zona
     return a
