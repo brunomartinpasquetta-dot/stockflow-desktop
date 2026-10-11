@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { AlertTriangle, BadgePercent, List, Loader2, Printer, QrCode, Search, ShoppingCart, Trash2, Undo2, Wallet, X, Zap } from 'lucide-react'
 
 import { api } from '@/lib/api'
+import { qrDeLaInstalacion } from '@/lib/mpQr'
 import { cn } from '@/lib/utils'
 import {
   useArticles,
@@ -1203,10 +1204,12 @@ function PDV() {
 
   // --- MercadoPago QR ---
   const mpConfigured = mpConfigQuery.data?.configured === true
+  // El QR es el de la instalación, no el de la caja diaria abierta (si no, al
+  // abrir la caja siguiente desaparecía el botón: Denver, 11-oct-2026). La caja
+  // abierta sigue haciendo falta para cobrar.
   const mpPosDeviceForCurrentCash = useMemo(() => {
-    const list = mpPosDevicesQuery.data ?? []
     if (!currentCashRegisterId) return null
-    return list.find((d) => d.cashRegisterId === currentCashRegisterId && d.active) ?? null
+    return qrDeLaInstalacion(mpPosDevicesQuery.data)
   }, [mpPosDevicesQuery.data, currentCashRegisterId])
   const mpMethod = useMemo(() => {
     const methods = activeMethods

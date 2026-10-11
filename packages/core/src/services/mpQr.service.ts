@@ -247,25 +247,46 @@ export class MpQrService {
     return this.ctx.db.select().from(mpPosDevices).orderBy(asc(mpPosDevices.createdAt)).all();
   }
 
+  /**
+   * EL QR ES UNO POR INSTALACIÓN, NO POR CAJA DIARIA (Bruno, 11-oct-2026).
+   *
+   * `mp_pos_devices.cash_register_id` apunta a la caja diaria —la sesión que
+   * se abre y se cierra—, así que el QR vinculado un día «desaparecía» al
+   * abrir la caja siguiente (otro id) y, al tocar «Generar QR» de nuevo, se
+   * creaba un SEGUNDO punto de cobro: las órdenes iban a ése y el cartel
+   * pegado en el mostrador quedaba huérfano (Denver, 11-oct-2026: «se le
+   * desvinculó el QR que le habíamos generado»). El cartel impreso es uno
+   * solo; lo que cambia por venta es el importe. Por eso el punto de cobro de
+   * la instalación es EL PRIMERO que se vinculó y sigue activo, sea cual sea
+   * la caja abierta; `cash_register_id` queda como dato histórico (en qué
+   * caja se creó). Mientras exista uno, nunca se crea otro.
+   *
+   * Pendiente (main, no hotfix): vincular por terminal/PC para comercios con
+   * varias PC cobrando con QR a la vez (Mercado Pago admite UNA orden por
+   * punto de cobro a la vez: dos PC sobre el mismo cartel se pisarían).
+   */
+  private dispositivoDeLaInstalacion(): MpPosDevice | null {
+    return (
+      this.ctx.db
+        .select()
+        .from(mpPosDevices)
+        .where(eq(mpPosDevices.active, 1))
+        .orderBy(asc(mpPosDevices.createdAt))
+        .get() ?? null
+    );
+  }
+
   async getQrForCashRegister(
-    cashRegisterId: string,
+    _cashRegisterId: string,
   ): Promise<{ qrUrl: string; qrImageBase64: string | null } | null> {
-    const dev = this.ctx.db
-      .select()
-      .from(mpPosDevices)
-      .where(eq(mpPosDevices.cashRegisterId, cashRegisterId))
-      .get();
+    const dev = this.dispositivoDeLaInstalacion();
     if (!dev) return null;
     return { qrUrl: dev.qrUrl, qrImageBase64: dev.qrImageBase64 ?? null };
   }
 
-  async getPosDeviceByCashRegister(cashRegisterId: string): Promise<MpPosDevice | null> {
-    const dev = this.ctx.db
-      .select()
-      .from(mpPosDevices)
-      .where(eq(mpPosDevices.cashRegisterId, cashRegisterId))
-      .get();
-    return dev ?? null;
+  /** La caja que se pasa ya no decide: el QR es el de la instalación (ver arriba). */
+  async getPosDeviceByCashRegister(_cashRegisterId: string): Promise<MpPosDevice | null> {
+    return this.dispositivoDeLaInstalacion();
   }
 
   async createPosDevice(input: { cashRegisterId: string }): Promise<MpPosDevice> {

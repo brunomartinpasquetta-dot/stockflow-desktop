@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Loader2, QrCode, CheckCircle2, AlertCircle } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
+import { qrDeLaInstalacion } from '@/lib/mpQr'
 import { useLicense } from '@/contexts/LicenseContext'
 import { usePrintQrCartel } from '@/lib/usePrint'
 import { descargarImagen, nombreDeArchivo } from '@/lib/descargarArchivo'
@@ -195,7 +196,9 @@ export function ConfiguracionMercadoPago() {
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Asigná un QR único a cada caja. El QR se imprime una vez y se reutiliza para todas las ventas.
+                El QR es uno solo por comercio: se genera una vez, se imprime y vale para todas las
+                aperturas de caja. Lo que cambia en cada venta es el importe, que el cliente ve al
+                escanearlo. No hace falta generarlo de nuevo al abrir una caja.
               </p>
               <table className="w-full text-sm">
                 <thead>
@@ -210,22 +213,20 @@ export function ConfiguracionMercadoPago() {
                     <tr className="border-b">
                       <td className="py-2">Caja #{currentCashQuery.data.number}</td>
                       <td>
-                        {posQuery.data?.find((p) => p.cashRegisterId === currentCashQuery.data?.id) ? (
+                        {qrDeLaInstalacion(posQuery.data) ? (
                           <span className="inline-flex items-center gap-1 text-green-600"><QrCode size={14} /> Generado</span>
                         ) : (
                           <span className="text-muted-foreground">Sin generar</span>
                         )}
                       </td>
                       <td>
-                        {posQuery.data?.find((p) => p.cashRegisterId === currentCashQuery.data?.id) ? (
+                        {qrDeLaInstalacion(posQuery.data) ? (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() =>
                               setVerQr({
-                                pos: posQuery.data.find(
-                                  (p) => p.cashRegisterId === currentCashQuery.data?.id,
-                                )!,
+                                pos: qrDeLaInstalacion(posQuery.data)!,
                                 numero: currentCashQuery.data!.number,
                               })
                             }
@@ -233,7 +234,7 @@ export function ConfiguracionMercadoPago() {
                             Ver e imprimir QR
                           </Button>
                         ) : null}
-                        {posQuery.data?.find((p) => p.cashRegisterId === currentCashQuery.data?.id) ? (
+                        {qrDeLaInstalacion(posQuery.data) ? (
                           /* Para la caja que quedó enganchada a un QR que no
                              acepta el importe del sistema. Pide confirmación
                              porque el código cambia y hay que reimprimirlo. */
