@@ -66,6 +66,7 @@ import {
   useFamilies,
   useSuppliers,
 } from '@/lib/hooks'
+import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { formatCurrency, formatQty, parseCurrencyInput } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
@@ -956,7 +957,17 @@ export function Articulos() {
       </Card>
 
       {/* Panel de detalle / formulario */}
-      <Card className="flex h-[36%] min-h-[240px] flex-shrink-0 flex-col overflow-hidden border-t-2">
+      {/* Vacío ocupa sólo una franja: a 1360×768 se llevaba 253 px sin nada
+          adentro y la lista quedaba corta (Bruno, 10-oct-2026). Con ficha,
+          menos alto que antes porque los campos son más chicos. */}
+      <Card
+        className={cn(
+          'flex flex-shrink-0 flex-col overflow-hidden border-t-2',
+          // Con ficha, el alto lo da el contenido hasta un tope: ni aire de más
+          // ni barra de scroll si entra todo.
+          mode === 'idle' ? 'h-10' : 'max-h-[40%]',
+        )}
+      >
         {mode === 'idle' ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             Seleccione un artículo de la lista o presione <kbd className="mx-1 rounded border bg-muted px-1">Nuevo</kbd>.
@@ -1091,20 +1102,24 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
 
 
   return (
-    <div className="flex h-full flex-col p-3">
+    <div className="flex min-h-0 flex-col p-2">
       {/* Cabecera del panel */}
-      <div className="mb-2 flex shrink-0 items-center justify-between">
-        <div className="text-sm font-medium">
+      <div className="mb-1 flex shrink-0 items-center justify-between">
+        <div className="text-xs font-medium">
           {mode === 'view' && 'Detalle del artículo'}
           {mode === 'edit' && 'Editando artículo'}
           {mode === 'create' && 'Nuevo artículo'}
         </div>
       </div>
 
-      {/* Grid del formulario */}
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-3 overflow-auto">
+      {/* Grid del formulario. Compacto (Bruno, 10-oct-2026, a 1360×768: la
+          ficha ocupaba 253 px con campos de 36 px y se comía la lista): campos
+          de 28 px, letra chica y menos aire entre filas. */}
+      {/* Sin flex-1: el alto lo pone el contenido (la tarjeta tiene el tope) y
+          sólo aparece barra de scroll si de verdad no entra. */}
+      <div className="grid min-h-0 grid-cols-12 gap-x-2 gap-y-1.5 overflow-auto [&_input]:h-7 [&_input]:text-xs [&_select]:h-7 [&_select]:text-xs [&_textarea]:text-xs">
         {/* Fila 1: id */}
-        <Field className="col-span-3" label="Código">
+        <Field className="col-span-2" label="Código">
           <Input
             value={form.barcode}
             onChange={(e) => setField('barcode', e.target.value)}
@@ -1118,7 +1133,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="Familia">
+        <Field className="col-span-2" label="Familia">
           <SelectWithQuickCreate
             value={form.familyId || null}
             onChange={(id) => setField('familyId', id)}
@@ -1129,7 +1144,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         </Field>
 
         {/* Fila 2: clasificación */}
-        <Field className="col-span-3" label="Proveedor">
+        <Field className="col-span-2" label="Proveedor">
           <SelectWithQuickCreate
             value={form.supplierId || null}
             onChange={(id) => setField('supplierId', id)}
@@ -1138,7 +1153,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="Marca *">
+        <Field className="col-span-2" label="Marca *">
           <Input
             value={form.brand}
             onChange={(e) => setField('brand', e.target.value)}
@@ -1147,7 +1162,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
           />
         </Field>
         <div className="col-span-2" />
-        <Field className="col-span-2" label="IVA">
+        <Field className="col-span-1" label="IVA">
           <Select
             value={form.vatRate}
             onChange={(e) => setField('vatRate', e.target.value)}
@@ -1160,7 +1175,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             ))}
           </Select>
         </Field>
-        <Field className="col-span-2" label="Unidad">
+        <Field className="col-span-1" label="Unidad">
           <Select
             value={form.unit}
             onChange={(e) => setField('unit', e.target.value as Unit)}
@@ -1175,21 +1190,21 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         </Field>
 
         {/* Fila 3: costo + Lista 1 */}
-        <Field className="col-span-3" label="P. Costo">
+        <Field className="col-span-2" label="P. Costo">
           <CurrencyInput
             value={form.costPrice}
             onChange={(v) => setCosto(v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="P. Venta (Lista 1)">
+        <Field className="col-span-2" label="P. Venta (Lista 1)">
           <CurrencyInput
             value={form.listPrice1}
             onChange={(v) => setPrecioLista(1, v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Utilidad %">
+        <Field className="col-span-1" label="Utilidad %">
           <Input
             inputMode="decimal"
             placeholder="—"
@@ -1201,14 +1216,14 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         <div className="col-span-4" />
 
         {/* Fila 4: Lista 2 + Lista 3 */}
-        <Field className="col-span-3" label="P. Lista 2">
+        <Field className="col-span-2" label="P. Lista 2">
           <CurrencyInput
             value={form.listPrice2}
             onChange={(v) => setPrecioLista(2, v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Utilidad %">
+        <Field className="col-span-1" label="Utilidad %">
           <Input
             inputMode="decimal"
             placeholder="—"
@@ -1217,14 +1232,14 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="P. Lista 3">
+        <Field className="col-span-2" label="P. Lista 3">
           <CurrencyInput
             value={form.listPrice3}
             onChange={(v) => setPrecioLista(3, v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Utilidad %">
+        <Field className="col-span-1" label="Utilidad %">
           <Input
             inputMode="decimal"
             placeholder="—"
@@ -1236,17 +1251,17 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         <div className="col-span-2" />
 
         {/* Fila 5: mayorista */}
-        <Field className="col-span-3" label="P. Mayor">
+        <Field className="col-span-2" label="P. Mayor">
           <CurrencyInput
             value={form.wholesalePrice}
             onChange={(v) => setField('wholesalePrice', v)}
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-2" label="Utilidad">
+        <Field className="col-span-1" label="Utilidad">
           <ReadonlyValue>{utilPct(form.wholesalePrice, form.costPrice)}</ReadonlyValue>
         </Field>
-        <Field className="col-span-3" label="Cant. mín. mayorista">
+        <Field className="col-span-2" label="Cant. mín. mayorista">
           <Input
             type="number"
             step="0.001"
@@ -1258,7 +1273,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         <div className="col-span-4" />
 
         {/* Fila 6: stock */}
-        <Field className="col-span-3" label="Stock">
+        <Field className="col-span-1" label="Stock">
           <Input
             type="number"
             step="0.001"
@@ -1267,7 +1282,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="Stock Mín">
+        <Field className="col-span-1" label="Stock Mín">
           <Input
             type="number"
             step="0.001"
@@ -1276,7 +1291,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="Stock Ideal">
+        <Field className="col-span-1" label="Stock Ideal">
           <Input
             type="number"
             step="0.001"
@@ -1285,7 +1300,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
             disabled={inputsDisabled}
           />
         </Field>
-        <Field className="col-span-3" label="Venta por peso">
+        <Field className="col-span-1" label="Venta por peso">
           <label className="inline-flex h-9 items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -1299,7 +1314,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         </Field>
 
         {/* Fila 7: notas + imagen */}
-        <Field className="col-span-8" label="Notas">
+        <Field className="col-span-12" label="Notas">
           <textarea
             value={form.notes}
             onChange={(e) => setField('notes', e.target.value)}
@@ -1347,7 +1362,7 @@ function Field(props: {
 }): React.ReactElement {
   return (
     <div className={props.className}>
-      <Label className="mb-1 block text-xs text-muted-foreground">{props.label}</Label>
+      <Label className="mb-0.5 block text-[11px] leading-tight text-muted-foreground">{props.label}</Label>
       {props.children}
     </div>
   )

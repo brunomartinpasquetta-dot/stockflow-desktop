@@ -39,7 +39,10 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
     <th
       ref={ref}
       className={cn(
-        'h-9 px-2.5 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted-foreground',
+        // Densidad (Bruno, 10-oct-2026, a 1360×768): cabecera y celdas más
+        // bajas en TODAS las grillas, para que entren más renglones sin
+        // tocar cada pantalla.
+        'h-8 px-2 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted-foreground',
         className,
       )}
       {...props}
@@ -50,7 +53,7 @@ TableHead.displayName = 'TableHead'
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn('px-2.5 py-1.5 align-middle', className)} {...props} />
+    <td ref={ref} className={cn('px-2 py-1 align-middle', className)} {...props} />
   ),
 )
 TableCell.displayName = 'TableCell'

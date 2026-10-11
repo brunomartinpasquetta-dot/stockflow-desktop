@@ -596,15 +596,17 @@ export function Compras() {
   })
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      <div className="grid shrink-0 grid-cols-4 gap-2 rounded-lg border bg-card p-2">
+    <div className="flex h-full flex-col gap-2">
+      {/* Densidad (Bruno, 10-oct-2026): a 1360×768 el encabezado medía 111 px, el
+          pie 158 y a la grilla le quedaban 293 (nueve renglones). Todo lo que no es
+          la grilla se achica: campos de 32 px, letra chica, menos aire. */}
+      <div className="grid shrink-0 grid-cols-4 gap-x-2 gap-y-1 rounded-lg border bg-card px-2 py-1 [&_input]:h-7 [&_input]:text-xs [&_select]:h-7 [&_select]:text-xs [&_button]:h-7 [&_button]:text-xs [&_label]:text-[11px] [&_label]:leading-tight">
         <div className="col-span-2 flex flex-col gap-1">
           <Label>Proveedor</Label>
           <Button variant="outline" className="justify-between" onClick={() => setSupplierPickerOpen(true)}>
-            <span className="truncate">{selectedSupplier ? `${selectedSupplier.code} — ${selectedSupplier.name}` : 'Elegir proveedor…'}</span>
+            <span className="truncate">{selectedSupplier ? `${selectedSupplier.code} — ${selectedSupplier.name}${selectedSupplier.cuit ? ` · CUIT ${selectedSupplier.cuit}` : ''}` : 'Elegir proveedor…'}</span>
             <Search className="h-4 w-4 shrink-0 opacity-60" />
           </Button>
-          {selectedSupplier?.cuit && <span className="text-xs text-muted-foreground">CUIT: {selectedSupplier.cuit}</span>}
         </div>
         <div className="flex flex-col gap-1">
           <Label>Comprobante</Label>
@@ -624,7 +626,7 @@ export function Compras() {
             <Input type="date" value={dateIso} onChange={(e) => setDateIso(e.target.value)} />
           </div>
         </div>
-        <div className="col-span-4 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="col-span-4 flex h-5 items-center justify-between text-[10px] text-muted-foreground">
           <span>Usuario: {currentUser?.fullName} · N° interno {numberQuery.data?.number ?? '—'} · {today}</span>
           <div className="flex items-center gap-2">
             <Badge variant={priceMode === 'gross' ? 'outline' : 'warning'}>
@@ -711,12 +713,12 @@ export function Compras() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-lg border bg-card p-2">
         <div className="relative">
-          <ShoppingCart className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <ShoppingCart className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={barcodeRef}
-            className="h-11 pl-10 text-base"
+            className="h-9 pl-9 text-sm"
             placeholder="Código o nombre del producto — escanear o escribir y Enter"
             value={barcode}
             onChange={(e) => setBarcode(e.target.value)}
@@ -892,46 +894,46 @@ export function Compras() {
       </div>
 
       {/* Pie compacto: antes se comía el alto y la grilla quedaba sin lugar. */}
-      <div className="grid shrink-0 grid-cols-3 gap-2 rounded-lg border bg-card p-2">
-        <div className="flex flex-col gap-1 text-sm">
+      <div className="grid shrink-0 grid-cols-3 gap-2 rounded-lg border bg-card px-2 py-1.5 text-sm [&_select]:h-7 [&_select]:text-xs [&_input]:h-6">
+        <div className="flex flex-col gap-0 text-xs">
           <div className="flex justify-between">
             <span className="text-muted-foreground">{priceMode === 'gross' ? 'Subtotal (con IVA)' : 'Subtotal neto'}</span>
             <span className="tabular-nums">{formatCurrency(totals.subtotal)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Descuento</span>
-            <CurrencyInput className="h-7 w-28 text-right tabular-nums" value={globalDiscount}
+            <CurrencyInput className="h-6 w-24 text-right text-xs tabular-nums" value={globalDiscount}
               onChange={setGlobalDiscount} />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{priceMode === 'gross' ? 'IVA contenido' : 'IVA'}</span>
             <span className="tabular-nums">{formatCurrency(totals.vatAmount)}</span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between border-t pt-1">
-            <span className="font-semibold">TOTAL</span>
-            <span className="text-xl font-bold tabular-nums">{formatCurrency(totals.total)}</span>
+          <div className="mt-0.5 flex items-baseline justify-between border-t pt-0.5">
+            <span className="text-sm font-semibold">TOTAL</span>
+            <span className="text-lg font-bold tabular-nums">{formatCurrency(totals.total)}</span>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm">
+        <div className="flex flex-col gap-1.5">
+          <label className="flex h-6 items-center gap-2 text-sm">
             <input type="checkbox" className="h-4 w-4 rounded border-input" checked={isAccountPurchase} onChange={(e) => setIsAccountPurchase(e.target.checked)} />
             <span>Compra a cuenta del proveedor</span>
           </label>
           {isAccountPurchase ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] leading-tight text-muted-foreground">
               Queda como deuda con el proveedor. {selectedSupplier ? `(${selectedSupplier.name})` : ''} No requiere caja abierta.
             </p>
           ) : noCash ? (
             <>
               <div className="flex flex-col gap-1">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">El dinero sale de</Label>
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">El dinero sale de</Label>
                 <Select value={fundingSource} onChange={(e) => setFundingSource(e.target.value as 'daily' | 'general')}>
                   <option value="daily">Caja diaria</option>
                   <option value="general">Caja General{cashGeneralBalance.data ? ` (saldo ${formatCurrency(cashGeneralBalance.data.balance)})` : ''}</option>
                 </Select>
               </div>
-              <p className="text-xs text-destructive">No hay caja diaria abierta. Abra la caja (F7), pague desde Caja General o registre la compra a cuenta del proveedor.</p>
+              <p className="text-[11px] leading-tight text-destructive">Sin caja abierta: ábrala (F7), pague desde Caja General o registre la compra a cuenta.</p>
             </>
           ) : noMethods ? (
             <p className="text-xs text-destructive">No hay medios de pago configurados.</p>
@@ -953,31 +955,34 @@ export function Compras() {
             </>
           ) : (
             <>
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">El dinero sale de</Label>
-                <Select value={fundingSource} onChange={(e) => setFundingSource(e.target.value as 'daily' | 'general')}>
-                  <option value="daily">Caja diaria</option>
-                  <option value="general">Caja General{cashGeneralBalance.data ? ` (saldo ${formatCurrency(cashGeneralBalance.data.balance)})` : ''}</option>
-                </Select>
+              {/* Dos selectores en una fila: apilados se llevaban el pie entero. */}
+              <div className="grid grid-cols-2 gap-x-2">
+                <div className="flex flex-col gap-0.5">
+                  <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">El dinero sale de</Label>
+                  <Select value={fundingSource} onChange={(e) => setFundingSource(e.target.value as 'daily' | 'general')}>
+                    <option value="daily">Caja diaria</option>
+                    <option value="general">Caja General{cashGeneralBalance.data ? ` (saldo ${formatCurrency(cashGeneralBalance.data.balance)})` : ''}</option>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="compra-method" className="text-[11px] uppercase tracking-wide text-muted-foreground">Forma de pago</Label>
+                  <PaymentMethodSelect
+                    id="compra-method"
+                    methods={activeMethods}
+                    value={selectedMethodId}
+                    onChange={setSelectedMethodId}
+                  />
+                </div>
               </div>
               {fundingSource === 'general' && (
-                <p className="text-xs text-muted-foreground">El egreso baja el saldo de Caja General, no la caja diaria.</p>
+                <p className="text-[11px] text-muted-foreground">El egreso baja el saldo de Caja General, no la caja diaria.</p>
               )}
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="compra-method">Forma de pago</Label>
-                <PaymentMethodSelect
-                  id="compra-method"
-                  methods={activeMethods}
-                  value={selectedMethodId}
-                  onChange={setSelectedMethodId}
-                />
-              </div>
               {activeMethods.length > 1 && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-7 self-start text-xs"
                   onClick={() => setMixedMode(true)}
                 >
                   Pago mixto (F12)
@@ -987,8 +992,8 @@ export function Compras() {
           )}
         </div>
 
-        <div className="flex flex-col justify-end gap-2">
-          <Button variant="success" className="h-14 text-lg" disabled={!canConfirm} onClick={() => createMutation.mutate()}>
+        <div className="flex flex-col justify-end gap-1.5">
+          <Button variant="success" className="h-10 text-base" disabled={!canConfirm} onClick={() => createMutation.mutate()}>
             {createMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
             {isAccountPurchase
               ? `Confirmar compra a cuenta (F2) — ${formatCurrency(totals.total)}`
