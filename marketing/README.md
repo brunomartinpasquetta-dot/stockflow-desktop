@@ -35,3 +35,5 @@ Generadores de las imágenes 1200×1200 (render con Chrome headless).
 
 ## Precios (definido 2026-07)
 Suscripción **$70.000/mes** + demo **$5.000** (prueba 15 días + instalación). Target: comercios que facturan (ferreterías, autoservicios, mayoristas), NO kioscos. CTA = WhatsApp +54 342 584 7340.
+
+> **La landing se mudó (11-oct-2026)** a `~/MARKETING/landing/stockflow/` (repo propio, con todo el historial) y la trabaja la sesión «Landing y marketing digital». El despliegue es `./deploy.sh` dentro de esa carpeta. Lo que queda acá (`mercadolibre/`, `demo-data/`) sigue igual.
