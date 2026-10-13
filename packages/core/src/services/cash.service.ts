@@ -16,6 +16,7 @@ import { hasPermission, requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
 import { CashGeneralService } from './cashGeneral.service';
 import { BusinessRuleError, NotFoundError, PermissionDeniedError } from '../errors';
+import { formatPesos } from '@stockflow/shared';
 
 export interface AddMovementInput {
   type: 'income' | 'expense';
@@ -157,7 +158,7 @@ export async function assertPhysicalCashAvailable(
   if (cmpDecimal(amount, disponible) > 0) {
     throw new BusinessRuleError(
       'insufficient_cash_daily',
-      `No hay efectivo suficiente en la caja (disponible ${disponible}, egreso en efectivo ${amount})`,
+      `No hay efectivo suficiente en la caja: hay ${formatPesos(disponible)} y el egreso en efectivo es de ${formatPesos(amount)}`,
     );
   }
 }

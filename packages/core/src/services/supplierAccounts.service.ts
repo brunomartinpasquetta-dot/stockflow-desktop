@@ -8,6 +8,7 @@ import { requirePermission } from '../auth/permissions';
 import { assertPhysicalCashAvailable } from './cash.service';
 import type { ServiceContext } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
+import { formatPesos } from '@stockflow/shared';
 
 /** Una línea de pago a proveedor (un medio de pago + monto). */
 export interface SupplierPaymentDraft {
@@ -263,7 +264,7 @@ export class SupplierAccountsService {
       if (cmpDecimal(cgBalance, totalPaid) < 0) {
         throw new BusinessRuleError(
           'insufficient_cash_general',
-          `Caja General no tiene saldo suficiente (disponible ${cgBalance}, pago ${totalPaid})`,
+          `Caja General no tiene saldo suficiente: hay ${formatPesos(cgBalance)} y el pago es de ${formatPesos(totalPaid)}`,
         );
       }
       return null;

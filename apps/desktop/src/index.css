@@ -410,3 +410,6 @@ body.printing #print-area {
 .doc-a4 .doc-qr { width: 25mm; height: 25mm; }
 .doc-a4 .doc-fiscal-data { font-size: 9pt; line-height: 1.5; }
 .doc-a4 .doc-fiscal-note { font-size: 8pt; color: #555; }
+
+/* Los avisos (sonner) nunca son zona de arrastre de la ventana: la X tiene que recibir el clic. */
+[data-sonner-toaster], [data-sonner-toaster] * { -webkit-app-region: no-drag; }

@@ -29,6 +29,7 @@ import {
 } from '../schema/local';
 import { BaseRepository } from './base.repository';
 import { exigirCajaAbiertaEnTx } from './cajaAbierta';
+import { formatPesos } from '@stockflow/shared';
 
 /** Tipo del `tx` dentro de `db.transaction((tx) => …)`. */
 type Tx = Parameters<Parameters<LocalDatabase['transaction']>[0]>[0];
@@ -63,7 +64,7 @@ function cashGeneralExpenseInTx(
   if (cmpDecimal(prevBalance, opts.total) < 0) {
     throw new ConstraintError(
       'INSUFFICIENT_CASH_GENERAL',
-      `Caja General no tiene saldo suficiente (disponible ${prevBalance}, pago ${opts.total})`,
+      `Caja General no tiene saldo suficiente: hay ${formatPesos(prevBalance)} y el pago es de ${formatPesos(opts.total)}`,
     );
   }
   let cashPart = '0';

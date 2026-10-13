@@ -16,6 +16,7 @@ import { assertPhysicalCashAvailable } from './cash.service';
 import type { ServiceContext } from '../context';
 import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 import { type PriceMode, calculateSaleTotals } from '../pricing';
+import { formatPesos } from '@stockflow/shared';
 
 export interface PurchaseLineDraft {
   articleId: string;
@@ -209,7 +210,7 @@ export class PurchasesService {
       if (cmpDecimal(cgBalance, preview.total) < 0) {
         throw new BusinessRuleError(
           'insufficient_cash_general',
-          `Caja General no tiene saldo suficiente (disponible ${cgBalance}, compra ${preview.total})`,
+          `Caja General no tiene saldo suficiente: hay ${formatPesos(cgBalance)} y la compra es de ${formatPesos(preview.total)}`,
         );
       }
     }
