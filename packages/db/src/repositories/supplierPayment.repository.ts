@@ -608,30 +608,33 @@ export class SupplierPaymentRepository extends BaseRepository<
           // Devolver a la caja diaria lo que no salió de ahí…
           const aDevolver = enDiaria.filter((m) => m.type === 'expense');
           for (const mv of aDevolver) {
-            const pm = mv.paymentMethodId ? pmMap.get(mv.paymentMethodId) : undefined;
-            const esEfectivo = pm == null || pm.isPhysicalCash === true;
+            /**
+             * Una caja CERRADA ya está arqueada: no recibe la devolución, sea
+             * efectivo o transferencia. Antes sólo se desviaba el efectivo y la
+             * devolución de un pago electrónico caía en la caja cerrada
+             * (Bruno, 13-oct-2026: «todavía no terminaste»). Si la caja del
+             * pago está cerrada, la devolución va a la caja abierta de hoy.
+             */
             let destinoCaja = mv.cashRegisterId;
-            if (esEfectivo) {
-              const reg = tx
-                .select({ status: cashRegisters.status })
+            const reg = tx
+              .select({ status: cashRegisters.status })
+              .from(cashRegisters)
+              .where(eq(cashRegisters.id, mv.cashRegisterId))
+              .get();
+            if (reg?.status !== 'open') {
+              const abierta = tx
+                .select({ id: cashRegisters.id })
                 .from(cashRegisters)
-                .where(eq(cashRegisters.id, mv.cashRegisterId))
+                .where(eq(cashRegisters.status, 'open'))
+                .limit(1)
                 .get();
-              if (reg?.status !== 'open') {
-                const abierta = tx
-                  .select({ id: cashRegisters.id })
-                  .from(cashRegisters)
-                  .where(eq(cashRegisters.status, 'open'))
-                  .limit(1)
-                  .get();
-                if (!abierta) {
-                  throw new ConstraintError(
-                    'NO_OPEN_REGISTER',
-                    'La caja de ese pago está cerrada y no hay ninguna abierta: abra la caja para devolverle el efectivo.',
-                  );
-                }
-                destinoCaja = abierta.id;
+              if (!abierta) {
+                throw new ConstraintError(
+                  'NO_OPEN_REGISTER',
+                  'La caja de ese pago está cerrada y no hay ninguna abierta: abra la caja de hoy para devolverle el dinero.',
+                );
               }
+              destinoCaja = abierta.id;
             }
             tx.insert(cashMovements)
               .values({
