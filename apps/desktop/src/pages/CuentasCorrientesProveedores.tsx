@@ -23,13 +23,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select } from '@/components/ui/select'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
+import { CorregirOrigenPago } from '@/components/CorregirOrigenPago'
 import { ReturnPurchaseDialog } from '@/components/ReturnDialogs'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import type { SupplierAccountPayableDTO } from '@/types/api'
@@ -312,40 +312,10 @@ function PagoCuentaDialog({
 
 /** Detalle expandible de un comprobante: productos + pagos aplicados. */
 function ComprobanteDetalle({ accountId }: { accountId: string }) {
-  const qc = useQueryClient()
-  const canWrite = useCanWrite()
   const detailQuery = useQuery({
     queryKey: ['supplierAccountDetail', accountId],
     queryFn: () => api.supplierAccounts.getAccountDetail(accountId),
   })
-  /** Pago cuyo origen se está por corregir (pendiente de confirmación). */
-  const [corregir, setCorregir] = useState<{ id: string; amount: string } | null>(null)
-  const [corrigiendo, setCorrigiendo] = useState<string | null>(null)
-
-  async function aplicarCorreccion(nuevoOrigen: 'daily' | 'general'): Promise<void> {
-    if (!corregir) return
-    const id = corregir.id
-    setCorregir(null)
-    setCorrigiendo(id)
-    try {
-      const r = await api.supplierAccounts.corregirOrigenDePago(id, nuevoOrigen)
-      toast.success(
-        r.destino === 'general'
-          ? 'Listo: el pago ahora figura como salido de Caja General y se le devolvió el dinero a la caja diaria.'
-          : 'Listo: el pago ahora figura como salido de la caja diaria y se le devolvió el dinero a Caja General.',
-        { duration: 10_000 },
-      )
-      void qc.invalidateQueries({ queryKey: ['supplierAccountDetail', accountId] })
-      void qc.invalidateQueries({ queryKey: ['cash'] })
-      void qc.invalidateQueries({ queryKey: ['cashGeneral'] })
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'No se pudo corregir el origen del pago', {
-        duration: 15_000,
-      })
-    } finally {
-      setCorrigiendo(null)
-    }
-  }
 
   if (detailQuery.isLoading) {
     return <div className="px-4 py-3 text-sm text-muted-foreground">Cargando detalle…</div>
@@ -416,15 +386,7 @@ function ComprobanteDetalle({ accountId }: { accountId: string }) {
                   {/* Corregir el origen: el error típico es pagar eligiendo la
                       caja equivocada. No anula nada, sólo mueve el egreso. */}
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={!canWrite || corrigiendo === p.id}
-                      onClick={() => setCorregir(p)}
-                    >
-                      {corrigiendo === p.id && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                      Corregir origen
-                    </Button>
+                    <CorregirOrigenPago paymentId={p.id} amount={p.amount} />
                   </TableCell>
                 </TableRow>
               ))
@@ -439,34 +401,6 @@ function ComprobanteDetalle({ accountId }: { accountId: string }) {
         </span>
       </div>
 
-      {/* Corregir el origen del dinero. No anula el pago: la factura sigue
-          pagada y el saldo del proveedor no cambia. */}
-      <Dialog open={corregir !== null} onOpenChange={(abierto) => !abierto && setCorregir(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>¿De dónde salió este pago?</DialogTitle>
-            <DialogDescription>
-              Se mueve el egreso de {formatCurrency(corregir?.amount ?? '0')} a la caja que corresponda.
-              La factura sigue pagada y la deuda con el proveedor no cambia.
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground">
-            Si la caja diaria de ese pago ya está cerrada, el efectivo se devuelve a la caja abierta
-            de hoy: una caja cerrada ya está arqueada y no se puede tocar.
-          </p>
-          <DialogFooter className="sm:justify-between">
-            <Button variant="outline" onClick={() => setCorregir(null)}>
-              Cancelar
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => void aplicarCorreccion('daily')}>
-                Salió de la caja diaria
-              </Button>
-              <Button onClick={() => void aplicarCorreccion('general')}>Salió de Caja General</Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
@@ -819,6 +753,16 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
                           >
                             <FileDown className="h-4 w-4" />
                           </Button>
+                          {/* Un comprobante ya pagado no está en «abiertos»: desde acá
+                              se corrige el origen del dinero de cualquier pago. */}
+                          {e.paymentId && (
+                            <CorregirOrigenPago
+                              paymentId={e.paymentId}
+                              amount={e.credit}
+                              fundingSource={e.fundingSource}
+                              variante="icono"
+                            />
+                          )}
                         </span>
                       )}
                       {e.kind === 'purchase' && e.purchaseId && canDevolver && (

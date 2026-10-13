@@ -71,6 +71,10 @@ export interface SupplierStatementEntry {
   comprobanteBalance: string | null;
   /** compra asociada (para lanzar una devolución desde el estado de cuenta). */
   purchaseId: string | null;
+  /** id del pago (sólo en pagos): desde el estado de cuenta se corrige su origen. */
+  paymentId: string | null;
+  /** de dónde salió el dinero del pago (null = pago anterior a la versión que lo guarda). */
+  fundingSource: 'daily' | 'general' | null;
 }
 
 export interface SupplierStatement {
@@ -381,6 +385,8 @@ export class SupplierAccountsService {
         paymentMethodName: null,
         comprobanteBalance: null,
         purchaseId: ac.purchaseId,
+        paymentId: null,
+        fundingSource: null,
       });
       const pays = (await repos.supplierPayments.findByAccount(ac.id))
         .slice()
@@ -398,6 +404,8 @@ export class SupplierAccountsService {
           paymentMethodName: pmName,
           comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
           purchaseId: null,
+          paymentId: pay.id,
+          fundingSource: pay.fundingSource === 'general' || pay.fundingSource === 'daily' ? pay.fundingSource : null,
         });
       }
     }
@@ -415,6 +423,8 @@ export class SupplierAccountsService {
         paymentMethodName: null,
         comprobanteBalance: null,
         purchaseId: r.purchaseId,
+        paymentId: null,
+        fundingSource: null,
       });
       void purchase;
     }

@@ -734,6 +734,10 @@ export interface SupplierStatementEntryDTO {
   paymentMethodName: string | null;
   comprobanteBalance: string | null;
   purchaseId: string | null;
+  /** id del pago (sólo en pagos): habilita «Corregir origen» desde el estado de cuenta. */
+  paymentId: string | null;
+  /** de dónde salió el dinero del pago; null si es un pago anterior a la versión que lo guarda. */
+  fundingSource: 'daily' | 'general' | null;
 }
 
 export interface SupplierStatementDTO {
