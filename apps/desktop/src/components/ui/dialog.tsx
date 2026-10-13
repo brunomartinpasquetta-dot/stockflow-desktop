@@ -24,11 +24,21 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      // Un clic en un AVISO (sonner) no es «clic afuera»: cerrar el aviso no
+      // tiene que cerrar el diálogo (Bruno, 13-oct-2026: la X no cerraba nada).
+      onPointerDownOutside={(e) => {
+        if ((e.target as Element | null)?.closest?.('[data-sonner-toaster]')) e.preventDefault()
+        onPointerDownOutside?.(e)
+      }}
+      onInteractOutside={(e) => {
+        if ((e.target as Element | null)?.closest?.('[data-sonner-toaster]')) e.preventDefault()
+        onInteractOutside?.(e)
+      }}
       className={cn(
         'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-3 border bg-background p-5 shadow-lg rounded-lg data-[state=open]:animate-fade-in',
         className,

@@ -413,3 +413,7 @@ body.printing #print-area {
 
 /* Los avisos (sonner) nunca son zona de arrastre de la ventana: la X tiene que recibir el clic. */
 [data-sonner-toaster], [data-sonner-toaster] * { -webkit-app-region: no-drag; }
+
+/* Con un diálogo modal abierto, Radix deja <body> sin eventos de puntero: los avisos
+   seguían viéndose pero la X no recibía el clic. Los avisos siempre reciben el clic. */
+[data-sonner-toaster] { pointer-events: auto !important; }
