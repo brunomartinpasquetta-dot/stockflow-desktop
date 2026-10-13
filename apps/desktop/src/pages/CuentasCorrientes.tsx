@@ -99,7 +99,7 @@ function CobranzaDialog({
               <p className="mt-1 text-xs text-amber-600">
                 {split.isExcess
                   ? 'Los medios de pago suman más que el monto a cobrar.'
-                  : `Repartí el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
+                  : `Reparta el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
               </p>
             )}
           </div>
@@ -209,7 +209,7 @@ function CobranzaCuentaDialog({
               <p className="mt-1 text-xs text-amber-600">
                 {split.isExcess
                   ? 'Los medios de pago suman más que el monto a cobrar.'
-                  : `Repartí el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
+                  : `Reparta el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
               </p>
             )}
           </div>

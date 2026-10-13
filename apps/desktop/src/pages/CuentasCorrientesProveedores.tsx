@@ -90,6 +90,13 @@ function PagoDialog({
   const montoNum = monto ? Number(parseCurrencyInput(monto)) : 0
   const balanceNum = Number(account.balance)
   const split = usePaymentSplit(activeMethods, montoNum)
+  // El pago arranca con TODO en efectivo (como en Ventas): si no se reparte
+  // entre varios medios, no hay que escribir el monto dos veces y el botón
+  // queda habilitado de entrada (Bruno, 13-oct-2026: «no me deja pagar»).
+  useEffect(() => {
+    if (montoNum > 0 && split.totalPaid === 0) split.fillAllInCash()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [montoNum, activeMethods.length])
   const noCash = useNoCashOpen()
   const [fundingSource, setFundingSource] = useState<'daily' | 'general'>('daily')
   // Sin caja diaria abierta, el único origen posible es Caja General.
@@ -143,19 +150,19 @@ function PagoDialog({
               <span className="text-xs text-destructive">No puede superar el saldo del comprobante.</span>
             ) : (
               <span className="text-xs text-muted-foreground">
-                Podés pagar una parte: ingresá un monto menor y el resto queda pendiente en la cuenta.
+                Puede pagar una parte: ingrese un monto menor y el resto queda pendiente en la cuenta.
               </span>
             )}
           </div>
           <FundingSourceField value={fundingSource} onChange={setFundingSource} noCash={noCash} />
           <div className="border-t pt-2">
             <p className="mb-1 text-xs font-medium text-muted-foreground">Composición del pago</p>
-            <PaymentSplitInput methods={activeMethods} split={split} />
+            <PaymentSplitInput methods={activeMethods} split={split} accion="pagar" />
             {montoNum > 0 && !split.isComplete && (
               <p className="mt-1 text-xs text-amber-600">
                 {split.isExcess
                   ? 'Los medios de pago suman más que el monto a pagar.'
-                  : `Repartí el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
+                  : `Reparta el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
               </p>
             )}
           </div>
@@ -204,6 +211,13 @@ function PagoCuentaDialog({
   const montoNum = monto ? Number(parseCurrencyInput(monto)) : 0
   const balanceNum = Number(totalBalance)
   const split = usePaymentSplit(activeMethods, montoNum)
+  // El pago arranca con TODO en efectivo (como en Ventas): si no se reparte
+  // entre varios medios, no hay que escribir el monto dos veces y el botón
+  // queda habilitado de entrada (Bruno, 13-oct-2026: «no me deja pagar»).
+  useEffect(() => {
+    if (montoNum > 0 && split.totalPaid === 0) split.fillAllInCash()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [montoNum, activeMethods.length])
   const noCash = useNoCashOpen()
   const [fundingSource, setFundingSource] = useState<'daily' | 'general'>('daily')
   // Sin caja diaria abierta, el único origen posible es Caja General.
@@ -265,19 +279,19 @@ function PagoCuentaDialog({
               <span className="text-xs text-destructive">No puede superar el saldo total del proveedor.</span>
             ) : (
               <span className="text-xs text-muted-foreground">
-                Podés pagar una parte: se aplica a los comprobantes más viejos y el resto queda pendiente.
+                Puede pagar una parte: se aplica a los comprobantes más viejos y el resto queda pendiente.
               </span>
             )}
           </div>
           <FundingSourceField value={fundingSource} onChange={setFundingSource} noCash={noCash} />
           <div className="border-t pt-2">
             <p className="mb-1 text-xs font-medium text-muted-foreground">Composición del pago</p>
-            <PaymentSplitInput methods={activeMethods} split={split} />
+            <PaymentSplitInput methods={activeMethods} split={split} accion="pagar" />
             {montoNum > 0 && !split.isComplete && (
               <p className="mt-1 text-xs text-amber-600">
                 {split.isExcess
                   ? 'Los medios de pago suman más que el monto a pagar.'
-                  : `Repartí el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
+                  : `Reparta el monto entre los medios de pago: faltan ${formatCurrency(split.remaining)}.`}
               </p>
             )}
           </div>

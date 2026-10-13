@@ -12,9 +12,12 @@ import type { PaymentMethodDTO } from '@/types/api'
 export function PaymentSplitInput({
   methods,
   split,
+  accion = 'cobrar',
 }: {
   methods: PaymentMethodDTO[]
   split: PaymentSplit
+  /** «cobrar» en una venta, «pagar» en un pago a proveedor: cambia el texto del restante. */
+  accion?: 'cobrar' | 'pagar'
 }) {
   if (methods.length === 0) {
     return <p className="text-xs text-destructive">No hay medios de pago activos. Configure al menos uno en “Medios de pago”.</p>
@@ -40,9 +43,9 @@ export function PaymentSplitInput({
         )}
         <span className="ml-auto text-right">
           {split.isExcess ? (
-            <span className="text-destructive">Excede el total. Ajustá los montos.</span>
+            <span className="text-destructive">Excede el total. Ajuste los montos.</span>
           ) : split.remaining > 0.005 ? (
-            <span className="text-destructive">Restante a cobrar: {formatCurrency(split.remaining)}</span>
+            <span className="text-destructive">Restante a {accion}: {formatCurrency(split.remaining)}</span>
           ) : split.isComplete ? (
             <span className="text-success">Pagos completos</span>
           ) : null}
