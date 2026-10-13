@@ -67,8 +67,9 @@ export function AnularPagoBoton({
       }
       setAbierto(false)
       setMotivo('')
+      // Claves de las dos pantallas (clientes y proveedores) y de las cajas.
       for (const k of [
-        'customerStatement', 'customerBalances', 'accountDetail', 'accountsOpen', 'receivables',
+        'accountStatement', 'accountOpen', 'accountDetail', 'customerBalances', 'customerStatement',
         'supplierStatement', 'supplierAccountDetail', 'supplierBalances', 'supplierOpen',
         'cash', 'cashGeneral',
       ]) {
