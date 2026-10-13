@@ -124,6 +124,8 @@ const DESCRIBE: Record<string, Describe> = {
   'cashGeneral:transferFromClosed': (p) => `Caja General: depósito de cierre $${s(g(p, 'amount'))}`,
   'accounts:receivePayment': (_p, r) => `Cobranza en cuenta corriente por $${s(g(r, 'totalApplied') ?? g(r, 'amount'))}`,
   'accounts:receivePaymentToCustomer': (_p, r) => `Cobranza a la cuenta del cliente por $${s(g(r, 'totalApplied'))}`,
+  'accounts:anularCobro': (p, r) => `Anulación de cobranza por $${s(g(r, 'total'))} — motivo: ${s(g(p, 'motivo'))}`,
+  'supplierAccounts:anularPago': (p, r) => `Anulación de pago a proveedor por $${s(g(r, 'total'))} (vuelve a ${g(r, 'destino') === 'general' ? 'Caja General' : 'la caja diaria'}) — motivo: ${s(g(p, 'motivo'))}`,
   'supplierAccounts:payInvoice': (_p, r) => `Pago a proveedor por $${s(g(r, 'totalApplied') ?? g(r, 'amount'))}`,
   'supplierAccounts:payToSupplier': (_p, r) => `Pago a la cuenta del proveedor por $${s(g(r, 'totalApplied'))}`,
   'priceUpdates:apply': (_p, r) => `Actualización masiva de precios (${s(g(r, 'updatedCount') ?? g(r, 'count'))} artículos)`,

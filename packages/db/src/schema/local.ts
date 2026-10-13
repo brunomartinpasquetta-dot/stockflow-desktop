@@ -866,6 +866,10 @@ export const payments = sqliteTable(
       .notNull()
       .references(() => paymentMethods.id),
     notes: text('notes'),
+    /** Anulación (migración 0043): quién, cuándo y por qué. null = vigente. */
+    voidedAt: integer('voided_at'),
+    voidedBy: text('voided_by'),
+    voidReason: text('void_reason'),
     createdAt: createdAtCol(),
   },
   (t) => ({
@@ -927,6 +931,10 @@ export const supplierPayments = sqliteTable(
      * se pueden corregir solos.
      */
     fundingSource: text('funding_source'),
+    /** Anulación (migración 0043): quién, cuándo y por qué. null = vigente. */
+    voidedAt: integer('voided_at'),
+    voidedBy: text('voided_by'),
+    voidReason: text('void_reason'),
     createdAt: createdAtCol(),
   },
   (t) => ({

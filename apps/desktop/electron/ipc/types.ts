@@ -726,7 +726,8 @@ export interface PayToSupplierResultDTO {
 
 export interface SupplierStatementEntryDTO {
   date: number;
-  kind: 'purchase' | 'payment' | 'return';
+  /** `void` = anulación de un pago. */
+  kind: 'purchase' | 'payment' | 'return' | 'void';
   reference: string;
   debit: string;
   credit: string;
@@ -734,10 +735,12 @@ export interface SupplierStatementEntryDTO {
   paymentMethodName: string | null;
   comprobanteBalance: string | null;
   purchaseId: string | null;
-  /** id del pago (sólo en pagos): habilita «Corregir origen» desde el estado de cuenta. */
+  /** id del pago (sólo en pagos): habilita «Corregir origen» y «Anular» desde el estado de cuenta. */
   paymentId: string | null;
   /** de dónde salió el dinero del pago; null si es un pago anterior a la versión que lo guarda. */
   fundingSource: 'daily' | 'general' | null;
+  /** el pago fue anulado (su anulación es otra entrada, de tipo `void`). */
+  voided?: boolean;
 }
 
 export interface SupplierStatementDTO {
@@ -905,7 +908,12 @@ export interface ReceivePaymentToCustomerResultDTO {
 
 export interface StatementEntryDTO {
   date: number;
-  kind: 'sale' | 'payment' | 'return';
+  /** `void` = anulación de una cobranza. */
+  kind: 'sale' | 'payment' | 'return' | 'void';
+  /** id de la cobranza (sólo en `payment`): habilita «Anular» desde el estado de cuenta. */
+  paymentId?: string | null;
+  /** la cobranza fue anulada. */
+  voided?: boolean;
   reference: string;
   debit: string;
   credit: string;
@@ -2452,6 +2460,8 @@ export interface ApiSurface {
     listBalances(): Res<SupplierBalanceDTO[]>;
     payInvoice(payload: PaySupplierInvoiceInputDTO): Res<PaySupplierInvoiceResultDTO>;
     /** Mueve el egreso de un pago entre la caja diaria y Caja General. */
+    /** Anula un pago a proveedor: la deuda vuelve y el dinero regresa a la caja de donde salió. */
+    anularPago(payload: { supplierPaymentId: string; motivo: string; cashRegisterId?: string | null }): Res<{ anulados: number; total: string; destino: 'daily' | 'general'; cajaUsada: string | null }>;
     corregirOrigenDePago(payload: {
       supplierPaymentId: string;
       nuevoOrigen: 'daily' | 'general';
@@ -2535,6 +2545,8 @@ export interface ApiSurface {
   accounts: {
     receivePayment(payload: ReceivePaymentInputDTO): Res<ReceivePaymentResultDTO>;
     receivePaymentToCustomer(payload: ReceivePaymentToCustomerInputDTO): Res<ReceivePaymentToCustomerResultDTO>;
+    /** Anula una cobranza: la deuda vuelve al cliente y el dinero sale de la caja abierta. */
+    anularCobro(payload: { paymentId: string; motivo: string; cashRegisterId?: string | null }): Res<{ anulados: number; total: string; customerId: string; cajaUsada: string }>;
     getStatement(payload: { customerId: string; dateRange?: DateRangeDTO }): Res<CustomerStatementDTO>;
     getTotalReceivables(): Res<{ total: string }>;
     listBalances(): Res<CustomerBalanceDTO[]>;

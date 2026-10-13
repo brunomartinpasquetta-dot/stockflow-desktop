@@ -474,6 +474,145 @@ export class SupplierPaymentRepository extends BaseRepository<
    *    toca el arqueo del efectivo.
    *  - Pasar el egreso A Caja General exige que tenga saldo.
    */
+  /**
+   * ANULA un pago a proveedor (Bruno, 13-oct-2026). Espejo de la anulación de
+   * cobranzas: el pago queda marcado (quién, cuándo, por qué), la deuda vuelve
+   * al comprobante y el dinero VUELVE a la caja de donde salió: Caja General si
+   * el pago salió de ahí; si salió de la caja diaria, a la caja del pago si
+   * sigue abierta o, si ya cerró, a la caja abierta de hoy. Se anulan juntos los
+   * pagos del mismo acto (misma cuenta, misma fecha).
+   */
+  async anularPago(data: {
+    supplierPaymentId: string;
+    userId: string;
+    motivo: string;
+    cashRegisterId?: string | null;
+  }): Promise<{ anulados: number; total: string; destino: 'daily' | 'general'; cajaUsada: string | null }> {
+    try {
+      const motivo = data.motivo.trim();
+      if (!motivo) throw new ConstraintError('VOID_REASON_REQUIRED', 'Indique el motivo de la anulación.');
+      return this.db.transaction((tx) => {
+        const pago = tx.select().from(supplierPayments).where(eq(supplierPayments.id, data.supplierPaymentId)).get();
+        if (!pago) throw new NotFoundError('Pago a proveedor', data.supplierPaymentId);
+        if (pago.voidedAt != null) throw new ConstraintError('PAYMENT_ALREADY_VOIDED', 'Ese pago ya está anulado.');
+        const hermanos = tx
+          .select()
+          .from(supplierPayments)
+          .where(and(eq(supplierPayments.accountId, pago.accountId), eq(supplierPayments.date, pago.date)))
+          .all()
+          .filter((h) => h.voidedAt == null);
+        const ids = hermanos.map((h) => h.id);
+        const total = sumDecimals(hermanos.map((h) => h.amount));
+        const now = Date.now();
+        const pmRows = tx
+          .select()
+          .from(paymentMethods)
+          .where(inArray(paymentMethods.id, [...new Set(hermanos.map((h) => h.paymentMethodId))]))
+          .all();
+        const pmMap = new Map(pmRows.map((r) => [r.id, r]));
+
+        // Origen real del dinero: lo dice el pago; en los viejos, dónde está el egreso.
+        const enDiaria = tx.select().from(cashMovements).where(inArray(cashMovements.supplierPaymentId, ids)).all();
+        const enGeneral = tx
+          .select()
+          .from(cashGeneralMovements)
+          .where(inArray(cashGeneralMovements.supplierPaymentId, ids))
+          .all();
+        const origen: 'daily' | 'general' =
+          pago.fundingSource === 'general' || pago.fundingSource === 'daily'
+            ? pago.fundingSource
+            : enGeneral.length > 0 && enDiaria.length === 0
+              ? 'general'
+              : 'daily';
+
+        // Marcar y devolver la deuda.
+        tx.update(supplierPayments)
+          .set({ voidedAt: now, voidedBy: data.userId, voidReason: motivo })
+          .where(inArray(supplierPayments.id, ids))
+          .run();
+        const cuenta = tx.select().from(supplierAccountsPayable).where(eq(supplierAccountsPayable.id, pago.accountId)).get();
+        if (!cuenta) throw new NotFoundError('Cuenta de proveedor', pago.accountId);
+        const nuevoSaldoBruto = addDecimal(cuenta.balance, total, 4);
+        const nuevoSaldo = cmpDecimal(nuevoSaldoBruto, cuenta.total) > 0 ? cuenta.total : nuevoSaldoBruto;
+        const estado =
+          cmpDecimal(nuevoSaldo, '0') === 0 ? 'paid' : cmpDecimal(nuevoSaldo, cuenta.total) === 0 ? 'open' : 'partial';
+        tx.update(supplierAccountsPayable)
+          .set({ balance: nuevoSaldo, status: estado, updatedAt: now })
+          .where(eq(supplierAccountsPayable.id, pago.accountId))
+          .run();
+
+        if (origen === 'general') {
+          // Vuelve a Caja General, con su desglose efectivo/electrónico.
+          const cgCur = tx.select().from(cashGeneral).where(eq(cashGeneral.id, 'singleton')).get();
+          let cashPart = '0';
+          let elecPart = '0';
+          for (const h of hermanos) {
+            const pm = pmMap.get(h.paymentMethodId);
+            if (pm?.isPhysicalCash === false) elecPart = addDecimal(elecPart, h.amount, 2);
+            else cashPart = addDecimal(cashPart, h.amount, 2);
+          }
+          const balanceAfter = addDecimal(cgCur?.currentBalance ?? '0', total, 2);
+          const balanceAfterCash = addDecimal(cgCur?.cashBalance ?? '0', cashPart, 2);
+          const balanceAfterElec = addDecimal(cgCur?.electronicBalance ?? '0', elecPart, 2);
+          tx.insert(cashGeneralMovements)
+            .values({
+              id: uuidv7(),
+              type: 'income',
+              amount: total,
+              description: `Anulación de pago a proveedor: ${motivo}`,
+              category: 'other',
+              createdBy: data.userId,
+              referenceId: pago.accountId,
+              supplierPaymentId: pago.id,
+              balanceAfter,
+              isCash: Number(cashPart) >= Number(elecPart),
+              balanceAfterCash,
+              balanceAfterElectronic: balanceAfterElec,
+              createdAt: now,
+            })
+            .run();
+          tx.update(cashGeneral)
+            .set({ currentBalance: balanceAfter, cashBalance: balanceAfterCash, electronicBalance: balanceAfterElec, lastUpdate: now })
+            .where(eq(cashGeneral.id, 'singleton'))
+            .run();
+          return { anulados: hermanos.length, total, destino: 'general' as const, cajaUsada: null };
+        }
+
+        // Vuelve a la caja diaria: la del pago si sigue abierta; si no, la abierta de hoy.
+        const abiertas = tx.select().from(cashRegisters).where(eq(cashRegisters.status, 'open')).all();
+        const cajaOriginal = enDiaria.find((m) => m.type === 'expense')?.cashRegisterId ?? null;
+        const caja =
+          (data.cashRegisterId && abiertas.find((c) => c.id === data.cashRegisterId)?.id) ||
+          (cajaOriginal && abiertas.find((c) => c.id === cajaOriginal)?.id) ||
+          abiertas.sort((a, b) => b.number - a.number)[0]?.id;
+        if (!caja) {
+          throw new ConstraintError(
+            'NO_OPEN_REGISTER',
+            'No hay una caja abierta: abra la caja de hoy para que el dinero del pago anulado vuelva a la caja.',
+          );
+        }
+        for (const h of hermanos) {
+          const pm = pmMap.get(h.paymentMethodId);
+          tx.insert(cashMovements)
+            .values({
+              cashRegisterId: caja,
+              type: 'income',
+              description: `Anulación de pago a proveedor${pm && !pm.isPhysicalCash ? ` — ${pm.name}` : ''}: ${motivo}`,
+              amount: h.amount,
+              date: now,
+              userId: data.userId,
+              paymentMethodId: h.paymentMethodId,
+              supplierPaymentId: h.id,
+            })
+            .run();
+        }
+        return { anulados: hermanos.length, total, destino: 'daily' as const, cajaUsada: caja };
+      });
+    } catch (err) {
+      return rethrowDbError(err);
+    }
+  }
+
   async corregirOrigen(data: {
     supplierPaymentId: string;
     nuevoOrigen: 'daily' | 'general';

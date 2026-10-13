@@ -30,6 +30,7 @@ import {
 import { Select } from '@/components/ui/select'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { CorregirOrigenPago } from '@/components/CorregirOrigenPago'
+import { AnularPagoBoton } from '@/components/AnularPagoBoton'
 import { ReturnPurchaseDialog } from '@/components/ReturnDialogs'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import type { SupplierAccountPayableDTO } from '@/types/api'
@@ -714,16 +715,17 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
                 </TableRow>
               ) : (
                 filteredEntries.map((e, i) => (
-                  <TableRow key={i}>
+                  <TableRow key={i} className={e.voided ? 'text-muted-foreground line-through' : undefined}>
                     <TableCell className="text-sm">{formatDate(e.date)}</TableCell>
                     <TableCell>
                       {e.kind === 'purchase'
                         ? 'Compra'
                         : e.kind === 'return'
                           ? 'Devolución'
-                          : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
-                            ? 'Pago total'
-                            : 'Pago parcial'}
+                          : e.kind === 'void'
+                            ? 'Anulación de pago'
+                            : (e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005 ? 'Pago total' : 'Pago parcial') +
+                              (e.voided ? ' (anulado)' : '')}
                     </TableCell>
                     <TableCell className="text-sm">{e.kind === 'purchase' ? 'Cuenta corriente' : e.kind === 'return' ? 'Crédito en cuenta' : (e.paymentMethodName ?? '—')}</TableCell>
                     <TableCell className={`text-right tabular-nums ${e.kind === 'payment' ? 'text-success' : ''}`}>
@@ -755,13 +757,16 @@ function SupplierDetail({ supplierId, onBack }: { supplierId: string; onBack: ()
                           </Button>
                           {/* Un comprobante ya pagado no está en «abiertos»: desde acá
                               se corrige el origen del dinero de cualquier pago. */}
-                          {e.paymentId && (
-                            <CorregirOrigenPago
-                              paymentId={e.paymentId}
-                              amount={e.credit}
-                              fundingSource={e.fundingSource}
-                              variante="icono"
-                            />
+                          {e.paymentId && !e.voided && (
+                            <>
+                              <CorregirOrigenPago
+                                paymentId={e.paymentId}
+                                amount={e.credit}
+                                fundingSource={e.fundingSource}
+                                variante="icono"
+                              />
+                              <AnularPagoBoton tipo="pago" paymentId={e.paymentId} amount={e.credit} />
+                            </>
                           )}
                         </span>
                       )}

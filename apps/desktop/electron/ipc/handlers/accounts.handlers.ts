@@ -19,6 +19,11 @@ export function buildAccountsHandlers(deps: HandlerDeps): HandlerMap {
       (payload: ReceivePaymentInputDTO, ctx): Promise<ReceivePaymentResultDTO> =>
         new AccountsReceivableService(ctx).receivePayment(payload),
     ),
+    'accounts:anularCobro': withSession(
+      deps,
+      (payload: { paymentId: string; motivo: string; cashRegisterId?: string | null }, ctx) =>
+        new AccountsReceivableService(ctx).anularCobro(payload),
+    ),
     'accounts:receivePaymentToCustomer': withSession(
       deps,
       (payload: ReceivePaymentToCustomerInputDTO, ctx): Promise<ReceivePaymentToCustomerResultDTO> =>

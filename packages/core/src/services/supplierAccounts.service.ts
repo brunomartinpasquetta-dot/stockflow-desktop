@@ -59,7 +59,10 @@ export interface PayToSupplierResult {
 
 export interface SupplierStatementEntry {
   date: number;
-  kind: 'purchase' | 'payment' | 'return';
+  /** `void` = anulación de un pago (la deuda vuelve). */
+  kind: 'purchase' | 'payment' | 'return' | 'void';
+  /** el pago fue anulado (se muestra tachado; su anulación es otra entrada). */
+  voided?: boolean;
   reference: string;
   /** importe que aumenta la deuda (compras a cuenta) */
   debit: string;
@@ -297,6 +300,25 @@ export class SupplierAccountsService {
    * pasa de verdad —elegir mal el origen al pagar— y hasta ahora no tenía
    * arreglo (cliente, 8-oct-2026).
    */
+  /**
+   * Anula un pago a proveedor (Bruno, 13-oct-2026). La deuda vuelve al
+   * comprobante y el dinero a la caja de donde salió; queda en Auditoría.
+   */
+  async anularPago(input: {
+    supplierPaymentId: string;
+    motivo: string;
+    cashRegisterId?: string | null;
+  }): Promise<{ anulados: number; total: string; destino: 'daily' | 'general'; cajaUsada: string | null }> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'manage_supplier_accounts');
+    return repos.supplierPayments.anularPago({
+      supplierPaymentId: input.supplierPaymentId,
+      motivo: input.motivo,
+      cashRegisterId: input.cashRegisterId ?? this.ctx.currentCashRegister?.id ?? null,
+      userId: currentUser.id,
+    });
+  }
+
   async corregirOrigenDePago(input: {
     supplierPaymentId: string;
     nuevoOrigen: 'daily' | 'general';
@@ -407,7 +429,24 @@ export class SupplierAccountsService {
           purchaseId: null,
           paymentId: pay.id,
           fundingSource: pay.fundingSource === 'general' || pay.fundingSource === 'daily' ? pay.fundingSource : null,
+          voided: pay.voidedAt != null,
         });
+        if (pay.voidedAt != null) {
+          paidSoFar = subDecimal(paidSoFar, pay.amount, 4);
+          raw.push({
+            date: pay.voidedAt,
+            kind: 'void',
+            reference: `Anulación de pago${pay.voidReason ? ` — ${pay.voidReason}` : ''}`,
+            debit: pay.amount,
+            credit: '0.0000',
+            paymentMethodName: pmName,
+            comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
+            purchaseId: null,
+            paymentId: pay.id,
+            fundingSource: null,
+            voided: false,
+          });
+        }
       }
     }
 

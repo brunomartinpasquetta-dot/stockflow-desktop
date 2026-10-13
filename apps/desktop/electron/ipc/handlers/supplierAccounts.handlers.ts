@@ -21,6 +21,11 @@ export function buildSupplierAccountsHandlers(deps: HandlerDeps): HandlerMap {
         return new SupplierAccountsService(ctx).listSupplierBalances();
       },
     ),
+    'supplierAccounts:anularPago': withSession(
+      deps,
+      (payload: { supplierPaymentId: string; motivo: string; cashRegisterId?: string | null }, ctx) =>
+        new SupplierAccountsService(ctx).anularPago(payload),
+    ),
     'supplierAccounts:corregirOrigenDePago': withSession(
       deps,
       (

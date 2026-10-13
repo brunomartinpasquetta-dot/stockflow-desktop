@@ -51,7 +51,12 @@ export interface ReceivePaymentToCustomerResult {
 
 export interface StatementEntry {
   date: number;
-  kind: 'sale' | 'payment' | 'return';
+  /** `void` = anulación de una cobranza (la deuda vuelve). */
+  kind: 'sale' | 'payment' | 'return' | 'void';
+  /** id de la cobranza (sólo en `payment`): habilita «Anular» desde el estado de cuenta. */
+  paymentId?: string | null;
+  /** la cobranza fue anulada (se muestra tachada; su anulación es otra entrada). */
+  voided?: boolean;
   reference: string;
   /** importe que aumenta la deuda (ventas a cuenta) */
   debit: string;
@@ -179,6 +184,26 @@ export class AccountsReceivableService {
   }
 
   /**
+   * Anula una cobranza (Bruno, 13-oct-2026: «me equivoqué de cliente»). La
+   * deuda vuelve al comprobante y el dinero sale de la caja abierta; queda en
+   * Auditoría. Mismo permiso que cobrar.
+   */
+  async anularCobro(input: {
+    paymentId: string;
+    motivo: string;
+    cashRegisterId?: string | null;
+  }): Promise<{ anulados: number; total: string; customerId: string; cajaUsada: string }> {
+    const { repos, currentUser } = this.ctx;
+    requirePermission(currentUser, 'receive_payment');
+    return repos.payments.anularCobro({
+      paymentId: input.paymentId,
+      motivo: input.motivo,
+      cashRegisterId: input.cashRegisterId ?? this.ctx.currentCashRegister?.id ?? null,
+      userId: currentUser.id,
+    });
+  }
+
+  /**
    * Registra una cobranza a NIVEL CUENTA: el monto se aplica al saldo total del
    * cliente, distribuyéndose automáticamente entre sus comprobantes abiertos en
    * orden FIFO (del más viejo al más nuevo). El repositorio hace la transacción
@@ -303,7 +328,27 @@ export class AccountsReceivableService {
           saleNumber: sale?.number ?? null,
           paymentMethodName: pmName,
           comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
+          paymentId: p.id,
+          voided: p.voidedAt != null,
         });
+        // La anulación es una entrada propia, con su fecha: la deuda vuelve.
+        if (p.voidedAt != null) {
+          paidSoFar = subDecimal(paidSoFar, p.amount, 4);
+          raw.push({
+            date: p.voidedAt,
+            kind: 'void',
+            reference: `Anulación de cobranza${p.voidReason ? ` — ${p.voidReason}` : ''}`,
+            debit: p.amount,
+            credit: '0.0000',
+            saleId: ac.saleId,
+            saleType: sale?.type ?? null,
+            saleNumber: sale?.number ?? null,
+            paymentMethodName: pmName,
+            comprobanteBalance: subDecimal(ac.total, paidSoFar, 4),
+            paymentId: p.id,
+            voided: false,
+          });
+        }
       }
     }
 

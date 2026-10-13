@@ -455,6 +455,8 @@ export const api = {
       nuevoOrigen: 'daily' | 'general',
     ): Promise<{ movidos: number; destino: 'daily' | 'general'; cajaUsada: string | null }> =>
       unwrap(sf().supplierAccounts.corregirOrigenDePago({ supplierPaymentId, nuevoOrigen })),
+    anularPago: (input: { supplierPaymentId: string; motivo: string }): Promise<{ anulados: number; total: string; destino: 'daily' | 'general'; cajaUsada: string | null }> =>
+      unwrap(sf().supplierAccounts.anularPago(input)),
     payToSupplier: (input: PayToSupplierInputDTO): Promise<PayToSupplierResultDTO> => unwrap(sf().supplierAccounts.payToSupplier(input)),
     getStatement: (supplierId: string): Promise<SupplierStatementDTO> => unwrap(sf().supplierAccounts.getStatement({ supplierId })),
     listOpenBySupplier: (supplierId: string): Promise<SupplierAccountPayableDTO[]> => unwrap(sf().supplierAccounts.listOpenBySupplier({ supplierId })),
@@ -516,6 +518,8 @@ export const api = {
     receivePayment: (input: ReceivePaymentInputDTO): Promise<ReceivePaymentResultDTO> => unwrap(sf().accounts.receivePayment(input)),
     receivePaymentToCustomer: (input: ReceivePaymentToCustomerInputDTO): Promise<ReceivePaymentToCustomerResultDTO> =>
       unwrap(sf().accounts.receivePaymentToCustomer(input)),
+    anularCobro: (input: { paymentId: string; motivo: string }): Promise<{ anulados: number; total: string; customerId: string; cajaUsada: string }> =>
+      unwrap(sf().accounts.anularCobro(input)),
     getStatement: (customerId: string): Promise<CustomerStatementDTO> => unwrap(sf().accounts.getStatement({ customerId })),
     getTotalReceivables: (): Promise<{ total: string }> => unwrap(sf().accounts.getTotalReceivables()),
     listBalances: (): Promise<CustomerBalanceDTO[]> => unwrap(sf().accounts.listBalances()),

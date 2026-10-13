@@ -8,6 +8,7 @@ import { useArticles, useCompany, useCustomerBalances, usePaymentMethods } from 
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { ReturnSaleDialog } from '@/components/ReturnDialogs'
+import { AnularPagoBoton } from '@/components/AnularPagoBoton'
 import { exportReceiptPdf } from '@/lib/receiptDoc'
 import { exportStatementPdf, exportStatementExcel } from '@/lib/statementDoc'
 import { printPaymentReceiptSilent } from '@/lib/printPaymentReceipt'
@@ -708,19 +709,20 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                 </TableRow>
               ) : (
                 filteredEntries.map((e, i) => (
-                  <TableRow key={i}>
+                  <TableRow key={i} className={e.voided ? 'text-muted-foreground line-through' : undefined}>
                     <TableCell className="text-sm">{formatDate(e.date)}</TableCell>
                     <TableCell>
                       {e.kind === 'sale'
                         ? 'Venta'
                         : e.kind === 'return'
                           ? 'Devolución'
-                          : e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005
-                            ? 'Cobranza total'
-                            : 'Cobranza parcial'}
+                          : e.kind === 'void'
+                            ? 'Anulación de cobranza'
+                            : (e.comprobanteBalance != null && Number(e.comprobanteBalance) <= 0.005 ? 'Cobranza total' : 'Cobranza parcial') +
+                              (e.voided ? ' (anulada)' : '')}
                     </TableCell>
                     <TableCell className="text-sm">{e.kind === 'sale' ? 'Cuenta corriente' : e.kind === 'return' ? 'Crédito en cuenta' : (e.paymentMethodName ?? '—')}</TableCell>
-                    <TableCell className={`text-right tabular-nums ${e.kind !== 'sale' ? 'text-success' : ''}`}>
+                    <TableCell className={`text-right tabular-nums ${(e.kind === 'payment' || e.kind === 'return') && !e.voided ? 'text-success' : ''}`}>
                       {formatCurrency(Number(e.debit) > 0 ? e.debit : e.credit)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(e.runningBalance)}</TableCell>
@@ -747,6 +749,10 @@ function CustomerDetail({ customerId, onBack }: { customerId: string; onBack: ()
                         >
                           <FileDown className="h-4 w-4" />
                         </Button>
+                        {/* Anular la cobranza (p. ej. se cobró al cliente equivocado). */}
+                        {e.paymentId && !e.voided && (
+                          <AnularPagoBoton tipo="cobro" paymentId={e.paymentId} amount={e.credit} />
+                        )}
                         </span>
                       ) : e.kind === 'sale' && e.saleId ? (
                         <span className="inline-flex items-center">
