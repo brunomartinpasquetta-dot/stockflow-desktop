@@ -20,6 +20,8 @@ export interface CobroQrModalProps {
   onApproved: (orderId: string, mpPaymentId: string | null) => void
   onCancelled: () => void
   onClose: () => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }
 
 /**
@@ -35,6 +37,7 @@ export function CobroQrModal({
   onApproved,
   onCancelled,
   onClose,
+  onCloseAutoFocus,
 }: CobroQrModalProps) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [order, setOrder] = useState<MpOrderDTO | null>(null)
@@ -204,7 +207,7 @@ export function CobroQrModal({
         if (!o) handleClose()
       }}
     >
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>Cobrar con QR MercadoPago</DialogTitle>
         </DialogHeader>

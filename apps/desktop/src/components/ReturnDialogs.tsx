@@ -137,6 +137,7 @@ export function ReturnSaleDialog({
   open,
   onClose,
   onDone,
+  onCloseAutoFocus,
 }: {
   saleId: string
   /** Renglón elegido en el selector por artículo: llega marcado para devolver. */
@@ -144,6 +145,8 @@ export function ReturnSaleDialog({
   open: boolean
   onClose: () => void
   onDone?: () => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }) {
   const qc = useQueryClient()
   const companyQ = useCompany()
@@ -274,7 +277,7 @@ export function ReturnSaleDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Undo2 className="h-5 w-5 text-primary" />

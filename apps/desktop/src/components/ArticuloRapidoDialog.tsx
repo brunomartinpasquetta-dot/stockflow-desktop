@@ -36,9 +36,12 @@ export interface ArticuloRapido {
 export function ArticuloRapidoDialog({
   onAdd,
   onClose,
+  onCloseAutoFocus,
 }: {
   onAdd: (linea: ArticuloRapido) => void
   onClose: () => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }) {
   const [description, setDescription] = useState('')
   const [quantity, setQuantity] = useState('1')
@@ -62,7 +65,7 @@ export function ArticuloRapidoDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>Artículo rápido</DialogTitle>
         </DialogHeader>

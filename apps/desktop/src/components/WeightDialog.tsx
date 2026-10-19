@@ -15,11 +15,14 @@ export function WeightDialog({
   articleDescription,
   onClose,
   onConfirm,
+  onCloseAutoFocus,
 }: {
   open: boolean
   articleDescription?: string
   onClose: () => void
   onConfirm: (weightKg: string) => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }) {
   const scaleConfigQuery = useQuery({
     queryKey: ['hardwareScaleConfig'],
@@ -70,7 +73,7 @@ export function WeightDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scale className="h-5 w-5" /> Peso del producto

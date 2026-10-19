@@ -26,10 +26,11 @@ import { useLanContext } from '@/contexts/LanContext'
 import { printSaleTicketSilent } from '@/lib/printSaleTicket'
 import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
-import { destinoDelEnter, enterDebeConfirmar, guardarEnterConfirma, leerEnterConfirma, vigilarOrigenDelFoco } from '@/lib/enterConfirma'
+import { avisoImporteConCodigo, debeIrAlBuscador, decidirCantidad, decidirImporte, type CampoDeImporte } from '@/lib/lectorDeCodigos'
+import { textoSospecha } from '@/lib/cantidadSospechosa'
 import { guardarImprimirTicketLocal, imprimirTicketActivado, leerImprimirTicketLocal } from '@/lib/imprimirTicket'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
-import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty, toInputString } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
@@ -116,11 +117,14 @@ function CustomerPicker({
   customers,
   onClose,
   onSelect,
+  onCloseAutoFocus,
 }: {
   open: boolean
   customers: CustomerDTO[]
   onClose: () => void
   onSelect: (c: CustomerDTO) => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }) {
   const [q, setQ] = useState('')
   const filtered = useMemo(() => {
@@ -136,7 +140,7 @@ function CustomerPicker({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>Seleccionar cliente</DialogTitle>
         </DialogHeader>
@@ -180,6 +184,7 @@ function ArticlePicker({
   activeList,
   onClose,
   onPick,
+  onCloseAutoFocus,
 }: {
   open: boolean
   articles: ArticleDTO[]
@@ -189,6 +194,8 @@ function ArticlePicker({
   activeList: 1 | 2 | 3
   onClose: () => void
   onPick: (a: ArticleDTO) => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }) {
   const [q, setQ] = useState('')
   const [familyId, setFamilyId] = useState('')
@@ -260,6 +267,7 @@ function ArticlePicker({
           agrandaba nada y parecia que la funcion no estuviera. */}
       <DialogContent
         className="flex flex-col overflow-hidden"
+        onCloseAutoFocus={onCloseAutoFocus}
         style={{
           transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,
           width: tam.w,
@@ -399,10 +407,13 @@ function DevolucionPicker({
   open,
   onClose,
   onPick,
+  onCloseAutoFocus,
 }: {
   open: boolean
   onClose: () => void
   onPick: (saleId: string, lineId: string) => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }) {
   const [busca, setBusca] = useState('')
   const texto = useDebouncedValue(busca.trim(), 200)
@@ -422,7 +433,7 @@ function DevolucionPicker({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>Devolución — seleccione el artículo</DialogTitle>
         </DialogHeader>
@@ -499,11 +510,14 @@ function PromoPicker({
   articles,
   onClose,
   onPick,
+  onCloseAutoFocus,
 }: {
   open: boolean
   articles: ArticleDTO[]
   onClose: () => void
   onPick: (a: ArticleDTO) => void
+  /** Al cerrar: a dónde va el foco (Ventas lo devuelve a su buscador). */
+  onCloseAutoFocus?: (e: Event) => void
 }) {
   const promosQuery = usePromotions()
   const activas = (promosQuery.data ?? []).filter((p) => p.active)
@@ -520,7 +534,7 @@ function PromoPicker({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BadgePercent className="h-5 w-5 text-primary" />
@@ -758,16 +772,24 @@ function PDV() {
   const [returningLineId, setReturningLineId] = useState<string | null>(null)
   const [barcode, setBarcode] = useState('')
   const barcodeRef = useRef<HTMLInputElement>(null)
-  // Raíz de la pantalla: el Enter global sólo vale para lo que pasa ACÁ (no para
-  // la búsqueda global ni el chat de Flowy, que viven en la misma ventana).
+  // Raíz de la pantalla: el desvío de teclas al buscador sólo vale para lo que
+  // pasa ACÁ (no para la búsqueda global ni el chat de Flowy, que viven en la
+  // misma ventana).
   const raizRef = useRef<HTMLDivElement>(null)
-  // Cómo llegó el foco (Tab o clic): decide si Enter activa un botón o confirma.
-  const origenFocoRef = useRef<ReturnType<typeof vigilarOrigenDelFoco> | null>(null)
-  useEffect(() => {
-    const v = vigilarOrigenDelFoco()
-    origenFocoRef.current = v
-    return () => v.detener()
-  }, [])
+  /**
+   * Al cerrar un diálogo el foco vuelve al buscador (y no al botón que lo
+   * abrió): el próximo código del lector tiene que entrar ahí. Es el
+   * `onCloseAutoFocus` de Radix: sin el preventDefault, Radix devuelve el foco
+   * por su cuenta y lo pisa.
+   */
+  function focoAlBuscadorAlCerrar(e: Event): void {
+    e.preventDefault()
+    barcodeRef.current?.focus()
+  }
+  /** Cantidad de un renglón al entrar al campo: vuelve si lo tipeado era un código escaneado. */
+  const cantidadAlEntrarRef = useRef<{ i: number; valor: string } | null>(null)
+  /** Precio o descuento de un renglón al entrar al campo: ídem. */
+  const importeAlEntrarRef = useRef<{ i: number; campo: CampoDeImporte; valor: string; manual: boolean } | null>(null)
   /**
    * Renglón marcado del desplegable, para moverse con las flechas.
    * -1 = ninguno: Enter usa el criterio de siempre (código exacto, o el primer
@@ -788,11 +810,11 @@ function PDV() {
   // los pagos registrados siguen sumando exacto el total.
   const [calcularVueltoOn, setCalcularVueltoOn] = useState<boolean>(() => leerPreferenciaVuelto())
   const [pagaCon, setPagaCon] = useState('')
-  // "Enter confirma la venta": con el buscador vacío, Enter hace lo que F2. Viene
-  // activado; se recuerda en cada PC y la casilla lo apaga (ver lib/enterConfirma).
-  const [enterConfirmaOn, setEnterConfirmaOn] = useState<boolean>(() => leerEnterConfirma())
-  // Cuándo se cargó el último artículo: un Enter pegado al del lector no confirma.
-  const ultimoArticuloRef = useRef(0)
+  // ENTER YA NO CONFIRMA LA VENTA (Bruno, 16-oct-2026): con el lector de códigos
+  // el Enter final de cada lectura cobraba la venta si el foco no estaba en el
+  // buscador, y el artículo leído se perdía. Se confirma con F2 o con el botón
+  // verde. La preferencia vieja «stockflow:ventas:enterConfirma» que haya
+  // quedado guardada en alguna PC ya no se lee.
   // Pantalla de cobro con vuelto (se abre al confirmar, como en StockFácil).
   const [cobroVueltoOpen, setCobroVueltoOpen] = useState(false)
   // Modo mixto explícito (toggle "Pago Mixto"): expone el split N-filas.
@@ -939,7 +961,6 @@ function PDV() {
     addArticleWithQty(article, '1')
   }
   function addArticleWithQty(article: ArticleDTO, qty: string): void {
-    ultimoArticuloRef.current = Date.now()
     // Lista 2/3 pedida pero vacía en la ficha: se cobra Lista 1 y se avisa.
     const listaCaida = priceListFallback(article, selectedPriceList)
     if (listaCaida) {
@@ -994,6 +1015,66 @@ function PDV() {
   }
   function removeLine(i: number): void {
     setCart((prev) => prev.filter((_, idx) => idx !== i))
+    // El foco quedaba en el tacho y el código siguiente del lector se perdía.
+    barcodeRef.current?.focus()
+  }
+  /**
+   * Terminó la edición de la cantidad de un renglón (Enter o salir del campo).
+   * Si lo tipeado tiene pinta de código de barras —se escaneó con el cursor en
+   * la cantidad— no se acepta: vuelve la cantidad anterior y, si el código es
+   * de un artículo, ese artículo se carga. Una cantidad inusualmente alta se
+   * pregunta antes de aceptarla.
+   */
+  function cerrarCantidad(i: number, texto: string): void {
+    const entrada = cantidadAlEntrarRef.current
+    // Ya resuelta (el Enter la cerró y después llegó la salida del campo).
+    if (!entrada || entrada.i !== i) return
+    cantidadAlEntrarRef.current = null
+    const decision = decidirCantidad(texto, entrada.valor, (v) => allArticles.some((a) => a.barcode === v))
+    if (decision.tipo === 'aceptar') {
+      setLineQty(i, parseCurrencyInput(texto))
+      return
+    }
+    if (decision.tipo === 'codigo') {
+      setLineQty(i, entrada.valor)
+      const articulo = allArticles.find((a) => a.barcode === decision.codigo)
+      if (articulo) {
+        toast.warning(
+          `La cantidad ingresada es el código de barras de «${articulo.description}». Se mantuvo la cantidad anterior y el artículo se agregó a la venta.`,
+          { duration: 10_000 },
+        )
+        addArticle(articulo)
+      } else {
+        toast.warning(`${textoSospecha('parece-codigo')} Se mantuvo la cantidad anterior.`, { duration: 10_000 })
+      }
+      return
+    }
+    if (window.confirm(`${textoSospecha('muy-alta')} ¿Confirma una cantidad de ${texto.trim()}?`)) {
+      setLineQty(i, parseCurrencyInput(texto))
+    } else {
+      setLineQty(i, entrada.valor)
+    }
+  }
+  /**
+   * Terminó la edición del PRECIO o del DESCUENTO de un renglón. Misma
+   * protección que la cantidad: si lo tipeado tiene pinta de código de barras
+   * no se acepta, vuelve el valor anterior y, si el código es de un artículo,
+   * ese artículo se carga. Se decide al SALIR del campo (también tras el
+   * Enter, que manda el foco al buscador) y no en el Enter mismo: el campo de
+   * importe vuelve a emitir lo tipeado al perder el foco y pisaría lo
+   * restaurado.
+   */
+  function cerrarImporte(i: number, texto: string): void {
+    const entrada = importeAlEntrarRef.current
+    if (!entrada || entrada.i !== i) return
+    importeAlEntrarRef.current = null
+    const decision = decidirImporte(texto, toInputString(entrada.valor), (v) => allArticles.some((a) => a.barcode === v))
+    if (decision.tipo === 'aceptar') return
+    if (entrada.campo === 'precio') setLinePrice(i, entrada.valor, entrada.manual)
+    else setLineDiscount(i, entrada.valor)
+    const articulo = allArticles.find((a) => a.barcode === decision.codigo)
+    toast.warning(avisoImporteConCodigo(entrada.campo, articulo?.description ?? null), { duration: 10_000 })
+    if (articulo) addArticle(articulo)
   }
   /*
    * El renglón puede ya no existir cuando llega la edición. El campo de
@@ -1020,12 +1101,13 @@ function PDV() {
       return next
     })
   }
-  function setLinePrice(i: number, value: string): void {
+  /** `manual` en false sólo al RESTAURAR el precio que había antes de un código escaneado. */
+  function setLinePrice(i: number, value: string, manual = true): void {
     setCart((prev) => {
       const line = prev[i]
       if (!line) return prev
       const next = [...prev]
-      next[i] = { ...line, unitPrice: value, priceManuallySet: true }
+      next[i] = { ...line, unitPrice: value, priceManuallySet: manual }
       return next
     })
   }
@@ -1291,12 +1373,6 @@ function PDV() {
     if (!activo) setPagaCon('')
     barcodeRef.current?.focus()
   }
-  function toggleEnterConfirma(activo: boolean): void {
-    setEnterConfirmaOn(activo)
-    guardarEnterConfirma(activo)
-    barcodeRef.current?.focus()
-  }
-
   // ── Comisión del medio de pago (FEATURE #1, sólo informativo para el vendedor) ──
   // El comercio ABSORBE la comisión; el cliente paga el total normal. Acá se
   // muestra al vendedor cuánto se lleva el medio y cuánto NETO entra a caja.
@@ -1496,7 +1572,8 @@ function PDV() {
       return
     }
     // Calcular vuelto: antes de registrar se abre la pantalla de cobro (total,
-    // con cuánto paga y el vuelto). Desde ahí, Enter confirma.
+    // con cuánto paga y el vuelto). Desde ahí se confirma con F2 o con el botón
+    // (Enter no: un código del lector cobraba la venta).
     if (calcularVueltoOn && cobraEnEfectivo && enEfectivo > 0 && !cobroVueltoOpen) {
       setPagaCon('')
       setCobroVueltoOpen(true)
@@ -1689,48 +1766,42 @@ function PDV() {
       rapidoOpen ||
       devolucionPickerOpen ||
       qrModalOpen ||
+      cobroVueltoOpen ||
+      pendingWeightArticle != null ||
       returningSaleId != null
     function onKeyDown(e: KeyboardEvent) {
+      // Pantalla «Cobro en efectivo» (calcular vuelto): se confirma con F2 o con
+      // el botón, NUNCA con Enter (Bruno, 16-oct-2026: un código leído ahí
+      // cobraba la venta). Se atiende antes que los demás diálogos para que el
+      // F2 no abra Compras (atajo F2 de la barra).
+      if (cobroVueltoOpen) {
+        if (e.key === 'F2') {
+          e.preventDefault()
+          e.stopPropagation()
+          if (!e.repeat && vueltoCalc.falta <= 0) void confirmar()
+        }
+        return
+      }
       if (e.repeat) return
       if (dialogoAbierto || procesando) return
       // Diálogos con estado propio (p. ej. dentro de un componente hijo).
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
-      // Enter desde cualquier lugar de la pantalla (no sólo con el cursor en el
-      // buscador): después de destildar una opción, cambiar una lista o hacer
-      // clic en blanco el foco ya no está ahí y Enter dejaba de confirmar.
-      if (e.key === 'Enter' && enterConfirmaOn) {
-        const el = e.target instanceof HTMLElement ? e.target : null
-        const dentro = el == null || el === document.body || el === document.documentElement || raizRef.current?.contains(el) === true
-        if (!dentro) return
-        const focusVisible = origenFocoRef.current?.focoPorTeclado(el) ?? false
-        const destino = destinoDelEnter(
-          el
-            ? {
-                tagName: el.tagName,
-                type: (el as HTMLInputElement).type,
-                role: el.getAttribute('role'),
-                isContentEditable: el.isContentEditable,
-                focusVisible,
-              }
-            : null,
-          el === barcodeRef.current,
-        )
-        if (destino !== 'confirmar') return
-        if (
-          enterDebeConfirmar({
-            activo: true,
-            busqueda: barcode,
-            hayArticulos: cart.length > 0,
-            puedeConfirmar: canConfirm,
-            repetida: e.repeat,
-            msDesdeElUltimoArticulo: Date.now() - ultimoArticuloRef.current,
-          })
-        ) {
-          e.preventDefault()
-          e.stopPropagation()
-          void confirmar()
-        }
-        return
+      // Lector de códigos: si el foco quedó fuera del buscador (tacho, clic en
+      // el total, forma de pago, una casilla…), la tecla se manda al buscador
+      // ANTES de que entre, así el código completo llega ahí. En un campo de
+      // escritura (cantidad, documento, descuento) la tecla es del campo.
+      const el = e.target instanceof HTMLElement ? e.target : null
+      const dentro = el == null || el === document.body || el === document.documentElement || raizRef.current?.contains(el) === true
+      if (
+        dentro &&
+        debeIrAlBuscador({
+          tecla: e,
+          foco: el ? { tagName: el.tagName, type: (el as HTMLInputElement).type, readOnly: (el as HTMLInputElement).readOnly, isContentEditable: el.isContentEditable } : null,
+          focoEnElBuscador: el === barcodeRef.current,
+          dialogoAbierto: false,
+        })
+      ) {
+        barcodeRef.current?.focus()
       }
       if (e.key === 'F2') {
         e.preventDefault()
@@ -1970,24 +2041,9 @@ function PDV() {
                   setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1))
                   return
                 }
-                if (e.key === 'Enter') {
-                  // Buscador vacío + "Enter confirma la venta": es como F2.
-                  if (
-                    enterDebeConfirmar({
-                      activo: enterConfirmaOn,
-                      busqueda: barcode,
-                      hayArticulos: cart.length > 0,
-                      puedeConfirmar: canConfirm,
-                      repetida: e.repeat,
-                      msDesdeElUltimoArticulo: Date.now() - ultimoArticuloRef.current,
-                    })
-                  ) {
-                    e.preventDefault()
-                    void confirmar()
-                    return
-                  }
-                  commitBarcode()
-                }
+                // Enter SÓLO carga el artículo; la venta se confirma con F2 o
+                // con el botón verde. Con el buscador vacío, Enter no hace nada.
+                if (e.key === 'Enter') commitBarcode()
                 if (e.key === 'Escape' && barcode.trim() !== '') {
                   setBarcode('')
                   setHighlight(-1)
@@ -2134,22 +2190,49 @@ function PDV() {
                           className="h-7 text-right tabular-nums"
                           inputMode="decimal"
                           value={l.quantity}
+                          onFocus={() => {
+                            cantidadAlEntrarRef.current = { i, valor: l.quantity }
+                          }}
                           onChange={(e) => setLineQty(i, e.target.value)}
-                          onBlur={() => setLineQty(i, parseCurrencyInput(l.quantity))}
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Enter') return
+                            e.preventDefault()
+                            cerrarCantidad(i, e.currentTarget.value)
+                            barcodeRef.current?.focus()
+                          }}
+                          onBlur={(e) => cerrarCantidad(i, e.currentTarget.value)}
                         />
                       </td>
                       <td className="px-2 py-0.5">
                         <CurrencyInput
                           className="h-7 text-right tabular-nums"
                           value={l.unitPrice}
+                          onFocus={() => {
+                            importeAlEntrarRef.current = { i, campo: 'precio', valor: l.unitPrice, manual: l.priceManuallySet }
+                          }}
                           onChange={(v) => setLinePrice(i, v)}
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Enter') return
+                            e.preventDefault()
+                            barcodeRef.current?.focus()
+                          }}
+                          onBlur={(e) => cerrarImporte(i, e.currentTarget.value)}
                         />
                       </td>
                       <td className="px-2 py-0.5">
                         <CurrencyInput
                           className="h-7 text-right tabular-nums"
                           value={l.discount}
+                          onFocus={() => {
+                            importeAlEntrarRef.current = { i, campo: 'descuento', valor: l.discount, manual: l.priceManuallySet }
+                          }}
                           onChange={(v) => setLineDiscount(i, v)}
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Enter') return
+                            e.preventDefault()
+                            barcodeRef.current?.focus()
+                          }}
+                          onBlur={(e) => cerrarImporte(i, e.currentTarget.value)}
                         />
                       </td>
                       <td className="px-2 py-0.5 text-right tabular-nums font-medium">
@@ -2364,15 +2447,6 @@ function PDV() {
                 />
                 <span>Calcular vuelto</span>
               </label>
-              <label className="flex items-center gap-2 text-sm" title="Con el buscador vacío, Enter confirma la venta (igual que F2). Destíldela para apagarlo en esta PC.">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-input"
-                  checked={enterConfirmaOn}
-                  onChange={(e) => toggleEnterConfirma(e.target.checked)}
-                />
-                <span>Enter confirma la venta</span>
-              </label>
               {/* Tildada, dice qué va a pasar (al tildarla sola no se ve ningún cambio). */}
               {calcularVueltoOn && (
                 <span className="text-[11px] leading-tight text-muted-foreground">
@@ -2388,7 +2462,7 @@ function PDV() {
             onClick={() => void confirmar()}
           >
             {createSale.isPending || procesando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
-            Confirmar venta ({enterConfirmaOn ? 'F2 o Enter' : 'F2'}) — {formatCurrency(totals.total)}
+            Confirmar venta (F2) — {formatCurrency(totals.total)}
           </Button>
           <div className="flex gap-1.5">
             <Button
@@ -2412,9 +2486,15 @@ function PDV() {
         </div>
       </div>
 
-      <CustomerPicker open={customerPickerOpen} customers={customers} onClose={() => setCustomerPickerOpen(false)} onSelect={pickCustomer} />
+      <CustomerPicker
+        open={customerPickerOpen}
+        customers={customers}
+        onClose={() => setCustomerPickerOpen(false)}
+        onSelect={pickCustomer}
+        onCloseAutoFocus={focoAlBuscadorAlCerrar}
+      />
       <Dialog open={cobroVueltoOpen} onOpenChange={(o) => { if (!o) setCobroVueltoOpen(false) }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm" onCloseAutoFocus={focoAlBuscadorAlCerrar}>
           <DialogHeader>
             <DialogTitle>Cobro en efectivo</DialogTitle>
           </DialogHeader>
@@ -2441,12 +2521,6 @@ function PDV() {
                 placeholder="0,00"
                 value={pagaCon}
                 onChange={(e) => setPagaCon(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    if (vueltoCalc.falta <= 0) void confirmar()
-                  }
-                }}
               />
             </div>
             <div className="flex items-baseline justify-between rounded-md bg-muted/50 px-3 py-2">
@@ -2465,7 +2539,7 @@ function PDV() {
                 disabled={vueltoCalc.falta > 0 || createSale.isPending || procesando}
                 onClick={() => void confirmar()}
               >
-                Confirmar venta (Enter)
+                Confirmar venta (F2)
               </Button>
             </div>
           </div>
@@ -2474,6 +2548,7 @@ function PDV() {
       <DevolucionPicker
         open={devolucionPickerOpen}
         onClose={() => setDevolucionPickerOpen(false)}
+        onCloseAutoFocus={focoAlBuscadorAlCerrar}
         onPick={(saleId, lineId) => {
           setDevolucionPickerOpen(false)
           setReturningLineId(lineId)
@@ -2485,6 +2560,7 @@ function PDV() {
           saleId={returningSaleId}
           lineaInicial={returningLineId ?? undefined}
           open
+          onCloseAutoFocus={focoAlBuscadorAlCerrar}
           onClose={() => {
             setReturningSaleId(null)
             setReturningLineId(null)
@@ -2497,6 +2573,7 @@ function PDV() {
       {rapidoOpen && (
         <ArticuloRapidoDialog
           onAdd={addArticuloRapido}
+          onCloseAutoFocus={focoAlBuscadorAlCerrar}
           onClose={() => {
             setRapidoOpen(false)
             barcodeRef.current?.focus()
@@ -2506,6 +2583,7 @@ function PDV() {
       <PromoPicker
         open={promoPickerOpen}
         articles={allArticles}
+        onCloseAutoFocus={focoAlBuscadorAlCerrar}
         onClose={() => {
           setPromoPickerOpen(false)
           barcodeRef.current?.focus()
@@ -2518,6 +2596,7 @@ function PDV() {
         families={familiesQuery.data ?? []}
         suppliers={suppliersQuery.data ?? []}
         activeList={selectedPriceList}
+        onCloseAutoFocus={focoAlBuscadorAlCerrar}
         onClose={() => {
           setArticlePickerOpen(false)
           barcodeRef.current?.focus()
@@ -2527,6 +2606,7 @@ function PDV() {
       <WeightDialog
         open={pendingWeightArticle != null}
         articleDescription={pendingWeightArticle?.description}
+        onCloseAutoFocus={focoAlBuscadorAlCerrar}
         onClose={() => setPendingWeightArticle(null)}
         onConfirm={(weightKg) => {
           if (pendingWeightArticle) addArticleWithQty(pendingWeightArticle, weightKg)
@@ -2541,6 +2621,7 @@ function PDV() {
           onApproved={(orderId, mpPaymentId) => void confirmarConQrAprobado(orderId, mpPaymentId)}
           onCancelled={() => setQrModalOpen(false)}
           onClose={() => setQrModalOpen(false)}
+          onCloseAutoFocus={focoAlBuscadorAlCerrar}
         />
       )}
     </div>
