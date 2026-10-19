@@ -73,7 +73,9 @@
     "test:anular-pago": "tsx electron/__tests__/anular-pago.smoke.ts",
     "test:tema": "tsx electron/__tests__/tema.smoke.ts",
     "test:mp-qr-fijo": "tsx electron/__tests__/mp-qr-fijo.smoke.ts",
-    "test:mp-qr-flujo": "tsx electron/__tests__/mp-qr-flujo.smoke.ts"
+    "test:mp-qr-flujo": "tsx electron/__tests__/mp-qr-flujo.smoke.ts",
+    "test:topes-importes": "tsx electron/__tests__/topes-importes.smoke.ts",
+    "test:entrada-numerica": "tsx electron/__tests__/entrada-numerica.smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

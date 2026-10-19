@@ -10,6 +10,7 @@ import type {
   VoucherType,
 } from '@stockflow/shared';
 import { cmpDecimal, sumDecimals } from '@stockflow/shared';
+import { exigirDentroDelTope, exigirTotalesRazonables } from '@stockflow/db';
 
 import { requirePermission } from '../auth/permissions';
 import { assertPhysicalCashAvailable } from './cash.service';
@@ -97,6 +98,19 @@ export class PurchasesService {
       throw new BusinessRuleError('no_payments', 'La compra debe registrar al menos un pago');
     }
 
+    // Topes (19-oct-2026): ver createSale. Una cantidad de 215.841 unidades por
+    // $485 millones fue un código de barras tipeado en la cantidad (8-oct-2026).
+    for (const l of input.lines) {
+      exigirDentroDelTope('quantity', l.quantity, 'cantidad');
+      exigirDentroDelTope('costPrice', l.costPrice, 'precio');
+      exigirDentroDelTope('salePrice', l.salePrice, 'precio');
+      exigirDentroDelTope('newListPrice1', l.newListPrice1, 'precio');
+      exigirDentroDelTope('newListPrice2', l.newListPrice2, 'precio');
+      exigirDentroDelTope('newListPrice3', l.newListPrice3, 'precio');
+    }
+    exigirDentroDelTope('discount', input.discount, 'importe');
+    for (const p of payments) exigirDentroDelTope('amount', p.amount, 'importe');
+
     const supplier = await repos.suppliers.findById(input.supplierId);
     if (!supplier) throw new NotFoundError('Proveedor', input.supplierId);
 
@@ -170,6 +184,11 @@ export class PurchasesService {
       resolvedLines.map((l) => ({ quantity: l.quantity, unitPrice: l.costPrice, vatRate: l.vatRate })),
       input.discount ?? '0.0000',
       mode,
+    );
+
+    exigirTotalesRazonables(
+      { lineas: preview.lines.map((l) => l.lineTotal), subtotal: preview.subtotal, total: preview.total },
+      'compra',
     );
 
     if (!isAccountPurchase) {

@@ -10,6 +10,7 @@ import type {
   VoucherType,
 } from '@stockflow/shared';
 import { cmpDecimal, sumDecimals } from '@stockflow/shared';
+import { exigirDentroDelTope, exigirTotalesRazonables } from '@stockflow/db';
 
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
@@ -114,6 +115,17 @@ export class SalesService {
     const isAccountSale = draft.isAccountSale === true;
     const payments = isAccountSale ? [] : (draft.payments ?? []);
 
+    // Topes (19-oct-2026): antes de tocar nada. Un código de barras leído en
+    // un casillero numérico no puede llegar a ser cantidad, precio, descuento
+    // ni pago. El repositorio lo vuelve a validar con los esquemas.
+    for (const l of lines) {
+      exigirDentroDelTope('quantity', l.quantity, 'cantidad');
+      exigirDentroDelTope('unitPrice', l.unitPrice, 'precio');
+      exigirDentroDelTope('discount', l.discount, 'precio');
+    }
+    exigirDentroDelTope('discount', draft.discount, 'importe');
+    for (const p of payments) exigirDentroDelTope('amount', p.amount, 'importe');
+
     const register = await this.resolveOpenRegister();
 
     const customer = await repos.customers.findById(draft.customerId);
@@ -182,6 +194,11 @@ export class SalesService {
     const company = await repos.company.getOrCreate();
     const mode: PriceMode = company.priceMode === 'net' ? 'net' : 'gross';
     const preview = calculateSaleTotals(resolvedLines, draft.discount ?? '0.0000', mode);
+    // Lo calculado también tiene tope y no puede quedar en negativo (descuento mayor que el importe).
+    exigirTotalesRazonables(
+      { lineas: preview.lines.map((l) => l.lineTotal), subtotal: preview.subtotal, total: preview.total },
+      'venta',
+    );
 
     if (!isAccountSale) {
       // La suma de los pagos debe ser EXACTAMENTE igual al total (no hay vuelto).

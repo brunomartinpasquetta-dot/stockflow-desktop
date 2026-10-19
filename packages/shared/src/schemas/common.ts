@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+import {
+  MENSAJE_CANTIDAD_ALTA,
+  MENSAJE_IMPORTE_ALTO,
+  superaElTope,
+  type ClaveDeTope,
+} from '../limites';
+
 /**
  * Piezas reutilizables para los schemas de entidad.
  * Los decimales viajan como string (la DB los guarda como TEXT).
@@ -39,6 +46,40 @@ export const qtySchema = z
 export const pctSchema = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'Debe ser un porcentaje con hasta 2 decimales');
+
+/*
+ * Variantes CON TOPE de los decimales de arriba, para lo que se CARGA (entrada
+ * de ventas, compras, presupuestos, caja, artículos…). Los esquemas de forma de
+ * la base (`SaleSchema`, `ArticleSchema`…) siguen con los de arriba: leer un dato
+ * viejo no puede fallar por un tope nuevo. Los topes viven en `../limites.ts`.
+ *
+ * `sinRuta` hace que el aviso llegue al usuario SOLO, sin el prefijo técnico
+ * «lines.0.quantity:» (ver `ValidationError.fromZod`).
+ */
+const conTope = (clave: ClaveDeTope, mensaje: string) => ({
+  check: (v: string) => !superaElTope(v, clave),
+  opciones: { message: mensaje, params: { sinRuta: true, tope: clave } },
+});
+
+const tImporte = conTope('importe', MENSAJE_IMPORTE_ALTO);
+const tPrecio = conTope('precio', MENSAJE_IMPORTE_ALTO);
+const tCantidad = conTope('cantidad', MENSAJE_CANTIDAD_ALTA);
+const tStock = conTope('stock', MENSAJE_CANTIDAD_ALTA);
+
+/** Importe total (venta, pago, movimiento de caja, descuento global, crédito…): dinero con tope. */
+export const importeSchema = moneySchema.refine(tImporte.check, tImporte.opciones);
+
+/** Importe que puede ser negativo (arqueo de caja en rojo), con tope sobre el valor absoluto. */
+export const signedImporteSchema = signedMoneySchema.refine(tImporte.check, tImporte.opciones);
+
+/** Precio unitario, costo, precio de lista o descuento de un renglón: dinero con tope. */
+export const precioSchema = moneySchema.refine(tPrecio.check, tPrecio.opciones);
+
+/** Cantidad de un renglón de venta, compra, presupuesto o promoción: cantidad con tope. */
+export const cantidadSchema = qtySchema.refine(tCantidad.check, tCantidad.opciones);
+
+/** Existencia de un artículo (stock, mínimo, ideal, mínimo mayorista): cantidad con tope. */
+export const stockSchema = qtySchema.refine(tStock.check, tStock.opciones);
 
 /** Alícuotas de IVA admitidas en Argentina. */
 export const vatRateSchema = z.enum(['0.00', '10.50', '21.00', '27.00']);

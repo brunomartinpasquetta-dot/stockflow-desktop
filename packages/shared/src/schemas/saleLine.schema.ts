@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
-import { idSchema, moneySchema, qtySchema, timestampSchema, vatRateSchema } from './common';
+import {
+  cantidadSchema,
+  idSchema,
+  moneySchema,
+  precioSchema,
+  qtySchema,
+  timestampSchema,
+  vatRateSchema,
+} from './common';
 
 /** Shape completo de `sale_lines` (matches DB). */
 export const SaleLineSchema = z.object({
@@ -32,9 +40,9 @@ export const CreateSaleLineInputSchema = z
   .object({
     articleId: idSchema.optional(),
     description: z.string().trim().min(1).max(120).optional(),
-    quantity: qtySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
-    unitPrice: moneySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
-    discount: moneySchema.default('0.0000'),
+    quantity: cantidadSchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+    unitPrice: precioSchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+    discount: precioSchema.default('0.0000'),
     vatRate: vatRateSchema.default('21.00'),
   })
   .superRefine((line, ctx) => {

@@ -1,6 +1,16 @@
 import { z } from 'zod';
 
-import { idSchema, moneySchema, pctSchema, timestampSchema } from './common';
+import { idSchema, importeSchema, pctSchema, timestampSchema } from './common';
+
+/**
+ * Comisión del medio de pago: un porcentaje entre 0 y 100 (19-oct-2026: un
+ * código de barras tipeado como comisión dejaba una comisión de miles de millones
+ * por ciento y el neto cobrado en negativo).
+ */
+const comisionSchema = pctSchema.refine((v) => Number(v) <= 100, {
+  message: 'La comisión debe estar entre 0 y 100.',
+  params: { sinRuta: true },
+});
 
 /** Tipos de medio de pago. Sólo `cash` puede afectar el arqueo físico. */
 export const paymentMethodTypeSchema = z.enum([
@@ -32,7 +42,7 @@ export const CreatePaymentMethodSchema = z
     name: z.string().min(1).max(60),
     type: paymentMethodTypeSchema,
     isPhysicalCash: z.boolean().default(false),
-    commissionPct: pctSchema.default('0.00'),
+    commissionPct: comisionSchema.default('0.00'),
     active: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
   })
@@ -51,7 +61,7 @@ export const UpdatePaymentMethodSchema = z
     name: z.string().min(1).max(60).optional(),
     type: paymentMethodTypeSchema.optional(),
     isPhysicalCash: z.boolean().optional(),
-    commissionPct: pctSchema.optional(),
+    commissionPct: comisionSchema.optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   });
@@ -59,7 +69,7 @@ export const UpdatePaymentMethodSchema = z
 /** Un pago individual: integrante de una venta (sale_payments) o de una cobranza. */
 export const PaymentInputSchema = z.object({
   paymentMethodId: idSchema,
-  amount: moneySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+  amount: importeSchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
   reference: z.string().max(60).nullish(),
 });
 export type PaymentInput = z.infer<typeof PaymentInputSchema>;

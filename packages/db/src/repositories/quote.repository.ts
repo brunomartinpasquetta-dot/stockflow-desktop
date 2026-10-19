@@ -11,6 +11,7 @@ import {
 } from '@stockflow/shared';
 
 import { rethrowDbError } from '../errors';
+import { exigirTotalesRazonables } from '../topes';
 import type { LocalDatabase } from '../local/client';
 import { companies, quoteLines, quotes, type Quote, type QuoteLine } from '../schema/local';
 import { BaseRepository } from './base.repository';
@@ -83,6 +84,9 @@ export class QuoteRepository extends BaseRepository<Quote, typeof quotes.$inferI
           priceMode === 'gross'
             ? subDecimal(subtotal, quoteDiscount, 4)
             : subDecimal(addDecimal(subtotal, vatAmount, 4), quoteDiscount, 4);
+
+        // Topes de lo calculado (19-oct-2026): ver `exigirTotalesRazonables`.
+        exigirTotalesRazonables({ lineas: computedLines.map((l) => l.lineTotal), subtotal, total }, 'presupuesto');
 
         const quoteRows = tx
           .insert(quotes)

@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { toast } from 'sonner'
+
+import { evaluarEntrada } from '@/lib/entradaNumerica'
 import { parseCurrencyInput } from '@/lib/format'
 
 export function WeightDialog({
@@ -63,7 +66,15 @@ export function WeightDialog({
     onConfirm(liveReading.value)
     onClose()
   }
+  // Peso tipeado a mano: con el cursor acá, un código de barras leído entraba como
+  // kilos (19-oct-2026). Lo que parece código o supera el tope no se acepta.
+  const rechazoManual = manual.trim() ? evaluarEntrada('cantidad', manual) : null
   function confirmFromManual() {
+    if (rechazoManual && rechazoManual.tipo !== 'aceptar') {
+      toast.warning(rechazoManual.mensaje, { duration: 10_000 })
+      setManual('')
+      return
+    }
     const v = parseCurrencyInput(manual)
     if (!v || Number(v) <= 0) return
     onConfirm(v)
@@ -106,7 +117,11 @@ export function WeightDialog({
               onChange={(e) => setManual(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') confirmFromManual() }}
             />
-            <p className="text-xs text-muted-foreground">Sin balanza configurada — ingresá el peso a mano.</p>
+            {rechazoManual && rechazoManual.tipo !== 'aceptar' ? (
+              <p className="text-xs text-destructive" data-testid="peso-rechazado">{rechazoManual.mensaje}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Sin balanza configurada. Ingrese el peso a mano.</p>
+            )}
           </div>
         )}
         <DialogFooter>
@@ -116,7 +131,7 @@ export function WeightDialog({
               Confirmar peso
             </Button>
           ) : (
-            <Button onClick={confirmFromManual} disabled={!manual || Number(parseCurrencyInput(manual)) <= 0}>
+            <Button onClick={confirmFromManual} disabled={!manual || Number(parseCurrencyInput(manual)) <= 0 || (rechazoManual != null && rechazoManual.tipo !== 'aceptar')}>
               Confirmar
             </Button>
           )}

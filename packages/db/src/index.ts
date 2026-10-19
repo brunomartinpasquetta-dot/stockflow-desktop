@@ -20,6 +20,7 @@ export * from './local/client';
 export * from './seed';
 export * from './init';
 export * from './errors';
+export * from './topes';
 export * from './repositories';
 
 // Cloud (Postgres).

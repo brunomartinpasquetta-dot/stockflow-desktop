@@ -14,6 +14,7 @@ import {
 } from '@stockflow/shared';
 
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
+import { exigirTotalesRazonables } from '../topes';
 import type { LocalDatabase } from '../local/client';
 import {
   accountsReceivable,
@@ -192,6 +193,11 @@ export class SaleRepository extends BaseRepository<Sale, typeof sales.$inferInse
           priceMode === 'gross'
             ? subDecimal(lineSum, saleDiscount, 4)
             : subDecimal(addDecimal(lineSum, vatAmount, 4), saleDiscount, 4);
+
+        // Topes de lo calculado (19-oct-2026): nada de renglones o totales
+        // negativos ni de importes de un código de barras. Si algo no cierra,
+        // se corta ANTES de escribir.
+        exigirTotalesRazonables({ lineas: computedLines.map((l) => l.lineTotal), subtotal, total }, 'venta');
 
         // Validación de pagos.
         if (data.isAccountSale) {

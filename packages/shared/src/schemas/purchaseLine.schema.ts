@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
-import { idSchema, moneySchema, qtySchema, timestampSchema, vatRateSchema } from './common';
+import {
+  cantidadSchema,
+  idSchema,
+  moneySchema,
+  precioSchema,
+  qtySchema,
+  timestampSchema,
+  vatRateSchema,
+} from './common';
 
 /** Shape completo de `purchase_lines` (matches DB). */
 export const PurchaseLineSchema = z.object({
@@ -23,9 +31,9 @@ export const PurchaseLineSchema = z.object({
  */
 export const CreatePurchaseLineInputSchema = z.object({
   articleId: idSchema,
-  quantity: qtySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
-  costPrice: moneySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
-  salePrice: moneySchema,
+  quantity: cantidadSchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+  costPrice: precioSchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+  salePrice: precioSchema,
   vatRate: vatRateSchema.default('21.00'),
   /**
    * Precios nuevos POR LISTA, ya calculados por el servicio (modo "por
@@ -33,9 +41,9 @@ export const CreatePurchaseLineInputSchema = z.object({
    * Sólo se aplican si la compra actualiza precios; ausente = esa lista no se
    * toca. En modo manual el servicio manda sólo `newListPrice1` (= salePrice).
    */
-  newListPrice1: moneySchema.optional(),
-  newListPrice2: moneySchema.optional(),
-  newListPrice3: moneySchema.optional(),
+  newListPrice1: precioSchema.optional(),
+  newListPrice2: precioSchema.optional(),
+  newListPrice3: precioSchema.optional(),
 });
 
 export type PurchaseLineOutput = z.infer<typeof PurchaseLineSchema>;

@@ -10,6 +10,7 @@
  */
 export * from './utils';
 export * from './schemas';
+export * from './limites';
 
 // Tipos de entidades derivados de las tablas de la base local (`typeof tabla.$inferSelect`).
 export type {

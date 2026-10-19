@@ -6,7 +6,7 @@
  * - `view_reports` para leer; `manage_cash_general` para registrar
  *   ingresos/egresos manuales; `close_cash` para transferir desde caja diaria.
  */
-import { addDecimal, subDecimal } from '@stockflow/shared';
+import { MENSAJE_IMPORTE_ALTO, addDecimal, subDecimal, superaElTope } from '@stockflow/shared';
 import type { CashGeneralCategory, CashGeneralMovementType } from '@stockflow/db';
 import { CashRegisterRepository } from '@stockflow/db';
 
@@ -65,6 +65,8 @@ function assertPositive(amount: string): void {
   if (!Number.isFinite(n) || n <= 0) {
     throw new ValidationError('amount', 'El monto debe ser mayor a cero');
   }
+  // Tope (19-oct-2026): un código de barras tipeado como importe.
+  if (superaElTope(amount, 'importe')) throw new ValidationError('amount', MENSAJE_IMPORTE_ALTO);
 }
 
 function assertDescription(description: string): void {
@@ -102,6 +104,7 @@ export class CashGeneralService {
     if (!Number.isFinite(n) || n < 0) {
       throw new ValidationError('cashAmount', 'El efectivo declarado no puede ser negativo');
     }
+    if (superaElTope(input.cashAmount, 'importe')) throw new ValidationError('cashAmount', MENSAJE_IMPORTE_ALTO);
     return repos.cashGeneral.adjustBreakdown(input.cashAmount);
   }
 

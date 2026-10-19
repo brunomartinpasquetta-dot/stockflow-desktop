@@ -70,6 +70,10 @@ export function parseCurrencyInput(input: string | number | null | undefined): s
   if (input == null) return '0'
   let s = String(input).trim().replace(/\s/g, '').replace(/\$/g, '')
   if (s === '') return '0'
+  // Un importe no lleva letras. `Number()` acepta «1e5» (100000) y «0x1F» (31): un
+  // código alfanumérico leído por el lector (4E10, 2E5) terminaba como una cantidad de
+  // miles de millones. Con letras no es un importe: queda en cero (19-oct-2026).
+  if (/[a-z]/i.test(s)) return '0'
   if (s.includes(',')) {
     // hay coma -> es el separador decimal; los puntos son miles
     s = s.replace(/\./g, '').replace(',', '.')
@@ -83,7 +87,13 @@ export function parseCurrencyInput(input: string | number | null | undefined): s
   // Garantizar el contrato `^\d+(\.\d{1,4})?$`: redondear a 4 decimales y
   // evitar notación científica (toFixed nunca la produce). Luego quitar los
   // ceros/punto sobrantes a la derecha ("12.3400"→"12.34", "12.0000"→"12").
-  const fixed = Math.abs(n).toFixed(4)
+  // OJO: `toFixed` SÍ produce notación científica desde 1e21 («1e+21»), que rompe el
+  // contrato y llegaba al servidor como «Debe ser un decimal…». Desde ahí se devuelve el
+  // entero completo: sigue siendo un decimal válido y el tope del servidor lo rechaza
+  // con su aviso claro.
+  const abs = Math.abs(n)
+  if (abs >= 1e21) return BigInt(Math.trunc(abs)).toString()
+  const fixed = abs.toFixed(4)
   return fixed.replace(/\.?0+$/, '')
 }
 

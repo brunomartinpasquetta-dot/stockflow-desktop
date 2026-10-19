@@ -153,7 +153,9 @@ export function decidirImporte(
   const t = String(texto ?? '').trim()
   if (t === String(anterior ?? '').trim()) return { tipo: 'aceptar' }
   // Sólo ocho dígitos o más: un código corto del padrón (100, 1500) es un importe.
-  if (!/^\d{8,}$/.test(t) || cantidadSospechosa(t) !== 'parece-codigo') return { tipo: 'aceptar' }
+  // Sólo ocho dígitos o más: un código corto del padrón (100, 1500) es un importe. También es
+  // un código el que quedó pegado a un importe con decimales («1500,5» + el código).
+  if (!(/^\d{8,}$/.test(t) || /[.,]\d{8,}$/.test(t)) || cantidadSospechosa(t) !== 'parece-codigo') return { tipo: 'aceptar' }
   return { tipo: 'codigo', codigo: codigoDentroDeLaCantidad(t, anterior, esCodigoConocido) }
 }
 

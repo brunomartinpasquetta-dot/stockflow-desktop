@@ -2,8 +2,11 @@ import { z } from 'zod';
 
 import { PaymentInputSchema } from './paymentMethod.schema';
 import {
+  cantidadSchema,
   idSchema,
+  importeSchema,
   moneySchema,
+  precioSchema,
   qtySchema,
   timestampSchema,
   vatRateSchema,
@@ -52,9 +55,9 @@ export const QuoteSchema = z.object({
  */
 export const CreateQuoteLineInputSchema = z.object({
   articleId: idSchema,
-  quantity: qtySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
-  unitPrice: moneySchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
-  discount: moneySchema.default('0.0000'),
+  quantity: cantidadSchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+  unitPrice: precioSchema.refine((v) => Number(v) > 0, 'debe ser mayor a 0'),
+  discount: precioSchema.default('0.0000'),
   vatRate: vatRateSchema.default('21.00'),
 });
 
@@ -67,7 +70,7 @@ export const CreateQuoteWithLinesSchema = z.object({
   customerId: idSchema,
   sellerId: idSchema,
   validityDays: z.number().int().positive().default(30),
-  discount: moneySchema.default('0.0000'),
+  discount: importeSchema.default('0.0000'),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),
   lines: z

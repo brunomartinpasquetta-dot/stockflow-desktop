@@ -25,6 +25,11 @@ check(s('') === null, 'vacío: no avisa');
 check(s('0') === null, 'cero: no avisa (de eso se encarga el total)');
 check(s('abc') === null, 'texto suelto: no rompe');
 check(s('-5') === null, 'negativo: no avisa acá');
+check(s('1.000.001') === 'muy-alta', 'con puntos de miles («1.000.001»): antes daba NaN y pasaba sin avisar');
+check(s('1.234,5') === null, 'con puntos de miles y coma decimal («1.234,5»): una cantidad normal no molesta');
+check(s('12.500.000') === 'muy-alta', 'doce millones y medio con puntos de miles');
+check(s('10.0007791234567890') === 'parece-codigo' && s('1,57790000000031') === 'parece-codigo', 'un código pegado a una cantidad con decimales');
+check(s('2,5') === null && s('0,125') === null, 'decimales normales: no molestan');
 
 // Lo que sí hay que frenar.
 check(s('7792798810639') === 'parece-codigo', 'el código de barras de un artículo del padrón');

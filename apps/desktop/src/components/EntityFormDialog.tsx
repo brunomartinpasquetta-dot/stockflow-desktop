@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ZodTypeAny } from 'zod'
@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { ApiError } from '@/lib/api'
+import { evaluarEntrada } from '@/lib/entradaNumerica'
 import { parseCurrencyInput } from '@/lib/format'
 import {
   Dialog,
@@ -86,9 +87,24 @@ export function EntityFormDialog({
 
   const currencyFields = new Set(fields.filter((f) => f.type === 'currency').map((f) => f.name))
 
+  /** El valor que tenía cada campo de importe al entrar: a eso se vuelve si lo escrito era un código de barras. */
+  const alEntrar = useRef<Record<string, string>>({})
+
   function handleCurrencyBlur(name: string): void {
     const raw = getValues(name)
-    setValue(name, parseCurrencyInput(typeof raw === 'string' ? raw : String(raw ?? '')))
+    const texto = typeof raw === 'string' ? raw : String(raw ?? '')
+    // Un código de barras leído en el casillero (o un valor por encima del tope
+    // del servidor) no se acepta: vuelve lo que había y se avisa (19-oct-2026).
+    // Los porcentajes (comisión) no son importes: tienen su propio tope en el servidor.
+    if (name !== 'commissionPct') {
+      const d = evaluarEntrada('importe', texto, alEntrar.current[name] ?? '')
+      if (d.tipo !== 'aceptar') {
+        setValue(name, alEntrar.current[name] ?? '')
+        toast.warning(d.mensaje, { duration: 10_000 })
+        return
+      }
+    }
+    setValue(name, parseCurrencyInput(texto))
   }
 
   const submit = handleSubmit(async (values) => {
@@ -162,6 +178,12 @@ export function EntityFormDialog({
                             inputMode={f.type === 'currency' || f.type === 'number' ? 'decimal' : undefined}
                             placeholder={f.placeholder}
                             {...reg}
+                            onFocus={() => {
+                              if (currencyFields.has(f.name)) {
+                                const v = getValues(f.name)
+                                alEntrar.current[f.name] = typeof v === 'string' ? v : String(v ?? '')
+                              }
+                            }}
                             onBlur={(e) => {
                               void reg.onBlur(e)
                               if (currencyFields.has(f.name)) handleCurrencyBlur(f.name)

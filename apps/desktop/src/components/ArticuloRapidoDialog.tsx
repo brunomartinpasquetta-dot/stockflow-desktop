@@ -16,7 +16,9 @@ import { CurrencyInput } from '@/components/ui/currency-input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { QuantityInput } from '@/components/ui/quantity-input'
 import { Select } from '@/components/ui/select'
+import { primerExcesoDelCarrito } from '@/lib/entradaNumerica'
 import { parseCurrencyInput } from '@/lib/format'
 
 const VAT_OPTIONS = [
@@ -50,7 +52,10 @@ export function ArticuloRapidoDialog({
 
   const precioNum = Number(parseCurrencyInput(unitPrice)) || 0
   const cantidadNum = Number(quantity.replace(',', '.')) || 0
-  const puedeAgregar = description.trim().length > 0 && precioNum > 0 && cantidadNum > 0
+  // Lo tipeado también cuenta si el cursor sigue en el casillero: un código de
+  // barras leído acá no puede llegar a ser cantidad ni precio (19-oct-2026).
+  const exceso = primerExcesoDelCarrito([{ cantidad: quantity, precio: unitPrice }])
+  const puedeAgregar = description.trim().length > 0 && precioNum > 0 && cantidadNum > 0 && !exceso
 
   function agregar(): void {
     if (!puedeAgregar) return
@@ -95,16 +100,16 @@ export function ArticuloRapidoDialog({
           <div className="grid grid-cols-3 gap-2">
             <div className="flex flex-col gap-1">
               <Label>Cantidad</Label>
-              <Input
+              <QuantityInput
                 className="text-right tabular-nums"
-                inputMode="decimal"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onChange={setQuantity}
+                onCommit={setQuantity}
               />
             </div>
             <div className="flex flex-col gap-1">
               <Label>Precio unitario</Label>
-              <CurrencyInput value={unitPrice} onChange={setUnitPrice} />
+              <CurrencyInput value={unitPrice} onChange={setUnitPrice} tope="precio" />
             </div>
             <div className="flex flex-col gap-1">
               <Label>IVA</Label>

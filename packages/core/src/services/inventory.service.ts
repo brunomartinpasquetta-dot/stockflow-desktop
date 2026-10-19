@@ -4,6 +4,8 @@
 import type { Article } from '@stockflow/shared';
 import { cmpDecimal, decimalString, gteDecimal, subDecimal } from '@stockflow/shared';
 
+import { exigirDentroDelTope } from '@stockflow/db';
+
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
 import { NotFoundError } from '../errors';
@@ -56,6 +58,9 @@ export class InventoryService {
   async adjustStock(articleId: string, newStock: string, reason: string): Promise<StockAdjustment> {
     const { repos, currentUser } = this.ctx;
     requirePermission(currentUser, 'adjust_stock');
+
+    // Tope (19-oct-2026): un código de barras tipeado como existencia.
+    exigirDentroDelTope('newStock', newStock, 'stock');
 
     const article = await repos.articles.findById(articleId);
     if (!article) throw new NotFoundError('Artículo', articleId);

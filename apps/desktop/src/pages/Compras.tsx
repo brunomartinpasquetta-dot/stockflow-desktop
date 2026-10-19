@@ -25,6 +25,8 @@ import { formatCurrency, formatDate, parseCurrencyInput } from '@/lib/format'
 import { todayIso } from '@/lib/periodPresets'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
+import { QuantityInput } from '@/components/ui/quantity-input'
+import { primerExcesoDelCarrito } from '@/lib/entradaNumerica'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { PaymentMethodSelect } from '@/components/PaymentMethodSelect'
@@ -453,6 +455,13 @@ export function Compras() {
 
   const createMutation = useMutation({
     mutationFn: () => {
+      // Última defensa de pantalla (19-oct-2026): lo tipeado ya está en el carrito
+      // aunque el cursor siga en el casillero. El servidor lo rechazaría igual.
+      const exceso = primerExcesoDelCarrito(
+        cart.map((l) => ({ cantidad: l.quantity, precio: l.costPrice })),
+        { descuentoGlobal: parseCurrencyInput(globalDiscount), total: totalNum },
+      )
+      if (exceso) throw new Error(`${exceso} Revise los importes de la compra antes de confirmar.`)
       const monoPayments =
         !isAccountPurchase && !mixedMode && selectedMethod
           ? [{ paymentMethodId: selectedMethod.id, amount: totalNum.toFixed(4) }]
@@ -799,11 +808,14 @@ export function Compras() {
                     </td>
                     <td className="px-2 py-0.5 text-sm text-muted-foreground">{l.article.brand ?? ''}</td>
                     <td className="px-2 py-0.5">
-                      <Input className="h-7 text-right tabular-nums" inputMode="decimal" value={l.quantity}
-                        onChange={(e) => setLine(i, 'quantity', e.target.value)} onBlur={() => setLine(i, 'quantity', parseCurrencyInput(l.quantity))} />
+                      {/* El lector escribe donde está el cursor: una cantidad con forma de
+                          código de barras no se acepta (19-oct-2026). */}
+                      <QuantityInput className="h-7 text-right tabular-nums" value={l.quantity}
+                        esCodigoConocido={(v) => allArticles.some((a) => a.barcode === v)}
+                        onChange={(v) => setLine(i, 'quantity', v)} onCommit={(v) => setLine(i, 'quantity', v)} />
                     </td>
                     <td className="px-2 py-0.5">
-                      <CurrencyInput className="h-7 text-right tabular-nums" value={l.costPrice}
+                      <CurrencyInput className="h-7 text-right tabular-nums" value={l.costPrice} tope="precio"
                         onChange={(v) => setLine(i, 'costPrice', v)} />
                     </td>
                     <td className="px-2 py-0.5">
@@ -824,6 +836,7 @@ export function Compras() {
                           <CurrencyInput
                             className={cambia ? 'h-8 border-primary/60 text-right font-medium tabular-nums' : 'h-8 text-right tabular-nums'}
                             value={l[campo]}
+                            tope="precio"
                             onChange={(v) => {
                               setCart((prev) => {
                                 if (!prev[i]) return prev

@@ -21,7 +21,9 @@ import { EntityTable, type Column } from '@/components/EntityTable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
+import { QuantityInput } from '@/components/ui/quantity-input'
 import { Label } from '@/components/ui/label'
 import type { ArticleDTO, PromotionDTO } from '@/types/api'
 
@@ -267,7 +269,7 @@ function PromoFormDialog(props: {
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="promo-price">Precio de venta</Label>
-              <Input id="promo-price" inputMode="decimal" placeholder="Ej: 12000" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <CurrencyInput id="promo-price" placeholder="Ej: 12000" value={price} onChange={setPrice} tope="precio" />
             </div>
           </div>
 
@@ -324,12 +326,12 @@ function PromoFormDialog(props: {
                         <span className="ml-2 font-mono text-[10px] text-muted-foreground">{i.barcode}</span>
                       </td>
                       <td className="px-2 py-1">
-                        <Input
+                        <QuantityInput
                           className="h-7 text-center"
-                          inputMode="decimal"
                           value={i.quantity}
-                          onChange={(e) =>
-                            setItems((prev) => prev.map((it, k) => (k === idx ? { ...it, quantity: e.target.value } : it)))
+                          esCodigoConocido={(v) => articles.some((a) => a.barcode === v)}
+                          onChange={(v) =>
+                            setItems((prev) => prev.map((it, k) => (k === idx ? { ...it, quantity: v } : it)))
                           }
                         />
                       </td>

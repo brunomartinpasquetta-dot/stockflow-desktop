@@ -14,6 +14,7 @@ import {
 } from '@stockflow/shared';
 
 import { ConstraintError, NotFoundError, rethrowDbError } from '../errors';
+import { exigirTotalesRazonables } from '../topes';
 import type { LocalDatabase } from '../local/client';
 import {
   articles,
@@ -123,6 +124,9 @@ export class PurchaseRepository extends BaseRepository<
           priceMode === 'gross'
             ? subDecimal(lineSum, purchaseDiscount, 4)
             : subDecimal(addDecimal(lineSum, vatAmount, 4), purchaseDiscount, 4);
+
+        // Topes de lo calculado (19-oct-2026): ver `exigirTotalesRazonables`.
+        exigirTotalesRazonables({ lineas: computedLines.map((l) => l.lineTotal), subtotal, total }, 'compra');
 
         // Validación de pagos para compras contado.
         if (data.paymentType === 'cash' && paymentsIn.length > 0) {

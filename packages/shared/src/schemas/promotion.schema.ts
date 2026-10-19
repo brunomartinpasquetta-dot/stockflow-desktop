@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { idSchema, moneySchema, qtySchema } from './common';
+import { cantidadSchema, idSchema, precioSchema } from './common';
 
 /**
  * Promociones/combos. La promo se vende como un artículo "espejo" (marca
@@ -10,13 +10,13 @@ import { idSchema, moneySchema, qtySchema } from './common';
 export const PromotionItemInputSchema = z.object({
   articleId: idSchema,
   /** Unidades del componente por cada promo vendida (acepta decimales). */
-  quantity: qtySchema,
+  quantity: cantidadSchema,
 });
 
 export const CreatePromotionSchema = z.object({
   name: z.string().trim().min(2, 'El nombre debe tener al menos 2 letras').max(200),
   /** Precio de venta de la promo (va a las 3 listas del artículo espejo). */
-  price: moneySchema,
+  price: precioSchema,
   items: z.array(PromotionItemInputSchema).min(1, 'La promo necesita al menos un artículo'),
   notes: z.string().max(500).nullish(),
 });

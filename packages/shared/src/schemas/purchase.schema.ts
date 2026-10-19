@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { CreatePurchaseLineInputSchema } from './purchaseLine.schema';
 import { PaymentInputSchema } from './paymentMethod.schema';
-import { idSchema, moneySchema, timestampSchema, voucherTypeSchema } from './common';
+import { idSchema, importeSchema, moneySchema, timestampSchema, voucherTypeSchema } from './common';
 
 const purchasePaymentTypeSchema = z.enum(['cash', 'credit']);
 const purchaseStatusSchema = z.enum(['completed', 'voided', 'pending']);
@@ -33,7 +33,7 @@ export const CreatePurchaseSchema = z.object({
   supplierInvoiceNumber: z.string().nullish(),
   supplierId: idSchema,
   paymentType: purchasePaymentTypeSchema,
-  discount: moneySchema.default('0.0000'),
+  discount: importeSchema.default('0.0000'),
   updatedPricesOnSave: z.boolean().default(false),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),

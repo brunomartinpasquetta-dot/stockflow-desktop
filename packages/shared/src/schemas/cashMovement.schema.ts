@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { idSchema, moneySchema, timestampSchema } from './common';
+import { idSchema, importeSchema, moneySchema, timestampSchema } from './common';
 
 /** Shape completo de `cash_movements` (matches DB). */
 export const CashMovementSchema = z.object({
@@ -22,7 +22,7 @@ export const CreateCashMovementSchema = z.object({
   cashRegisterId: idSchema,
   type: z.enum(['income', 'expense']),
   description: z.string().min(1).max(200),
-  amount: moneySchema,
+  amount: importeSchema,
   userId: idSchema,
   date: timestampSchema.optional(),
   relatedSaleId: idSchema.nullish(),

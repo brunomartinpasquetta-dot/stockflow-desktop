@@ -4,6 +4,7 @@ import { CreateSaleLineInputSchema } from './saleLine.schema';
 import { PaymentInputSchema } from './paymentMethod.schema';
 import {
   idSchema,
+  importeSchema,
   moneySchema,
   timestampSchema,
   voucherTypeSchema,
@@ -46,7 +47,7 @@ export const CreateSaleSchema = z.object({
   cashRegisterId: idSchema,
   /** true = venta a cuenta corriente (no lleva pagos). */
   isAccountSale: z.boolean().default(false),
-  discount: moneySchema.default('0.0000'),
+  discount: importeSchema.default('0.0000'),
   date: timestampSchema.optional(),
   notes: z.string().nullish(),
   /**
@@ -55,7 +56,7 @@ export const CreateSaleSchema = z.object({
    * ventas a cuenta concurrentes superen el límite. '0.0000' (o ausente) = sin
    * límite.
    */
-  creditLimit: moneySchema.optional(),
+  creditLimit: importeSchema.optional(),
 });
 
 /** Venta + líneas (mínimo 1) + pagos (N; vacío sólo si es a cuenta corriente). */

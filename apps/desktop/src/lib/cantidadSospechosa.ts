@@ -10,6 +10,8 @@
  * marca el renglón y se pide confirmar una vez antes de guardar.
  */
 
+import { parseCurrencyInput } from './format';
+
 /** A partir de acá una cantidad en un renglón deja de ser creíble para un comercio. */
 export const CANTIDAD_ALTA = 10_000;
 
@@ -25,8 +27,14 @@ export function cantidadSospechosa(
 ): MotivoSospecha | null {
   const texto = String(cantidad ?? '').trim();
   if (texto === '') return null;
-  const n = Number(texto.replace(',', '.'));
+  // Se convierte como lo hace el campo al guardar (puntos de miles, coma decimal): con
+  // `Number('1.000.001')` daba NaN, no se consideraba sospechosa y el renglón se guardaba
+  // con 1.000.001 unidades (19-oct-2026).
+  const n = Number(parseCurrencyInput(texto));
   if (!Number.isFinite(n) || n <= 0) return null;
+  // Un código pegado a una cantidad con decimales («10.000» + «7791234567890»): ningún
+  // campo admite ocho decimales, así que esa cola es un código leído (19-oct-2026).
+  if (/[.,]\d{8,}$/.test(texto)) return 'parece-codigo';
   const soloDigitos = /^\d+$/.test(texto);
   // Un código de barras del padrón tipeado como cantidad: no hay duda.
   if (soloDigitos && esCodigoConocido(texto)) return 'parece-codigo';

@@ -5,6 +5,7 @@ import {
   docTypeSchema,
   fiscalCategorySchema,
   idSchema,
+  importeSchema,
   moneySchema,
   timestampSchema,
 } from './common';
@@ -40,7 +41,7 @@ const customerBase = z.object({
   docNumber: z.string().nullish(),
   category: fiscalCategorySchema,
   priceList: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(1),
-  creditLimit: moneySchema.default('0.0000'),
+  creditLimit: importeSchema.default('0.0000'),
   email: z.string().email().nullish(),
   facebook: z.string().nullish(),
 });

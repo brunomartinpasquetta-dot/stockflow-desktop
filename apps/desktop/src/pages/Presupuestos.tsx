@@ -21,6 +21,9 @@ import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { usePrintQuote } from '@/lib/usePrint'
 import { PaymentSplitInput } from '@/components/PaymentSplitInput'
 import { CurrencyInput } from '@/components/ui/currency-input'
+import { PercentInput } from '@/components/ui/percent-input'
+import { QuantityInput } from '@/components/ui/quantity-input'
+import { primerExcesoDelCarrito } from '@/lib/entradaNumerica'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -623,6 +626,16 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
       toast.error('Seleccione un cliente')
       return
     }
+    // Última defensa de pantalla (19-oct-2026): lo tipeado ya está en el carrito
+    // aunque el cursor siga en el casillero. El servidor lo rechazaría igual.
+    const exceso = primerExcesoDelCarrito(
+      cart.map((l) => ({ cantidad: l.quantity, precio: l.unitPrice, descuento: lineDiscountAbs(l) })),
+      { descuentoGlobal: globalDiscountAbs, total: totals.total },
+    )
+    if (exceso) {
+      toast.error(`${exceso} Revise los importes del presupuesto antes de guardar.`)
+      return
+    }
     setSaving(true)
     try {
       const created = await api.quotes.create({
@@ -786,16 +799,17 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
                     <div className="font-mono text-xs text-muted-foreground">{l.article.barcode}</div>
                   </td>
                   <td className="px-2 py-1">
-                    <Input
+                    <QuantityInput
                       className="h-8 text-right tabular-nums"
-                      inputMode="decimal"
                       value={l.quantity}
-                      onChange={(e) => setCart((p) => p.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))}
+                      esCodigoConocido={(v) => (articlesQuery.data ?? []).some((a) => a.barcode === v)}
+                      onChange={(v) => setCart((p) => p.map((x, j) => (j === i ? { ...x, quantity: v } : x)))}
                     />
                   </td>
                   <td className="px-2 py-1">
                     <CurrencyInput
                       className="h-8 text-right tabular-nums"
+                      tope="precio"
                       value={l.unitPrice}
                       onChange={(v) => setCart((p) => p.map((x, j) => (j === i ? { ...x, unitPrice: v } : x)))}
                     />
@@ -811,15 +825,16 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
                         {l.discountIsPct ? '%' : '$'}
                       </button>
                       {l.discountIsPct ? (
-                        <input
-                          type="number" min="0" max="100" step="0.5"
+                        <PercentInput
+                          min="0" max="100" step="0.5"
                           value={l.discount}
-                          onChange={(e) => setCart((p) => p.map((x, j) => (j === i ? { ...x, discount: e.target.value } : x)))}
+                          onChange={(v) => setCart((p) => p.map((x, j) => (j === i ? { ...x, discount: v } : x)))}
                           className="h-8 w-16 rounded-md border bg-background px-1.5 text-right text-sm tabular-nums"
                         />
                       ) : (
                         <CurrencyInput
                           className="h-8 w-20 text-right tabular-nums"
+                          tope="precio"
                           value={l.discount}
                           onChange={(v) => setCart((p) => p.map((x, j) => (j === i ? { ...x, discount: v } : x)))}
                         />
@@ -867,10 +882,10 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
                 {discountIsPct ? '%' : '$'}
               </button>
               {discountIsPct ? (
-                <input
-                  type="number" min="0" max="100" step="0.5"
+                <PercentInput
+                  min="0" max="100" step="0.5"
                   value={globalDiscount}
-                  onChange={(e) => setGlobalDiscount(e.target.value)}
+                  onChange={setGlobalDiscount}
                   className="h-7 w-24 rounded-md border bg-background px-2 text-right text-sm tabular-nums"
                 />
               ) : (

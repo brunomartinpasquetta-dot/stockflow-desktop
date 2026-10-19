@@ -71,6 +71,9 @@ import { api } from '@/lib/api'
 import { formatCurrency, formatQty, parseCurrencyInput } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
+import { QuantityInput } from '@/components/ui/quantity-input'
+import { primerExcesoDelCarrito } from '@/lib/entradaNumerica'
+import { MENSAJE_CANTIDAD_ALTA, superaElTope } from '@/lib/topes'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ArticleDTO, FamilyDTO, SupplierDTO, Unit } from '@/types/api'
 
@@ -387,6 +390,10 @@ export function Articulos() {
     if (!form.brand.trim()) return 'La marca es obligatoria'
     if (Number(form.costPrice) < 0) return 'El costo no puede ser negativo'
     if (Number(form.listPrice1) < 0) return 'El precio de lista 1 no puede ser negativo'
+    // Topes (19-oct-2026): un código de barras tipeado en un precio o en el stock.
+    const exceso = primerExcesoDelCarrito([{ precio: form.costPrice }, { precio: form.listPrice1 }, { precio: form.listPrice2 }, { precio: form.listPrice3 }, { precio: form.wholesalePrice }])
+    if (exceso) return exceso
+    if ([form.stock, form.minStock, form.idealStock, form.wholesaleMinQty].some((v) => superaElTope(v, 'stock'))) return MENSAJE_CANTIDAD_ALTA
     return null
   }
 
@@ -1192,6 +1199,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         {/* Fila 3: costo + Lista 1 */}
         <Field className="col-span-2" label="P. Costo">
           <CurrencyInput
+            tope="precio"
             value={form.costPrice}
             onChange={(v) => setCosto(v)}
             disabled={inputsDisabled}
@@ -1199,6 +1207,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         </Field>
         <Field className="col-span-2" label="P. Venta (Lista 1)">
           <CurrencyInput
+            tope="precio"
             value={form.listPrice1}
             onChange={(v) => setPrecioLista(1, v)}
             disabled={inputsDisabled}
@@ -1218,6 +1227,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         {/* Fila 4: Lista 2 + Lista 3 */}
         <Field className="col-span-2" label="P. Lista 2">
           <CurrencyInput
+            tope="precio"
             value={form.listPrice2}
             onChange={(v) => setPrecioLista(2, v)}
             disabled={inputsDisabled}
@@ -1234,6 +1244,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         </Field>
         <Field className="col-span-2" label="P. Lista 3">
           <CurrencyInput
+            tope="precio"
             value={form.listPrice3}
             onChange={(v) => setPrecioLista(3, v)}
             disabled={inputsDisabled}
@@ -1253,6 +1264,7 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
         {/* Fila 5: mayorista */}
         <Field className="col-span-2" label="P. Mayor">
           <CurrencyInput
+            tope="precio"
             value={form.wholesalePrice}
             onChange={(v) => setField('wholesalePrice', v)}
             disabled={inputsDisabled}
@@ -1262,11 +1274,12 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
           <ReadonlyValue>{utilPct(form.wholesalePrice, form.costPrice)}</ReadonlyValue>
         </Field>
         <Field className="col-span-2" label="Cant. mín. mayorista">
-          <Input
+          <QuantityInput
             type="number"
             step="0.001"
+            tipo="stock"
             value={form.wholesaleMinQty}
-            onChange={(e) => setField('wholesaleMinQty', e.target.value)}
+            onChange={(v) => setField('wholesaleMinQty', v)}
             disabled={inputsDisabled}
           />
         </Field>
@@ -1274,29 +1287,32 @@ function ArticuloForm(props: ArticuloFormProps): React.ReactElement {
 
         {/* Fila 6: stock */}
         <Field className="col-span-1" label="Stock">
-          <Input
+          <QuantityInput
             type="number"
             step="0.001"
+            tipo="stock"
             value={form.stock}
-            onChange={(e) => setField('stock', e.target.value)}
+            onChange={(v) => setField('stock', v)}
             disabled={inputsDisabled}
           />
         </Field>
         <Field className="col-span-1" label="Stock Mín">
-          <Input
+          <QuantityInput
             type="number"
             step="0.001"
+            tipo="stock"
             value={form.minStock}
-            onChange={(e) => setField('minStock', e.target.value)}
+            onChange={(v) => setField('minStock', v)}
             disabled={inputsDisabled}
           />
         </Field>
         <Field className="col-span-1" label="Stock Ideal">
-          <Input
+          <QuantityInput
             type="number"
             step="0.001"
+            tipo="stock"
             value={form.idealStock}
-            onChange={(e) => setField('idealStock', e.target.value)}
+            onChange={(v) => setField('idealStock', v)}
             disabled={inputsDisabled}
           />
         </Field>

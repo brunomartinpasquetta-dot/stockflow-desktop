@@ -18,9 +18,11 @@ import type {
   PriceUpdateEntryWithBatch,
 } from '@stockflow/db';
 
+import { MENSAJE_IMPORTE_ALTO, superaElTope } from '@stockflow/shared';
+
 import { requirePermission } from '../auth/permissions';
 import type { ServiceContext } from '../context';
-import { BusinessRuleError, NotFoundError } from '../errors';
+import { BusinessRuleError, NotFoundError, ValidationError } from '../errors';
 
 export type PriceField =
   | 'costPrice'
@@ -247,6 +249,12 @@ export class PriceUpdateService {
         );
       } else {
         newValue = computeNewValue(baseValue, rule, oldCost, newCost);
+      }
+      // Tope (19-oct-2026): un código de barras tipeado como porcentaje, monto
+      // o valor deja los precios por las nubes. Un precio que YA estaba por
+      // encima del tope (dato viejo) no frena el lote del resto.
+      if (superaElTope(newValue, 'precio') && !superaElTope(oldValue, 'precio')) {
+        throw new ValidationError('rule.value', MENSAJE_IMPORTE_ALTO);
       }
       if (oldValue !== newValue) {
         out.push({ field, oldValue, newValue });

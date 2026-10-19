@@ -64,16 +64,24 @@ export class ValidationError extends DomainError {
 
   /** Construye un ValidationError a partir de un error de Zod (`error.issues`). */
   static fromZod(error: {
-    issues: ReadonlyArray<{ path: ReadonlyArray<PropertyKey>; message: string }>;
+    issues: ReadonlyArray<{
+      path: ReadonlyArray<PropertyKey>;
+      message: string;
+      /** Los topes de importes y cantidades marcan `sinRuta`: el aviso es para el usuario. */
+      params?: Record<string, unknown>;
+    }>;
   }): ValidationError {
     const issues = error.issues.map((i) => ({
       path: i.path.map(String).join('.') || '(root)',
       message: i.message,
     }));
     const first = issues[0];
+    // Un tope superado (código de barras tipeado como importe o cantidad) se
+    // muestra con su texto solo: «lines.0.quantity: …» no le sirve al cajero.
+    const sinRuta = error.issues[0]?.params?.sinRuta === true;
     return new ValidationError(
       first?.path ?? '(root)',
-      first ? `${first.path}: ${first.message}` : 'Datos inválidos',
+      first ? (sinRuta ? first.message : `${first.path}: ${first.message}`) : 'Datos inválidos',
       issues,
       { cause: error },
     );

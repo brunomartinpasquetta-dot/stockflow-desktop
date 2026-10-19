@@ -28,11 +28,14 @@ import { usePaymentSplit } from '@/lib/usePaymentSplit'
 import { calcularVuelto, guardarPreferenciaVuelto, leerPreferenciaVuelto } from '@/lib/vuelto'
 import { avisoImporteConCodigo, debeIrAlBuscador, decidirCantidad, decidirImporte, type CampoDeImporte } from '@/lib/lectorDeCodigos'
 import { textoSospecha } from '@/lib/cantidadSospechosa'
+import { evaluarEntrada, primerExcesoDelCarrito } from '@/lib/entradaNumerica'
+import { MENSAJE_CANTIDAD_ALTA, MENSAJE_IMPORTE_ALTO, superaElTope } from '@/lib/topes'
 import { guardarImprimirTicketLocal, imprimirTicketActivado, leerImprimirTicketLocal } from '@/lib/imprimirTicket'
 import { calculateSaleTotals, lineTotal, priceListFallback, resolvePrice, vatBreakdown } from '@/lib/pricing'
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyInput, formatQty, toInputString } from '@/lib/format'
 import { articleMatches, buildSearchContext } from '@/lib/articleSearch'
 import { CurrencyInput } from '@/components/ui/currency-input'
+import { PercentInput } from '@/components/ui/percent-input'
 import { type SaleTicketData, type SaleTicketLine, type SaleTicketPayment } from '@/print/SaleTicket'
 import { ArticuloRapidoDialog, type ArticuloRapido } from '@/components/ArticuloRapidoDialog'
 import { VAT_CONDITION_LABELS } from '@/lib/fiscalDoc'
@@ -966,6 +969,14 @@ function PDV() {
     if (listaCaida) {
       toast.warning(`${article.description}: sin precio en Lista ${listaCaida}. Se cobra a Lista 1.`, { id: `lista-${article.id}` })
     }
+    // Un precio de ficha por encima del tope (dato cargado antes de los topes: en Leo Citzia el
+    // artículo «VARIOS» quedó con $5.989.999.999.990) no se cobra: se avisa y hay que corregirlo.
+    if (superaElTope(resolvePrice(article, selectedCustomer, qty, selectedPriceList), 'precio')) {
+      toast.warning(
+        `El precio cargado en la ficha de «${article.description}» es inusualmente alto. Corríjalo en el renglón antes de confirmar la venta.`,
+        { id: `precio-alto-${article.id}`, duration: 12_000 },
+      )
+    }
     setCart((prev) => {
       const idx = prev.findIndex((l) => l.article?.id === article.id)
       if (idx >= 0) {
@@ -1049,6 +1060,12 @@ function PDV() {
       }
       return
     }
+    // Por encima del tope del servidor no se pregunta: no se acepta (19-oct-2026).
+    if (superaElTope(parseCurrencyInput(texto), 'cantidad')) {
+      setLineQty(i, entrada.valor)
+      toast.warning(`${MENSAJE_CANTIDAD_ALTA} Se mantuvo la cantidad anterior.`, { duration: 10_000 })
+      return
+    }
     if (window.confirm(`${textoSospecha('muy-alta')} ¿Confirma una cantidad de ${texto.trim()}?`)) {
       setLineQty(i, parseCurrencyInput(texto))
     } else {
@@ -1069,7 +1086,15 @@ function PDV() {
     if (!entrada || entrada.i !== i) return
     importeAlEntrarRef.current = null
     const decision = decidirImporte(texto, toInputString(entrada.valor), (v) => allArticles.some((a) => a.barcode === v))
-    if (decision.tipo === 'aceptar') return
+    if (decision.tipo === 'aceptar') {
+      // Un importe con puntos de miles que igual supera el tope del servidor (19-oct-2026).
+      if (evaluarEntrada('precio', texto, toInputString(entrada.valor)).tipo === 'excede') {
+        if (entrada.campo === 'precio') setLinePrice(i, entrada.valor, entrada.manual)
+        else setLineDiscount(i, entrada.valor)
+        toast.warning(`${MENSAJE_IMPORTE_ALTO} Se mantuvo el valor anterior.`, { duration: 10_000 })
+      }
+      return
+    }
     if (entrada.campo === 'precio') setLinePrice(i, entrada.valor, entrada.manual)
     else setLineDiscount(i, entrada.valor)
     const articulo = allArticles.find((a) => a.barcode === decision.codigo)
@@ -1365,7 +1390,10 @@ function PDV() {
         : 0
   // ¿Este cobro lleva efectivo? (aunque todavía no haya productos cargados)
   const cobraEnEfectivo = !accountSale && (mixedMode ? metodoEfectivo != null : selectedMethod?.isPhysicalCash === true)
-  const pagaConNum = pagaCon.trim() ? Number(parseCurrencyInput(pagaCon)) : 0
+  // «Paga con» es sólo informativo, pero un código de barras leído acá mostraba un
+  // vuelto de miles de millones: lo que parece código o supera el tope no cuenta.
+  const pagaConRechazo = pagaCon.trim() ? evaluarEntrada('importe', pagaCon) : ({ tipo: 'aceptar' } as const)
+  const pagaConNum = pagaCon.trim() && pagaConRechazo.tipo === 'aceptar' ? Number(parseCurrencyInput(pagaCon)) : 0
   const vueltoCalc = calcularVuelto(pagaConNum, enEfectivo)
   function toggleCalcularVuelto(activo: boolean): void {
     setCalcularVueltoOn(activo)
@@ -1566,6 +1594,18 @@ function PDV() {
 
   async function confirmar(): Promise<void> {
     if (!effectiveCustomerId || !canConfirm) return
+    // Última defensa de pantalla (19-oct-2026): F2 con el cursor todavía en un
+    // casillero deja en el carrito lo tipeado (un código de barras leído, por
+    // ejemplo). Nada por encima de los topes sale de acá; el servidor lo
+    // rechazaría igual, pero así el aviso llega antes y con el renglón a la vista.
+    const exceso = primerExcesoDelCarrito(
+      cart.map((l) => ({ cantidad: l.quantity, precio: l.unitPrice, descuento: l.discount })),
+      { descuentoGlobal: globalDiscountAbs, total: totals.total },
+    )
+    if (exceso) {
+      toast.error(`${exceso} Revise los importes de la venta antes de confirmar.`, { duration: 12_000 })
+      return
+    }
     // Si el modo mono-medio elige MercadoPago QR, derivar al modal de cobro QR.
     if (!accountSale && !mixedMode && selectedMethod?.type === 'mp' && canCobrarQr) {
       setQrModalOpen(true)
@@ -2206,6 +2246,7 @@ function PDV() {
                       <td className="px-2 py-0.5">
                         <CurrencyInput
                           className="h-7 text-right tabular-nums"
+                          sinGuardia
                           value={l.unitPrice}
                           onFocus={() => {
                             importeAlEntrarRef.current = { i, campo: 'precio', valor: l.unitPrice, manual: l.priceManuallySet }
@@ -2222,6 +2263,7 @@ function PDV() {
                       <td className="px-2 py-0.5">
                         <CurrencyInput
                           className="h-7 text-right tabular-nums"
+                          sinGuardia
                           value={l.discount}
                           onFocus={() => {
                             importeAlEntrarRef.current = { i, campo: 'descuento', valor: l.discount, manual: l.priceManuallySet }
@@ -2277,13 +2319,12 @@ function PDV() {
                 {discountIsPct ? '%' : '$'}
               </button>
               {discountIsPct ? (
-                <input
-                  type="number"
+                <PercentInput
                   min="0"
                   max="100"
                   step="0.5"
                   value={globalDiscount}
-                  onChange={(e) => setGlobalDiscount(e.target.value)}
+                  onChange={setGlobalDiscount}
                   className="h-7 w-28 rounded-md border bg-background px-2 text-right text-sm tabular-nums"
                 />
               ) : (
@@ -2521,8 +2562,17 @@ function PDV() {
                 placeholder="0,00"
                 value={pagaCon}
                 onChange={(e) => setPagaCon(e.target.value)}
+                onBlur={() => {
+                  if (pagaConRechazo.tipo !== 'aceptar') {
+                    toast.warning(pagaConRechazo.mensaje, { duration: 10_000 })
+                    setPagaCon('')
+                  }
+                }}
               />
             </div>
+            {pagaConRechazo.tipo !== 'aceptar' && (
+              <p className="text-xs text-destructive" data-testid="paga-con-rechazado">{pagaConRechazo.mensaje}</p>
+            )}
             <div className="flex items-baseline justify-between rounded-md bg-muted/50 px-3 py-2">
               <span className="text-sm font-medium">{vueltoCalc.falta > 0 ? 'Faltan' : 'Vuelto'}</span>
               <span className={'text-3xl font-bold tabular-nums ' + (vueltoCalc.falta > 0 ? 'text-destructive' : 'text-success')}>
