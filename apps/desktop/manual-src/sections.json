@@ -401,7 +401,8 @@
      "tips": [
       "Probá el escáner antes de hacer la venta para asegurate de que funciona",
       "Si un producto tiene varios códigos de barras (ej: versiones viejas del packaging), cargá el que usualmente vendés",
-      "Podés dejar el campo en blanco si el producto no tiene código de barras (artículos a granel, productos propios, etc.)"
+      "Podés dejar el campo en blanco si el producto no tiene código de barras (artículos a granel, productos propios, etc.)",
+      "En Ventas, la lectura del escáner termina en Enter, que sólo agrega el artículo: la venta no se confirma sola, se confirma con F2 o con el botón verde."
      ]
     },
     {
@@ -884,7 +885,9 @@
       "La búsqueda es por SUBSTRING: '7' encuentra '17xx', 'desc' encuentra 'descartable'.",
       "Si escaneas un código exacto, se agrega directamente al carrito.",
       "Podés agregar el mismo producto varias veces; las cantidades se suman.",
-      "El stock aparece junto al código si hay riesgo de sobrestock (en rojo)."
+      "El stock aparece junto al código si hay riesgo de sobrestock (en rojo).",
+      "Enter agrega el artículo al carrito y nada más: no confirma la venta. La venta se confirma con F2 o con el botón verde «Confirmar venta».",
+      "El cursor vuelve siempre al campo de búsqueda (después de agregar un artículo, de quitar un renglón o de cerrar una ventana). Si queda en otro lugar de la pantalla, el primer dígito de una lectura pasa solo al campo de búsqueda."
      ]
     },
     {
@@ -905,7 +908,8 @@
       "Si necesitás resetear el precio manual, borrá la línea y volvé a agregarla.",
       "El descuento por línea NO es un porcentaje; es un importe fijo en pesos.",
       "El subtotal de la línea ya descuenta el importe de descuento.",
-      "Si el producto supera el stock disponible, aparece en rojo el stock actual."
+      "Si el producto supera el stock disponible, aparece en rojo el stock actual.",
+      "La cantidad, el precio y el descuento de un renglón no aceptan lo que tiene forma de código de barras: si el lector escribe un código ahí, se mantiene el valor anterior, se avisa y, si el código es de un artículo, ese artículo se agrega a la venta. Una cantidad de 10.000 o más se consulta antes de aceptarla."
      ]
     },
     {
@@ -963,7 +967,7 @@
       "La comisión la ABSORBE el comercio; el cliente paga el total normal (no aumenta el ticket).",
       "F4 = rotar medios (solo en modo mono, sin account). F12 = activar/desactivar modo mixto.",
       "Si no hay medios configurados, aparece un error y un link a Medios de Pago.",
-      "Calcular vuelto: tildá 'Calcular vuelto' en el recuadro 'Opciones de venta', arriba del botón 'Confirmar venta' (queda guardada en cada PC). Al confirmar una venta en efectivo se abre la pantalla 'Cobro en efectivo' con el total: escribí con cuánto paga el cliente y se muestra el vuelto. Enter confirma, Esc vuelve. Es sólo una ayuda: lo que se registra es el total de la venta."
+      "Calcular vuelto: tildá 'Calcular vuelto' en el recuadro 'Opciones de venta', arriba del botón 'Confirmar venta' (queda guardada en cada PC). Al confirmar una venta en efectivo se abre la pantalla 'Cobro en efectivo' con el total: escribí con cuánto paga el cliente y se muestra el vuelto. Se confirma con F2 o con el botón «Confirmar venta (F2)»; «Volver (Esc)» regresa sin confirmar. Enter no confirma la venta. Es sólo una ayuda: lo que se registra es el total de la venta."
      ]
     },
     {
@@ -1046,7 +1050,8 @@
       "F2 es el atajo: presioná F2 en cualquier momento (salvo que estés editando un campo).",
       "Si la impresora está apagada o sin papel, la venta igual se registra; el error es solo de impresión.",
       "El número de comprobante es único y secuencial por tipo (Remito X, Factura A, etc.).",
-      "Una vez registrada, la venta se ve en Historial de Ventas."
+      "Una vez registrada, la venta se ve en Historial de Ventas.",
+      "Enter no confirma la venta: sólo agrega al carrito el artículo buscado o leído. Con un lector de códigos de barras cada lectura termina en Enter; por eso la venta se confirma únicamente con F2 o con el botón verde. Hasta la versión 1.18.0 existía, en las «Opciones de venta», una casilla para confirmar con Enter; ya no está."
      ]
     },
     {
@@ -1098,7 +1103,8 @@
       "El campo de búsqueda siempre está enfocado cuando entras a Ventas, así que podés empezar a escribir o escanear al instante."
      ],
      "steps": [
-      "F2: Confirmá la venta (mismo que botón verde).",
+      "Enter (en el campo de búsqueda): agrega el artículo al carrito. No confirma la venta.",
+      "F2: Confirmá la venta (mismo que botón verde). Es la única tecla que la confirma.",
       "F4: Rotá entre medios de pago (siguiente medio en la lista).",
       "F12: Activá/desactivá pago mixto.",
       "Escape: Limpiá el carrito (si el campo de búsqueda está vacío)."
@@ -1213,7 +1219,8 @@
      ],
      "steps": [],
      "tips": [
-      "Escape limpia la búsqueda; al confirmar la venta el buscador queda limpio para la siguiente."
+      "Escape limpia la búsqueda; al confirmar la venta el buscador queda limpio para la siguiente.",
+      "Enter nunca confirma la venta: la venta se confirma con F2 o con el botón verde."
      ]
     },
     {

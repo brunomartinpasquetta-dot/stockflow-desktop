@@ -34,7 +34,7 @@ a { color: inherit; }
 <h1>StockFlow</h1>
 <div class="sub">Sistema de Gestión Comercial</div>
 <div class="sub" style="margin-top:18px;font-size:16pt;color:#1b2a4a;font-weight:600;">Manual de Usuario</div>
-<div class="ver">Versión 1.12.0</div>
+<div class="ver">Versión 1.18.1</div>
 <div class="foot">© 2026 · Crafted by BPSG</div>
 </div>
 <div class='toc'><h2>Índice</h2><ol>
@@ -256,6 +256,7 @@ a { color: inherit; }
 <div class='tip'><span>Probá el escáner antes de hacer la venta para asegurate de que funciona</span></div>
 <div class='tip'><span>Si un producto tiene varios códigos de barras (ej: versiones viejas del packaging), cargá el que usualmente vendés</span></div>
 <div class='tip'><span>Podés dejar el campo en blanco si el producto no tiene código de barras (artículos a granel, productos propios, etc.)</span></div>
+<div class='tip'><span>En Ventas, la lectura del escáner termina en Enter, que sólo agrega el artículo: la venta no se confirma sola, se confirma con F2 o con el botón verde.</span></div>
 </div>
 <h3>Listas de precios 1, 2 y 3</h3>
 <p>StockFlow maneja hasta 3 listas de precios distintas para cada producto. Esto es útil si vendés al público a un precio, a mayoristas a otro, o si tenés clientes especiales con descuentos negociados.</p>
@@ -600,6 +601,8 @@ a { color: inherit; }
 <div class='tip'><span>Si escaneas un código exacto, se agrega directamente al carrito.</span></div>
 <div class='tip'><span>Podés agregar el mismo producto varias veces; las cantidades se suman.</span></div>
 <div class='tip'><span>El stock aparece junto al código si hay riesgo de sobrestock (en rojo).</span></div>
+<div class='tip'><span>Enter agrega el artículo al carrito y nada más: no confirma la venta. La venta se confirma con F2 o con el botón verde «Confirmar venta».</span></div>
+<div class='tip'><span>El cursor vuelve siempre al campo de búsqueda (después de agregar un artículo, de quitar un renglón o de cerrar una ventana). Si queda en otro lugar de la pantalla, el primer dígito de una lectura pasa solo al campo de búsqueda.</span></div>
 </div>
 <h3>4. Editar líneas del carrito: cantidad, precio y descuento</h3>
 <p>Cada línea del carrito muestra: producto, marca, cantidad, precio unitario, descuento, y subtotal. Podés editar cantidad y precio (si querés cambiar el precio de una línea manualmente). El descuento en línea es siempre en pesos ($), y se aplica solo a esa línea.</p>
@@ -617,6 +620,7 @@ a { color: inherit; }
 <div class='tip'><span>El descuento por línea NO es un porcentaje; es un importe fijo en pesos.</span></div>
 <div class='tip'><span>El subtotal de la línea ya descuenta el importe de descuento.</span></div>
 <div class='tip'><span>Si el producto supera el stock disponible, aparece en rojo el stock actual.</span></div>
+<div class='tip'><span>La cantidad, el precio y el descuento de un renglón no aceptan lo que tiene forma de código de barras: si el lector escribe un código ahí, se mantiene el valor anterior, se avisa y, si el código es de un artículo, ese artículo se agrega a la venta. Una cantidad de 10.000 o más se consulta antes de aceptarla.</span></div>
 </div>
 <h3>5. Descuento global (FEATURE NUEVA 2026)</h3>
 <p>Además del descuento por línea, podés aplicar un descuento global a toda la venta con el toggle $/%. Ese descuento se aplica sobre el SUBTOTAL TOTAL (sin descuentos de línea).</p>
@@ -662,7 +666,7 @@ a { color: inherit; }
 <div class='tip'><span>La comisión la ABSORBE el comercio; el cliente paga el total normal (no aumenta el ticket).</span></div>
 <div class='tip'><span>F4 = rotar medios (solo en modo mono, sin account). F12 = activar/desactivar modo mixto.</span></div>
 <div class='tip'><span>Si no hay medios configurados, aparece un error y un link a Medios de Pago.</span></div>
-<div class='tip'><span>Calcular vuelto: tildá &#x27;Calcular vuelto&#x27; en el recuadro &#x27;Opciones de venta&#x27;, arriba del botón &#x27;Confirmar venta&#x27; (queda guardada en cada PC). Al confirmar una venta en efectivo se abre la pantalla &#x27;Cobro en efectivo&#x27; con el total: escribí con cuánto paga el cliente y se muestra el vuelto. Enter confirma, Esc vuelve. Es sólo una ayuda: lo que se registra es el total de la venta.</span></div>
+<div class='tip'><span>Calcular vuelto: tildá &#x27;Calcular vuelto&#x27; en el recuadro &#x27;Opciones de venta&#x27;, arriba del botón &#x27;Confirmar venta&#x27; (queda guardada en cada PC). Al confirmar una venta en efectivo se abre la pantalla &#x27;Cobro en efectivo&#x27; con el total: escribí con cuánto paga el cliente y se muestra el vuelto. Se confirma con F2 o con el botón «Confirmar venta (F2)»; «Volver (Esc)» regresa sin confirmar. Enter no confirma la venta. Es sólo una ayuda: lo que se registra es el total de la venta.</span></div>
 </div>
 <h3>8. Comisión del medio de pago (FEATURE NUEVA 2026)</h3>
 <p>Cuando seleccionás un medio de pago (transferencia, tarjeta de crédito, etc.), StockFlow calcula automáticamente la comisión que cobra ese medio (en porcentaje, ej. 2.5% para Visa). Esa comisión LA ABSORBE EL COMERCIO, no se suma al ticket. El cliente paga el total normal, pero vos ves cuánto &#x27;neto&#x27; entra a la caja después de descontar la comisión.</p>
@@ -730,6 +734,7 @@ a { color: inherit; }
 <div class='tip'><span>Si la impresora está apagada o sin papel, la venta igual se registra; el error es solo de impresión.</span></div>
 <div class='tip'><span>El número de comprobante es único y secuencial por tipo (Remito X, Factura A, etc.).</span></div>
 <div class='tip'><span>Una vez registrada, la venta se ve en Historial de Ventas.</span></div>
+<div class='tip'><span>Enter no confirma la venta: sólo agrega al carrito el artículo buscado o leído. Con un lector de códigos de barras cada lectura termina en Enter; por eso la venta se confirma únicamente con F2 o con el botón verde. Hasta la versión 1.18.0 existía, en las «Opciones de venta», una casilla para confirmar con Enter; ya no está.</span></div>
 </div>
 <h3>12. Venta a cuenta corriente</h3>
 <p>Para vender a cuenta corriente, el cliente DEBE cumplir: (1) no ser &#x27;Consumidor Final&#x27;; (2) tener documento (DNI/CUIT); (3) tener límite de crédito disponible. Si se cumplen, aparece el checkbox &#x27;Venta a cuenta corriente&#x27;.</p>
@@ -769,7 +774,8 @@ a { color: inherit; }
 <p>StockFlow tiene varios atajos para acelerar el flujo de venta: F2 confirma venta, F4 rota entre medios de pago (solo en mono-modo), F12 activa/desactiva pago mixto, Escape limpia el carrito si está vacía la búsqueda.</p>
 <p>El campo de búsqueda siempre está enfocado cuando entras a Ventas, así que podés empezar a escribir o escanear al instante.</p>
 <ol class='steps'>
-<li>F2: Confirmá la venta (mismo que botón verde).</li>
+<li>Enter (en el campo de búsqueda): agrega el artículo al carrito. No confirma la venta.</li>
+<li>F2: Confirmá la venta (mismo que botón verde). Es la única tecla que la confirma.</li>
 <li>F4: Rotá entre medios de pago (siguiente medio en la lista).</li>
 <li>F12: Activá/desactivá pago mixto.</li>
 <li>Escape: Limpiá el carrito (si el campo de búsqueda está vacío).</li>
@@ -854,6 +860,7 @@ a { color: inherit; }
 <p>Para cargar varios artículos de una lista está «Ver todos»: esa ventana se puede MOVER (arrastrando el título) y AGRANDAR (esquina inferior derecha), así no tapa el carrito.</p>
 <div class='tips'>
 <div class='tip'><span>Escape limpia la búsqueda; al confirmar la venta el buscador queda limpio para la siguiente.</span></div>
+<div class='tip'><span>Enter nunca confirma la venta: la venta se confirma con F2 o con el botón verde.</span></div>
 </div>
 <h3>Listas de precios por renglón — cambiar de lista no toca lo cargado</h3>
 <p>Cada renglón recuerda con qué lista de precios entró al carrito. Cambiar la lista (o el cliente) NO re-precia lo que ya está cargado: rige para lo que agregues después.</p>

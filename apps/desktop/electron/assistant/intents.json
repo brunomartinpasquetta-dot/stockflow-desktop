@@ -1359,12 +1359,12 @@
       "no me encuentra el codigo escaneado",
       "el lector no reconoce el producto"
      ],
-     "answer": "Sí, funciona con cualquier lector de códigos que se enchufe por USB. En la pantalla de Ventas hay un casillero grande que dice 'Código o nombre del producto — escaneá o escribí y Enter': escaneás y el producto se suma solo al ticket.",
+     "answer": "Sí, funciona con cualquier lector de códigos que se enchufe por USB. En la pantalla de Ventas hay un casillero grande que dice 'Código o nombre del producto — escaneá o escribí y Enter': escaneás y el producto se suma solo al ticket. La venta no se cobra sola: se confirma con F2 o con el botón verde 'Confirmar venta (F2)'.",
      "steps": [
       "Primero abrí Artículos: apretá la tecla F1, o hacé clic en el botón 'Artículos' (ícono de una caja) en la barra de íconos de arriba. Se abre la pantalla de Artículos.",
       "Conectá la pistola (el lector) a un puerto USB de la computadora. No hay que instalar nada: funciona como si fuera un teclado.",
       "Abrí Ventas: presioná F5, o hacé clic en el botón 'Ventas' (el del carrito) en la barra de arriba.",
-      "Apuntá la pistola al código de barras del producto y apretá el gatillo. El número aparece en el casillero de arriba y el producto se agrega solo a la venta.",
+      "Apuntá la pistola al código de barras del producto y apretá el gatillo. El número aparece en el casillero de arriba y el producto se agrega solo a la venta. La lectura termina con un Enter que sólo agrega el producto: no confirma la venta (eso se hace con F2 o con el botón verde).",
       "Si sale el aviso 'No se encontró el producto', andá a Artículos (F1) y fijate que ese mismo número esté cargado en el casillero 'Código' del producto.",
       "Hacé una venta de prueba antes de atender clientes, para asegurarte de que el lector anda bien."
      ],
@@ -5807,11 +5807,11 @@
       "Presioná la tecla F5, o hacé clic en el botón 'Ventas' (tiene el dibujito de un carrito de compras) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Si en vez de la pantalla de venta ves un cartel que dice 'No hay caja abierta', hacé clic en el botón 'Ir a Caja' y abrí la caja del día. Después volvé a Ventas con F5.",
       "En el medio de la pantalla hay un casillero grande que dice 'Código o nombre del producto — escaneá o escribí y Enter'. El cursor ya está ahí esperándote: pasá el producto por el lector de códigos, o escribí su nombre.",
-      "Apretá la tecla Enter, o hacé clic en el producto en la listita que aparece abajo del casillero. Vas a ver que el producto se suma a la lista del medio de la pantalla.",
+      "Apretá la tecla Enter, o hacé clic en el producto en la listita que aparece abajo del casillero. Vas a ver que el producto se suma a la lista del medio de la pantalla. Enter sólo agrega el producto: no cobra la venta.",
       "Repetí lo mismo con cada producto que lleva el cliente. Si lleva dos iguales, escanealo dos veces (la cantidad se suma sola).",
       "Abajo, en la columna del medio, fijate que la 'Forma de pago' sea la correcta (por ejemplo Efectivo). Si querés cambiarla, hacé clic en ese desplegable y elegí otra.",
       "Si el cliente va a pagar con más de un medio a la vez (parte efectivo, parte tarjeta), apretá F12 o el botón 'Pago mixto' y repartí el monto: la venta no se confirma hasta que la suma de los pagos dé justo el total.",
-      "Abajo a la derecha está el botón verde grande que dice 'Confirmar venta (F2)' con el total. Presioná F2 o hacé clic ahí.",
+      "Abajo a la derecha está el botón verde grande que dice 'Confirmar venta (F2)' con el total. Presioná F2 o hacé clic ahí. Enter no confirma la venta.",
       "Va a aparecer un cartelito verde arriba a la derecha que dice 'Venta ... registrada' con el número y el total. La pantalla queda limpia para la próxima venta, y si tenés impresora el ticket sale solo."
      ],
      "image": "pdv-principal.png",
@@ -5959,7 +5959,7 @@
      "steps": [
       "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Fijate en el casillero grande del medio que dice 'Código o nombre del producto — escaneá o escribí y Enter'. El cursor ya está ahí cuando entrás a Ventas.",
-      "CON LECTOR: pasá el producto por la pistola. Se agrega solo a la lista, con cantidad 1.",
+      "CON LECTOR: pasá el producto por la pistola. Se agrega solo a la lista, con cantidad 1. La venta no se cobra sola: se confirma con F2 o con el botón verde.",
       "SIN LECTOR: escribí parte del nombre, la marca o el código. Abajo del casillero aparece una listita con los productos que coinciden y su precio.",
       "Apretá Enter para agregar el primero de la listita, o hacé clic en el que quieras. El producto aparece en la lista del medio.",
       "Si escaneás o agregás el mismo producto otra vez, no se repite la línea: se suma la cantidad.",
@@ -6410,19 +6410,60 @@
       "como termino la venta",
       "finalizar venta",
       "dar por hecha la venta",
-      "boton verde grande"
+      "boton verde grande",
+      "confirmar la venta con enter",
+      "enter no confirma la venta",
+      "enter ya no cobra",
+      "tilde de enter para confirmar la venta"
      ],
-     "answer": "Cuando ya cargaste todo, apretás F2 o el botón verde grande de abajo a la derecha. Con eso StockFlow guarda la venta, descuenta el stock, suma la plata a la caja e imprime el ticket. Todo en un solo toque.",
+     "answer": "Cuando ya cargaste todo, apretás F2 o el botón verde grande de abajo a la derecha. Con eso StockFlow guarda la venta, descuenta el stock, suma la plata a la caja e imprime el ticket. Todo en un solo toque. Enter no confirma la venta (sólo agrega el artículo buscado) y la casilla de las Opciones de venta que permitía confirmar con Enter ya no existe.",
      "steps": [
       "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Dale una última mirada a la pantalla: cliente, productos, cantidades, descuentos y forma de pago.",
       "Presioná la tecla F2, o hacé clic en el botón verde grande de abajo a la derecha que dice 'Confirmar venta (F2)' con el total.",
+      "Enter no confirma la venta: con el lector de códigos de barras cada lectura termina en Enter, y por eso sólo agrega el artículo. Para confirmar siempre se usa F2 o el botón verde.",
       "Arriba a la derecha aparece un cartelito verde: 'Venta X #123 registrada' con el total. Eso confirma que quedó guardada.",
       "La lista de productos se vacía sola: ya podés atender al próximo cliente.",
       "Si tenés impresora y el cuadradito 'Imprimir ticket automáticamente' está tildado, el ticket sale solo.",
       "Si el botón verde está gris (no se puede apretar), falta algo: productos en la lista, una forma de pago elegida, o en pago mixto que los montos sumen justo el total."
      ],
      "image": "pdv-principal.png"
+    },
+    {
+     "id": "lector-cobro-solo",
+     "canonical": "El lector de códigos de barras cobró solo la venta",
+     "patterns": [
+      "el lector cobro solo la venta",
+      "el lector confirma la venta solo",
+      "el escaner cobra solo",
+      "la pistola cobra sola la venta",
+      "escaneo y se cobra solo",
+      "la venta se cobra sola al escanear",
+      "se confirma la venta sin que yo toque nada",
+      "se cobro la venta sin el articulo que escanee",
+      "escaneo un producto y se confirma la venta",
+      "el lector hace la venta solo",
+      "la venta se registra sola con el lector",
+      "por que enter no confirma la venta",
+      "casilla de enter en opciones de venta",
+      "el enter ya no cobra la venta",
+      "el lector escribio el codigo en la cantidad",
+      "escaneo y queda una cantidad enorme",
+      "el lector puso el codigo en el precio",
+      "el lector puso el codigo en el descuento"
+     ],
+     "answer": "Ocurría cuando el cursor no estaba en el campo de búsqueda de Ventas (por ejemplo, después de tocar el tacho (el botón rojo de basura) de un renglón, el total, la forma de pago o la cantidad de un renglón): los dígitos del código no entraban a la búsqueda y el Enter final que envía el lector confirmaba la venta sin el artículo leído. Desde la versión 1.18.1 ya no ocurre: Enter ya no confirma la venta. La venta se confirma con F2 o con el botón verde «Confirmar venta (F2)», también en la pantalla «Cobro en efectivo».",
+     "steps": [
+      "Enter sólo agrega al carrito el artículo buscado o leído. No confirma la venta, ni en la pantalla de Ventas ni en «Cobro en efectivo» (calcular vuelto).",
+      "El cursor vuelve siempre al campo de búsqueda: después de agregar un artículo, de quitar un renglón o de cerrar una ventana. Si el cursor quedó en otro lugar de la pantalla, el primer dígito de una lectura pasa solo al campo de búsqueda.",
+      "Si el cursor está en la cantidad, el precio o el descuento de un renglón y se lee un código de barras, el sistema no lo acepta: mantiene el valor anterior, avisa y, si el código corresponde a un artículo, lo agrega a la venta. Una cantidad de 10.000 o más se consulta antes de aceptarla.",
+      "Para confirmar la venta, use F2 o el botón verde «Confirmar venta (F2)».",
+      "En una PC con una versión anterior a la 1.18.1, hasta actualizar se evita el problema destildando la casilla de Enter, en las «Opciones de venta»."
+     ],
+     "action": {
+      "label": "Abrir Ventas",
+      "screen": "ventas"
+     }
     },
     {
      "id": "error-al-confirmar",
@@ -6581,11 +6622,11 @@
       "atajos",
       "vender sin mouse"
      ],
-     "answer": "Dentro de Ventas podés trabajar casi sin tocar el mouse: F2 cobra, F4 cambia la forma de pago, F12 activa el pago repartido y Enter agrega el producto que buscaste. Para ENTRAR a Ventas desde cualquier lado, la tecla es F5.",
+     "answer": "Dentro de Ventas podés trabajar casi sin tocar el mouse: F2 cobra, F4 cambia la forma de pago, F12 activa el pago repartido y Enter agrega el producto que buscaste (Enter no cobra la venta: se cobra con F2 o con el botón verde). Para ENTRAR a Ventas desde cualquier lado, la tecla es F5.",
      "steps": [
       "F5 (desde cualquier pantalla): abre Ventas.",
-      "Enter (en el casillero de búsqueda): agrega el producto que encontraste.",
-      "F2: confirma la venta, igual que el botón verde grande.",
+      "Enter (en el casillero de búsqueda): agrega el producto que encontraste. Nunca confirma la venta.",
+      "F2: confirma la venta, igual que el botón verde grande. Es la única tecla que la confirma, también en la pantalla 'Cobro en efectivo' (calcular vuelto).",
       "F4: salta a la siguiente forma de pago (efectivo, tarjeta, transferencia...). Solo funciona en pago simple y si tenés más de un medio cargado.",
       "F12: prende y apaga el pago mixto (repartir entre varios medios). Necesita más de un medio cargado.",
       "Escape: si escribiste algo en el buscador, lo borra. Si el buscador está vacío y hay productos cargados, te pregunta '¿Vaciar la venta actual?'.",
@@ -6851,7 +6892,7 @@
       "como funciona el buscador del pdv",
       "ver todos articulos ventana"
      ],
-     "answer": "Escribí y usá las flechas ↓/↑ para recorrer los resultados; Enter carga el renglón marcado y la lista se cierra. Sin marca, Enter usa el código exacto o el primer resultado (ideal para el lector de códigos). Para cargar varios seguidos usá «Ver todos»: esa ventana se mueve arrastrando el título y se agranda desde la esquina inferior derecha."
+     "answer": "Escribí y usá las flechas ↓/↑ para recorrer los resultados; Enter carga el renglón marcado y la lista se cierra. Sin marca, Enter usa el código exacto o el primer resultado (ideal para el lector de códigos). Enter nunca confirma la venta: eso se hace con F2 o con el botón verde. Para cargar varios seguidos usá «Ver todos»: esa ventana se mueve arrastrando el título y se agranda desde la esquina inferior derecha."
     },
     {
      "id": "listas-por-renglon",
@@ -6967,13 +7008,13 @@
       "donde esta el vuelto",
       "me paga con un billete grande"
      ],
-     "answer": "Tildá 'Calcular vuelto' en el recuadro 'Opciones de venta' de Ventas, arriba del botón 'Confirmar venta' (se hace una vez: queda guardado en esa PC). Desde ahí, al confirmar una venta en efectivo se abre la pantalla 'Cobro en efectivo' con el total: escribís con cuánto te paga el cliente y te muestra el vuelto en grande. Enter confirma la venta y Esc vuelve atrás.",
+     "answer": "Tildá 'Calcular vuelto' en el recuadro 'Opciones de venta' de Ventas, arriba del botón 'Confirmar venta' (se hace una vez: queda guardado en esa PC). Desde ahí, al confirmar una venta en efectivo se abre la pantalla 'Cobro en efectivo' con el total: escribís con cuánto te paga el cliente y te muestra el vuelto en grande. La venta se confirma con F2 o con el botón 'Confirmar venta (F2)' de esa pantalla; Esc vuelve atrás. Enter no confirma la venta.",
      "steps": [
       "En Ventas (F5), en el recuadro 'Opciones de venta' (arriba del botón verde 'Confirmar venta'), tildá 'Calcular vuelto'. Queda guardado en esa PC.",
       "Cargá los productos y elegí 'Efectivo' como forma de pago.",
       "Tocá 'Confirmar venta' o apretá F2: se abre la pantalla 'Cobro en efectivo' con el total de la venta.",
       "En 'Paga con' escribí con cuánto te paga el cliente, por ejemplo 10000. Abajo aparece el 'Vuelto' en verde. Si el billete no alcanza, dice 'Faltan' en rojo y no deja confirmar.",
-      "Apretá Enter para confirmar la venta (o Esc para volver sin confirmar). El aviso de venta registrada también te recuerda el vuelto.",
+      "La venta se confirma con F2 o con el botón verde 'Confirmar venta (F2)' de esa pantalla (Enter no la confirma); 'Volver (Esc)' regresa sin confirmar. El aviso de venta registrada también te recuerda el vuelto.",
       "Con tarjeta o transferencia la venta se confirma directo. Con pago mixto, el vuelto se calcula sobre la parte en efectivo."
      ],
      "action": {

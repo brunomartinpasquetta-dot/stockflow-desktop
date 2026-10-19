@@ -156,5 +156,25 @@ check(/if \(entrada\.campo === 'precio'\) setLinePrice\(i, entrada\.valor, entra
 check(/else setLineDiscount\(i, entrada\.valor\)/.test(ventas), 'un código en el descuento restaura el descuento anterior');
 check(/toast\.warning\(avisoImporteConCodigo\(entrada\.campo, articulo\?\.description \?\? null\)/.test(ventas) && /if \(articulo\) addArticle\(articulo\)/.test(ventas), 'avisa y, si el código es de un artículo, lo agrega a la venta');
 
+// ── Flowy y el manual ya no dicen que Enter confirma o cobra la venta ──
+function textosDe(valor: unknown, acumulado: string[] = []): string[] {
+  if (typeof valor === 'string') acumulado.push(valor);
+  else if (Array.isArray(valor)) for (const v of valor) textosDe(v, acumulado);
+  else if (valor && typeof valor === 'object') for (const v of Object.values(valor)) textosDe(v, acumulado);
+  return acumulado;
+}
+const kbLector = JSON.parse(readFileSync(join(raiz, 'electron', 'assistant', 'intents.json'), 'utf8')) as {
+  areas: { area: string; intents: { id: string; answer: string; steps?: string[] }[] }[];
+};
+const manualLector = JSON.parse(readFileSync(join(raiz, 'manual-src', 'sections.json'), 'utf8')) as unknown;
+const dicenEnterCobra = /\benter\s+(confirma|cobra)\b/i;
+check(!textosDe(kbLector).some((t) => dicenEnterCobra.test(t)), 'la base de Flowy no dice que Enter confirma o cobra la venta');
+check(!textosDe(manualLector).some((t) => dicenEnterCobra.test(t)), 'el manual no dice que Enter confirma o cobra la venta');
+const fichasVentas = kbLector.areas.find((a) => a.area === 'ventas')?.intents ?? [];
+const fichaVuelto = fichasVentas.find((f) => f.id === 'calcular-vuelto');
+check(!!fichaVuelto && /F2/.test(fichaVuelto.answer) && !/Apretá Enter/.test((fichaVuelto.steps ?? []).join(' ')), 'la ficha de calcular vuelto se confirma con F2 o el botón, no con Enter');
+const fichaLector = fichasVentas.find((f) => f.id === 'lector-cobro-solo');
+check(!!fichaLector && /F2/.test(fichaLector.answer) && /1\.18\.1/.test(fichaLector.answer), 'existe la ficha «El lector de códigos de barras cobró solo la venta»');
+
 console.log(fallas ? `\n❌ ${fallas} FALLAS` : '\n✅ TODO OK');
 process.exit(fallas ? 1 : 0);
