@@ -329,7 +329,6 @@ function PromoFormDialog(props: {
                         <QuantityInput
                           className="h-7 text-center"
                           value={i.quantity}
-                          esCodigoConocido={(v) => articles.some((a) => a.barcode === v)}
                           onChange={(v) =>
                             setItems((prev) => prev.map((it, k) => (k === idx ? { ...it, quantity: v } : it)))
                           }

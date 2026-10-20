@@ -84,7 +84,12 @@ export function debeIrAlBuscador(s: SituacionDeLaTecla): boolean {
  *  - aceptar: es una cantidad normal;
  *  - codigo: tiene pinta de código de barras (se escaneó con el cursor en la
  *    cantidad). NO se acepta: vuelve la cantidad anterior y, si el código es
- *    de un artículo, ese artículo se carga en la venta;
+ *    de un artículo, ese artículo se carga en la venta. Sólo es código lo que
+ *    tiene ocho dígitos o más (o un código pegado a una cantidad con decimales):
+ *    NUNCA se lo decide por coincidir con un código corto del padrón, porque los
+ *    comercios tienen artículos de código «1», «5», «10» y esas son cantidades
+ *    de todos los días (20-oct-2026: cambiar la cantidad a 5 agregaba el artículo
+ *    «5» y la cantidad no cambiaba);
  *  - preguntar: es inusualmente alta; se pide confirmación antes de aceptarla.
  */
 export type DecisionCantidad = { tipo: 'aceptar' } | { tipo: 'codigo'; codigo: string } | { tipo: 'preguntar' }
@@ -93,7 +98,8 @@ export type DecisionCantidad = { tipo: 'aceptar' } | { tipo: 'codigo'; codigo: s
  * El lector escribe donde está el cursor: el código queda pegado a la cantidad
  * que ya había, antes o después (el caso real fue «7790000000031» + «1»). Si
  * sacando la cantidad anterior de una punta queda el código de un artículo, ese
- * es el código leído. Si no, se devuelve lo escrito tal cual.
+ * es el código leído. Si no, se devuelve lo escrito tal cual. (Sólo se usa para
+ * decir QUÉ artículo se leyó: que lo escrito sea un código lo decide la forma.)
  */
 export function codigoDentroDeLaCantidad(
   texto: string,
@@ -118,7 +124,7 @@ export function decidirCantidad(
   const t = String(texto ?? '').trim()
   // Lo que ya estaba (por ejemplo, una cantidad alta que ya se confirmó) no se vuelve a preguntar.
   if (t === String(anterior ?? '').trim()) return { tipo: 'aceptar' }
-  const motivo = cantidadSospechosa(t, esCodigoConocido)
+  const motivo = cantidadSospechosa(t)
   if (motivo === 'parece-codigo') return { tipo: 'codigo', codigo: codigoDentroDeLaCantidad(t, anterior, esCodigoConocido) }
   if (motivo === 'muy-alta') return { tipo: 'preguntar' }
   return { tipo: 'aceptar' }

@@ -811,7 +811,6 @@ export function Compras() {
                       {/* El lector escribe donde está el cursor: una cantidad con forma de
                           código de barras no se acepta (19-oct-2026). */}
                       <QuantityInput className="h-7 text-right tabular-nums" value={l.quantity}
-                        esCodigoConocido={(v) => allArticles.some((a) => a.barcode === v)}
                         onChange={(v) => setLine(i, 'quantity', v)} onCommit={(v) => setLine(i, 'quantity', v)} />
                     </td>
                     <td className="px-2 py-0.5">

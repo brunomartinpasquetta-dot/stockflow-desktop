@@ -802,7 +802,6 @@ function QuoteForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => v
                     <QuantityInput
                       className="h-8 text-right tabular-nums"
                       value={l.quantity}
-                      esCodigoConocido={(v) => (articlesQuery.data ?? []).some((a) => a.barcode === v)}
                       onChange={(v) => setCart((p) => p.map((x, j) => (j === i ? { ...x, quantity: v } : x)))}
                     />
                   </td>

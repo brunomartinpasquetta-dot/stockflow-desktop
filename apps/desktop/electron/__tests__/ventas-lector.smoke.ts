@@ -85,6 +85,29 @@ check(d('12000').tipo === 'preguntar', 'inusualmente alta: se pide confirmación
 check(d('12000', '12000').tipo === 'aceptar', 'una cantidad alta ya confirmada no se vuelve a preguntar');
 check(d(' 3 ', '3').tipo === 'aceptar', 'sin cambios: se acepta');
 
+// ── Comercios migrados: el padrón tiene códigos internos CORTOS («1», «5», «10», «15») ──
+// 20-oct-2026: al tipear una cantidad igual al código de un artículo, el sistema devolvía la cantidad
+// anterior y agregaba ESE artículo a la venta. Sólo es código lo que tiene ocho dígitos o más.
+const padronConCortosCant = (v: string) => ['1', '5', '10', '15', '100', '7790000000031', '12345678'].includes(v);
+const dq = (texto: string, anterior = '2') => decidirCantidad(texto, anterior, padronConCortosCant);
+for (const t of ['1', '5', '10', '15', '100', '12', '2', '3', '3,5', '0,250', '0.25']) {
+  check(dq(t, '9').tipo === 'aceptar', `cantidad «${t}» con códigos cortos en el padrón: es una cantidad, se acepta`, JSON.stringify(dq(t, '9')));
+}
+check(dq('5', '1').tipo === 'aceptar' && dq('10', '1').tipo === 'aceptar' && dq('1', '5').tipo === 'aceptar', 'cantidad 5, 10 y 1 sobre un renglón de 1 o 5: se aceptan');
+const q1 = dq('7790000000031', '1');
+check(q1.tipo === 'codigo' && q1.codigo === '7790000000031', 'con códigos cortos en el padrón, un EAN-13 como cantidad sigue protegido', JSON.stringify(q1));
+const q2 = dq('77900000000311', '1');
+check(q2.tipo === 'codigo' && q2.codigo === '7790000000031', 'con códigos cortos en el padrón, el código pegado a la cantidad vieja (7790000000031 + «1») se reconoce', JSON.stringify(q2));
+const q3 = dq('27790000000031', '2');
+check(q3.tipo === 'codigo' && q3.codigo === '7790000000031', 'con códigos cortos en el padrón, el código pegado detrás de la cantidad vieja se reconoce', JSON.stringify(q3));
+const q4 = dq('12345678', '1');
+check(q4.tipo === 'codigo' && q4.codigo === '12345678', 'un código de ocho dígitos (EAN-8) como cantidad se rechaza', JSON.stringify(q4));
+const q5 = dq('1234567', '1');
+check(q5.tipo === 'aceptar' || q5.tipo === 'preguntar', 'siete dígitos sin coma no es un código (se trata como cantidad alta)', JSON.stringify(q5));
+const q6 = dq('99990000000001', '1');
+check(q6.tipo === 'codigo' && q6.codigo === '99990000000001', 'un código de más de ocho dígitos que no es de ningún artículo: se rechaza igual', JSON.stringify(q6));
+check(dq('1500', '1').tipo === 'aceptar' && dq('9999', '1').tipo === 'aceptar', 'cantidades de tres y cuatro dígitos: se aceptan');
+
 // ── Precio y descuento con pinta de código de barras (misma protección) ──
 const p = (texto: string, anterior = '1500') => decidirImporte(texto, anterior, padron);
 check(p('1800').tipo === 'aceptar', 'precio normal: se acepta');

@@ -16,7 +16,6 @@
  * renglón (además de rechazar, carga el artículo si el código es de uno), pero
  * usa el mismo tope y los mismos avisos de acá.
  */
-import { cantidadSospechosa } from './cantidadSospechosa'
 import { parseCurrencyInput, toInputString } from './format'
 import { MENSAJE_CANTIDAD_ALTA, MENSAJE_IMPORTE_ALTO, mensajeDeTope, superaElTope, type ClaveDeTope } from './topes'
 
@@ -49,19 +48,13 @@ export function avisoDeCodigoEnCasillero(tipo: TipoDeEntrada): string {
  * cambió, no hay nada que decidir: un dato viejo que ya estaba (incluso alto)
  * no se vuelve a juzgar.
  */
-export function evaluarEntrada(
-  tipo: TipoDeEntrada,
-  texto: string,
-  anterior = '',
-  esCodigoConocido: (valor: string) => boolean = () => false,
-): DecisionDeEntrada {
+export function evaluarEntrada(tipo: TipoDeEntrada, texto: string, anterior = ''): DecisionDeEntrada {
   const t = String(texto ?? '').trim()
   if (t === '' || t === String(anterior ?? '').trim()) return { tipo: 'aceptar' }
   // Sólo dígitos y ocho o más: EAN-8 para arriba. Lo tipeado con coma o punto
-  // (1234,50 / 12.000.000) nunca es un código. Para la cantidad también cuenta
-  // el código de un artículo del padrón, tenga los dígitos que tenga.
-  const soloDigitos = /^\d+$/.test(t)
-  if (soloDigitos && (t.length >= 8 || (esCantidad(tipo) && cantidadSospechosa(t, esCodigoConocido) === 'parece-codigo'))) {
+  // (1234,50 / 12.000.000) nunca es un código. NO se compara con los códigos del
+  // padrón: un artículo de código interno «5» no vuelve código a la cantidad 5.
+  if (/^\d{8,}$/.test(t)) {
     return { tipo: 'codigo', mensaje: avisoDeCodigoEnCasillero(tipo) }
   }
   // El código que quedó PEGADO a un valor con decimales («10.000» + «7791234567890»): ningún

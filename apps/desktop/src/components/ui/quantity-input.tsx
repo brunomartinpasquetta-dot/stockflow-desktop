@@ -8,8 +8,8 @@
  *  - mientras se escribe emite lo tipeado tal cual (`onChange`), para que los
  *    cálculos de la pantalla sigan en vivo;
  *  - al terminar de editar (salir del campo o Enter) NO acepta lo que tiene
- *    forma de código de barras (ocho dígitos o más, o el código de un artículo
- *    si se pasa `esCodigoConocido`) ni lo que supera el tope del servidor:
+ *    forma de código de barras (ocho dígitos o más; nunca se lo compara con los
+ *    códigos cortos del padrón) ni lo que supera el tope del servidor:
  *    vuelve la cantidad que tenía, avisa, y NO llama a `onCommit`;
  *  - si se acepta, `onCommit` recibe la cantidad canónica (`"1.5"`);
  *  - una cantidad inusualmente alta pero posible (`confirmarDesde`, por
@@ -32,14 +32,12 @@ export interface QuantityInputProps extends Omit<InputProps, 'value' | 'onChange
   onCommit?: (canonico: string) => void
   /** 'cantidad' (renglones, default) o 'stock' (existencias del artículo). */
   tipo?: Extract<ClaveDeTope, 'cantidad' | 'stock'>
-  /** Reconoce el código de un artículo del padrón tipeado como cantidad. */
-  esCodigoConocido?: (valor: string) => boolean
   /** A partir de qué cantidad se pide confirmar. 0 o `Infinity` = nunca. */
   confirmarDesde?: number
 }
 
 export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(function QuantityInput(
-  { value, onChange, onCommit, onFocus, onBlur, onKeyDown, tipo = 'cantidad', esCodigoConocido, confirmarDesde, ...rest },
+  { value, onChange, onCommit, onFocus, onBlur, onKeyDown, tipo = 'cantidad', confirmarDesde, ...rest },
   ref,
 ) {
   /** La cantidad que tenía al entrar: a eso se vuelve si lo escrito se rechaza. */
@@ -49,7 +47,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
 
   /** Termina la edición. Devuelve true si se rechazó (y ya se restauró y avisó). */
   function terminar(texto: string): boolean {
-    const d = evaluarEntrada(tipo, texto, alEntrarRef.current, esCodigoConocido)
+    const d = evaluarEntrada(tipo, texto, alEntrarRef.current)
     if (d.tipo !== 'aceptar') {
       onChange(alEntrarRef.current)
       toast.warning(d.mensaje, { duration: 10_000 })

@@ -20,8 +20,7 @@ function check(ok: boolean, que: string, detalle = ''): void {
   if (!ok) fallas++;
   console.log(`${ok ? '✅' : '❌'} ${que}${!ok && detalle ? `  → ${detalle}` : ''}`);
 }
-const padron = (v: string) => v === '7790000000031' || v === '1234';
-const tipo = (t: Parameters<typeof evaluarEntrada>[0], texto: string, anterior = '') => evaluarEntrada(t, texto, anterior, padron).tipo;
+const tipo = (t: Parameters<typeof evaluarEntrada>[0], texto: string, anterior = '') => evaluarEntrada(t, texto, anterior).tipo;
 
 // ── Los topes de la pantalla SON los del servidor (un solo lugar) ──
 check(JSON.stringify(TOPES) === JSON.stringify(TOPES_SERVIDOR), 'la pantalla lee los mismos topes que el servidor', `${JSON.stringify(TOPES)} vs ${JSON.stringify(TOPES_SERVIDOR)}`);
@@ -50,7 +49,13 @@ for (const t of ['importe', 'precio', 'cantidad', 'stock'] as const) {
 }
 check(tipo('stock', '10.0007791234567890') === 'codigo' && tipo('cantidad', '1,57790000000031') === 'codigo' && tipo('importe', '1500,5779123456789') === 'codigo', 'un código PEGADO a un valor con decimales («10.000» + código)');
 check(tipo('importe', '0,00005') === 'aceptar' && tipo('importe', '12345678,5') === 'aceptar', 'cinco decimales o un importe de 8 dígitos con coma no son códigos');
-check(tipo('cantidad', '1234') === 'codigo', 'el código CORTO de un artículo del padrón, como cantidad');
+// 20-oct-2026: el código CORTO de un artículo del padrón («5», «10», «1234») es una cantidad como cualquiera.
+check(tipo('cantidad', '1234') === 'aceptar', 'cantidad 1234 con un artículo de código «1234» en el padrón: es una cantidad, se acepta');
+const conCortos = (t: Parameters<typeof evaluarEntrada>[0], texto: string, anterior = '2') => evaluarEntrada(t, texto, anterior).tipo;
+for (const t of ['1', '5', '10', '15']) {
+  check(conCortos('cantidad', t) === 'aceptar' && conCortos('stock', t) === 'aceptar', `cantidad y stock «${t}» con un artículo de código «${t}» en el padrón: se aceptan`);
+}
+check(conCortos('cantidad', '7790000000031') === 'codigo' && conCortos('cantidad', '77900000000311', '1') === 'codigo' && conCortos('stock', '12345678') === 'codigo', 'con códigos cortos en el padrón, los códigos largos siguen protegidos');
 check(tipo('importe', '1234') === 'aceptar', 'pero 1234 como importe es un importe (los códigos cortos del padrón son importes de todos los días)');
 check(avisoDeCodigoEnCasillero('importe').includes('12.000.000'), 'el aviso del importe explica cómo escribir un importe grande');
 check(!/\btú\b|\bvos\b|\btenés\b|\bescribí\b/i.test(avisoDeCodigoEnCasillero('importe') + avisoDeCodigoEnCasillero('cantidad')), 'avisos sin tutear');

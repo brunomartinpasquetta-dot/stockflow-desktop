@@ -11,8 +11,7 @@ function check(ok: boolean, que: string, detalle = ''): void {
   if (!ok) fallas++;
   console.log(`${ok ? '✅' : '❌'} ${que}${!ok && detalle ? `  → ${detalle}` : ''}`);
 }
-const padron = (v: string) => v === '7792798810639' || v === '2000000009827';
-const s = (c: string | number) => cantidadSospechosa(c, padron);
+const s = (c: string | number) => cantidadSospechosa(c);
 
 // Lo normal NO molesta.
 check(s('1') === null, 'una unidad: no avisa');
@@ -39,6 +38,10 @@ check(s('215841') === 'muy-alta', 'el caso real del comercio: 215.841 unidades')
 check(s('10000') === 'muy-alta', 'justo en el límite de lo creíble');
 check(s('9999') === null, 'un poco por debajo del límite: no molesta');
 check(s('99999999999') === 'parece-codigo', 'un número enorme de muchos dígitos');
+
+// 20-oct-2026: la cantidad NUNCA se compara con los códigos del padrón (artículos de código interno «1», «5», «10»).
+check(['1', '5', '10', '15', '1500'].every((c) => cantidadSospechosa(c) === null), '1, 5, 10, 15 y 1500 son cantidades normales (aunque haya artículos con ese código)');
+check(cantidadSospechosa('7792798810639') === 'parece-codigo' && cantidadSospechosa('2000000009827') === 'parece-codigo', 'el EAN-13 sigue siendo un código, sin mirar el padrón');
 
 // Sin padrón a mano sigue funcionando por la cantidad de dígitos.
 check(cantidadSospechosa('7792798810639') === 'parece-codigo', 'sin padrón, por los dígitos');
