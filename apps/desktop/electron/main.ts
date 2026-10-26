@@ -29,6 +29,7 @@ import { LicenseManager } from './license/LicenseManager';
 import { CLOUD_API_URL_DEFAULT, CLOUD_PUBLIC_KEY_PEM } from './license/cloud-public-key';
 import { setupLogger } from './logger';
 import { MpTokenStore } from './secure/MpTokenStore';
+import { aplicarSinPantalla } from './sinPantalla';
 import { MpQrService, createServiceContext } from '@stockflow/core';
 import { checkForOutdatedVersion, setupAutoUpdater, type UpdaterController } from './updater';
 
@@ -37,6 +38,9 @@ const HEARTBEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const isDev = process.env.NODE_ENV === 'development';
 const DEV_SERVER_URL = 'http://localhost:5173';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+// Sólo para las pruebas automáticas (STOCKFLOW_SIN_PANTALLA=1): sin esa variable no hace nada.
+aplicarSinPantalla();
 
 let mainWindow: BrowserWindow | null = null;
 let dbHandle: DbHandle | null = null;
