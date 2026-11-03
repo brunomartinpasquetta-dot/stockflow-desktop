@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { cn } from '@/lib/utils'
-import { Link } from 'react-router-dom'
+import { useWindowNav } from '@/lib/useWindowNav'
 import { Loader2, Printer, Scale, HardDrive, ArrowRight, RefreshCw, Network, RefreshCcw, AlertTriangle, Trash2 } from 'lucide-react'
 
 import { api, ApiError } from '@/lib/api'
@@ -1486,11 +1486,15 @@ function UpdatesSection() {
 
 /* ----------------------- GENERAL ----------------------- */
 function GeneralSection() {
-  const links: { to: string; label: string }[] = [
-    { to: '/empresa', label: 'Datos de la empresa' },
-    { to: '/medios-de-pago', label: 'Medios de pago' },
-    { to: '/usuarios', label: 'Usuarios' },
-    { to: '/importar-stock', label: 'Importar stock desde Excel' },
+  // Abren la pantalla en su propia ventana (1.18.4). Antes eran enlaces de
+  // ruta (`<Link to="/medios-de-pago">`) y, dentro de la ventana de
+  // Configuración, no abrían nada (Bruno, 3-nov-2026).
+  const openInWindow = useWindowNav()
+  const links: { pageKey: string; label: string }[] = [
+    { pageKey: 'empresa', label: 'Datos de la empresa' },
+    { pageKey: 'medios-de-pago', label: 'Medios de pago' },
+    { pageKey: 'usuarios', label: 'Usuarios' },
+    { pageKey: 'importar-stock', label: 'Importar stock desde Excel' },
   ]
   // Tema de ESTA pantalla (se recuerda por PC, no en la base): ver lib/tema.
   const [tema, setTema] = useState<Tema>(() => leerTema())
@@ -1533,14 +1537,15 @@ function GeneralSection() {
           </p>
         </fieldset>
         {links.map((l) => (
-          <Link
-            key={l.to}
-            to={l.to}
-            className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-accent"
+          <button
+            key={l.pageKey}
+            type="button"
+            onClick={() => openInWindow(l.pageKey)}
+            className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm hover:bg-accent"
           >
             <span>{l.label}</span>
             <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          </Link>
+          </button>
         ))}
       </CardContent>
     </Card>

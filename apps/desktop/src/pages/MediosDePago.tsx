@@ -33,6 +33,10 @@ const pmSchema = z
     commissionPct: z
       .string()
       .refine((v) => /^\d{1,3}(\.\d{1,2})?$/.test(v) && Number(v) <= 100, { message: 'Porcentaje entre 0 y 100' }),
+    // Recargo que paga el cliente (1.18.4). Sin esta línea el formulario lo descartaba al guardar.
+    surchargePct: z
+      .string()
+      .refine((v) => /^\d{1,3}(\.\d{1,2})?$/.test(v) && Number(v) <= 100, { message: 'Porcentaje entre 0 y 100' }),
     sortOrder: z.coerce.number().int('Debe ser un número entero').min(0, 'Debe ser ≥ 0'),
     isPhysicalCash: z.boolean(),
     active: z.boolean(),
@@ -75,6 +79,13 @@ export function MediosDePago() {
       render: (r) => `${formatNumber(r.commissionPct, 2)} %`,
     },
     {
+      key: 'surchargePct',
+      header: 'Recargo %',
+      align: 'right',
+      sortValue: (r) => Number(r.surchargePct),
+      render: (r) => `${formatNumber(r.surchargePct, 2)} %`,
+    },
+    {
       key: 'isPhysicalCash',
       header: 'Efectivo físico',
       align: 'center',
@@ -103,6 +114,7 @@ export function MediosDePago() {
     { name: 'type', label: 'Tipo', type: 'select', options: TYPE_OPTIONS },
     { name: 'sortOrder', label: 'Orden', type: 'number', placeholder: '0' },
     { name: 'commissionPct', label: 'Comisión %', type: 'currency', placeholder: '0,00' },
+    { name: 'surchargePct', label: 'Recargo % (lo paga el cliente)', type: 'currency', placeholder: '0,00' },
     { name: 'isPhysicalCash', label: 'Afecta el arqueo de efectivo físico (sólo para "Efectivo")', type: 'checkbox' },
     { name: 'active', label: 'Medio activo', type: 'checkbox' },
   ]
@@ -113,6 +125,7 @@ export function MediosDePago() {
         type: editing.type,
         sortOrder: editing.sortOrder,
         commissionPct: editing.commissionPct,
+        surchargePct: editing.surchargePct ?? '0',
         isPhysicalCash: editing.isPhysicalCash,
         active: editing.active,
       }
@@ -121,6 +134,7 @@ export function MediosDePago() {
         type: 'other',
         sortOrder: (methods.data?.length ?? 0) + 1,
         commissionPct: '0',
+        surchargePct: '0',
         isPhysicalCash: false,
         active: true,
       }

@@ -285,6 +285,14 @@ export const paymentMethods = sqliteTable(
       .notNull()
       .default(false),
     commissionPct: text('commission_pct').notNull().default('0.00'),
+    /**
+     * RECARGO que paga el CLIENTE por usar este medio (1.18.4; Bruno, 3-nov-2026:
+     * «cobrar un 10 % al que pague con tarjeta de crédito»). Es lo contrario de
+     * la comisión, que la absorbe el comercio: el recargo se SUMA a la venta como
+     * un renglón más («Recargo Tarjeta de crédito 10 %»), así entra al ticket, a
+     * la factura, a la caja y a las estadísticas sin tocar nada más. Nace en 0.
+     */
+    surchargePct: text('surcharge_pct').notNull().default('0.00'),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: createdAtCol(),

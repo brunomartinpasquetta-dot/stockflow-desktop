@@ -31,6 +31,8 @@ export const PaymentMethodSchema = z.object({
   type: paymentMethodTypeSchema,
   isPhysicalCash: z.boolean(),
   commissionPct: pctSchema,
+  /** Recargo que paga el cliente por usar el medio (0 a 100 %). */
+  surchargePct: pctSchema,
   active: z.boolean(),
   sortOrder: z.number().int(),
   createdAt: timestampSchema,
@@ -43,6 +45,7 @@ export const CreatePaymentMethodSchema = z
     type: paymentMethodTypeSchema,
     isPhysicalCash: z.boolean().default(false),
     commissionPct: comisionSchema.default('0.00'),
+    surchargePct: comisionSchema.default('0.00'),
     active: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
   })
@@ -62,6 +65,7 @@ export const UpdatePaymentMethodSchema = z
     type: paymentMethodTypeSchema.optional(),
     isPhysicalCash: z.boolean().optional(),
     commissionPct: comisionSchema.optional(),
+    surchargePct: comisionSchema.optional(),
     active: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
   });

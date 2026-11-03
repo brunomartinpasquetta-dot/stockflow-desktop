@@ -2896,7 +2896,8 @@
       "En **Medios de pago** configurás todos los formas en que recibís dinero: efectivo, transferencia, tarjeta de débito, crédito, Mercado Pago, cheques, etc.",
       "Cada medio tiene una **comisión %** (ej: 3% para tarjeta de crédito). La comisión **la absorbe el comercio**: StockFlow resta automáticamente ese porcentaje del total y lo muestra en reportes. Por ejemplo, si vendés $100 con tarjeta al 3%, StockFlow registra $97 de venta neta (la comisión es $3).",
       "Opciones: **Orden** (para mostrar los medios en cierto orden en las ventas), **Efectivo físico** (marca cuál afecta el arqueo de caja), **Activo/Inactivo** (para habilitar o deshabilitar rápidamente).",
-      "Hay medios **predeterminados** (Efectivo, Transferencia, Tarjeta de crédito, Tarjeta de débito) que no se pueden borrar; solo desactivarlos."
+      "Hay medios **predeterminados** (Efectivo, Transferencia, Tarjeta de crédito, Tarjeta de débito) que no se pueden borrar; solo desactivarlos.",
+      "Cada medio tiene además un **Recargo %** (desde la 1.18.4): un porcentaje que **paga el cliente** por usar ese medio. Si pone 10 % en Tarjeta de crédito, una venta de $100 cobrada con tarjeta sale $110. En Ventas el recargo aparece antes de cobrar y se suma al total como un renglón más («Recargo Tarjeta de crédito 10 %»), así figura en el ticket, en la factura, en la caja y en las estadísticas. Con pago mixto se aplica sólo a la parte pagada con ese medio. Viene en 0 en todos los medios. No confundir con la comisión: la comisión la absorbe el comercio; el recargo lo paga el cliente."
      ],
      "steps": [
       "Andá a Configuración > General > Medios de pago",

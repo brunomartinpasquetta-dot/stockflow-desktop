@@ -188,6 +188,8 @@ export interface PaymentMethodDTO {
   /** Sólo este afecta el arqueo físico del cajón. */
   isPhysicalCash: boolean;
   commissionPct: string;
+  /** Recargo % que paga el cliente por usar este medio (1.18.4). */
+  surchargePct: string;
   active: boolean;
   sortOrder: number;
   createdAt: number;

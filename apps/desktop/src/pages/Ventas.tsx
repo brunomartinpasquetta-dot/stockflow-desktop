@@ -1378,15 +1378,61 @@ function PDV() {
     )
   }
 
+  // ── Recargo por medio de pago (1.18.4): lo paga el CLIENTE ──
+  // Distinto de la comisión (que la absorbe el comercio): el recargo se SUMA a
+  // la venta como un renglón más («Recargo Tarjeta de crédito 10 %»), así entra
+  // al ticket, a la factura, a la caja y a las estadísticas sin tocar nada más.
+  // Pago único: sobre el total. Pago mixto: sobre la parte pagada con ese medio.
+  // Con todos los medios en 0 % no cambia nada: ni renglón, ni total, ni pagos.
+  const recargos = useMemo(() => {
+    const out: { paymentMethodId: string; nombre: string; pct: number; importe: number }[] = []
+    if (accountSale) return out
+    const agregar = (m: (typeof activeMethods)[number] | undefined, base: number): void => {
+      const pct = Number(m?.surchargePct ?? 0)
+      if (!m || !(pct > 0) || !(base > 0)) return
+      out.push({ paymentMethodId: m.id, nombre: m.name, pct, importe: Math.round(base * pct) / 100 })
+    }
+    if (mixedMode) {
+      for (const p of split.payments) agregar(activeMethods.find((m) => m.id === p.paymentMethodId), Number(p.amount))
+    } else {
+      agregar(selectedMethod ?? undefined, totalNum)
+    }
+    return out
+  }, [accountSale, mixedMode, split.payments, activeMethods, selectedMethod, totalNum])
+  const pctTexto = (pct: number): string => pct.toLocaleString('es-AR', { maximumFractionDigits: 2 })
+  const lineasRecargo = recargos.map((r) => ({
+    description: `Recargo ${r.nombre} ${pctTexto(r.pct)} %`,
+    quantity: '1',
+    // En modo neto el renglón va sin IVA: con el 21 % encima queda el importe del recargo.
+    unitPrice: (priceMode === 'gross' ? r.importe : r.importe / 1.21).toFixed(4),
+    discount: '0',
+    vatRate: '21.00',
+  }))
+  const totalesACobrar = lineasRecargo.length ? calculateSaleTotals([...lineInputs, ...lineasRecargo], globalDiscountAbs, priceMode) : totals
+  const totalACobrar = Number(totalesACobrar.total)
+  /** Los pagos con el recargo sumado al medio que lo cobra; cierra exacto con `totalACobrar`. */
+  function conRecargo(pagos: { paymentMethodId: string; amount: string }[]): { paymentMethodId: string; amount: string }[] {
+    if (recargos.length === 0) return pagos
+    const out = pagos.map((p) => ({ paymentMethodId: p.paymentMethodId, amount: Number(p.amount) }))
+    for (const r of recargos) {
+      const p = out.find((x) => x.paymentMethodId === r.paymentMethodId)
+      if (p) p.amount += r.importe
+    }
+    const diff = totalACobrar - out.reduce((a, p) => a + p.amount, 0)
+    const ajuste = out.find((x) => recargos.some((r) => r.paymentMethodId === x.paymentMethodId)) ?? out[0]
+    if (ajuste && Math.abs(diff) > 0.00001) ajuste.amount += diff
+    return out.map((p) => ({ paymentMethodId: p.paymentMethodId, amount: p.amount.toFixed(4) }))
+  }
+
   // Vuelto: se calcula sobre lo que se cobra en EFECTIVO. Pago único con un
   // medio de efectivo físico → el total; pago mixto → la parte en efectivo.
   const metodoEfectivo = useMemo(() => activeMethods.find((m) => m.isPhysicalCash) ?? null, [activeMethods])
   const enEfectivo = accountSale
     ? 0
     : mixedMode
-      ? Number(split.payments.find((p) => p.paymentMethodId === metodoEfectivo?.id)?.amount ?? 0)
+      ? Number(conRecargo(split.payments).find((p) => p.paymentMethodId === metodoEfectivo?.id)?.amount ?? 0)
       : selectedMethod?.isPhysicalCash
-        ? totalNum
+        ? totalACobrar
         : 0
   // ¿Este cobro lleva efectivo? (aunque todavía no haya productos cargados)
   const cobraEnEfectivo = !accountSale && (mixedMode ? metodoEfectivo != null : selectedMethod?.isPhysicalCash === true)
@@ -1410,17 +1456,18 @@ function PDV() {
     if (accountSale) return 0
     let sum = 0
     if (mixedMode) {
-      for (const p of split.payments) {
+      for (const p of conRecargo(split.payments)) {
         const pct = commissionByPct.get(p.paymentMethodId) ?? 0
         if (pct > 0) sum += (Number(p.amount) * pct) / 100
       }
     } else if (selectedMethod) {
       const pct = Number(selectedMethod.commissionPct)
-      if (pct > 0) sum += (totalNum * pct) / 100
+      if (pct > 0) sum += (totalACobrar * pct) / 100
     }
     return sum
-  }, [accountSale, mixedMode, split.payments, selectedMethod, commissionByPct, totalNum])
-  const netToCash = totalNum - commissionTotal
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountSale, mixedMode, split.payments, selectedMethod, commissionByPct, totalACobrar, recargos])
+  const netToCash = totalACobrar - commissionTotal
 
   // DESDE EL ACCESO REMOTO NO SE VENDE: el mostrador es el mostrador, y si se
   // pudiera cobrar desde afuera una tablet pasaría a ser una caja más sin
@@ -1630,9 +1677,9 @@ function PDV() {
     setCobroVueltoOpen(false)
     const monoPayments =
       !accountSale && !mixedMode && selectedMethod
-        ? [{ paymentMethodId: selectedMethod.id, amount: totalNum.toFixed(4) }]
+        ? [{ paymentMethodId: selectedMethod.id, amount: totalACobrar.toFixed(4) }]
         : null
-    const paymentsToSend = accountSale ? [] : (monoPayments ?? split.payments)
+    const paymentsToSend = accountSale ? [] : (monoPayments ?? conRecargo(split.payments))
     try {
       const result = await createSale.mutateAsync({
         type: voucherType,
@@ -1641,14 +1688,17 @@ function PDV() {
         payments: paymentsToSend,
         discount: globalDiscountAbs,
         notes: pedidoWebNotes,
-        lines: cart.map((l) => ({
-          articleId: l.article?.id,
-          description: l.article ? undefined : l.description,
-          quantity: parseCurrencyInput(l.quantity),
-          unitPrice: parseCurrencyInput(l.unitPrice),
-          discount: parseCurrencyInput(l.discount),
-          vatRate: l.vatRate,
-        })),
+        lines: [
+          ...cart.map((l) => ({
+            articleId: l.article?.id,
+            description: l.article ? undefined : l.description,
+            quantity: parseCurrencyInput(l.quantity),
+            unitPrice: parseCurrencyInput(l.unitPrice),
+            discount: parseCurrencyInput(l.discount),
+            vatRate: l.vatRate,
+          })),
+          ...lineasRecargo,
+        ],
       })
       // La venta YA quedó registrada y pegó en caja. Avisamos al operador y
       // reseteamos el form ANTES de imprimir: el aviso + el reset NO deben
@@ -1745,17 +1795,20 @@ function PDV() {
         type: voucherType,
         customerId: effectiveCustomerId,
         isAccountSale: false,
-        payments: [{ paymentMethodId: mpMethod.id, amount: totalNum.toFixed(4) }],
+        payments: [{ paymentMethodId: mpMethod.id, amount: totalACobrar.toFixed(4) }],
         discount: globalDiscountAbs,
         notes: mpPaymentId ? `MP Payment ID: ${mpPaymentId}` : null,
-        lines: cart.map((l) => ({
-          articleId: l.article?.id,
-          description: l.article ? undefined : l.description,
-          quantity: parseCurrencyInput(l.quantity),
-          unitPrice: parseCurrencyInput(l.unitPrice),
-          discount: parseCurrencyInput(l.discount),
-          vatRate: l.vatRate,
-        })),
+        lines: [
+          ...cart.map((l) => ({
+            articleId: l.article?.id,
+            description: l.article ? undefined : l.description,
+            quantity: parseCurrencyInput(l.quantity),
+            unitPrice: parseCurrencyInput(l.unitPrice),
+            discount: parseCurrencyInput(l.discount),
+            vatRate: l.vatRate,
+          })),
+          ...lineasRecargo,
+        ],
       })
       await api.mpQr.linkOrderToSale(orderId, result.sale.id).catch(() => {})
       if (pedidoWebId) {
@@ -2342,13 +2395,19 @@ function PDV() {
               <span className="tabular-nums">−{formatCurrency(globalDiscountAbs)}</span>
             </div>
           )}
+          {recargos.map((r) => (
+            <div key={r.paymentMethodId} className="flex justify-between text-xs text-muted-foreground" data-testid="recargo-medio">
+              <span>Recargo {r.nombre} {pctTexto(r.pct)} %</span>
+              <span className="tabular-nums">+{formatCurrency(r.importe.toFixed(4))}</span>
+            </div>
+          ))}
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{priceMode === 'gross' ? 'IVA contenido' : 'IVA'}</span>
-            <span className="tabular-nums">{formatCurrency(totals.vatAmount)}</span>
+            <span className="tabular-nums">{formatCurrency(totalesACobrar.vatAmount)}</span>
           </div>
           <div className="mt-1 flex items-baseline justify-between border-t pt-1">
             <span className="font-semibold">TOTAL</span>
-            <span className="text-2xl font-bold tabular-nums">{formatCurrency(totals.total)}</span>
+            <span className="text-2xl font-bold tabular-nums">{formatCurrency(totalesACobrar.total)}</span>
           </div>
         </div>
 
@@ -2462,7 +2521,7 @@ function PDV() {
               onClick={() => setQrModalOpen(true)}
             >
               <QrCode className="mr-2 h-5 w-5" />
-              Cobrar con QR MercadoPago — {formatCurrency(totals.total)}
+              Cobrar con QR MercadoPago — {formatCurrency(totalesACobrar.total)}
             </Button>
           )}
           {/* Opciones de venta: preferencias de esta caja, juntas en un recuadro
@@ -2503,7 +2562,7 @@ function PDV() {
             onClick={() => void confirmar()}
           >
             {createSale.isPending || procesando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wallet className="h-5 w-5" />}
-            Confirmar venta (F2) — {formatCurrency(totals.total)}
+            Confirmar venta (F2) — {formatCurrency(totalesACobrar.total)}
           </Button>
           <div className="flex gap-1.5">
             <Button
@@ -2542,7 +2601,7 @@ function PDV() {
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <span className="text-sm text-muted-foreground">Total de la venta</span>
-              <span className="text-2xl font-bold tabular-nums">{formatCurrency(totals.total)}</span>
+              <span className="text-2xl font-bold tabular-nums">{formatCurrency(totalesACobrar.total)}</span>
             </div>
             {mixedMode && (
               <div className="flex items-baseline justify-between">
@@ -2665,7 +2724,7 @@ function PDV() {
       {qrModalOpen && currentCashRegisterId && (
         <CobroQrModal
           open={qrModalOpen}
-          amount={totals.total}
+          amount={totalesACobrar.total}
           cashRegisterId={currentCashRegisterId}
           description={`Venta ${voucherType} #${numberQuery.data?.number ?? '?'}`}
           onApproved={(orderId, mpPaymentId) => void confirmarConQrAprobado(orderId, mpPaymentId)}

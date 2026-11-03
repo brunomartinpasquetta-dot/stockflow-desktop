@@ -4023,9 +4023,10 @@
       "que es el neto a recibir",
       "comision qr",
       "cuanto me queda despues de la comision",
-      "el sistema me descuenta comision"
+      "el sistema me descuenta comision",
+      "recargo o comision"
      ],
-     "answer": "Cuando cobrás con tarjeta o QR, esas empresas te cobran una comisión a vos. StockFlow te muestra un cuadrito informativo en la pantalla de Ventas con cuánto es esa comisión y cuánto te queda neto. Importante: al cliente no le cambia nada, él paga el total normal; es información para vos.",
+     "answer": "Cuando cobrás con tarjeta o QR, esas empresas te cobran una comisión a vos. StockFlow te muestra un cuadrito informativo en la pantalla de Ventas con cuánto es esa comisión y cuánto te queda neto. Importante: al cliente no le cambia nada, él paga el total normal; es información para vos. Si lo que quiere es cobrarle un porcentaje de más al cliente por usar ese medio, eso es el 'Recargo %' del medio de pago, no la comisión.",
      "steps": []
     },
     {
@@ -6285,9 +6286,10 @@
       "por que aparece una comision",
       "el cliente paga la comision",
       "costo del medio de pago",
-      "le cobro mas por la tarjeta"
+      "le cobro mas por la tarjeta",
+      "recargo o comision"
      ],
-     "answer": "Ese recuadro amarillo te avisa cuánto te descuenta la tarjeta u otro medio de pago por esa venta. Es solo información para vos: al cliente NO se le cobra de más, paga el total normal.",
+     "answer": "Ese recuadro amarillo te avisa cuánto te descuenta la tarjeta u otro medio de pago por esa venta. Es solo información para vos: al cliente NO se le cobra de más, paga el total normal. Si lo que quiere es cobrarle un porcentaje de más al cliente por usar ese medio, eso es el 'Recargo %' del medio de pago, no la comisión.",
      "steps": [
       "Primero abrí Ventas: apretá la tecla F5, o hacé clic en el botón 'Ventas' (ícono de un carrito) en la barra de íconos de arriba. Se abre la pantalla de Ventas.",
       "Elegí una forma de pago que tenga comisión cargada (por ejemplo, una tarjeta con 2,5%).",
@@ -7353,9 +7355,10 @@
       "comision en naranja",
       "descuento por medio de pago",
       "fee de tarjeta",
-      "numero naranja en la caja"
+      "numero naranja en la caja",
+      "recargo o comision"
      ],
-     "answer": "La comisión es lo que vos como comercio perdés por cobrar con ciertos medios (por ejemplo, lo que te descuenta el posnet). El sistema la calcula solo en cada venta, según cómo esté configurado ese medio de pago. En la tabla 'Desglose por medio de pago' la ves en la columna 'Comisión', en color naranja y con un signo menos: no es plata que entra, es plata que se va. Por ejemplo, si vendés $1000 con una tarjeta que tiene 2% de comisión, ahí aparece '− $20'. Si querés cambiar el porcentaje, eso se configura en 'Gestión' > 'Medios de Pago' (lo maneja el administrador o encargado).",
+     "answer": "La comisión es lo que vos como comercio perdés por cobrar con ciertos medios (por ejemplo, lo que te descuenta el posnet). El sistema la calcula solo en cada venta, según cómo esté configurado ese medio de pago. En la tabla 'Desglose por medio de pago' la ves en la columna 'Comisión', en color naranja y con un signo menos: no es plata que entra, es plata que se va. Por ejemplo, si vendés $1000 con una tarjeta que tiene 2% de comisión, ahí aparece '− $20'. Si querés cambiar el porcentaje, eso se configura en 'Gestión' > 'Medios de Pago' (lo maneja el administrador o encargado). Si lo que quiere es cobrarle un porcentaje de más al cliente por usar ese medio, eso es el 'Recargo %' del medio de pago, no la comisión.",
      "steps": []
     },
     {
@@ -11189,6 +11192,33 @@
       "label": "Abrir Configuración",
       "screen": "configuracion"
      }
+    },
+    {
+     "id": "recargo-medio-pago",
+     "canonical": "¿Cómo le cobro un recargo al cliente que paga con tarjeta?",
+     "patterns": [
+      "recargo por tarjeta",
+      "cobrar mas por tarjeta",
+      "recargo medio de pago",
+      "recargo tarjeta de credito",
+      "sumar un porcentaje al que paga con tarjeta",
+      "cobrar 10 por ciento mas con tarjeta",
+      "recargo en ventas",
+      "el cliente paga el recargo",
+      "que es el recargo",
+      "diferencia entre comision y recargo",
+      "cobrar recargo",
+      "recargo por pagar con credito"
+     ],
+     "answer": "En 'Gestión' → 'Medios de pago', cada medio tiene el campo 'Recargo %'. Es un porcentaje que paga el CLIENTE por usar ese medio: si pone 10 % en Tarjeta de crédito, una venta de $100 cobrada con tarjeta sale $110. En Ventas, al elegir ese medio, el recargo aparece antes de cobrar y se suma al total como un renglón más («Recargo Tarjeta de crédito 10 %»), así figura en el ticket, en la factura y en la caja. Es distinto de la 'Comisión %', que es lo que el medio le descuenta al comercio y no se le cobra al cliente. Viene en 0 en todos los medios.",
+     "steps": [
+      "Arriba haga clic en el menú 'Gestión' y después en 'Medios de pago'.",
+      "Elija el medio (por ejemplo, Tarjeta de crédito) y toque el lápiz para modificarlo.",
+      "En 'Recargo % (lo paga el cliente)' escriba el porcentaje, por ejemplo 10, y guarde.",
+      "En Ventas, al elegir ese medio, abajo del subtotal aparece 'Recargo Tarjeta de crédito 10 %' con el importe, y el TOTAL ya lo incluye.",
+      "Con pago mixto, el recargo se aplica sólo a la parte que se paga con ese medio.",
+      "Para dejar de cobrarlo, vuelva a poner 0."
+     ]
     }
    ]
   },
