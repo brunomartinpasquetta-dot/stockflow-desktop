@@ -1526,6 +1526,15 @@ def _migrar_cuerpo(con, hay: set, sq: sqlite3.Connection, rep: "Reporte", ahora:
         # milésimos): como deuda dejaba la cuenta "abierta" por nada.
         if abs(saldo) < Decimal("0.01"):
             saldo = Decimal(0)
+        # El TOTAL de StockFácil puede venir ya neto de las entregas (Paranacito,
+        # nov-2026: total 98.400 = saldo, con 512.300 de entregas colgadas). Como
+        # las entregas viajan como pagos, el total tiene que ser la deuda ANTES
+        # de ellas; si no, el estado de cuenta las descuenta dos veces.
+        entregas_cta = sum((Decimal(dec(pg["ENTREGA"] or 0)) for pg in pagos_cta.get(r["IDCUENTA"], [])), Decimal(0))
+        if total_cta + Decimal("0.005") < saldo + entregas_cta:
+            rep.aviso(f"cuenta {r['IDCUENTA']}: total {total_cta} menor que saldo + entregas "
+                      f"({saldo} + {entregas_cta}); el saldo inicial pasa a {saldo + entregas_cta}")
+            total_cta = saldo + entregas_cta
         # Se migran TODAS las cuentas, también las saldadas: el comercio quiere
         # ver el historial del cliente aunque hoy no deba nada.
         if total_cta <= 0 and saldo <= 0 and not lineas_cta.get(r["IDCUENTA"]):

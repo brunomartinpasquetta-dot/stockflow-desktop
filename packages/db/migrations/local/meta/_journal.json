@@ -309,6 +309,13 @@
       "when": 1786725687291,
       "tag": "0044_recargo_medio_de_pago",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1786725687541,
+      "tag": "0045_saldo_inicial_stockfacil",
+      "breakpoints": true
     }
   ]
 }

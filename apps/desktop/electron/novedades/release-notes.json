@@ -2,6 +2,14 @@
   "_doc": "Novedades mostradas al cliente tras actualizar. Se completan A MANO en cada release, en lenguaje de comerciante y tono formal (sin tutear). 'novedades' = solo cambios VISIBLES (pantallas, funciones); las correcciones de errores NUNCA se detallan: se marca 'internas': true y la app muestra una frase genérica. Si una versión no tiene novedades visibles, se deja 'novedades': [] y no genera ventana por sí sola.",
   "versiones": [
     {
+      "version": "1.18.6",
+      "novedades": [
+        "Cuentas corrientes traídas de StockFácil: el estado de cuenta y el Resumen PDF descontaban dos veces las entregas de dinero registradas en StockFácil (el saldo renglón a renglón quedaba en negativo, aunque el saldo adeudado era el correcto). Ahora el saldo inicial es la deuda anterior a esas entregas y la cuenta cierra renglón a renglón. El saldo adeudado, la caja y las ventas hechas en StockFlow no cambian.",
+        "En el estado de cuenta, ese saldo inicial se llama «Saldo de cuenta corriente traído de StockFácil» en lugar de «Venta X #…»."
+      ],
+      "internas": false
+    },
+    {
       "version": "1.18.5",
       "novedades": [
         "Cuentas Corrientes → Resumen PDF: el resumen que se le manda al cliente ahora lista las entregas de dinero una por una, con la fecha y el medio de pago, y muestra el saldo después de cada movimiento (columnas Compras, Entregas y Saldo). Hasta ahora las entregas iban sólo sumadas en una línea.",

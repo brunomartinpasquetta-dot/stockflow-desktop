@@ -9883,6 +9883,18 @@
      "answer": "Sí: el «Resumen PDF» abre cada venta en sus artículos (cantidad, descripción, precio e importe) y lista las entregas de dinero una por una, con fecha y medio de pago, con el saldo después de cada movimiento (columnas Compras, Entregas y Saldo). Una entrega anulada aparece marcada. Abajo van los totales y el SALDO ADEUDADO, que es el saldo real de la cuenta (0 si no debe). Se genera desde Cuentas Corrientes → detalle del cliente → Resumen PDF."
     },
     {
+     "id": "cc-saldo-inicial-stockfacil",
+     "canonical": "¿Qué es el «Saldo de cuenta corriente traído de StockFácil» en el estado de cuenta?",
+     "patterns": [
+      "saldo traido de stockfacil",
+      "saldo inicial stockfacil cuenta corriente",
+      "resumen de cuenta saldo negativo",
+      "el estado de cuenta descuenta dos veces las entregas",
+      "venta x saldo inicial migracion"
+     ],
+     "answer": "Es la deuda que el cliente traía de StockFácil el día de la migración, antes de las entregas de dinero que también se trajeron de allá. Figura como primer renglón del estado de cuenta y del Resumen PDF, y las entregas registradas en StockFácil se descuentan de ese saldo; así la cuenta cierra renglón a renglón con el saldo adeudado. Hasta la 1.18.5 ese saldo venía ya neto de esas entregas y el estado de cuenta las descontaba dos veces (quedaba en negativo); la 1.18.6 lo corrige sola al abrir. El saldo adeudado, la caja y las ventas hechas en StockFlow no cambian."
+    },
+    {
      "id": "cc-boton-cobrar-periodo-bloqueado",
      "canonical": "¿Por qué el botón 'Cobrar período' está gris o no se habilita?",
      "patterns": [

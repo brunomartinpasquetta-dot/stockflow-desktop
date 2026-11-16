@@ -126,6 +126,19 @@ export interface AccountReceivableDetail {
   payments: AccountDetailPayment[];
 }
 
+/**
+ * Cómo se nombra el comprobante en el estado de cuenta. La venta sintética
+ * que arma la migración de StockFácil («Saldo … StockFácil» en las notas) no
+ * es una venta: es la deuda que el cliente traía; nombrarla «Venta X #4» en el
+ * resumen que recibe el cliente lo confunde.
+ */
+function referenciaDe(sale: Sale): string {
+  const esSaldoInicial = /^Saldo.*StockFácil/.test(sale.notes ?? '');
+  return esSaldoInicial
+    ? `Saldo de cuenta corriente traído de StockFácil (${sale.type} #${sale.number})`
+    : `Venta ${sale.type} #${sale.number}`;
+}
+
 export class AccountsReceivableService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -299,7 +312,7 @@ export class AccountsReceivableService {
         articles,
         date: ac.createdAt,
         kind: 'sale',
-        reference: sale ? `Venta ${sale.type} #${sale.number}` : `Cuenta ${ac.id}`,
+        reference: sale ? referenciaDe(sale) : `Cuenta ${ac.id}`,
         debit: ac.total,
         credit: '0.0000',
         saleId: ac.saleId,
