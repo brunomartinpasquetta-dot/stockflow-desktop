@@ -203,7 +203,6 @@ async function main(): Promise<void> {
     check(!/NO se listan una por una/.test(manual) && /se listan una por una, con la fecha/.test(manual), 'el manual ya no dice que las entregas no se listan');
     const intents = readFileSync(join(raiz, 'electron/assistant/intents.json'), 'utf8');
     check(!/van sumadas en una sola línea/.test(intents) && /lista las entregas de dinero una por una/.test(intents), 'la ficha de Flowy dice que las lista');
-    check(readFileSync(join(raiz, 'package.json'), 'utf8').includes('"version": "1.18.5"'), 'versión 1.18.5');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
