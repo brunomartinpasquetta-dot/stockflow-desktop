@@ -2308,10 +2308,10 @@
      ]
     },
     {
-     "heading": "Resumen de cuenta en PDF: detalle por producto",
+     "heading": "Resumen de cuenta en PDF: compras, entregas y saldo",
      "paragraphs": [
       "El «Resumen PDF» que se le manda al cliente abre cada venta en SUS ARTÍCULOS: cantidad, descripción, precio unitario e importe, en renglones grises debajo del comprobante. El cliente ve qué se le cobra, no sólo un número de venta.",
-      "Las entregas de dinero NO se listan una por una: van sumadas en una línea (Compras · Entregas a cuenta), y abajo el SALDO ADEUDADO, que es el saldo real de la cuenta — 0 si no debe.",
+      "Las entregas de dinero se listan una por una, con la fecha y el medio de pago, y cada renglón muestra el saldo que quedó después (columnas Compras, Entregas y Saldo). Una entrega anulada aparece marcada y su anulación es otro renglón. Abajo van los totales (Compras · Entregas a cuenta · Devoluciones) y el SALDO ADEUDADO, que es el saldo real de la cuenta — 0 si no debe.",
       "El buscador de la pantalla filtra por nombre o teléfono y se limpia al volver del detalle."
      ],
      "steps": [],

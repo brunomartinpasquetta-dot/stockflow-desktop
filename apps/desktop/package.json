@@ -1,7 +1,7 @@
 {
   "name": "@stockflow/desktop",
   "private": true,
-  "version": "1.18.4",
+  "version": "1.18.5",
   "type": "module",
   "main": "dist-electron/main.mjs",
   "scripts": {
@@ -59,6 +59,7 @@
     "test:contabilidad-listados": "tsx electron/__tests__/contabilidad-listados.smoke.ts",
     "test:fiscal-pv": "tsx electron/__tests__/fiscal-pv.smoke.ts",
     "test:recargo-medio-pago": "tsx electron/__tests__/recargo-medio-pago.smoke.ts",
+    "test:resumen-cuenta-entregas": "tsx electron/__tests__/resumen-cuenta-entregas.smoke.ts",
     "test:ventas-lector": "tsx electron/__tests__/ventas-lector.smoke.ts",
     "test:devolucion-items": "tsx electron/__tests__/devolucion-items.smoke.ts",
     "test:imprimir-ticket": "tsx electron/__tests__/imprimir-ticket.smoke.ts",

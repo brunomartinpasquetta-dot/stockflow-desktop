@@ -31,9 +31,14 @@ const nombreDe = (c: StatementDocData['customer']): string =>
 
 function etiqueta(e: StatementEntryDTO): string {
   if (e.kind === 'payment') {
-    return e.paymentMethodName ? `Entrega — ${e.paymentMethodName}` : 'Entrega de dinero'
+    const base = e.paymentMethodName ? `Entrega — ${e.paymentMethodName}` : 'Entrega de dinero'
+    return e.voided ? `${base} (anulada)` : base
   }
-  if (e.kind === 'return') return `Devolución ${e.reference}`.trim()
+  // La anulación vuelve a cargar la deuda: para el cliente es la entrega que se
+  // deshizo, con el motivo si lo hay.
+  if (e.kind === 'void') return e.reference.replace(/^Anulación de cobranza/, 'Anulación de entrega')
+  // `reference` ya dice «Devolución DEV #N».
+  if (e.kind === 'return') return e.reference || 'Devolución'
   return e.reference || 'Comprobante'
 }
 
@@ -97,21 +102,31 @@ export function exportStatementPdf(data: StatementDocData): void {
   // comprobante. Un resumen que sólo dice "Venta B #1234 — $48.500" no le sirve
   // al cliente que pregunta qué se le está cobrando, que es justo cuando pide
   // el resumen. Los importes de esos renglones van en la columna de detalle:
-  // las columnas Debe/Haber/Saldo son sólo del comprobante, para que la cuenta
-  // siga cerrando.
-  // El PDF que se le manda al cliente NO lista las entregas una por una:
-  // pedido del comercio (19-ago-2026). Al cliente le interesa qué compró y
-  // cuánto debe; el historial de pagos queda en pantalla. La cuenta igual
-  // cierra a la vista: "Compras − Entregas = Saldo" va abajo, con el total de
-  // entregas sumado.
-  const visibles = data.entries.filter((e) => e.kind !== 'payment')
-  const body: (string | { content: string; styles?: Record<string, unknown> })[][] = []
-  for (const e of visibles) {
+  // las columnas Compras/Entregas/Saldo son sólo del movimiento, para que la
+  // cuenta siga cerrando.
+  // Las ENTREGAS van listadas una por una, con fecha y medio de pago, y el
+  // saldo después de cada movimiento (Bruno, 12-nov-2026: «que se incluyan las
+  // entregas que realizó el cliente»). Hasta la 1.18.4 iban sólo sumadas abajo,
+  // por un pedido de un comercio de ago-2026; el cliente que recibe el resumen
+  // quiere ver también qué pagó y cuándo, y así la cuenta cierra renglón a
+  // renglón. Una entrega anulada se muestra marcada y su anulación es otro
+  // renglón: la cuenta queda igual que en pantalla.
+  type Celda = string | { content: string; styles?: Record<string, unknown> }
+  const body: Celda[][] = []
+  for (const e of data.entries) {
+    const apagada = e.kind === 'payment' && e.voided
+    const fila = (texto: string): Celda => (apagada ? { content: texto, styles: { textColor: 150 } } : texto)
+    // La anulación de una entrega va en la columna Entregas, en negativo: bajo
+    // «Compras» el cliente la leería como algo que se le cobró.
+    // El signo va adelante a mano: según el sistema, Intl escribe «$-2.000,00».
+    const colCompras = e.kind === 'void' ? '' : Number(e.debit) ? formatCurrency(e.debit) : ''
+    const colEntregas = e.kind === 'void' ? `-${formatCurrency(e.debit)}` : Number(e.credit) ? formatCurrency(e.credit) : ''
     body.push([
-      formatDate(e.date),
-      etiqueta(e),
-      Number(e.debit) ? formatCurrency(e.debit) : '',
-      Number(e.credit) ? formatCurrency(e.credit) : '',
+      fila(formatDate(e.date)),
+      fila(etiqueta(e)),
+      fila(colCompras),
+      fila(colEntregas),
+      fila(formatCurrency(e.runningBalance)),
     ])
     for (const a of e.articles ?? []) {
       const cant = Number(a.quantity)
@@ -124,35 +139,47 @@ export function exportStatementPdf(data: StatementDocData): void {
         },
         '',
         '',
+        '',
       ])
     }
   }
   if (data.range && Math.abs(saldoAnterior) > 0.005) {
-    body.unshift(['', 'Saldo anterior', formatCurrency(String(saldoAnterior)), ''])
+    body.unshift(['', 'Saldo anterior', '', '', formatCurrency(String(saldoAnterior))])
   }
 
   autoTable(doc, {
     startY: y + 5,
-    head: [['Fecha', 'Detalle', 'Compras', 'Devoluciones']],
+    head: [['Fecha', 'Detalle', 'Compras', 'Entregas', 'Saldo']],
     body,
     styles: { fontSize: 8.5, cellPadding: 1.6 },
     headStyles: { fillColor: [27, 82, 204] },
     columnStyles: {
       0: { cellWidth: 20 },
-      2: { halign: 'right', cellWidth: 30 },
-      3: { halign: 'right', cellWidth: 30 },
+      2: { halign: 'right', cellWidth: 27 },
+      3: { halign: 'right', cellWidth: 27 },
+      4: { halign: 'right', cellWidth: 29 },
     },
     margin: { left: 14, right: 10 },
   })
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
 
-  const cargos = data.entries.reduce((a, e) => a + Number(e.debit), 0)
-  const entregas = data.entries.reduce((a, e) => a + Number(e.credit), 0)
+  // Totales del período listado. Las entregas van NETAS de anulaciones y las
+  // devoluciones aparte, así Compras − Entregas − Devoluciones = Saldo cierra
+  // con lo que se ve arriba.
+  const suma = (f: (e: StatementEntryDTO) => number) => data.entries.reduce((a, e) => a + f(e), 0)
+  const compras = suma((e) => (e.kind === 'sale' ? Number(e.debit) : 0))
+  const entregas =
+    suma((e) => (e.kind === 'payment' ? Number(e.credit) : 0)) - suma((e) => (e.kind === 'void' ? Number(e.debit) : 0))
+  const devoluciones = suma((e) => (e.kind === 'return' ? Number(e.credit) : 0))
   doc.setFontSize(9).setFont('helvetica', 'normal')
-  // Las entregas van SUMADAS en una línea, no listadas: así la cuenta cierra a
-  // la vista (Compras − Entregas = Saldo) sin exponer el historial de pagos.
   doc.text(
-    `Compras: ${formatCurrency(String(cargos))}   ·   Entregas a cuenta: ${formatCurrency(String(entregas))}`,
+    [
+      `Compras: ${formatCurrency(String(compras))}`,
+      `Entregas a cuenta: ${formatCurrency(String(entregas))}`,
+      devoluciones > 0.005 ? `Devoluciones: ${formatCurrency(String(devoluciones))}` : '',
+    ]
+      .filter(Boolean)
+      .join('   ·   '),
     14,
     y,
   )

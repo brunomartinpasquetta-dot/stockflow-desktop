@@ -9869,15 +9869,18 @@
     },
     {
      "id": "resumen-detalle-productos",
-     "canonical": "¿El resumen de cuenta muestra qué compró el cliente?",
+     "canonical": "¿El resumen de cuenta muestra qué compró y qué entregó el cliente?",
      "patterns": [
       "resumen de cuenta productos",
       "pdf cuenta corriente detalle",
       "que compro el cliente resumen",
       "resumen para mandar al cliente",
-      "estado de cuenta pdf"
+      "estado de cuenta pdf",
+      "resumen de cuenta entregas",
+      "el pdf no muestra los pagos del cliente",
+      "resumen con las entregas del cliente"
      ],
-     "answer": "Sí: el «Resumen PDF» abre cada venta en sus artículos (cantidad, descripción, precio e importe). Las entregas de dinero van sumadas en una sola línea y abajo está el SALDO ADEUDADO, que es el saldo real de la cuenta (0 si no debe). Se genera desde Cuentas Corrientes → detalle del cliente → Resumen PDF."
+     "answer": "Sí: el «Resumen PDF» abre cada venta en sus artículos (cantidad, descripción, precio e importe) y lista las entregas de dinero una por una, con fecha y medio de pago, con el saldo después de cada movimiento (columnas Compras, Entregas y Saldo). Una entrega anulada aparece marcada. Abajo van los totales y el SALDO ADEUDADO, que es el saldo real de la cuenta (0 si no debe). Se genera desde Cuentas Corrientes → detalle del cliente → Resumen PDF."
     },
     {
      "id": "cc-boton-cobrar-periodo-bloqueado",

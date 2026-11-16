@@ -167,7 +167,7 @@ const ventas = readFileSync(join(raiz, 'src', 'pages', 'Ventas.tsx'), 'utf8');
 check(!existsSync(join(raiz, 'src', 'lib', 'enterConfirma.ts')), 'lib/enterConfirma.ts ya no existe');
 check(!/enterConfirma|enterDebeConfirmar|destinoDelEnter/.test(ventas.replace(/\/\/.*$/gm, '')), 'Ventas ya no usa la lógica de «Enter confirma la venta»');
 check(!ventas.includes('Enter confirma la venta</span>'), 'la casilla «Enter confirma la venta» ya no está');
-check(ventas.includes('Confirmar venta (F2) — {formatCurrency(totals.total)}'), 'el botón verde dice «Confirmar venta (F2)»');
+check(ventas.includes('Confirmar venta (F2) — {formatCurrency(totalesACobrar.total)}'), 'el botón verde dice «Confirmar venta (F2)»');
 check(!ventas.includes('Confirmar venta (Enter)'), 'la pantalla de vuelto ya no dice «(Enter)»');
 check(/if \(e\.key === 'Enter'\) commitBarcode\(\)/.test(ventas), 'en el buscador, Enter sólo carga el artículo');
 
